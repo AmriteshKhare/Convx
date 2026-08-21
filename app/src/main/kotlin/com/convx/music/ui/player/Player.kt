@@ -225,6 +225,7 @@ import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.Lyrics
 import com.convx.music.ui.component.PlayerSliderTrack
 import com.convx.music.ui.component.ResizableIconButton
+import com.convx.music.ui.utils.resize
 import com.convx.music.ui.player.customize.DiyDesignCanvas
 import com.convx.music.ui.player.customize.DiyOrientation
 import com.convx.music.ui.player.customize.DiyStickerLayer
@@ -1533,7 +1534,7 @@ fun BottomSheetPlayer(
                                     ) {
                                         AsyncImage(
                                             model = ImageRequest.Builder(context)
-                                                .data(thumbnailUrl)
+                                                .data(thumbnailUrl.resize(1200, 1200))
                                                 .size(CoilSize.ORIGINAL)
                                                 .crossfade(true)
                                                 .build(),

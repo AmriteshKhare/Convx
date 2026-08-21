@@ -118,8 +118,14 @@ fun PlayerContainerMorphOverlay(
                         // Under both recordings: the pill's own glass stayed behind in the
                         // nav bar, and the full player's background only reaches full opacity
                         // at the handoff, so without this the first frames are see-through.
+                        // Faded on the SAME curve the mini layer fades on (not flat): the full
+                        // player's own recording is opaque by the handoff, so this plate would
+                        // otherwise sit fully opaque behind it for the rest of the flight --
+                        // and real glass is translucent by design, so for that whole back
+                        // stretch it was compositing against this flat plate instead of the
+                        // live scene, reading as dead/dark instead of glassy.
                         drawRect(
-                            color = color,
+                            color = color.copy(alpha = color.alpha * playerSheetBarAlpha(fraction)),
                             topLeft = Offset(rect.left, rect.top),
                             size = Size(rect.width, rect.height),
                         )

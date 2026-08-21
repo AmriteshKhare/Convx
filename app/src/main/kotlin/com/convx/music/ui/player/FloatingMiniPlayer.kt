@@ -63,6 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.size.Size as CoilSize
+import androidx.compose.ui.platform.LocalContext
 import com.convx.music.LocalListenTogetherManager
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
@@ -79,6 +82,7 @@ import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.ui.component.ScrollingWaveformSeekBar
 import com.convx.music.ui.component.rememberPlaybackFraction
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
+import com.convx.music.ui.utils.resize
 import com.convx.music.utils.rememberPreference
 import kotlin.math.abs
 import kotlin.math.exp
@@ -114,6 +118,7 @@ fun FloatingMiniPlayer(
     onQueueClick: (() -> Unit)? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    val context = LocalContext.current
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
     val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsStateWithLifecycle()
@@ -299,7 +304,14 @@ fun FloatingMiniPlayer(
         ) {
             if (isInline) {
                 AsyncImage(
-                    model = mediaMetadata?.thumbnailUrl,
+                    // Same URL AND decode size as PlayerArtworkMorphOverlay and the
+                    // full player's own artwork -- one shared Coil cache entry for
+                    // all three, so the pill, the flying cover, and the handoff
+                    // target are pixel-identical (no re-decode pop between them).
+                    model = ImageRequest.Builder(context)
+                        .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
+                        .size(CoilSize.ORIGINAL)
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     placeholder = painterResource(R.drawable.thumbnail_fallback),
@@ -361,7 +373,14 @@ fun FloatingMiniPlayer(
                 val waveformSeed = remember(mediaMetadata?.id) { mediaMetadata?.id?.hashCode() ?: 0 }
 
                 AsyncImage(
-                    model = mediaMetadata?.thumbnailUrl,
+                    // Same URL AND decode size as PlayerArtworkMorphOverlay and the
+                    // full player's own artwork -- one shared Coil cache entry for
+                    // all three, so the pill, the flying cover, and the handoff
+                    // target are pixel-identical (no re-decode pop between them).
+                    model = ImageRequest.Builder(context)
+                        .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
+                        .size(CoilSize.ORIGINAL)
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     placeholder = painterResource(R.drawable.thumbnail_fallback),
@@ -515,7 +534,14 @@ fun FloatingMiniPlayer(
                 Spacer(Modifier.width(8.dp))
 
                 AsyncImage(
-                    model = mediaMetadata?.thumbnailUrl,
+                    // Same URL AND decode size as PlayerArtworkMorphOverlay and the
+                    // full player's own artwork -- one shared Coil cache entry for
+                    // all three, so the pill, the flying cover, and the handoff
+                    // target are pixel-identical (no re-decode pop between them).
+                    model = ImageRequest.Builder(context)
+                        .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
+                        .size(CoilSize.ORIGINAL)
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     placeholder = painterResource(R.drawable.thumbnail_fallback),

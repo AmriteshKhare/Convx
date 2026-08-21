@@ -28,6 +28,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Size as CoilSize
+import com.convx.music.ui.utils.resize
 
 /**
  * Registered bounds of the mini player's own artwork and the full player's own artwork,
@@ -164,8 +165,13 @@ fun PlayerArtworkMorphOverlay(
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(thumbnailUrl)
-                .size(CoilSize(full.width.toInt(), full.height.toInt()))
+                // Same URL AND same decode size as every real player artwork
+                // (Thumbnail.kt, Player.kt's APPLE_MUSIC layer, the mini pill
+                // below) -- Coil then serves the identical cached bitmap at the
+                // handoff instead of decoding a second one sized to this box,
+                // which was the one-frame pop once the flight ended.
+                .data(thumbnailUrl.resize(1200, 1200))
+                .size(CoilSize.ORIGINAL)
                 .crossfade(false)
                 .build(),
             contentDescription = null,
