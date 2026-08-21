@@ -7,6 +7,7 @@ package com.convx.music.ui.screens
 
 import android.app.Activity
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,6 +23,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.navigation.NamedNavArgument
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
@@ -30,6 +34,11 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.dialog
 import androidx.navigation.navArgument
+import com.convx.music.constants.DarkModeKey
+import com.convx.music.constants.PureBlackKey
+import com.convx.music.ui.screens.settings.DarkMode
+import com.convx.music.utils.rememberEnumPreference
+import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.utils.LocalNavAnimatedVisibilityScope
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
@@ -53,6 +62,7 @@ import com.convx.music.ui.screens.playlist.LocalPlaylistScreen
 import com.convx.music.ui.screens.playlist.OnlinePlaylistScreen
 import com.convx.music.ui.screens.playlist.TopPlaylistScreen
 import com.convx.music.ui.screens.search.OnlineSearchResult
+import com.convx.music.ui.screens.search.SearchScreen
 import com.convx.music.ui.screens.settings.AboutScreen
 import com.convx.music.ui.screens.settings.AppearanceSettings
 import com.convx.music.ui.screens.settings.CanvasSelection
@@ -110,6 +120,24 @@ fun NavGraphBuilder.navigationBuilder(
     // in this file.
     sharedComposable(Screens.Home.route) {
         HomeScreen(navController = navController, snackbarHostState = snackbarHostState)
+    }
+
+    // A plain destination again, not an overlay layered above the tabs -- see the
+    // comment at its LaunchedEffect(Unit)/enterSearch site in MainActivity.kt for why.
+    composable(Screens.Search.route) {
+        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
+        val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
+        val isSystemInDarkTheme = isSystemInDarkTheme()
+        val useDarkTheme = remember(darkTheme, isSystemInDarkTheme) {
+            if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
+        }
+        val pureBlack = remember(pureBlackEnabled, useDarkTheme) {
+            pureBlackEnabled && useDarkTheme
+        }
+        SearchScreen(
+            navController = navController,
+            pureBlack = pureBlack,
+        )
     }
 
     // Only ever reachable as a tab while local-only mode is on (see Screens.mainScreens),

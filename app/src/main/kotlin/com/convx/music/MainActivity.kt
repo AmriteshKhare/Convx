@@ -152,7 +152,6 @@ import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberNavTransitionFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberPagerTransitionFreeze
-import com.convx.music.ui.screens.search.SearchScreen
 import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.utils.LocalSharedTransitionScope
 import com.convx.music.ui.utils.markSharedArtworkSource
@@ -1090,61 +1089,36 @@ class MainActivity : ComponentActivity() {
                     Timber.tag("Navigation").d("route -> $currentRoute")
                 }
 
-                /**
-                 * Search is an overlay drawn above the pager, not one of its pages.
-                 *
-                 * It was a page, at index 1 -- between Home and Library -- while the bar
-                 * has always drawn it as the standalone circle on the far right. Opening
-                 * search therefore slid the pager sideways past a tab, and every real tab
-                 * switch slid past search. Neither matched what the bar showed. Making it
-                 * a page at the END instead would have cost two intervening pages'
-                 * composition on the way there, so it is not a page at all: the pager is
-                 * exactly the three tabs the bar draws, and search opens in place over
-                 * them for zero page travel.
-                 */
-                var searchOverlayOpen by rememberSaveable { mutableStateOf(openSearchOnLaunch) }
-
-                // Home/Library/Settings are real NavHost destinations again, so
-                // currentRoute already IS the tab route -- no pager-page lookup needed.
-                // The only thing layered on top is search, which is an overlay rather
-                // than a destination, so nothing in the back stack reports it; every
-                // "which tab is this" check downstream (search-mode detection, top-bar
-                // visibility, the nav bar's puck) still wants to hear "we are in
-                // search" while the overlay is up, so answer for it here.
-                val effectiveRoute by remember {
-                    derivedStateOf {
-                        if (searchOverlayOpen) Screens.Search.route else currentRoute
+                // Search is a plain NavHost destination again (Screens.Search.route),
+                // not an overlay layered above the tabs. It was made an overlay to
+                // dodge the main-tabs pager (search would have had to be a page,
+                // sliding through Library on the way in/out); the pager itself was
+                // reverted back to plain destinations and search was left behind as
+                // an overlay, which is what caused the stale-backdrop/hidden-results/
+                // hidden-suggestion-navigation bugs (a tap inside search pushed a
+                // real destination, but the overlay Box stayed on top holding its
+                // last frame, sampled by the nav bar's glass and hiding the pushed
+                // screen). Being a real destination again fixes all of it for free --
+                // the same NavHost/backdrop machinery every other screen already uses.
+                LaunchedEffect(Unit) {
+                    if (openSearchOnLaunch) {
+                        navController.navigate(Screens.Search.route) { launchSingleTop = true }
                     }
                 }
+
+                val effectiveRoute = currentRoute
 
                 val inSearchScreen by remember {
                     derivedStateOf {
                         currentRoute?.startsWith("search/") == true ||
-                            effectiveRoute == Screens.Search.route
+                            currentRoute == Screens.Search.route
                     }
                 }
                 val inSearchInputScreen by remember {
-                    derivedStateOf { effectiveRoute == Screens.Search.route }
+                    derivedStateOf { currentRoute == Screens.Search.route }
                 }
                 LaunchedEffect(inSearchScreen) {
                     if (!inSearchScreen) searchKeyboardActive = false
-                }
-                // A tap inside the search overlay (a recommendation, a result, a
-                // suggestion) pushes a real NavHost destination but never told the
-                // overlay to close -- it stayed open, on top, holding its last
-                // composed frame. That stale frame is what the nav bar's glass
-                // sampled instead of the new screen, and it also kept searchModeActive
-                // true, so system back replayed the search-collapse animation instead
-                // of popping the pushed destination. Closing here, the moment the
-                // route actually leaves the overlay's own footprint, covers every tap
-                // site at once instead of wiring onDismiss through each one.
-                LaunchedEffect(currentRoute) {
-                    if (searchOverlayOpen &&
-                        currentRoute !in TabRootRoutes &&
-                        currentRoute?.startsWith("search/") != true
-                    ) {
-                        searchOverlayOpen = false
-                    }
                 }
                 // The floating nav bar keeps Settings as one of its own tabs (see
                 // floatingNavigationItems above), so it should stay visible there too â€”
@@ -1481,13 +1455,13 @@ class MainActivity : ComponentActivity() {
                         coroutineScope.launch {
                             delay(SearchNavTransitionDelayMs)
                             // Search opens over whatever tab is showing. Drilled into a
-                            // detail screen, pop back to the tab root first so the overlay
-                            // does not sit on top of an album page the user can no longer
-                            // see the back button for.
+                            // detail screen, pop back to the tab root first so search
+                            // does not stack on top of an album page the user can no
+                            // longer see the back button for.
                             if (navController.currentDestination?.route !in TabRootRoutes) {
                                 navController.popBackStack(navController.graph.startDestinationId, inclusive = false)
                             }
-                            searchOverlayOpen = true
+                            navController.navigate(Screens.Search.route) { launchSingleTop = true }
                             searchVisualOverride = null
                         }
                     }
@@ -1498,14 +1472,14 @@ class MainActivity : ComponentActivity() {
                         searchVisualOverride = false
                         coroutineScope.launch {
                             delay(SearchNavTransitionDelayMs)
-                            // search/{query} (the results screen) is still a real pushed
-                            // NavHost destination -- leave it the normal way. The input
-                            // overlay itself just closes, and whatever tab was underneath
-                            // is still exactly where it was: no page to scroll back to.
-                            if (navController.currentDestination?.route?.startsWith("search/") == true) {
+                            // Pop the WHOLE search flow, not a single level. Searching
+                            // pushes search_input and then search/{query} on top of it,
+                            // so navigateUp() from a results screen would only land back
+                            // on the input screen. Cancelling search must return to
+                            // whatever preceded it.
+                            if (!navController.popBackStack(Screens.Search.route, inclusive = true)) {
                                 navController.navigateUp()
                             }
-                            searchOverlayOpen = false
                             searchVisualOverride = null
                         }
                     }
@@ -1530,11 +1504,9 @@ class MainActivity : ComponentActivity() {
                     onTapBar = {
                         if (inSearchScreen && !inSearchInputScreen) {
                             // Tapping the bar again from a results screen (search/{query})
-                            // pops that screen and reopens the search overlay's keyboard
+                            // pops back to the input screen and reopens the keyboard
                             // instead of trying to resubmit in place.
-                            if (navController.currentDestination?.route !in TabRootRoutes) {
-                                navController.popBackStack(navController.graph.startDestinationId, inclusive = false)
-                            }
+                            navController.popBackStack(Screens.Search.route, inclusive = false)
                         }
                         searchKeyboardActive = true
                     },
@@ -2142,33 +2114,6 @@ class MainActivity : ComponentActivity() {
                                         snackbarHostState = snackbarHostState,
                                     )
                                 }
-                                }
-
-                                // Search, over the tabs rather than beside them. This box
-                                // (not NavHost's own modifier) is what carries layerBackdrop
-                                // now -- see the comment on it below. Moved OUT of NavHost's
-                                // modifier chain and made the shared parent of both NavHost
-                                // and this AnimatedVisibility specifically so glass sampling
-                                // covers search too.
-                                //
-                                // It didn't before: layerBackdrop lived on NavHost's own
-                                // modifier, and this AnimatedVisibility was a SIBLING call
-                                // after NavHost's closing brace -- outside the element that
-                                // modifier was attached to, not inside it. appBackdrop's
-                                // recorded layer therefore never contained search's content
-                                // at all; it kept showing whatever the tab underneath had
-                                // last drawn, frozen, for as long as search stayed open. That
-                                // is the "search's backdrop still holds the previous page"
-                                // bug -- not a freeze/throttle timing issue, a structural one.
-                                AnimatedVisibility(
-                                    visible = searchOverlayOpen,
-                                    enter = fadeIn(Motion.appear()),
-                                    exit = fadeOut(Motion.appear()),
-                                ) {
-                                    SearchScreen(
-                                        navController = navController,
-                                        pureBlack = pureBlack,
-                                    )
                                 }
                                 } // CompositionLocalProvider(LocalSharedTransitionScope)
                                 } // SharedTransitionLayout
