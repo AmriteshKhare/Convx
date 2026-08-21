@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Convx Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
@@ -345,7 +345,12 @@ private val themeColorCache = android.util.LruCache<String, androidx.compose.ui.
 // Measured 2026-08-05 on SM-M346B, Home scroll p50: true => record 1.9ms / issue 4.6ms,
 // false => record 16.9ms / issue 19.7ms. The gap is the forced full-tree re-record in
 // LayerBackdropNode.draw(); the fix is to give the subtree RenderNodes, not to drop glass.
-private val TabRootRoutes = setOf(Screens.Home.route, Screens.Library.route, Screens.Settings.route)
+private val TabRootRoutes = setOf(
+    Screens.Home.route,
+    Screens.Library.route,
+    Screens.Settings.route,
+    Screens.Songs.route,
+)
 
 private const val DIAG_DISABLE_BACKDROP = false
 
@@ -1123,6 +1128,23 @@ class MainActivity : ComponentActivity() {
                 }
                 LaunchedEffect(inSearchScreen) {
                     if (!inSearchScreen) searchKeyboardActive = false
+                }
+                // A tap inside the search overlay (a recommendation, a result, a
+                // suggestion) pushes a real NavHost destination but never told the
+                // overlay to close -- it stayed open, on top, holding its last
+                // composed frame. That stale frame is what the nav bar's glass
+                // sampled instead of the new screen, and it also kept searchModeActive
+                // true, so system back replayed the search-collapse animation instead
+                // of popping the pushed destination. Closing here, the moment the
+                // route actually leaves the overlay's own footprint, covers every tap
+                // site at once instead of wiring onDismiss through each one.
+                LaunchedEffect(currentRoute) {
+                    if (searchOverlayOpen &&
+                        currentRoute !in TabRootRoutes &&
+                        currentRoute?.startsWith("search/") != true
+                    ) {
+                        searchOverlayOpen = false
+                    }
                 }
                 // The floating nav bar keeps Settings as one of its own tabs (see
                 // floatingNavigationItems above), so it should stay visible there too â€”

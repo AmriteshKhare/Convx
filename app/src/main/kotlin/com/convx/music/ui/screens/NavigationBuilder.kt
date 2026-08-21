@@ -579,10 +579,10 @@ private fun NavGraphBuilder.sharedComposable(
 ) = composable(
     route = route,
     arguments = arguments,
-    enterTransition = { fadeIn(tween(1)) },
+    enterTransition = { fadeIn(tween(Motion.PushMillis)) },
     exitTransition = { fadeOut(tween(180), targetAlpha = 0.7f) },
     popEnterTransition = { fadeIn(tween(180), initialAlpha = 0.7f) },
-    popExitTransition = { fadeOut(tween(1)) },
+    popExitTransition = { fadeOut(Motion.appearExit()) },
 ) { entry ->
     CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
         val morphId = entry.morphArtworkId()
