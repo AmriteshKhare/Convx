@@ -129,6 +129,7 @@ import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.ui.component.AlbumGridItem
 import com.convx.music.ui.component.ExpandableText
+import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
 import com.convx.music.ui.component.HideOnScrollFAB
 import com.convx.music.ui.component.LinkSegment
@@ -136,6 +137,8 @@ import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.LocalMenuState
+import com.convx.music.ui.component.isGlassAllowed
+import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
@@ -143,8 +146,6 @@ import com.convx.music.ui.component.NavigationTitle
 import com.convx.music.ui.component.SongListItem
 import com.convx.music.ui.component.YouTubeGridItem
 import com.convx.music.ui.component.YouTubeListItem
-import com.convx.music.ui.component.isGlassAllowed
-import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.rememberHeroTint
@@ -253,10 +254,11 @@ fun ArtistScreen(
     }
 
     // Apple Music style: a single dominant color pulled from the artist's own
-    // artwork washes the screen instead of a flat Material surface, and the
-    // circular back/share/subscribe chrome is real liquid glass sampling this
-    // screen's own content behind it (same Modifier.liquidGlass + LocalAppBackdrop
-    // mechanism the floating nav bar puck uses) rather than a flat fallback color.
+    // artwork washes the screen instead of a flat Material surface. The
+    // floating back/share chrome (and the subscriber/listener chips) stays
+    // real liquid glass sampling this screen's own content behind it; the
+    // play-row buttons (info/play/subscribe) are a flat fill in the tint's
+    // own contrast color instead — see ContrastCircleButton below.
     val artistThumbnail = artistPage?.artist?.thumbnail ?: libraryArtist?.artist?.thumbnailUrl
 
     val glassConfig = LocalGlassEffectConfig.current
@@ -286,7 +288,8 @@ fun ArtistScreen(
     // outside the NavHost turned out not to be necessary).
     val heroZoom = rememberHeroZoom()
 
-    val tint = rememberHeroTint(artistThumbnail)
+    val heroPalette = com.convx.music.ui.component.rememberHeroPalette(artistThumbnail)
+    val tint = heroPalette.background
     val onTint = com.convx.music.ui.theme.AppleTokens.onColor(tint)
 
     // Fills the screen tint into the capture BEFORE the content, exactly like
@@ -314,14 +317,13 @@ fun ArtistScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    0f to tint,
-                    0.5f to tint,
-                    1f to screenBackground,
-                )
-            )
+            .background(tint)
     ) {
+    com.convx.music.ui.component.HeroMeshWash(
+        palette = heroPalette,
+        screenBackground = screenBackground,
+        modifier = Modifier.matchParentSize(),
+    )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
         // root appBackdrop — sampling appBackdrop here is the RenderNode cycle.
@@ -655,7 +657,8 @@ fun ArtistScreen(
                                     // Info Button (Left) — sits a touch lower than the
                                     // bigger center Play button, not perfectly centered
                                     // with it, so it reads as "grounded" beside it.
-                                    GlassCircleButton(
+                                    ContrastCircleButton(
+                                        onTint = onTint,
                                         onClick = { /* Could show description or bio */ },
                                         size = 48.dp,
                                         modifier = Modifier.offset(y = 8.dp),
@@ -714,7 +717,8 @@ fun ArtistScreen(
 
                                     // Favorite/Subscribe Button (Right)
                                     val isSubscribed = libraryArtist?.artist?.bookmarkedAt != null
-                                    GlassCircleButton(
+                                    ContrastCircleButton(
+                                        onTint = onTint,
                                         onClick = {
                                             database.transaction {
                                                 val artist = libraryArtist?.artist

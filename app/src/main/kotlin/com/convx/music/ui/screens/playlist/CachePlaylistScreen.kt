@@ -125,6 +125,7 @@ import com.convx.music.ui.component.HeroBackground
 import com.convx.music.ui.component.rememberHeroTopBlur
 import com.convx.music.ui.component.rememberHeroSource
 import com.convx.music.ui.component.rememberHeroTint
+import com.convx.music.ui.component.rememberHeroPalette
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.GlassComponent
@@ -233,7 +234,8 @@ fun CachePlaylistScreen(
         staticArt = heroUrl,
         songs = filteredSongs.map { it.thumbnailUrl to false },
     )
-    val tint = rememberHeroTint(heroUrl)
+    val heroPalette = rememberHeroPalette(heroUrl)
+    val tint = heroPalette.background
     val onTint = AppleTokens.onColor(tint)
 
     val glassConfig = LocalGlassEffectConfig.current
@@ -262,7 +264,7 @@ fun CachePlaylistScreen(
         heroSource = heroSource,
         blurArtwork = true,
         fullBlur = true,
-        bottomGradient = true,
+        meshWash = heroPalette,
         // Scroll-linked sharp-top/blurred-bottom split, replaced by fullBlur above.
         // topBlurProgress = rememberHeroTopBlur(lazyListState),
         heroScale = heroZoom.scale,

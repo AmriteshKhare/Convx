@@ -127,8 +127,8 @@ import com.convx.music.db.entities.PlaylistEntity
 import com.convx.music.db.entities.PlaylistSongMap
 import com.convx.music.models.toMediaMetadata
 import com.convx.music.playback.queues.YouTubePlaylistQueue
-import com.convx.music.ui.component.ListScrollRail
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
+import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
 import com.convx.music.ui.component.ChromeScrim
 import com.convx.music.ui.component.rememberChromeScrimProgress
@@ -578,14 +578,6 @@ fun OnlinePlaylistScreen(
         }
         }
 
-        // A YouTube playlist keeps its own track order, so the rail is a proportional
-        // thumb rather than letters.
-        ListScrollRail(
-            lazyListState = lazyListState,
-            itemCount = songs.size,
-            sectionIndexMap = null,
-        )
-
         // Floating glass chrome over the tinted background, replacing the
         // Material TopAppBar. Select mode and in-place search keep their exact
         // prior behavior, just restyled containers; the title still only fades
@@ -876,7 +868,8 @@ private fun OnlinePlaylistHeader(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Share Button (Left - Circular)
-                    GlassCircleButton(
+                    ContrastCircleButton(
+                        onTint = onTint,
                         onClick = {
                             val intent = Intent().apply {
                                 action = Intent.ACTION_SEND
@@ -902,7 +895,8 @@ private fun OnlinePlaylistHeader(
                     // is the same "is this the active context" heuristic
                     // AlbumScreen uses (there, albumId happens to match directly).
                     val isPlayingThisPlaylist = isPlaying && songs.any { it.id == mediaMetadata?.id }
-                    GlassCircleButton(
+                    ContrastCircleButton(
+                        onTint = onTint,
                         onClick = {
                             if (songs.isNotEmpty()) {
                                 if (isPlayingThisPlaylist) {
@@ -931,7 +925,8 @@ private fun OnlinePlaylistHeader(
 
                     // Save Button (Right - Circular)
                     val isBookmarked = dbPlaylist?.playlist?.bookmarkedAt != null
-                    GlassCircleButton(
+                    ContrastCircleButton(
+                        onTint = onTint,
                         onClick = {
                             coroutineScope.launch(Dispatchers.IO) {
                                 if (dbPlaylist != null) {
@@ -1130,7 +1125,8 @@ private fun OnlinePlaylistHeader(
                 }
 
                 // Shuffle Button
-                GlassCircleButton(
+                ContrastCircleButton(
+                    onTint = onTint,
                     onClick = {
                         if (songs.isNotEmpty()) {
                             playerConnection.playQueue(
@@ -1153,7 +1149,8 @@ private fun OnlinePlaylistHeader(
                 }
 
                 // More Options Button
-                GlassCircleButton(
+                ContrastCircleButton(
+                    onTint = onTint,
                     onClick = {
                         menuState.show {
                             YouTubePlaylistMenu(

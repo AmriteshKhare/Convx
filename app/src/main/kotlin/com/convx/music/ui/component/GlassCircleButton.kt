@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -88,6 +89,50 @@ fun GlassCircleButton(
             )
     ) {
         CompositionLocalProvider(LocalContentColor provides contentColor) {
+            content()
+        }
+    }
+}
+
+/**
+ * A flat circular button whose fill and content colour both come from the
+ * screen's own artwork tint, not from glass or a fixed Material color — the
+ * back/share/favorite buttons on an artwork-tinted screen (Artist, Album)
+ * that wants its whole chrome to read as *that record's* color rather than
+ * floating glass over it.
+ *
+ * [onTint] should be the same contrast color the rest of the screen already
+ * derives from its tint (e.g. `AppleTokens.onColor(tint)`), so a light-tinted
+ * cover gets dark buttons/icons and a dark-tinted cover gets light ones.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ContrastCircleButton(
+    onTint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    size: Dp = 44.dp,
+    content: @Composable () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .pressWobble(interactionSource)
+            .size(size)
+            .clip(GlassCircleShape)
+            .background(onTint.copy(alpha = 0.16f))
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                role = Role.Button,
+                indication = ripple(bounded = false, radius = size / 2),
+                interactionSource = interactionSource,
+            )
+    ) {
+        CompositionLocalProvider(LocalContentColor provides onTint) {
             content()
         }
     }

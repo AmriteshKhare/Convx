@@ -159,6 +159,7 @@ import com.convx.music.playback.queues.ListQueue
 import com.convx.music.ui.component.ActionPromptDialog
 import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.component.EmptyPlaceholder
+import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
 import com.convx.music.ui.component.ChromeScrim
 import com.convx.music.ui.component.rememberChromeScrimProgress
@@ -1458,7 +1459,8 @@ fun LocalPlaylistHeader(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // More Options Button (Left - Circular)
-                GlassCircleButton(
+                ContrastCircleButton(
+                    onTint = onTint,
                     onClick = {
                         menuState.show {
                             LocalPlaylistMenu(
@@ -1540,7 +1542,8 @@ fun LocalPlaylistHeader(
                 // list is the same "is this the active context" heuristic
                 // AlbumScreen uses (there, albumId happens to match directly).
                 val isPlayingThisPlaylist = isPlaying && songs.any { it.song.id == mediaMetadata?.id }
-                GlassCircleButton(
+                ContrastCircleButton(
+                    onTint = onTint,
                     onClick = {
                         if (isPlayingThisPlaylist) {
                             playerConnection.player.pause()
@@ -1565,7 +1568,8 @@ fun LocalPlaylistHeader(
                 }
 
                 // Shuffle Button (Right - Circular)
-                GlassCircleButton(
+                ContrastCircleButton(
+                    onTint = onTint,
                     onClick = {
                         playerConnection.playQueue(
                             ListQueue(

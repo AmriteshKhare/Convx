@@ -27,6 +27,7 @@ import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 import com.materialkolor.score.Score
+import kotlin.math.sqrt
 
 val DefaultThemeColor = AppleTokens.AccentRed
 
@@ -136,6 +137,81 @@ fun Bitmap.extractThemeColor(): Color {
 
     val rankedColors = Score.score(swatches.associate { it.rgb to it.population })
     return Color(rankedColors.first())
+}
+
+/**
+ * The three raw colours a hero screen background paints itself from. Unlike
+ * [extractThemeColor] (tuned to pick a seed [Score.score] can build a whole M3
+ * scheme from, which skews toward muted swatches), these favour the artwork's
+ * own most vivid colours — a screen background should look like the cover,
+ * not like a safe seed for the OS to build widgets around.
+ */
+data class HeroPalette(
+    /** The screen's flat tint, from the artwork's dominant/most-vivid swatch. */
+    val background: Color,
+    /** A second, distinct swatch — the mesh wash's highlight blobs. */
+    val accent: Color,
+    /** Mean colour of the artwork's own bottom edge, for a wash that reads as
+     *  a continuation of the artwork rather than a second surface starting. */
+    val wash: Color,
+)
+
+/** Saturation weighted against the square root of population, not population
+ *  alone — stops a cover that's mostly black sky from scoring black just
+ *  because black covers the most pixels. */
+private fun Palette.Swatch.vibrancy(): Float {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(rgb, hsv)
+    return hsv[1] * sqrt(population.toFloat())
+}
+
+fun Bitmap.extractHeroPalette(): HeroPalette? {
+    val swatches = Palette.from(this)
+        .maximumColorCount(16)
+        .generate()
+        .swatches
+    if (swatches.isEmpty()) return null
+
+    val background = if (swatches.isAchromatic()) {
+        neutralSeed(swatches)
+    } else {
+        val totalPopulation = swatches.sumOf { it.population }.coerceAtLeast(1)
+        val dominant = swatches.maxBy { it.population }
+        val vibrant = swatches.maxBy { it.vibrancy() }
+        // A vibrant swatch covering too little of the artwork is a stray
+        // highlight, not what the cover is about — fall back to whatever
+        // covers most of it instead of tinting the screen off noise.
+        if (vibrant.population.toFloat() / totalPopulation < 0.04f) Color(dominant.rgb) else Color(vibrant.rgb)
+    }
+
+    // Runner-up vibrant swatch, distinct from whichever one `background` used,
+    // so the wash reads as two colours from the cover rather than one twice.
+    val accent = swatches
+        .filterNot { Color(it.rgb) == background }
+        .maxByOrNull { it.vibrancy() }
+        ?.let { Color(it.rgb) }
+        ?: background
+
+    return HeroPalette(background = background, accent = accent, wash = bottomEdgeMean())
+}
+
+/** Flat mean of the artwork's bottom band. */
+private fun Bitmap.bottomEdgeMean(): Color {
+    val band = (height * 0.18f).toInt().coerceIn(1, height)
+    val startY = height - band
+    val pixels = IntArray(width * band)
+    getPixels(pixels, 0, width, 0, startY, width, band)
+
+    var red = 0L
+    var green = 0L
+    var blue = 0L
+    for (pixel in pixels) {
+        red += (pixel shr 16) and 0xFF
+        green += (pixel shr 8) and 0xFF
+        blue += pixel and 0xFF
+    }
+    val n = pixels.size.coerceAtLeast(1)
+    return Color(red = (red / n).toInt(), green = (green / n).toInt(), blue = (blue / n).toInt())
 }
 
 /** True when the artwork carries no usable hue. Shares the tested rule in

@@ -118,6 +118,7 @@ import com.convx.music.ui.component.SongListItem
 import com.convx.music.ui.component.SortHeader
 import com.convx.music.ui.component.rememberHeroSource
 import com.convx.music.ui.component.rememberHeroTint
+import com.convx.music.ui.component.rememberHeroPalette
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalGlassEffectConfig
@@ -263,7 +264,8 @@ fun AutoPlaylistScreen(
         staticArt = heroUrl,
         songs = filteredSongs.map { it.thumbnailUrl to false },
     )
-    val tint = rememberHeroTint(heroUrl)
+    val heroPalette = rememberHeroPalette(heroUrl)
+    val tint = heroPalette.background
     val onTint = AppleTokens.onColor(tint)
 
     val heroBackdrop = rememberLayerBackdrop()
@@ -300,7 +302,7 @@ fun AutoPlaylistScreen(
         heroSource = heroSource,
         blurArtwork = true,
         fullBlur = true,
-        bottomGradient = true,
+        meshWash = heroPalette,
         // topBlurProgress = heroTopBlur,
         heroScale = heroZoom.scale,
         modifier = Modifier.fillMaxSize(),

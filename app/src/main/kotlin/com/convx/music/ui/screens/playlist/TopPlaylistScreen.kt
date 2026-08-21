@@ -120,6 +120,7 @@ import com.convx.music.ui.component.HeroBackground
 import com.convx.music.ui.component.rememberHeroTopBlur
 import com.convx.music.ui.component.rememberHeroSource
 import com.convx.music.ui.component.rememberHeroTint
+import com.convx.music.ui.component.rememberHeroPalette
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.GlassComponent
@@ -133,6 +134,7 @@ import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalContentColor
+import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
 import com.convx.music.ui.component.ChromeScrim
 import com.convx.music.ui.component.rememberChromeScrimProgress
@@ -285,7 +287,8 @@ fun TopPlaylistScreen(
         staticArt = heroUrl,
         songs = songs?.map { it.song.thumbnailUrl to false } ?: emptyList()
     )
-    val tint = rememberHeroTint(heroUrl)
+    val heroPalette = rememberHeroPalette(heroUrl)
+    val tint = heroPalette.background
     val onTint = AppleTokens.onColor(tint)
 
     val glassConfig = LocalGlassEffectConfig.current
@@ -314,7 +317,7 @@ fun TopPlaylistScreen(
         heroSource = heroSource,
         blurArtwork = true,
         fullBlur = true,
-        bottomGradient = true,
+        meshWash = heroPalette,
         // Scroll-linked sharp-top/blurred-bottom split, replaced by fullBlur above.
         // topBlurProgress = rememberHeroTopBlur(state),
         heroScale = heroZoom.scale,
@@ -826,7 +829,8 @@ private fun TopPlaylistHeader(
                     }
                 }
 
-                GlassCircleButton(
+                ContrastCircleButton(
+                    onTint = onTint,
                     onClick = {
                         menuState.show {
                             TopPlaylistMenu(

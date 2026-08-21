@@ -241,7 +241,7 @@ inline fun ListItem(
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = AppleTokens.Gutter),
                 color = AppleTokens.divider,
-                thickness = 0.5.dp,
+                thickness = 0.75.dp,
             )
         }
     }

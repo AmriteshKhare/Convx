@@ -131,6 +131,7 @@ import com.convx.music.playback.ExoDownloadService
 import com.convx.music.playback.queues.LocalAlbumRadio
 import com.convx.music.ui.component.AlbumGradient
 import com.convx.music.ui.component.ExpandableText
+import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
 import com.convx.music.ui.component.HeroCardHeader
 import com.convx.music.ui.component.IconButton
@@ -139,14 +140,14 @@ import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.LocalMenuState
+import com.convx.music.ui.component.isGlassAllowed
+import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.NavigationTitle
 import com.convx.music.ui.component.SongListItem
 import com.convx.music.ui.component.YouTubeGridItem
-import com.convx.music.ui.component.isGlassAllowed
-import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.menu.AlbumMenu
 import com.convx.music.ui.menu.SelectionSongMenu
@@ -289,7 +290,8 @@ fun AlbumScreen(
         }
     }
 
-    val tint = rememberHeroTint(albumWithSongs?.album?.thumbnailUrl)
+    val heroPalette = com.convx.music.ui.component.rememberHeroPalette(albumWithSongs?.album?.thumbnailUrl)
+    val tint = heroPalette.background
     val onTint = com.convx.music.ui.theme.AppleTokens.onColor(tint)
 
     val glassConfig = LocalGlassEffectConfig.current
@@ -335,14 +337,13 @@ fun AlbumScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    0f to tint,
-                    0.5f to tint,
-                    1f to screenBackground,
-                )
-            )
+            .background(tint)
     ) {
+    com.convx.music.ui.component.HeroMeshWash(
+        palette = heroPalette,
+        screenBackground = screenBackground,
+        modifier = Modifier.matchParentSize(),
+    )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
     // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
     // root appBackdrop — sampling appBackdrop here is the RenderNode cycle.
@@ -702,7 +703,8 @@ fun AlbumScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Shuffle Button (Left - Circular)
-                        GlassCircleButton(
+                        ContrastCircleButton(
+                            onTint = onTint,
                             onClick = {
                                 playerConnection.service.getAutomix(playlistId)
                                 playerConnection.playQueue(
@@ -747,7 +749,8 @@ fun AlbumScreen(
                         }
 
                         // Favorite/Save Button (Right - Circular)
-                        GlassCircleButton(
+                        ContrastCircleButton(
+                            onTint = onTint,
                             onClick = {
                                 database.query {
                                     update(albumWithSongs.album.toggleLike())
@@ -1036,10 +1039,6 @@ fun AlbumScreen(
         // pill instead, same as the TopAppBar's title/actions used to. Backed by a
         // scrim that ramps from transparent to a dark shade as the list scrolls
         // past the hero art, same treatment as the Artist screen.
-        // Redeclared here (shadowing the one above) inside the listBackdrop
-        // provider — liquidGlass reads LocalAppBackdrop at the point it's
-        // composed, so the outer val (composed before this provider) would
-        // still capture heroBackdrop's empty fallback otherwise.
         CompositionLocalProvider(LocalAppBackdrop provides listBackdrop) {
         val chromeBackgroundModifier = if (useGlass) {
             Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)

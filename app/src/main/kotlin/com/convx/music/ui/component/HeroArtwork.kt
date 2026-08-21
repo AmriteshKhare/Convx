@@ -2,6 +2,10 @@ package com.convx.music.ui.component
 
 import android.content.Context
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -61,7 +65,8 @@ import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.DefaultThemeColor
 import com.convx.music.ui.theme.LocalAccentColor
-import com.convx.music.ui.theme.extractThemeColor
+import com.convx.music.ui.theme.HeroPalette
+import com.convx.music.ui.theme.extractHeroPalette
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,11 +88,11 @@ sealed class HeroSource {
 private val HeroBlurRadius = 48.dp
 
 /**
- * Hero tints keyed by artwork URL (the image's stable id): the Coil decode +
+ * Hero palettes keyed by artwork URL (the image's stable id): the Coil decode +
  * palette extraction is expensive, so the same artwork never recomputes on
  * revisit or recomposition. Bounded for a long session.
  */
-private val heroTintCache = android.util.LruCache<String, Color>(128)
+private val heroPaletteCache = android.util.LruCache<String, HeroPalette>(128)
 
 /**
  * 0..1 scroll progress for [HeroBackground]'s `topBlurProgress`: ramps as the first
@@ -161,14 +166,34 @@ fun Color.asDeepTint(): Color {
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
+/** Same clamp family as [asDeepTint], tuned for a mesh-wash blob instead of a
+ *  flat page background: lighter and more saturated so it reads as a glow. */
+fun Color.asVividAccent(): Color {
+    val hsl = FloatArray(3)
+    androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[1] = hsl[1].coerceAtLeast(0.45f)
+    hsl[2] = hsl[2].coerceIn(0.45f, 0.68f)
+    return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+}
+
+/** Same clamp family as [asDeepTint], a shade lighter — the wash a real blur
+ *  of the artwork would leave behind, not the page's own deep tint. */
+fun Color.asWashTint(): Color {
+    val hsl = FloatArray(3)
+    androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[1] = hsl[1].coerceAtLeast(0.22f)
+    hsl[2] = hsl[2].coerceIn(0.20f, 0.42f)
+    return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+}
+
 /**
- * The artwork tint for [url], from cache when it is there and by extraction when it is not.
+ * The artwork palette for [url], from cache when it is there and by extraction when it is not.
  *
  * Cheap on a repeat call even when the cache misses: the 100x100 decode Coil does here
  * lands in its own memory cache, so a second caller pays a lookup rather than a fetch.
  */
-suspend fun heroTintOf(context: Context, url: String): Color? {
-    heroTintCache.get(url)?.let { return it }
+suspend fun heroPaletteOf(context: Context, url: String): HeroPalette? {
+    heroPaletteCache.get(url)?.let { return it }
     return withContext(Dispatchers.IO) {
         try {
             val request = ImageRequest.Builder(context)
@@ -177,56 +202,75 @@ suspend fun heroTintOf(context: Context, url: String): Color? {
                 .allowHardware(false)
                 .build()
             context.imageLoader.execute(request).image?.toBitmap()
-                ?.extractThemeColor()?.asDeepTint()
+                ?.extractHeroPalette()
+                ?.let { raw ->
+                    HeroPalette(
+                        background = raw.background.asDeepTint(),
+                        accent = raw.accent.asVividAccent(),
+                        wash = raw.wash.asWashTint(),
+                    )
+                }
                 // Not cached on a miss: a later visit with a working network should still
-                // get the real artwork colour rather than a stand-in pinned forever.
-                ?.also { heroTintCache.put(url, it) }
+                // get the real artwork colours rather than a stand-in pinned forever.
+                ?.also { heroPaletteCache.put(url, it) }
         } catch (_: Exception) {
             null
         }
     }
 }
 
+/** The flat background half of [heroPaletteOf] — every existing caller only wants this. */
+suspend fun heroTintOf(context: Context, url: String): Color? = heroPaletteOf(context, url)?.background
+
 /**
- * Starts extracting [url]'s tint now, off any composition.
+ * Starts extracting [url]'s palette now, off any composition.
  *
- * Called as navigation into a hero screen begins, so the colour is already in the cache by
+ * Called as navigation into a hero screen begins, so the colours are already in the cache by
  * the time that screen composes -- otherwise the extraction starts on arrival and the
  * background visibly washes in a beat after the artwork.
  */
 fun prewarmHeroTint(context: Context, url: String?) {
-    if (url.isNullOrEmpty() || heroTintCache.get(url) != null) return
+    if (url.isNullOrEmpty() || heroPaletteCache.get(url) != null) return
     val appContext = context.applicationContext
-    heroTintScope.launch { heroTintOf(appContext, url) }
+    heroTintScope.launch { heroPaletteOf(appContext, url) }
 }
 
 private val heroTintScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+/**
+ * The full [HeroPalette] a screen builds its background from — flat tint,
+ * mesh-wash accent and edge wash together, so all three come from the one
+ * cached extraction instead of three separate ones drifting out of sync.
+ */
 @Composable
-fun rememberHeroTint(url: String?): Color {
+fun rememberHeroPalette(url: String?): HeroPalette {
     val context = LocalContext.current
 
-    // Where a failed extraction lands. The doc above claimed the fallback was
-    // AccentRed, but nothing ever assigned it: black is the *pending* value, and
-    // every failure path below simply left it there — a device that couldn't fetch
-    // the artwork (offline, 403, decode failure, image evicted under memory
-    // pressure) got a permanently black hero plane instead of a colour, which is
-    // the "generated colour falls to black on some phones" report. Resolves to the
-    // user's own theme colour now, so a miss degrades to their accent, not to black.
+    // Where a failed extraction lands. Black is only ever the *pending*
+    // value below; a device that couldn't fetch the artwork (offline, 403,
+    // decode failure, image evicted under memory pressure) resolves to the
+    // user's own theme colour instead, so a miss degrades to their accent,
+    // not to black.
     val fallbackTint = LocalAccentColor.current.asDeepTint()
+    val fallbackPalette = remember(fallbackTint) {
+        HeroPalette(background = fallbackTint, accent = fallbackTint.asVividAccent(), wash = fallbackTint.asWashTint())
+    }
 
-    // Black until the artwork color is extracted (no accent flash); seeded from the
-    // cache so a revisited image shows its tint at once.
-    var tint by remember(url) { mutableStateOf(url?.let { heroTintCache.get(it) } ?: Color.Black) }
+    // The same accent fallback as a failed extraction, not black, while the real
+    // extraction is pending -- seeded from the cache so a revisited image shows
+    // its colours at once. A bare black background reads as broken, not pending
+    // -- most visibly on the tile<->screen container morph, where every
+    // navigation (and every recomposition mid predictive-back-cancel) re-seeds
+    // this and would briefly show a dead black screen behind the morphing artwork.
+    var palette by remember(url) { mutableStateOf(url?.let { heroPaletteCache.get(it) } ?: fallbackPalette) }
 
     LaunchedEffect(url) {
         // No early return on a cache hit. Extraction can already be in flight from
         // prewarmHeroTint, and bailing out because "someone is handling it" left the
-        // tint stuck on its pending black forever.
-        tint = (url?.let { heroTintOf(context, it) }) ?: fallbackTint
+        // palette stuck on its pending fallback forever.
+        palette = (url?.let { heroPaletteOf(context, it) }) ?: fallbackPalette
     }
 
-    val animatedTint = tint
     // Root-cause fix, not per-screen: every hero-tinted screen (Artist, Album,
     // Playlist, Search, ...) reads its background straight off this value, but
     // only HeroBackground's own separate PureBlackHeroBackgroundKey check
@@ -235,7 +279,62 @@ fun rememberHeroTint(url: String?): Color {
     // override here fixes every caller at once instead of repeating this check
     // in 17 files.
     val (pureBlack) = rememberPreference(PureBlackHeroBackgroundKey, false)
-    return if (pureBlack) Color.Black else animatedTint
+    return if (pureBlack) {
+        HeroPalette(background = Color.Black, accent = Color.Black, wash = Color.Black)
+    } else {
+        palette
+    }
+}
+
+@Composable
+fun rememberHeroTint(url: String?): Color = rememberHeroPalette(url).background
+
+/**
+ * The screen surface below a hero image: an eased wash down to [screenBackground]
+ * with two soft colour blobs breaking up what would otherwise be a flat vertical
+ * ramp — draws the same idea a blurred-artwork backdrop reaches for, but from the
+ * extracted [palette] alone, so it costs the same regardless of API level and
+ * never re-shows a picture that is already on screen above it.
+ *
+ * Sized entirely by [modifier]; callers place it as the first child behind their
+ * hero content, same as any other background layer.
+ */
+@Composable
+fun HeroMeshWash(
+    palette: HeroPalette,
+    screenBackground: Color,
+    modifier: Modifier = Modifier,
+    /** Fraction of the surface's height the wash is still at full strength. */
+    washFraction: Float = 0.5f,
+) {
+    Canvas(modifier) {
+        drawRect(
+            Brush.verticalGradient(
+                0f to palette.wash,
+                washFraction to palette.wash,
+                washFraction + (1f - washFraction) * 0.45f to lerpColor(palette.wash, screenBackground, 0.20f),
+                washFraction + (1f - washFraction) * 0.80f to lerpColor(palette.wash, screenBackground, 0.65f),
+                1f to screenBackground,
+            ),
+        )
+        heroWashBlob(palette.accent.copy(alpha = 0.16f), Offset(0.16f, washFraction + 0.10f), 0.80f)
+        heroWashBlob(palette.wash.copy(alpha = 0.26f), Offset(0.90f, washFraction + 0.32f), 0.95f)
+    }
+}
+
+/** One soft radial blob: full colour at [at], gone by [radiusFraction] of the width. */
+private fun DrawScope.heroWashBlob(color: Color, at: Offset, radiusFraction: Float) {
+    val center = Offset(at.x * size.width, at.y * size.height)
+    val radius = size.width * radiusFraction
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(color, color.copy(alpha = 0f)),
+            center = center,
+            radius = radius,
+        ),
+        radius = radius,
+        center = center,
+    )
 }
 
 /**
@@ -347,7 +446,12 @@ fun HeroBackground(
     // a clean flat tint behind glass (e.g. search).
     showDefaultIcon: Boolean = true,
     // Decorative primary-color wash fading in at the bottom of the screen.
+    // Ignored when [meshWash] is set — the two are alternatives, not layers.
     bottomGradient: Boolean = false,
+    // Artwork-derived wash + colour blobs instead of the flat primary-color
+    // [bottomGradient] — pass the same [HeroPalette] the screen's own [tint]
+    // came from so the wash matches the artwork, not the user's accent.
+    meshWash: HeroPalette? = null,
     // 0..1 — extra blur ramped onto the crisp upper artwork as the list scrolls up.
     topBlurProgress: Float = 0f,
     // Pull-to-zoom scale for the hero artwork (1 = rest; >1 while overscrolling the top).
@@ -468,7 +572,13 @@ fun HeroBackground(
                 // No placeholder icon: a clean flat tint plane behind the content.
             }
         }
-        if (bottomGradient) {
+        if (meshWash != null) {
+            HeroMeshWash(
+                palette = meshWash,
+                screenBackground = MaterialTheme.colorScheme.background,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (bottomGradient) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
