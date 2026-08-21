@@ -52,11 +52,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import com.convx.music.constants.NavigationBarAnimationSpec
+import com.convx.music.ui.utils.bounceSeedVelocity
+import com.convx.music.ui.utils.bounceStiffnessFor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.pow
@@ -315,6 +318,7 @@ class BottomSheetState(
     val collapsedBound: Dp,
     val expandedBound: Dp,
     val dismissedBound: Dp,
+    private val density: Density,
 ) : DraggableState by draggableState {
     // Same technique as BackdropFreeze.kt: a plain array, not snapshot state,
     // read during the draw phase by a sampling glass surface's `frozen`
@@ -349,56 +353,69 @@ class BottomSheetState(
         if (totalRange <= 0f) 0f else ((animatable.value - collapsedBound).value / totalRange).coerceIn(0f, 1f)
     }
 
-    fun collapse(animationSpec: AnimationSpec<Dp>) {
+    fun collapse(animationSpec: AnimationSpec<Dp>, initialVelocity: Dp = 0.dp) {
         onAnchorChanged(collapsedAnchor)
         coroutineScope.launch {
-            animatable.animateTo(collapsedBound, animationSpec)
+            animatable.animateTo(collapsedBound, animationSpec, initialVelocity)
         }
     }
 
-    fun expand(animationSpec: AnimationSpec<Dp>) {
+    fun expand(animationSpec: AnimationSpec<Dp>, initialVelocity: Dp = 0.dp) {
         onAnchorChanged(expandedAnchor)
         coroutineScope.launch {
-            animatable.animateTo(expandedBound, animationSpec)
+            animatable.animateTo(expandedBound, animationSpec, initialVelocity)
         }
     }
 
-    private fun collapse() {
-        // Apple Music feel: bouncy spring for collapse with tactile overshoot
+    /**
+     * [velocityPxPerSec] is the fling's actual velocity (same sign convention as
+     * [performFling]: positive travels toward expanded, negative toward collapsed).
+     * Seeded into the spring as its initial velocity, on the same
+     * [bounceSeedVelocity]/[bounceStiffnessFor] curve the list/hero overscroll bounce
+     * already uses, so a hard downward flick carries into the collapse as a real
+     * rubber-band snap instead of the spring starting from rest every time.
+     */
+    private fun collapse(velocityPxPerSec: Float = 0f) {
+        val seed = bounceSeedVelocity(velocityPxPerSec)
         collapse(
             spring(
                 dampingRatio = 0.68f,
-                stiffness = 380f,
-            )
+                stiffness = bounceStiffnessFor(seed),
+            ),
+            initialVelocity = with(density) { seed.toDp() },
         )
     }
 
-    private fun expand() {
-        // Apple Music feel: bouncy spring for expand with tactile overshoot
+    private fun expand(velocityPxPerSec: Float = 0f) {
+        val seed = bounceSeedVelocity(velocityPxPerSec)
         expand(
             spring(
                 dampingRatio = 0.68f,
-                stiffness = 380f,
-            )
+                stiffness = bounceStiffnessFor(seed),
+            ),
+            initialVelocity = with(density) { seed.toDp() },
         )
     }
 
     fun collapseSoft() {
-        // Bouncy settling curve: energetic response, fast and fluid on 120Hz panels
+        // Apple Music feel: high damping + low stiffness = smooth, weighty settle.
+        // The snappier 0.70/360 this used briefly is what fed the mini-pill's
+        // measured-height feedback loop (see FloatingMiniPlayer's measuredHeightPx)
+        // fast enough to show up as icon flicker on every tap-driven collapse/expand.
         collapse(
             spring(
-                dampingRatio = 0.70f,
-                stiffness = 360f,
+                dampingRatio = 0.85f,
+                stiffness = Spring.StiffnessLow,
             ),
         )
     }
 
     fun expandSoft() {
-        // Bouncy settling curve: energetic response, fast and fluid on 120Hz panels
+        // Apple Music feel: high damping + low stiffness = smooth, weighty settle.
         expand(
             spring(
-                dampingRatio = 0.70f,
-                stiffness = 360f,
+                dampingRatio = 0.85f,
+                stiffness = Spring.StiffnessLow,
             ),
         )
     }
@@ -423,13 +440,13 @@ class BottomSheetState(
 
     fun performFling(velocity: Float, onDismiss: (() -> Unit)?) {
         if (velocity > 250) {
-            expand()
+            expand(velocity)
         } else if (velocity < -250) {
             if (value < collapsedBound && onDismiss != null) {
                 dismiss()
                 onDismiss.invoke()
             } else {
-                collapse()
+                collapse(velocity)
             }
         } else {
             val l0 = dismissedBound
@@ -555,6 +572,7 @@ fun rememberBottomSheetState(
             collapsedBound = collapsedBound,
             expandedBound = expandedBound,
             dismissedBound = dismissedBound,
+            density = density,
         )
     }
 }

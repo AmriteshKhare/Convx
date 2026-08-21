@@ -14,6 +14,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.ui.utils.bleedStart
 import com.convx.music.ui.utils.plusStart
 
@@ -101,6 +102,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.convx.music.LocalTabView
 import com.convx.music.ui.component.HeroCardHeader
+import com.convx.music.ui.component.HeroMergeBand
+import com.convx.music.ui.component.HeroMergeBandHeight
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -476,7 +479,9 @@ fun ArtistScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .aspectRatio(1f)
+                                    // BitChord/Apple-Music artist photo: very slightly
+                                    // taller than wide (height = width / 0.95).
+                                    .aspectRatio(0.95f)
                                     .offset {
                                         IntOffset(x = 0, y = headerOffset)
                                     }
@@ -523,6 +528,17 @@ fun ArtistScreen(
                                         )
                                     }
                                 }
+
+                                // BitChord-style join: blurred artwork smeared across
+                                // the foot, so the name below sits on blurred colour
+                                // instead of on a hard edge.
+                                HeroMergeBand(
+                                    artworkUrl = thumbnail,
+                                    heroRatio = 0.95f,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .offset(y = HeroMergeBandHeight / 2),
+                                )
                             }
                         }
 
@@ -564,11 +580,13 @@ fun ArtistScreen(
                                 .fillMaxWidth()
                                 .padding(
                                     top = if (thumbnail != null && !tabView) {
-                                        // Position content at the bottom part of the image
-                                        // Using screen width to calculate aspect ratio height minus overlap
+                                        // BitChord's HEADER_DROP: the name block hangs
+                                        // 44dp past the artwork's foot, onto the blurred
+                                        // colour the merge band leaves there — it reads
+                                        // as a caption to the picture, not part of it.
                                         LocalResources.current.displayMetrics.widthPixels.let { screenWidth ->
                                             with(density) {
-                                                ((screenWidth / 1.2f) - 144).toDp()
+                                                (screenWidth / 0.95f).toDp() - 44.dp
                                             }
                                         }
                                     } else {
@@ -1117,7 +1135,7 @@ fun ArtistScreen(
 
                                                             is AlbumItem -> navController.navigate("album/${item.id}")
                                                             is ArtistItem -> navController.navigate("artist/${item.id}")
-                                                            is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                                            is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                                         }
                                                     },
                                                     onLongClick = {

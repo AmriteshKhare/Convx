@@ -49,7 +49,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.Credentials
 import timber.log.Timber
@@ -277,9 +276,11 @@ class App : Application(), SingletonImageLoader.Factory {
     private var cachedCoilCacheSize: Int? = null
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
-        val cacheSize = cachedCoilCacheSize ?: runBlocking {
-            dataStore.data.map { it[MaxImageCacheSizeKey] ?: 512 }.first()
-        }
+        // Seeded asynchronously in onCreate (see there). If the first image
+        // lands before the seed does, this session builds the loader with the
+        // default cap and the user's setting applies from the next launch —
+        // versus the old runBlocking read, which stalled Main on that frame.
+        val cacheSize = cachedCoilCacheSize ?: 512
         return ImageLoader.Builder(this).apply {
             crossfade(false)
             // Use HARDWARE bitmap configuration for direct zero-copy GPU texture uploads

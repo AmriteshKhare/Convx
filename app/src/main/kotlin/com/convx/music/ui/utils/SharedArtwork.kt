@@ -6,6 +6,7 @@
  */
 package com.convx.music.ui.utils
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.EnterExitState
@@ -81,6 +82,15 @@ fun markMorphDirection(isPop: Boolean) {
     isMorphClosing.value = isPop
 }
 
+/**
+ * Whether the in-flight (or just-landed) navigation was a pop. Read by
+ * [com.convx.music.ui.component.backdrop.backdrops.rememberNavTransitionFreeze] --
+ * a pop is what predictive back gesture-scrubs live, and freezing the app
+ * backdrop for it only produces a late catch-up pop once the freeze's fixed
+ * window outlasts the gesture. See that function's own doc.
+ */
+fun lastNavWasPop(): Boolean = isMorphClosing.value
+
 private val MorphBoundsTransform = BoundsTransform { _, _ ->
     if (isMorphClosing.value) Motion.morphExit() else Motion.morphEnter()
 }
@@ -143,6 +153,20 @@ fun Bundle?.morphArtworkId(): String? =
 /** True for the destinations that open with a container morph -- see `sharedComposable`. */
 fun isMorphRoute(route: String?): Boolean =
     route != null && MorphRoutePrefixes.any(route::startsWith)
+
+/**
+ * Route into an online playlist carrying the tapped tile's title and artwork, so the
+ * destination can paint its hero and background colour on the first frame instead of
+ * after the network round trip. Both extras are optional; a plain
+ * `online_playlist/{id}` route (deep links) still matches.
+ */
+fun onlinePlaylistRoute(id: String, title: String?, thumbnail: String?): String = buildString {
+    append("online_playlist/").append(id)
+    if (!title.isNullOrEmpty() || !thumbnail.isNullOrEmpty()) {
+        append("?title=").append(Uri.encode(title ?: ""))
+        append("&thumbnail=").append(Uri.encode(thumbnail ?: ""))
+    }
+}
 
 private val MorphRoutePrefixes =
     listOf(

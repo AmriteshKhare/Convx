@@ -83,6 +83,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.utils.rememberHeroZoom
@@ -282,7 +283,7 @@ fun ArtistItemsScreen(
 
                                             is AlbumItem -> navController.navigate("album/${item.id}")
                                             is ArtistItem -> navController.navigate("artist/${item.id}")
-                                            is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                            is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                         }
                                     },
                             )
@@ -334,7 +335,7 @@ fun ArtistItemsScreen(
 
                                                 is AlbumItem -> navController.navigate("album/${item.id}")
                                                 is ArtistItem -> navController.navigate("artist/${item.id}")
-                                                is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                                is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                             }
                                         },
                                         onLongClick = {

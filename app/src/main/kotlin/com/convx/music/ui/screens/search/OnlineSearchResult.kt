@@ -72,6 +72,7 @@ import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.convx.music.constants.MiniPlayerBottomSpacing
@@ -246,7 +247,7 @@ fun OnlineSearchResult(
 
                             is AlbumItem -> navController.navigate("album/${item.id}")
                             is ArtistItem -> navController.navigate("artist/${item.id}")
-                            is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                            is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                         }
                     },
                     onLongClick = longClick,

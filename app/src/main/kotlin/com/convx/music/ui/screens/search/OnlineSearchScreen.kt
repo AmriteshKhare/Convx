@@ -9,6 +9,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.onlinePlaylistRoute
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -313,7 +314,7 @@ fun OnlineSearchScreen(
                                     onDismiss()
                                 }
                                 is PlaylistItem -> {
-                                    navController.navigate("online_playlist/${item.id}")
+                                    navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                     onDismiss()
                                 }
                             }

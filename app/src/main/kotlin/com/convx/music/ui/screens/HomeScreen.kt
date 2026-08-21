@@ -167,6 +167,7 @@ import com.convx.music.ui.utils.plusStart
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.utils.LocalFolderIndex
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.LocalDatabase
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
@@ -892,7 +893,7 @@ fun HomeScreen(
 
                             is AlbumItem -> navController.navigate("album/${item.id}")
                             is ArtistItem -> navController.navigate("artist/${item.id}")
-                            is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                            is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                         }
                     },
                     onLongClick = {
@@ -2244,7 +2245,13 @@ private fun LazyListScope.communityPlaylistsSection(
                     CommunityPlaylistCard(
                         item = item,
                         onClick = {
-                            deps.navController.navigate("online_playlist/${item.playlist.id.removePrefix("VL")}")
+                            deps.navController.navigate(
+                                onlinePlaylistRoute(
+                                    item.playlist.id.removePrefix("VL"),
+                                    item.playlist.title,
+                                    item.playlist.thumbnail,
+                                )
+                            )
                         },
                         onSongClick = { song ->
                             deps.playerConnection.playQueue(

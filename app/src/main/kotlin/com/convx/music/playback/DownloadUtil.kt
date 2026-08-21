@@ -17,6 +17,7 @@ import androidx.media3.database.DatabaseProvider
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
@@ -28,15 +29,8 @@ import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
 import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
-import com.music.innertube.YouTube
 import com.convx.music.constants.AudioQuality
 import com.convx.music.constants.AudioQualityKey
-import com.convx.music.constants.IpVersionKey
-import com.music.innertube.models.IpVersion
-import okhttp3.Dns
-import java.net.InetAddress
-import java.net.Inet4Address
-import java.net.Inet6Address
 import com.convx.music.db.MusicDatabase
 import com.convx.music.db.entities.FormatEntity
 import com.convx.music.db.entities.SongEntity
@@ -72,7 +66,6 @@ import java.util.Locale
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import okhttp3.OkHttpClient
 import java.time.LocalDateTime
 import java.util.concurrent.Executor
 import javax.inject.Inject
@@ -91,7 +84,6 @@ constructor(
 ) {
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
-    private val ipVersion by enumPreference(context, IpVersionKey, IpVersion.AUTO)
     private val songUrlCache = HashMap<String, Pair<String, Long>>()
     // Keep a reference to context so we can read DataStore prefs for JioSaavn support
     private val appContext: Context = context
@@ -146,28 +138,25 @@ constructor(
                 .Factory()
                 .setCache(playerCache)
                 .setUpstreamDataSourceFactory(
-                    OkHttpDataSource.Factory(
-                        OkHttpClient.Builder()
-                            .dns(object : Dns {
-                                override fun lookup(hostname: String): List<InetAddress> {
-                                    val addresses = Dns.SYSTEM.lookup(hostname)
-                                    return when (this@DownloadUtil.ipVersion) {
-                                        IpVersion.IPV4 -> addresses.filter { it is Inet4Address }.ifEmpty { addresses }
-                                        IpVersion.IPV6 -> addresses.filter { it is Inet6Address }.ifEmpty { addresses }
-                                        IpVersion.AUTO -> addresses
-                                    }
-                                }
-                            })
-                            .proxy(YouTube.proxy)
-                            .proxyAuthenticator { _, response ->
-                                YouTube.proxyAuth?.let { auth ->
-                                    response.request.newBuilder()
-                                        .header("Proxy-Authorization", auth)
-                                        .build()
-                                } ?: response.request
-                            }
-                            .build(),
-                    ),
+                    // Same OkHttp instance that resolved the stream URL
+                    // (YTPlayerUtils.httpClient): googlevideo ties a stream URL
+                    // to the connection context of the player request that
+                    // minted it, so resolving and streaming must share one
+                    // stack. The old inline client also snapshotted
+                    // YouTube.proxy/DNS at construction, so proxy changes never
+                    // reached playback; the shared one reads them live.
+                    //
+                    // RangedUpstreamDataSource splits each download into bounded
+                    // range requests: googlevideo paces one continuous response
+                    // to playback speed (~15 kB/s) but serves ranges at line
+                    // rate (~5.7 MB/s), so this is the difference between a
+                    // track downloading for its whole duration vs ~a second per
+                    // few MB. Non-googlevideo hosts pass through untouched.
+                    DataSource.Factory {
+                        RangedUpstreamDataSource(
+                            OkHttpDataSource.Factory(YTPlayerUtils.httpClient),
+                        )
+                    },
                 ),
         ) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
@@ -402,12 +391,21 @@ constructor(
         }
 
     init {
-        val result = mutableMapOf<String, Download>()
-        val cursor = downloadManager.downloadIndex.getDownloads()
-        while (cursor.moveToNext()) {
-            result[cursor.download.request.id] = cursor.download
+        // Seeding reads every row out of the DownloadIndex (SQLite). Inline it
+        // ran on whatever thread constructed this singleton — the main thread,
+        // at MainActivity startup — and the cost grew with the download
+        // library. On IO instead; the UI already collects `downloads`
+        // reactively, so a beat-later fill is invisible.
+        scope.launch(Dispatchers.IO) {
+            val result = mutableMapOf<String, Download>()
+            val cursor = downloadManager.downloadIndex.getDownloads()
+            cursor.use { c ->
+                while (c.moveToNext()) {
+                    result[c.download.request.id] = c.download
+                }
+            }
+            downloads.value = result
         }
-        downloads.value = result
     }
 
     fun getDownload(songId: String): Flow<Download?> = downloads.map { it[songId] }

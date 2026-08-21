@@ -1433,6 +1433,10 @@ interface DatabaseDao {
     @Query("SELECT * FROM song WHERE isLocal = 1 ORDER BY inLibrary")
     fun localSongsByCreateDateAsc(): Flow<List<Song>>
 
+    /** Ids only — the scanner preloads these once per scan instead of one getSongById per MediaStore row. */
+    @Query("SELECT id FROM song WHERE isLocal = 1")
+    suspend fun localSongIds(): List<String>
+
     @Transaction
     @Query("SELECT * FROM song WHERE isLocal = 1 ORDER BY title")
     fun localSongsByNameAsc(): Flow<List<Song>>

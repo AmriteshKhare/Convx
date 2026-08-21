@@ -86,6 +86,27 @@ object LrcLib {
         }.body<List<Track>>()
     }.getOrDefault(emptyList())
 
+    /**
+     * Exact lookup: LRCLIB's /get endpoint matches server-side on
+     * title + artist + duration and returns a single track. One cheap call
+     * replaces the whole /search chain on the common path — fewer round trips
+     * per track change, and the server's duration filter is more accurate
+     * than post-filtering search hits. The search chain stays as fallback for
+     * noisy titles the exact endpoint won't match.
+     */
+    private suspend fun queryExact(
+        artist: String,
+        title: String,
+        duration: Int,
+    ): Track? = runCatching {
+        if (duration <= 0) return@runCatching null
+        client.get("/api/get") {
+            parameter("track_name", title)
+            parameter("artist_name", artist)
+            parameter("duration", duration.toString())
+        }.body<Track>()
+    }.getOrNull()
+
     private suspend fun queryLyrics(
         artist: String,
         title: String,
@@ -141,9 +162,19 @@ object LrcLib {
         duration: Int,
         album: String? = null,
     ) = runCatching {
-        val tracks = queryLyrics(artist, title, album)
         val cleanedTitle = cleanTitle(title)
         val cleanedArtist = cleanArtist(artist)
+
+        // Strategy 0: exact endpoint. Server-side match on title + artist +
+        // duration; skips the multi-call search chain entirely on the common
+        // path.
+        val exact = queryExact(cleanedArtist, cleanedTitle, duration)
+        val exactText = exact?.let { it.syncedLyrics ?: it.plainLyrics }
+        if (exactText != null) {
+            return@runCatching Lyrics(exactText).text
+        }
+
+        val tracks = queryLyrics(artist, title, album)
 
         val res = when {
             duration == -1 -> {

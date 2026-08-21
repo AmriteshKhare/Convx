@@ -605,6 +605,16 @@ class MusicService :
         )
         player = createExoPlayer()
         player.addListener(this@MusicService)
+
+        // Keep the transition-path pref snapshot warm (see cached* fields).
+        scope.launch {
+            dataStore.data.collect { prefs ->
+                cachedRepeatMode = prefs[RepeatModeKey] ?: REPEAT_MODE_OFF
+                cachedAutoLoadMore = prefs[AutoLoadMoreKey] ?: true
+                cachedDisableLoadMoreWhenRepeatAll = prefs[DisableLoadMoreWhenRepeatAllKey] ?: false
+                cachedPersistentQueue = prefs[PersistentQueueKey] ?: true
+            }
+        }
         sleepTimer = SleepTimer(scope, player)
         player.addListener(sleepTimer)
 
@@ -2068,6 +2078,16 @@ class MusicService :
 
     private var previousMediaItemIndex = C.INDEX_UNSET
 
+    // Snapshot of the prefs the per-track player callbacks read. Those callbacks
+    // run on Main, and every dataStore.get() inside them blocks it — the helper
+    // wraps a runBlocking disk read — so a track transition could stall Main on
+    // several keys at once. One collector keeps this snapshot warm instead;
+    // reads that already ran inside withContext(Dispatchers.IO) were left alone.
+    @Volatile private var cachedRepeatMode = REPEAT_MODE_OFF
+    @Volatile private var cachedAutoLoadMore = true
+    @Volatile private var cachedDisableLoadMoreWhenRepeatAll = false
+    @Volatile private var cachedPersistentQueue = true
+
     override fun onMediaItemTransition(
         mediaItem: MediaItem?,
         reason: Int,
@@ -2080,7 +2100,7 @@ class MusicService :
         )
         // Force Repeat One if the player ignored it and auto-advanced
         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
-            val repeatMode = runBlocking { dataStore.get(RepeatModeKey, REPEAT_MODE_OFF) }
+            val repeatMode = cachedRepeatMode
             if (repeatMode == REPEAT_MODE_ONE &&
                 previousMediaItemIndex != C.INDEX_UNSET &&
                 previousMediaItemIndex != player.currentMediaItemIndex) {
@@ -2134,11 +2154,11 @@ class MusicService :
         }
 
         // Auto load more songs from queue
-        if (dataStore.get(AutoLoadMoreKey, true) &&
+        if (cachedAutoLoadMore &&
             reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT &&
             player.mediaItemCount - player.currentMediaItemIndex <= 5 &&
             currentQueue.hasNextPage() &&
-            !(dataStore.get(DisableLoadMoreWhenRepeatAllKey, false) && player.repeatMode == REPEAT_MODE_ALL)
+            !(cachedDisableLoadMoreWhenRepeatAll && player.repeatMode == REPEAT_MODE_ALL)
         ) {
             scope.launch(SilentHandler) {
                 val mediaItems = withContext(Dispatchers.IO) {
@@ -2157,7 +2177,7 @@ class MusicService :
         }
 
         // Save state when media item changes
-        if (dataStore.get(PersistentQueueKey, true)) {
+        if (cachedPersistentQueue) {
             saveQueueToDisk()
         }
     }
@@ -2177,7 +2197,7 @@ class MusicService :
 
         // Force Repeat All if the player ignored it and ended playback
         if (playbackState == Player.STATE_ENDED) {
-            val repeatMode = runBlocking { dataStore.get(RepeatModeKey, REPEAT_MODE_OFF) }
+            val repeatMode = cachedRepeatMode
             if (repeatMode == REPEAT_MODE_ALL && player.mediaItemCount > 0) {
                 player.seekTo(0, 0)
                 player.prepare()
@@ -2186,7 +2206,7 @@ class MusicService :
         }
 
         // Save state when playback state changes (but not during silence skipping)
-        if (dataStore.get(PersistentQueueKey, true) && !isSilenceSkipping) {
+        if (cachedPersistentQueue && !isSilenceSkipping) {
             saveQueueToDisk()
         }
 

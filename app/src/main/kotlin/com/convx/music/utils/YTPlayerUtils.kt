@@ -82,7 +82,26 @@ object YTPlayerUtils {
     private const val logTag = "YTPlayerUtils"
     private const val TAG = "YTPlayerUtils"
 
-    private val httpClient: OkHttpClient = OkHttpClient.Builder()
+    /**
+     * The one OkHttp instance for the whole media path: stream resolution
+     * ([playerResponseForPlayback]) AND the actual audio streaming
+     * ([DownloadUtil]'s OkHttpDataSource both use it).
+     *
+     * Shared on purpose — googlevideo binds a stream URL to the connection
+     * context of the `player` request that minted it. If resolving and
+     * streaming ran on separate stacks they could resolve to different
+     * addresses (v4 vs v6) and the media fetch would come back 403, sending
+     * the resolver into retry loops that show up as heat and lag.
+     *
+     * The DNS filter and proxy read [YouTube.ipVersion] / [YouTube.proxy]
+     * live inside the callbacks, so settings changes apply without rebuilding.
+     *
+     * Dispatcher/pool are sized past anything playback drives concurrently:
+     * stock OkHttp allows only 5 in-flight requests per host, and a track
+     * streaming while its successor resolves already wants 2-3 of those —
+     * requests queued behind the cap look exactly like a slow server.
+     */
+    val httpClient: OkHttpClient = OkHttpClient.Builder()
         .dns(object : Dns {
             override fun lookup(hostname: String): List<InetAddress> {
                 val addresses = Dns.SYSTEM.lookup(hostname)
@@ -107,7 +126,12 @@ object YTPlayerUtils {
             } ?: response.request
         }
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        // 30 s, not 15 s: multi-megabyte audio chunk reads ride this client too
+        // (DownloadUtil), and per-read timeouts bite slow networks mid-chunk.
+        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .dispatcher(okhttp3.Dispatcher().apply { maxRequestsPerHost = 16 })
+        .connectionPool(okhttp3.ConnectionPool(16, 5, java.util.concurrent.TimeUnit.MINUTES))
         .build()
 
     private val poTokenGenerator = PoTokenGenerator()

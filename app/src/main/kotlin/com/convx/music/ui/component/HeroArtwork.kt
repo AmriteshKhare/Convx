@@ -1,32 +1,37 @@
 package com.convx.music.ui.component
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -86,6 +91,85 @@ sealed class HeroSource {
 
 /** Blur radius for [HeroBackground]'s Apple-Music-style blurred artwork. */
 private val HeroBlurRadius = 48.dp
+
+/**
+ * The glass band laid across the hero artwork's foot (BitChord/Apple-Music
+ * detail-page treatment): a heavily-blurred copy of the same artwork, centred
+ * on the join between picture and page, masked to arrive from nothing and
+ * leave to nothing.
+ *
+ * A blur samples across its own footprint, so colour from the artwork is
+ * carried down past where the artwork ends and the page colour shows through
+ * the upper half — the line that used to separate the two surfaces has nothing
+ * left to be a line between. Place it behind the header text: the title then
+ * sits on blurred colour rather than on whatever the picture happens to be
+ * doing at its foot.
+ *
+ * Implemented without a progress-glass library because both layers are ours:
+ * the band re-draws the artwork (decoded small — a 100dp blur erases all
+ * detail) shifted so its bottom edge lands exactly on the band's centre, i.e.
+ * on the join. [Modifier.blur] is a RenderEffect no-op below Android S, where
+ * a *sharp* duplicate would look worse than no band at all — so the band is
+ * skipped there and the plain fade handles the join as before.
+ */
+@Composable
+fun HeroMergeBand(
+    artworkUrl: String?,
+    modifier: Modifier = Modifier,
+    /** Band height; generous, because half its run is spent arriving and half leaving. */
+    bandHeight: Dp = 320.dp,
+    /** Wide enough that nothing of the picture survives at full strength. */
+    blurRadius: Dp = 100.dp,
+    /** Aspect ratio of the hero artwork this band must line up with. */
+    heroRatio: Float = 1f,
+) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+
+    val bandHeightPx = LocalDensity.current.run { bandHeight.roundToPx() }
+
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(bandHeight)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0.00f to Color.Transparent,
+                        0.50f to Color.Black,
+                        1.00f to Color.Transparent,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
+    ) {
+        if (!artworkUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(artworkUrl)
+                    .size(160)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(heroRatio)
+                    // Bottom of the copy sits at the band's centre — the join.
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, placeable.height) {
+                            placeable.placeRelative(0, bandHeightPx / 2 - placeable.height)
+                        }
+                    }
+                    .blur(blurRadius),
+            )
+        }
+    }
+}
+
+/** Where [HeroMergeBand] is centred: half over the artwork, half over the page. */
+val HeroMergeBandHeight: Dp = 320.dp
 
 /**
  * Hero palettes keyed by artwork URL (the image's stable id): the Coil decode +
@@ -390,17 +474,6 @@ fun AlbumStyleHeroImage(
                 scaleX = heroScale
                 scaleY = heroScale
                 compositingStrategy = CompositingStrategy.Offscreen
-            }
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Black, Color.Transparent),
-                        startY = size.height * 0.45f,
-                        endY = size.height,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
             },
     ) {
         if (!artworkUrl.isNullOrBlank()) {
@@ -408,7 +481,21 @@ fun AlbumStyleHeroImage(
                 model = artworkUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                // The fade lives on the image, NOT the box: the merge band below
+                // is a sibling and must reach the join at full strength.
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color.Black, Color.Transparent),
+                                startY = size.height * 0.55f,
+                                endY = size.height,
+                            ),
+                            blendMode = BlendMode.DstIn,
+                        )
+                    },
             )
         } else {
             Image(
@@ -421,6 +508,17 @@ fun AlbumStyleHeroImage(
                     .graphicsLayer { alpha = 0.3f },
             )
         }
+
+        // BitChord-style join: a blurred copy of the artwork centred on the
+        // foot, so picture and page colour smear into one another instead of
+        // meeting at an edge. Hangs half below the box, under the header text.
+        HeroMergeBand(
+            artworkUrl = artworkUrl,
+            heroRatio = 1f,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = HeroMergeBandHeight / 2),
+        )
     }
 }
 

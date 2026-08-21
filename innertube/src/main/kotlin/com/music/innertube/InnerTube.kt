@@ -123,14 +123,11 @@ class InnerTube {
                 
                 // Retry on connection failure
                 retryOnConnectionFailure(true)
-                
-                // Cache configuration for better performance
-                cache(
-                    okhttp3.Cache(
-                        directory = java.io.File(System.getProperty("java.io.tmpdir"), "http_cache"),
-                        maxSize = 50L * 1024L * 1024L // 50 MB
-                    )
-                )
+
+                // No okhttp3.Cache here: every Innertube call is a POST (only
+                // OkHttp-cachable for GETs), and java.io.tmpdir is not a
+                // writable, app-scoped directory on Android anyway — the 50 MB
+                // cache could never have held entries.
                 
                 // Apply IP version filtering
                 dns(object : Dns {
@@ -209,6 +206,14 @@ class InnerTube {
      * server sent one. Cancellation is respected since [delay] throws if the
      * coroutine is cancelled.
      */
+    /**
+     * Runs [block], retrying transient transport failures and rate-limit /
+     * server-hiccup responses. A *timeout* is deliberately never retried: it
+     * is this client's own budget being spent, so repeating it multiplies the
+     * cost instead of sharing it (a timed-out call re-run three times turns a
+     * 6 s ceiling into 18 s on exactly the requests most likely to be on a
+     * latency-sensitive path).
+     */
     private suspend fun <T> withRetry(
         maxAttempts: Int = 3,
         initialDelay: Long = 500L,
@@ -220,6 +225,8 @@ class InnerTube {
         while (true) {
             try {
                 return block()
+            } catch (e: io.ktor.client.plugins.HttpRequestTimeoutException) {
+                throw e
             } catch (e: IOException) {
                 attempt++
                 if (attempt >= maxAttempts) throw e
@@ -269,6 +276,12 @@ class InnerTube {
     ) = withRetry {
         httpClient.post("player") {
             ytClient(client, setLogin = true)
+            // Tight budget just for this endpoint: it sits on the playback hot
+            // path and healthy answers arrive in 120-330 ms; one that hangs
+            // would otherwise hold the queue start for the full 60 s shared
+            // ceiling. Browse/search keep that wider ceiling — their payloads
+            // are far larger over the same connection.
+            timeout { requestTimeoutMillis = 6_000 }
             setBody(
                 PlayerBody(
                     context = client.toContext(locale, visitorData, dataSyncId).let {

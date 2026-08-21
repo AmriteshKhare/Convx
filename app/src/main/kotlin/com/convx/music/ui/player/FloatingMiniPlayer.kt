@@ -181,7 +181,17 @@ fun FloatingMiniPlayer(
     // and SubcomposeLayout can't answer intrinsic-measurement queries, which
     // crashes the whole bar. onSizeChanged gets the same measured height for
     // the !isInline tablet pill's icon/thumbnail scaling without that problem.
-    var measuredHeightPx by remember { mutableIntStateOf(0) }
+    //
+    // Seeded at the pill's real resting height (64dp, matching
+    // FloatingSideBar's FloatingMiniPlayerMinHeight/MaxHeight) rather than 0:
+    // every scroll-triggered mount of this branch used to render its very
+    // first frame with measuredHeightPx still at 0, which the size formulas
+    // below floor-clamp to 36dp regardless of the pill's real height — then
+    // the true measurement lands a frame later and every icon visibly pops
+    // to its real size. Starting from the known resting height means the
+    // first frame is already correct (or within a pixel of it) instead of
+    // popping from the clamp floor on every single expand.
+    var measuredHeightPx by remember { mutableIntStateOf(with(density) { 64.dp.roundToPx() }) }
     Box(
         contentAlignment = Alignment.CenterStart,
         modifier = Modifier

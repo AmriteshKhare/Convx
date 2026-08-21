@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
+import com.convx.music.ui.utils.lastNavWasPop
 import kotlinx.coroutines.flow.collectLatest
 
 // Covers Motion.PushMillis (260), the longest NavHost transition in MainActivity,
@@ -46,12 +47,23 @@ class NavTransitionFreeze {
     }
 }
 
-/** Marks a transition started every time [currentRoute] changes. */
+/**
+ * Marks a transition started every time [currentRoute] changes -- except on a pop
+ * ([lastNavWasPop]). A pop is what predictive back gesture-scrubs live: the route
+ * doesn't change until the gesture COMMITS, well after the visual transition has
+ * already been tracking the finger frame-by-frame unfrozen. Freezing at that point
+ * only holds the backdrop through its fixed window well past the point the screen
+ * already looks settled -- a late catch-up pop, not a smooth finish. Pushes aren't
+ * gesture-scrubbed, so they keep the freeze (its own performance reason still
+ * applies there).
+ */
 @Composable
 fun rememberNavTransitionFreeze(currentRoute: String?): NavTransitionFreeze {
     val freeze = remember { NavTransitionFreeze() }
     LaunchedEffect(currentRoute) {
-        freeze.markTransitionStarted()
+        if (!lastNavWasPop()) {
+            freeze.markTransitionStarted()
+        }
     }
     return freeze
 }

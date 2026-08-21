@@ -39,6 +39,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.onlinePlaylistRoute
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -529,7 +530,7 @@ fun OnlinePlaylistScreen(
                                             .combinedBounceClick(
                                                 onClick = {
                                                     when (item) {
-                                                        is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                                        is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                                         is AlbumItem -> navController.navigate("album/${item.browseId}")
                                                         is ArtistItem -> navController.navigate("artist/${item.id}")
                                                         is SongItem -> playerConnection.playQueue(

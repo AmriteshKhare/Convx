@@ -20,6 +20,7 @@ import com.convx.music.R
 import com.convx.music.db.entities.Album
 import com.convx.music.db.entities.Artist
 import com.convx.music.db.entities.Playlist
+import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.ui.menu.AlbumMenu
 import com.convx.music.ui.menu.ArtistMenu
 import com.convx.music.ui.menu.PlaylistMenu
@@ -230,7 +231,7 @@ fun LibraryPlaylistListItem(
         .fillMaxWidth()
         .clickable {
             if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.remoteSongCount != 0)
-                navController.navigate("online_playlist/${playlist.playlist.browseId}")
+                navController.navigate(onlinePlaylistRoute(playlist.playlist.browseId.orEmpty(), playlist.playlist.name, playlist.playlist.thumbnailUrl))
             else
                 navController.navigate("local_playlist/${playlist.id}")
         }
@@ -254,7 +255,7 @@ fun LibraryPlaylistGridItem(
         .combinedClickable(
             onClick = {
                 if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.remoteSongCount != 0)
-                    navController.navigate("online_playlist/${playlist.playlist.browseId}")
+                    navController.navigate(onlinePlaylistRoute(playlist.playlist.browseId.orEmpty(), playlist.playlist.name, playlist.playlist.thumbnailUrl))
                 else
                     navController.navigate("local_playlist/${playlist.id}")
             },

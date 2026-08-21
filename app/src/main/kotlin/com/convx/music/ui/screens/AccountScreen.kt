@@ -88,6 +88,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -141,7 +142,7 @@ fun AccountScreen(
                         modifier = Modifier
                             .combinedBounceClick(
                                 onClick = {
-                                    navController.navigate("online_playlist/${item.id}")
+                                    navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                 },
                                 onLongClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)

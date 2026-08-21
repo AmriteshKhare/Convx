@@ -37,14 +37,18 @@ object LyricsProviderRegistry {
     fun serializeProviderOrder(providers: List<String>): String =
         providers.filter { it in providerNames }.joinToString(",")
 
+    // LrcLib and Kugou lead: both are free, keyless, fast, and cover synced
+    // lyrics for the widest audience (Kugou for CJK). The remote/aggregator
+    // services follow; the YouTube-only pair stays last since it can only
+    // serve videoId tracks.
     fun getDefaultProviderOrder(): List<String> = listOf(
+        "LrcLib",
+        "Kugou",
         "YouLyPlus",
         "Paxsenix",
         "Musixmatch",
         "BetterLyrics",
         "SimpMusic",
-        "LrcLib",
-        "Kugou",
         "YouTubeSubtitle",
         "YouTubeMusic",
     )

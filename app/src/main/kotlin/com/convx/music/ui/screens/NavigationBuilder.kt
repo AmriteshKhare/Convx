@@ -299,10 +299,20 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "online_playlist/{playlistId}",
+        route = "online_playlist/{playlistId}?title={title}&thumbnail={thumbnail}",
         arguments = listOf(
             navArgument("playlistId") {
                 type = NavType.StringType
+            },
+            navArgument("title") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+            navArgument("thumbnail") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
             },
         ),
     ) {

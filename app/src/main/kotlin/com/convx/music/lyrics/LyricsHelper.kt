@@ -45,12 +45,19 @@ constructor(
             return LyricsProviderRegistry.getOrderedProviders(orderString)
         }
 
-        // Migration path: place the old preferred provider first in the default order
+        // Migration path: honor the legacy single-provider preference, but only
+        // when the user actually picked one — the key is written solely by the
+        // settings UI. A never-set key used to force YouLyPlus to the front for
+        // everyone, which is exactly the slow-chain behavior the new default
+        // order (LrcLib first) exists to fix.
         val preferredEnum = preferences[PreferredLyricsProviderKey]
-            .toEnum(PreferredLyricsProvider.YOULYPLUS)
-        val preferredName = LyricsProviderRegistry.getProviderNameForEnum(preferredEnum)
+            ?.let { it.toEnum(PreferredLyricsProvider.YOULYPLUS) }
+            ?.let { LyricsProviderRegistry.getProviderNameForEnum(it) }
+            ?: return LyricsProviderRegistry.getDefaultProviderOrder()
+                .mapNotNull { LyricsProviderRegistry.getProviderByName(it) }
+
         val defaultOrder = LyricsProviderRegistry.getDefaultProviderOrder()
-        val migratedOrder = listOf(preferredName) + defaultOrder.filter { it != preferredName }
+        val migratedOrder = listOf(preferredEnum) + defaultOrder.filter { it != preferredEnum }
         return migratedOrder.mapNotNull { LyricsProviderRegistry.getProviderByName(it) }
     }
 
@@ -81,7 +88,7 @@ constructor(
             return LyricsWithProvider(LYRICS_NOT_FOUND, "Unknown")
         }
 
-        val providers = resolveLyricsProviders()
+        val providers = resolveLyricsProviders().usableFor(isLocalSong(mediaMetadata.id))
         val scope = CoroutineScope(SupervisorJob())
         val deferred = scope.async {
             for (provider in providers) {
@@ -146,7 +153,7 @@ constructor(
         }
 
         val allResult = mutableListOf<LyricsResult>()
-        val providers = resolveLyricsProviders()
+        val providers = resolveLyricsProviders().usableFor(isLocalSong(mediaId))
         currentLyricsJob = CoroutineScope(SupervisorJob()).launch {
             providers.forEach { provider ->
                 if (provider.isEnabled(context)) {
@@ -173,8 +180,20 @@ constructor(
         currentLyricsJob = null
     }
 
+    /**
+     * Local songs carry MediaStore content-URI ids, not YouTube videoIds. The
+     * transcript/next-based providers can only ever fail for them, so skip the
+     * dead round trips — they sit at the end of the default order and are what
+     * made local-song lookups crawl before giving up entirely.
+     */
+    private fun isLocalSong(id: String): Boolean = id.startsWith("content://")
+
+    private fun List<LyricsProvider>.usableFor(isLocalSong: Boolean): List<LyricsProvider> =
+        if (!isLocalSong) this else filterNot { it.name in VIDEO_ID_ONLY_PROVIDERS }
+
     companion object {
         private const val MAX_CACHE_SIZE = 3
+        private val VIDEO_ID_ONLY_PROVIDERS = setOf("YouTubeSubtitle", "YouTubeMusic")
     }
 }
 

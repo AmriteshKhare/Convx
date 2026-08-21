@@ -85,6 +85,14 @@ object LocalAudioScanner {
                 listOf(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI)
             }
 
+            // One bulk read instead of a getSongById per MediaStore row — the
+            // old per-row lookup made a rescan of N songs cost N+1 sequential
+            // Room queries (2-3k songs = seconds of extra IO and CPU, i.e.
+            // device heat for nothing). The per-row fetch now happens only on
+            // the two branches that actually need the entity: excluded-folder
+            // removal and the inLibrary backfill.
+            val existingIds = database.localSongIds().toHashSet()
+
             collections.forEach { collection ->
             context.contentResolver.query(
                 collection,
@@ -135,9 +143,6 @@ object LocalAudioScanner {
 
                     val songId = contentUri
 
-                    // Check if song already exists
-                    val existingSong = database.getSongById(songId)
-
                     // Prefix match, not equality: excluding "Music/Podcasts" has to take
                     // its subfolders with it, and a folder picked by hand in settings is
                     // usually a parent of the ones MediaStore actually reports.
@@ -148,18 +153,22 @@ object LocalAudioScanner {
                         // Already imported from a folder that's since been excluded —
                         // remove it so toggling the folder off actually takes effect,
                         // not just "no new songs from here" going forward.
-                        if (existingSong != null) database.delete(existingSong.song)
+                        if (songId in existingIds) {
+                            database.getSongById(songId)?.let { database.delete(it.song) }
+                            existingIds.remove(songId)
+                        }
                         continue
                     }
 
-                    if (existingSong != null) {
+                    if (songId in existingIds) {
                         // Rows written before the scanner recorded DATE_ADDED have a null
                         // inLibrary, and this branch used to skip them forever — so
                         // "Recently added" stayed a no-op for anyone whose library was
                         // scanned by an older build, however many times they rescanned.
                         // Backfill the dates only; everything else about the row is left
                         // alone so a rescan never clobbers user edits.
-                        if (existingSong.song.inLibrary == null) {
+                        val existingSong = database.getSongById(songId)
+                        if (existingSong != null && existingSong.song.inLibrary == null) {
                             runCatching {
                                 database.withTransaction {
                                     upsert(
@@ -179,6 +188,7 @@ object LocalAudioScanner {
                         skippedExisting++
                         continue
                     }
+                    existingIds.add(songId)
 
                     val artistId = "local_artist_${artistName.hashCode()}"
                     val albumIdStr = "local_album_${albumName.hashCode()}"
