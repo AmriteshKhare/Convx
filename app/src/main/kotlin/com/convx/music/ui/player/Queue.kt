@@ -833,6 +833,14 @@ fun Queue(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(8.dp))
+                            // Collapses the queue's own sheet, not the outer player's --
+                            // that's what actually reveals the normal player view, since
+                            // Queue is drawn as a sibling sheet stacked over it.
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() },
+                                onClick = { state.collapseSoft() },
+                            )
                     )
 
                     Spacer(Modifier.width(12.dp))

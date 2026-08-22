@@ -2076,15 +2076,6 @@ fun BottomSheetPlayer(
                     }
 
                     DjReadout(modifier = Modifier.padding(top = 2.dp))
-
-                    if (showUpNext) {
-                        UpNextSong(
-                            playerConnection = playerConnection,
-                            titleColor = TextBackgroundColor,
-                            subtitleColor = TextBackgroundColor.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -2724,6 +2715,21 @@ fun BottomSheetPlayer(
             seekControls()
 
             Spacer(Modifier.height(if (useNewPlayerDesign) 24.dp else 8.dp))
+
+            // Below the seek bar, not the title row: the title area reflows with the
+            // marquee/artist tap targets, which used to shove this up and down with it.
+            // Padding matches seekControls' own PlayerHorizontalPadding exactly rather
+            // than inheriting an ambient Row padding, so it lines up with the seek bar
+            // regardless of what the title row above does with its own inset.
+            if (showUpNext) {
+                UpNextSong(
+                    playerConnection = playerConnection,
+                    titleColor = TextBackgroundColor,
+                    subtitleColor = TextBackgroundColor.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                )
+                Spacer(Modifier.height(8.dp))
+            }
 
             AnimatedVisibility(
                 // fullscreenLyricsCollapseTop repurposed: on, the controls stay
