@@ -1986,6 +1986,14 @@ class MainActivity : ComponentActivity() {
                                 // own modifier and up to wrap both NavHost and Search.
                                 Box(
                                     modifier = Modifier
+                                        // Predictive back scrubs popEnterTransition/popExitTransition
+                                        // (both plain fades, see below) by live gesture progress. Mid
+                                        // gesture that means BOTH the outgoing and incoming screen sit
+                                        // at partial alpha at once, and with no opaque fill under
+                                        // either one the window's default black showed straight
+                                        // through the gap -- a partially-released back swipe flashed
+                                        // black instead of just settling back to the current screen.
+                                        .background(MaterialTheme.colorScheme.background)
                                         // Skipped on WebView routes: layerBackdrop records
                                         // this whole subtree into a GraphicsLayer so glass
                                         // can sample it, which means the subtree is drawn

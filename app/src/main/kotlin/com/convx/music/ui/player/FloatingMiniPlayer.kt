@@ -7,6 +7,7 @@ package com.convx.music.ui.player
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
@@ -292,7 +293,19 @@ fun FloatingMiniPlayer(
         // height varies (FloatingMiniPlayerMinHeight..MaxHeight in
         // FloatingSideBar), so its icons/thumbnail scale with it instead of
         // looking tiny in a tall pill or cramped in a short one.
-        val measuredHeight = with(density) { measuredHeightPx.toDp() }
+        // Smoothed, not the raw per-frame measurement: artSize/controlSize below feed
+        // into this Row's own content, which is what onSizeChanged above measures, which
+        // sets measuredHeightPx -- a same-frame feedback loop. Reading the raw value here
+        // let each settle ping the next, snapping icon sizes by a pixel or two for several
+        // frames on every resize (the tablet pill growing/shrinking, most visibly) and
+        // reading as an icon flicker. Animating it breaks the loop: a resize now lags a
+        // few frames behind smoothly instead of both sides chasing each other to a stop.
+        val animatedHeightPx by animateIntAsState(
+            targetValue = measuredHeightPx,
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            label = "miniPlayerMeasuredHeight",
+        )
+        val measuredHeight = with(density) { animatedHeightPx.toDp() }
         val artSize = if (isInline) 36.dp else (measuredHeight * 0.6f).coerceIn(36.dp, 60.dp)
         val artCornerRadius = if (isInline) 9.dp else artSize * 0.22f
         val controlSize = if (isInline) 36.dp else (measuredHeight * 0.55f).coerceIn(36.dp, 52.dp)
