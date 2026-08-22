@@ -116,6 +116,12 @@ class BackupRestoreViewModel @Inject constructor(
                                 // capture path before closing DB to avoid reopening race
                                 val dbPath = database.openHelper.writableDatabase.path
                                 runBlocking(Dispatchers.IO) { database.checkpoint() }
+                                // Flagged before close: any other screen's Flow collector still
+                                // alive in this process can fire a query in the gap between this
+                                // close and the exitProcess(0) below, hitting a closed connection.
+                                // CrashHandler treats that specific race as expected here rather
+                                // than crashing over a query nothing is waiting on before exit.
+                                com.convx.music.utils.CrashHandler.databaseCloseExpected = true
                                 database.close()
                                 Timber.tag("RESTORE").i("Overwriting DB at path: $dbPath")
                                 FileOutputStream(dbPath).use { outputStream ->

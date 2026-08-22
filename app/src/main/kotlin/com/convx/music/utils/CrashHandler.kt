@@ -39,6 +39,18 @@ class CrashHandler private constructor(
             Timber.tag("CrashHandler").w(throwable, "Foreground service start refused by platform — ignoring, not crashing")
             return
         }
+        // Backup restore closes the shared Room database, overwrites its file, then hard-exits
+        // the process itself (BackupRestoreViewModel.restore(): database.close() -> exitProcess(0)).
+        // In that window any other still-alive screen/ViewModel whose Flow collector happens to
+        // fire a query against the now-closed connection throws exactly this -- "Error code: 21,
+        // message: connection is closed" (confirmed via a real device crash log, Xiaomi/Android 16,
+        // app 1.5.2). The process is already about to be killed intentionally right after; crashing
+        // here only replaces that clean restart with a scary crash screen for a query result nothing
+        // is even waiting on anymore.
+        if (databaseCloseExpected && throwable is android.database.SQLException) {
+            Timber.tag("CrashHandler").w(throwable, "SQLException during expected restore DB close — ignoring, process is already exiting")
+            return
+        }
         try {
             val crashLog = buildCrashLog(throwable)
             Timber.e(throwable, "App crashed")
@@ -84,6 +96,11 @@ class CrashHandler private constructor(
 
     companion object {
         const val EXTRA_CRASH_LOG = "crash_log"
+
+        /** Set by [com.convx.music.viewmodels.BackupRestoreViewModel] right before it closes
+         *  the shared database ahead of an intentional process exit. See the guard above. */
+        @Volatile
+        var databaseCloseExpected: Boolean = false
 
         fun install(context: Context) {
             val handler = CrashHandler(context.applicationContext)
