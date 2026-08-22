@@ -1244,28 +1244,6 @@ fun HomeScreen(
                     )
                 }
 
-                // YouTube's own mood/genre filters (Energize, Relax, Feel good...).
-                // The API has always returned these and HomeViewModel has always been able
-                // to act on them -- toggleChip refetches the feed with the chip's params --
-                // but nothing ever rendered the list, so the feature was invisible.
-                //
-                // Local-only mode has no remote feed to filter, so it gets nothing here.
-                val moodChips = homePage?.chips
-                if (showMoodFilters && !localOnly && !moodChips.isNullOrEmpty()) {
-                    item(key = "mood_filters", contentType = "mood_filters") {
-                        ChipsRow(
-                            // null is a real option, not a placeholder: it is how the user
-                            // clears the filter and returns to the unfiltered feed.
-                            chips = listOf<Pair<HomePage.Chip?, String>>(
-                                null to stringResource(R.string.filter_all),
-                            ) + moodChips.map { chip -> chip to chip.title },
-                            currentValue = selectedChip,
-                            onValueUpdate = { chip -> viewModel.toggleChip(chip) },
-                            modifier = Modifier.animateItem(),
-                        )
-                    }
-                }
-
                 if (selectedChip == null && !localOnly) {
                     item(key = "wrapped_card", contentType = "wrapped_card") {
                         AnimatedVisibility(visible = shouldShowWrappedCard) {
@@ -1357,6 +1335,9 @@ fun HomeScreen(
                     url = url,
                     keepListeningColumns = keepListeningColumns,
                     tabView = tabView,
+                    showMoodFilters = showMoodFilters,
+                    localOnly = localOnly,
+                    selectedChip = selectedChip,
                 )
                 // Only while a fetch is actually in flight. The old condition also kept this
                 // composed whenever a continuation merely EXISTED, so parking at the bottom of
@@ -1529,6 +1510,9 @@ private fun LazyListScope.homeSectionsContent(
     url: String?,
     keepListeningColumns: Int,
     tabView: Boolean,
+    showMoodFilters: Boolean,
+    localOnly: Boolean,
+    selectedChip: HomePage.Chip?,
 ) {
     sections.forEach { section ->
         when (section) {
@@ -1559,7 +1543,9 @@ private fun LazyListScope.homeSectionsContent(
                 section, deps, similarRecommendations,
             )
             is HomeSection.HomePageSection -> homePageSection(section, deps, homePage, mediaMetadata, isPlaying)
-            HomeSection.MoodAndGenres -> moodAndGenresSection(deps, explorePage)
+            HomeSection.MoodAndGenres -> moodAndGenresSection(
+                deps, explorePage, homePage, showMoodFilters, localOnly, selectedChip,
+            )
         }
     }
 }
@@ -2151,8 +2137,7 @@ private fun LazyListScope.quickPicksSection(
                     deps.quickPicksGridState,
                     rememberSnapFlingBehavior(deps.quickPicksSnapLayoutInfoProvider),
                 ),
-                contentPadding = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)
-                    .asPaddingValues().plusStart(deps.sideInset),
+                contentPadding = PaddingValues(horizontal = AppleTokens.Gutter).plusStart(deps.sideInset),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(ListItemHeight * QuickPicksGridRows)
@@ -2488,9 +2473,7 @@ private fun LazyListScope.accountPlaylistsSection(
             val distinctAccountPlaylists =
                 remember(accountPlaylists) { accountPlaylists.distinctBy { it.id } }
             LazyRow(
-                contentPadding = WindowInsets.systemBars
-                    .only(WindowInsetsSides.Horizontal)
-                    .asPaddingValues().plusStart(deps.sideInset),
+                contentPadding = PaddingValues(horizontal = AppleTokens.Gutter).plusStart(deps.sideInset),
                 modifier = Modifier.animateItem().bleedStart(deps.sideInset)
             ) {
                 items(
@@ -2537,8 +2520,7 @@ private fun LazyListScope.forgottenFavoritesSection(
             LazyHorizontalGrid(
                 state = deps.forgottenFavoritesGridState,
                 rows = GridCells.Fixed(rows),
-                contentPadding = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)
-                    .asPaddingValues().plusStart(deps.sideInset),
+                contentPadding = PaddingValues(horizontal = AppleTokens.Gutter).plusStart(deps.sideInset),
                 flingBehavior = rememberEdgeAwareFlingBehavior(
                     deps.forgottenFavoritesGridState,
                     rememberSnapFlingBehavior(deps.forgottenFavoritesSnapLayoutInfoProvider),
@@ -2653,9 +2635,7 @@ private fun LazyListScope.similarRecommendationsSection(
 
         item(key = "similar_to_list_${section.index}", contentType = "carousel") {
             LazyRow(
-                contentPadding = WindowInsets.systemBars
-                    .only(WindowInsetsSides.Horizontal)
-                    .asPaddingValues().plusStart(deps.sideInset),
+                contentPadding = PaddingValues(horizontal = AppleTokens.Gutter).plusStart(deps.sideInset),
                 modifier = Modifier.animateItem().bleedStart(deps.sideInset)
             ) {
                 items(items = recommendation.items, key = { it.id }) { item ->
@@ -2735,9 +2715,7 @@ private fun LazyListScope.homePageSection(
                 LazyHorizontalGrid(
                     state = rememberLazyGridState(),
                     rows = GridCells.Fixed(SongGridRows),
-                    contentPadding = WindowInsets.systemBars
-                        .only(WindowInsetsSides.Horizontal)
-                        .asPaddingValues().plusStart(deps.sideInset),
+                    contentPadding = PaddingValues(horizontal = AppleTokens.Gutter).plusStart(deps.sideInset),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(ListItemHeight * SongGridRows)
@@ -2802,9 +2780,7 @@ private fun LazyListScope.homePageSection(
             // Render mixed content as horizontal grid items (albums, playlists, artists, etc.)
             item(key = "home_section_list_${section.index}", contentType = "grid_carousel") {
                 LazyRow(
-                    contentPadding = WindowInsets.systemBars
-                        .only(WindowInsetsSides.Horizontal)
-                        .asPaddingValues().plusStart(deps.sideInset),
+                    contentPadding = PaddingValues(horizontal = AppleTokens.Gutter).plusStart(deps.sideInset),
                     modifier = Modifier.animateItem().bleedStart(deps.sideInset)
                 ) {
                     items(items = sectionData.items, key = { it.id }) { item ->
@@ -2819,7 +2795,33 @@ private fun LazyListScope.homePageSection(
 private fun LazyListScope.moodAndGenresSection(
     deps: HomeSectionDeps,
     explorePage: ExplorePage?,
+    homePage: HomePage?,
+    showMoodFilters: Boolean,
+    localOnly: Boolean,
+    selectedChip: HomePage.Chip?,
 ) {
+    // YouTube's own mood/genre filters (Energize, Relax, Feel good...), folded into this
+    // section rather than pinned above Home's own arrangement: they used to render at a
+    // fixed spot right under the title regardless of where "Mood and Genres" was dragged
+    // in Home Feed Order, so moving that row in settings visibly did nothing on Home.
+    //
+    // Local-only mode has no remote feed to filter, so it gets nothing here.
+    val moodChips = homePage?.chips
+    if (showMoodFilters && !localOnly && !moodChips.isNullOrEmpty()) {
+        item(key = "mood_filters", contentType = "mood_filters") {
+            ChipsRow(
+                // null is a real option, not a placeholder: it is how the user
+                // clears the filter and returns to the unfiltered feed.
+                chips = listOf<Pair<HomePage.Chip?, String>>(
+                    null to stringResource(R.string.filter_all),
+                ) + moodChips.map { chip -> chip to chip.title },
+                currentValue = selectedChip,
+                onValueUpdate = { chip -> deps.viewModel.toggleChip(chip) },
+                modifier = Modifier.animateItem(),
+            )
+        }
+    }
+
     // Deduplicated by title: YouTube can return the same
     // genre twice (seen with "Desi Hip-Hop"), and the grid
     // below keys on title — a repeat crashed Home outright
