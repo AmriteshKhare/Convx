@@ -170,6 +170,10 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SelectedThemeColorKey
 import com.convx.music.constants.AppBackgroundColorKey
 import com.convx.music.constants.AppTextColorKey
+import androidx.compose.material3.Surface
+import com.convx.music.constants.AppFont
+import com.convx.music.constants.SelectedFontKey
+import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -204,6 +208,15 @@ fun ThemeScreen(
         DefaultThemeColor.toArgb()
     )
     val (_, onDynamicThemeChange) = rememberPreference(DynamicThemeKey, defaultValue = true)
+    val (selectedFontValue) = rememberPreference(SelectedFontKey, defaultValue = AppFont.SYSTEM.value)
+    val fontLabel = when (AppFont.fromValue(selectedFontValue)) {
+        AppFont.SYSTEM -> stringResource(R.string.font_system)
+        AppFont.GOOGLE_SANS -> stringResource(R.string.font_google_sans)
+        AppFont.SANS_FLEX -> stringResource(R.string.font_sans_flex)
+        AppFont.OUTFIT -> stringResource(R.string.font_outfit)
+        AppFont.PLUS_JAKARTA_SANS -> stringResource(R.string.font_plus_jakarta_sans)
+    }
+    val onFontClick: () -> Unit = { navController.navigate("settings/appearance/font") }
 
     val selectedThemeColor = Color(selectedThemeColorInt)
     val configuration = LocalConfiguration.current
@@ -237,6 +250,8 @@ fun ThemeScreen(
             selectedThemeColor = selectedThemeColor,
             onSelectedThemeColorChange = handleColorSelection,
             onReset = onReset,
+            fontLabel = fontLabel,
+            onFontClick = onFontClick,
         )
     } else {
         PortraitThemeLayout(
@@ -247,6 +262,8 @@ fun ThemeScreen(
             selectedThemeColor = selectedThemeColor,
             onSelectedThemeColorChange = handleColorSelection,
             onReset = onReset,
+            fontLabel = fontLabel,
+            onFontClick = onFontClick,
         )
     }
 
@@ -273,6 +290,8 @@ fun PortraitThemeLayout(
     selectedThemeColor: Color,
     onSelectedThemeColorChange: (Color) -> Unit,
     onReset: () -> Unit,
+    fontLabel: String,
+    onFontClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -313,10 +332,48 @@ fun PortraitThemeLayout(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        FontQuickLink(fontLabel = fontLabel, onClick = onFontClick)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         HomeBackgroundControls()
 
 
         Spacer(modifier = Modifier.height(120.dp))
+    }
+}
+
+/**
+ * Quick link to [FontSelectionScreen][com.convx.music.ui.screens.settings.FontSelectionScreen]
+ * from the Theme screen — the font picker used to live only under Appearance, one level up,
+ * with no way to reach or see it from Theme itself.
+ */
+@Composable
+private fun FontQuickLink(
+    fontLabel: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth(0.9f),
+) {
+    Surface(
+        onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.app_font), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                fontLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -329,6 +386,8 @@ fun LandscapeThemeLayout(
     selectedThemeColor: Color,
     onSelectedThemeColorChange: (Color) -> Unit,
     onReset: () -> Unit,
+    fontLabel: String,
+    onFontClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -371,6 +430,14 @@ fun LandscapeThemeLayout(
                 pureBlack = pureBlack,
                 onPureBlackChange = onPureBlackChange,
                 onReset = onReset,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            FontQuickLink(
+                fontLabel = fontLabel,
+                onClick = onFontClick,
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(modifier = Modifier.height(16.dp))
