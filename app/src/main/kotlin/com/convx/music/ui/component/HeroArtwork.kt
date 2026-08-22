@@ -109,8 +109,9 @@ private val HeroBlurRadius = 48.dp
  * the band re-draws the artwork (decoded small — a 100dp blur erases all
  * detail) shifted so its bottom edge lands exactly on the band's centre, i.e.
  * on the join. [Modifier.blur] is a RenderEffect no-op below Android S, where
- * a *sharp* duplicate would look worse than no band at all — so the band is
- * skipped there and the plain fade handles the join as before.
+ * a *sharp* duplicate would look worse than no band at all — so below S this
+ * falls back to a plain [pageColor] gradient instead: no smeared detail, but
+ * still a fade rather than the hard edge doing nothing here would leave.
  */
 @Composable
 fun HeroMergeBand(
@@ -122,8 +123,26 @@ fun HeroMergeBand(
     blurRadius: Dp = 100.dp,
     /** Aspect ratio of the hero artwork this band must line up with. */
     heroRatio: Float = 1f,
+    /** The page colour below the join, for the pre-S plain-gradient fallback. */
+    pageColor: Color = Color.Black,
 ) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+        // Same footprint as the S+ Box below (fillMaxWidth/bandHeight), so callers'
+        // own .align/.offset on `modifier` line the fallback up on the same join.
+        Box(
+            modifier
+                .fillMaxWidth()
+                .height(bandHeight)
+                .background(
+                    Brush.verticalGradient(
+                        0.00f to Color.Transparent,
+                        0.50f to pageColor,
+                        1.00f to Color.Transparent,
+                    ),
+                ),
+        )
+        return
+    }
 
     val bandHeightPx = LocalDensity.current.run { bandHeight.roundToPx() }
 
