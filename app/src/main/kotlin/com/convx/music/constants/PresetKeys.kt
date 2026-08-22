@@ -41,6 +41,11 @@ object PresetKeys {
         PureBlackKey,
         PureBlackMiniPlayerKey,
         PureBlackHeroBackgroundKey,
+        // The Theme screen's explicit text/background color override (Theme.kt's
+        // flatText) — missing here meant a preset never carried the font color the
+        // user actually set, silently falling back to the accent-derived default.
+        AppTextColorKey,
+        AppBackgroundColorKey,
     )
 
     val LAYOUT: List<Preferences.Key<*>> = listOf(
