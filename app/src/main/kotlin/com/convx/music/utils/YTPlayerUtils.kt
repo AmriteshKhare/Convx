@@ -172,10 +172,17 @@ object YTPlayerUtils {
      * audio formats (4 vs IOS's 2), so it remains the better first choice. This array is
      * purely the recovery path.
      *
-     * VISIONOS was added 2026-08-19 ahead of IOS: an unreleased/internal client YouTube
-     * hasn't started bot-flagging yet, unlike IOS which the 2026-08-19 probe caught 5/5
-     * but user reports since then show failing on bot-flagged tracks too. IOS kept second
-     * since it still works when VISIONOS doesn't.
+     * VISIONOS was tried ahead of IOS on 2026-08-19 on the (unverified) theory that an
+     * unreleased/internal client wouldn't be bot-flagged yet. It has no probe data behind
+     * it, unlike IOS, and its own client comment already warns it's an unreleased client
+     * that "may stop working at any time" -- and user reports since then were of playback
+     * failing outright, consistent with VISIONOS passing validateStatus's HEAD check
+     * while still not actually streaming. Dropped back out the same day.
+     *
+     * Re-added 2026-08-22 as the FIRST fallback at owner request, matching ArchiveTune's
+     * N20260819 ordering (visionOS before any Android VR). Because a HEAD-passing but
+     * non-streaming VISIONOS URL would burn one validate round before IOS takes over,
+     * the cost of it failing is one extra probe -- not a dead end.
      *
      * IPADOS answered 0/5 in the same probe and is kept only for completeness.
      */
