@@ -225,6 +225,12 @@ fun PlayerV2(
     val (appTextColorInt) = rememberPreference(AppTextColorKey, defaultValue = 0)
     val (showUpNext) = rememberPreference(ShowUpNextKey, defaultValue = false)
     val diyLayout = rememberDiyLayout()
+    // Was hardcoded to PORTRAIT below, so rotating into landscape kept using the
+    // portrait sticker placement -- same real-orientation read the classic player
+    // uses for its own diyOrientation.
+    val diyOrientation = if (
+        LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    ) DiyOrientation.LANDSCAPE else DiyOrientation.PORTRAIT
 
     var showAudioDeviceBottomSheet by remember { mutableStateOf(false) }
     
@@ -430,6 +436,15 @@ fun PlayerV2(
                                             onSwipeRight = { if (canSkipPrevious) playerConnection.player.seekToPrevious() }
                                         )
                                 ) {
+                                    // Behind the artwork -- matches the classic player's z < 0
+                                    // band. Previously there was only one DiyStickerLayer call
+                                    // after the artwork, so a sticker placed at negative z (meant
+                                    // to sit behind the cover) rendered on top of it instead.
+                                    DiyStickerLayer(
+                                        layout = diyLayout,
+                                        orientation = diyOrientation,
+                                        zFilter = { it < 0 },
+                                    )
                                     AsyncImage(
                                         model = ImageRequest.Builder(context)
                                             .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
@@ -447,7 +462,8 @@ fun PlayerV2(
                                     )
                                     DiyStickerLayer(
                                         layout = diyLayout,
-                                        orientation = DiyOrientation.PORTRAIT,
+                                        orientation = diyOrientation,
+                                        zFilter = { it >= 0 },
                                     )
                                 }
                                 
@@ -709,6 +725,20 @@ fun PlayerV2(
                                             expandedBound = LocalConfiguration.current.screenHeightDp.dp,
                                             initialAnchor = expandedAnchor,
                                         )
+                                        // Queue's own inner sheet drags independently of playerState,
+                                        // the outer enum that actually decides whether this whole
+                                        // block is composed. Drag it to dismissedBound and Queue()
+                                        // (BottomSheet.kt:242,282) stops drawing BOTH its expanded
+                                        // and collapsed content -- nothing left on screen -- while
+                                        // playerState is still QUEUE, so nothing ever remounts a
+                                        // fresh, expanded queueSheetState. Tying the two together
+                                        // is what makes a drag-to-dismiss here behave like actually
+                                        // leaving the queue.
+                                        LaunchedEffect(queueSheetState.isDismissed) {
+                                            if (queueSheetState.isDismissed) {
+                                                playerState = PlayerInternalState.COVER
+                                            }
+                                        }
                                         Queue(
                                             state = queueSheetState,
                                             playerBottomSheetState = state,

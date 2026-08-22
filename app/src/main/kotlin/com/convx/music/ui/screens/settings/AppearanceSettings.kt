@@ -190,7 +190,6 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.UseNewMiniPlayerDesignKey
 import com.convx.music.constants.MiniBarTabStyleKey
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.constants.UseAppleMusicPlayerKey
 import com.convx.music.constants.UseNewPlayerDesignKey
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.ThumbnailCornerRadiusModal
@@ -243,10 +242,6 @@ fun AppearanceSettings(
     val (miniBarTabStyle, onMiniBarTabStyleChange) = rememberPreference(MiniBarTabStyleKey, defaultValue = false)
     val (_, _) = rememberPreference(DynamicThemeKey, defaultValue = true)
     val (useNewPlayerDesign, _) = rememberPreference(UseNewPlayerDesignKey, defaultValue = false)
-    // DIY stickers have no equivalent slot in the ported Apple Music Player V17
-    // layout, so its entry point is hidden rather than left dangling to a
-    // customization that would silently never render.
-    val (useAppleMusicPlayer, _) = rememberPreference(UseAppleMusicPlayerKey, defaultValue = false)
     val (showAudioQualityBadge, onShowAudioQualityBadgeChange) = rememberPreference(
         ShowAudioQualityBadgeKey,
         defaultValue = true
@@ -625,12 +620,16 @@ fun AppearanceSettings(
                     description = { Text(stringResource(R.string.player_icons_desc)) },
                     onClick = { navController.navigate("settings/appearance/playericons") }
                 ),
-                if (!useAppleMusicPlayer) Material3SettingsItem(
+                // Used to hide behind !useAppleMusicPlayer: DIY only drew its stickers on the
+                // classic player. Now that Player_v2 (V17) renders the same DiyStickerLayer
+                // too (with a real orientation read and the same behind/in-front z split),
+                // the editor applies to both and has no reason to be V17-only hidden.
+                Material3SettingsItem(
                     icon = painterResource(R.drawable.edit),
                     title = { Text(stringResource(R.string.diy)) },
                     description = { Text(stringResource(R.string.diy_desc)) },
                     onClick = { navController.navigate("settings/appearance/diy") }
-                ) else null
+                )
             )
         )
 

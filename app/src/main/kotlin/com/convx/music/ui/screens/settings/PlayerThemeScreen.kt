@@ -247,7 +247,16 @@ fun PlayerThemeScreen(
             PresetCard(
                 label = stringResource(R.string.apple_music_player_v17),
                 selected = useAppleMusicPlayer,
-                onClick = { onUseAppleMusicPlayerChange(!useAppleMusicPlayer) },
+                onClick = {
+                    val enabling = !useAppleMusicPlayer
+                    onUseAppleMusicPlayerChange(enabling)
+                    // V17 IS the Apple look; leaving the normal player's background style
+                    // on APPLE_MUSIC too is redundant and leaves that style stranded should
+                    // the user turn V17 back off. Move it to the closest look instead.
+                    if (enabling && background == PlayerBackgroundStyle.APPLE_MUSIC) {
+                        onBackgroundChange(PlayerBackgroundStyle.LIVE_MESH)
+                    }
+                },
             ) {
                 Box(
                     modifier = Modifier

@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
@@ -132,21 +131,6 @@ fun CastButton(
         Box(
             modifier = modifier
         ) {
-            // Shadow background for cast button
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .align(Alignment.Center)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.4f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-            
             // Cast button
             Box(
                 contentAlignment = Alignment.Center,
