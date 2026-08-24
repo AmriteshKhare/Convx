@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import com.convx.music.ui.component.BlurredBackdropImage
 import com.convx.music.ui.component.ScrollingWaveformSeekBar
 import com.convx.music.ui.component.rememberPlaybackFraction
 import com.convx.music.ui.component.thumbnailPx
@@ -76,7 +77,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
@@ -1251,29 +1251,19 @@ internal fun MiniPlayerBackgroundLayer(
     
     when (style) {
         PlayerBackgroundStyle.BLUR -> {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(mediaMetadata?.thumbnailUrl)
-                        .size(128, 128)
-                        .allowHardware(false)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .blur(30.dp)
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.45f))
-                )
-            } else {
-                // Modifier.blur no-ops below API 31 — without this fallback the
-                // gate above left nothing drawn at all. Solid black instead.
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-            }
+            // Baked blur on the 128px decode (see Player.kt BLUR branch): same
+            // look as Modifier.blur(30.dp), zero per-frame RenderEffect cost.
+            BlurredBackdropImage(
+                model = mediaMetadata?.thumbnailUrl,
+                screenBlurRadiusDp = 30f,
+                decodeSize = 128,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
         }
         PlayerBackgroundStyle.GRADIENT -> {
             if (gradientColors.isNotEmpty()) {
@@ -1376,27 +1366,17 @@ internal fun MiniPlayerBackgroundLayer(
                         scaleY = 1.5f
                     }
             ) {
-                // Modifier.blur no-ops below API 31 — an unblurred rotating 128x128
-                // crop is glitchy, so fall back to solid black there instead.
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val matrix = remember { ColorMatrix().apply { setToSaturation(1.6f) } }
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(mediaMetadata?.thumbnailUrl)
-                            .size(128, 128)
-                            .allowHardware(false)
-                            .build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        colorFilter = ColorFilter.colorMatrix(matrix),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(40.dp)
-                            .graphicsLayer { rotationZ = rotation.value }
-                    )
-                } else {
-                    Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-                }
+                // Baked blur on the 128px decode (see Player.kt BLUR branch note).
+                val matrix = remember { ColorMatrix().apply { setToSaturation(1.6f) } }
+                BlurredBackdropImage(
+                    model = mediaMetadata?.thumbnailUrl,
+                    screenBlurRadiusDp = 40f,
+                    decodeSize = 128,
+                    colorFilter = ColorFilter.colorMatrix(matrix),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { rotationZ = rotation.value },
+                )
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
             }
         }

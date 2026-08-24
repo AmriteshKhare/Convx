@@ -1355,7 +1355,12 @@ private fun SharedTransitionScope.ExpandedTabs(
         if (backdrop != null) {
             // Fixed 1dp blur here (see the blur() call below), so this is a
             // stable fraction, not something that needs recomputing per frame.
-            val tabsBackdropScale = glassResolutionScale(1f)
+            // Pinned at 1f: glassResolutionScale(1f) used to resolve to 1.0
+            // before the chrome-glass scale change (FULL_QUALITY_BLUR_DP 2.5f),
+            // and this hidden row feeds the puck's lens() refraction — a sharp
+            // effect that visibly softens at reduced capture resolution. The
+            // strip is short, so full-res capture here is cheap.
+            val tabsBackdropScale = 1f
             Row(
                 Modifier
                     .fillMaxWidth()

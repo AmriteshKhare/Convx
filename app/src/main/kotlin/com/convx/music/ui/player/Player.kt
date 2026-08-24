@@ -114,7 +114,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
@@ -217,6 +216,7 @@ import com.convx.music.vivimusic.isBuds
 import com.convx.music.vivimusic.isSpeaker
 import com.convx.music.vivimusic.AudioDeviceBottomSheet
 import com.convx.music.ui.component.DjReadout
+import com.convx.music.ui.component.BlurredBackdropImage
 import com.convx.music.ui.component.BottomSheet
 import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
 import com.convx.music.ui.component.BottomSheetState
@@ -388,7 +388,14 @@ fun BottomSheetPlayer(
 
     val dataSaverEnabled by rememberPreference(DataSaverEnabledKey, false)
     val enableCanvasPref by rememberPreference(CanvasThumbnailAnimationKey, true)
-    val enableCanvas = if (dataSaverEnabled) false else enableCanvasPref
+    // Canvas videos are the app's single largest data consumer (a looping video
+    // per track). DataSaver is the user's explicit "don't stream video" consent;
+    // battery saver gets the same treatment automatically — decoding + streaming
+    // a video per track is exactly what power saving exists to stop.
+    val powerSaverActive = remember {
+        context.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode ?: false
+    }
+    val enableCanvas = if (dataSaverEnabled || powerSaverActive) false else enableCanvasPref
     val (canvasSource) = rememberEnumPreference(CanvasSourceKey, defaultValue = CanvasSource.AUTO)
 
     val shouldUseDarkButtonColors = remember(playerBackground, useDarkTheme) {
@@ -1267,31 +1274,18 @@ fun BottomSheetPlayer(
                                         .graphicsLayer { alpha = backgroundAlpha() }
                                         .backdropStaticRegion(playerBackdrop)
                                 ) {
-                                    // Modifier.blur is a no-op below API 31 (RenderEffect isn't
-                                    // available) — without this gate, old Android shows the raw
-                                    // 160x160 crop stretched to fill the screen, unblurred and
-                                    // blocky, instead of the intended soft background. Solid
-                                    // black is closer to the intended look than that.
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(thumbnailUrl)
-                                                // 48x48 upscaled ~20-30x to fill the screen showed visible
-                                                // blocking even under a heavy blur — 160px matches the
-                                                // decode size HeroArtwork.kt already tuned for "visually
-                                                // identical to full-res once blurred" at a gentler upscale.
-                                                .size(160, 160)
-                                                .allowHardware(false)
-                                                .build(),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .blur(if (useDarkTheme) 150.dp else 100.dp)
-                                        )
-                                    } else {
-                                        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-                                    }
+                                    // Baked blur: the 160px source is upscaled ~7x to fill
+                                    // the screen, so a gaussian baked into the decode is
+                                    // visually identical to Modifier.blur(100-150dp) on the
+                                    // full-size image — but runs once per track on decode
+                                    // (cached) instead of a multi-ms RenderEffect pass on
+                                    // every redraw. StackBlur works on any API level, so
+                                    // the old below-S solid-black fallback goes away too.
+                                    BlurredBackdropImage(
+                                        model = thumbnailUrl,
+                                        screenBlurRadiusDp = if (useDarkTheme) 150f else 100f,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -1508,25 +1502,15 @@ fun BottomSheetPlayer(
                                         .graphicsLayer { alpha = backgroundAlpha() }
                                         .backdropStaticRegion(playerBackdrop)
                                 ) {
-                                    // Layer 1: Full-Screen Blurred Background. Modifier.blur is a
-                                    // no-op below API 31 — an unblurred 48x48 crop stretched full
-                                    // screen is blocky, so fall back to solid black there instead.
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(thumbnailUrl)
-                                                .size(48, 48) // Downsample significantly for performance
-                                                .allowHardware(false)
-                                                .build(),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .blur(150.dp)
-                                        )
-                                    } else {
-                                        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-                                    }
+                                    // Layer 1: Full-Screen Blurred Background — baked into
+                                    // the 48px decode (see BLUR branch note); the ~22x
+                                    // upscale hides the source entirely under the frost.
+                                    BlurredBackdropImage(
+                                        model = thumbnailUrl,
+                                        screenBlurRadiusDp = 150f,
+                                        decodeSize = 48,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
 
                                     // Layer 2: Clear Artwork (Limited to top 60% of screen)
                                     // Fades out when lyrics are shown to provide a full-screen blur
@@ -1689,68 +1673,51 @@ fun BottomSheetPlayer(
                                     }
                                     val colorFilter = ColorFilter.colorMatrix(matrix)
 
-                                    // All 3 layers depend on Modifier.blur, a no-op below API 31 —
-                                    // without it these would be 3 overlapping, unblurred, rotating
-                                    // 48x48 crops (glitchy), so fall back to solid black there.
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                        // Layer 1: The Anchor (Full Image, Counter-Clockwise)
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(thumbnailUrl)
-                                                .size(48, 48) // Downsample significantly for performance
-                                                .allowHardware(false)
-                                                .build(),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            colorFilter = colorFilter,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .blur(100.dp)
-                                                .graphicsLayer { rotationZ = anchorRotation.value }
-                                        )
+                                    // All 3 layers bake the blur into the 48px decode
+                                    // (see BLUR branch note) — the RenderEffect versions
+                                    // re-blurred three full-screen layers on every frame
+                                    // while rotating. Rotation stays as a plain
+                                    // graphicsLayer transform on the baked bitmap.
+                                    // Layer 1: The Anchor (Full Image, Counter-Clockwise)
+                                    BlurredBackdropImage(
+                                        model = thumbnailUrl,
+                                        screenBlurRadiusDp = 100f,
+                                        decodeSize = 48,
+                                        colorFilter = colorFilter,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer { rotationZ = anchorRotation.value },
+                                    )
 
-                                        // Layer 2: Fast Rotating Crop (Top-Left)
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(thumbnailUrl)
-                                                .size(48, 48) // Downsample significantly for performance
-                                                .allowHardware(false)
-                                                .build(),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            colorFilter = colorFilter,
-                                            alignment = Alignment.TopStart,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .blur(120.dp)
-                                                .graphicsLayer {
-                                                    rotationZ = fastRotation.value
-                                                    alpha = 0.6f
-                                                }
-                                        )
+                                    // Layer 2: Fast Rotating Crop (Top-Left)
+                                    BlurredBackdropImage(
+                                        model = thumbnailUrl,
+                                        screenBlurRadiusDp = 120f,
+                                        decodeSize = 48,
+                                        alignment = Alignment.TopStart,
+                                        colorFilter = colorFilter,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer {
+                                                rotationZ = fastRotation.value
+                                                alpha = 0.6f
+                                            },
+                                    )
 
-                                        // Layer 3: Slow Rotating Crop (Bottom-Right)
-                                        AsyncImage(
-                                            model = ImageRequest.Builder(context)
-                                                .data(thumbnailUrl)
-                                                .size(48, 48) // Downsample significantly for performance
-                                                .allowHardware(false)
-                                                .build(),
-                                            contentDescription = null,
-                                            contentScale = ContentScale.Crop,
-                                            colorFilter = colorFilter,
-                                            alignment = Alignment.BottomEnd,
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .blur(120.dp)
-                                                .graphicsLayer {
-                                                    rotationZ = slowRotation.value
-                                                    alpha = 0.5f
-                                                }
-                                        )
-                                    } else {
-                                        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-                                    }
+                                    // Layer 3: Slow Rotating Crop (Bottom-Right)
+                                    BlurredBackdropImage(
+                                        model = thumbnailUrl,
+                                        screenBlurRadiusDp = 120f,
+                                        decodeSize = 48,
+                                        alignment = Alignment.BottomEnd,
+                                        colorFilter = colorFilter,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer {
+                                                rotationZ = slowRotation.value
+                                                alpha = 0.5f
+                                            },
+                                    )
 
                                     // Global dark tint to prevent neon look + vertical gradient for depth
                                     Box(
