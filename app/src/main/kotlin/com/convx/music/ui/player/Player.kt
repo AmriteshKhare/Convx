@@ -244,6 +244,7 @@ import com.convx.music.ui.component.WavySlider
 import com.convx.music.ui.component.GlassCircleButton
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalBackdropLoopBucket
+import com.convx.music.ui.component.backdrop.backdrops.backdropStaticRegion
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.rememberBottomSheetState
@@ -1251,7 +1252,21 @@ fun BottomSheetPlayer(
                             label = "blurBackground"
                         ) { thumbnailUrl ->
                             if (thumbnailUrl != null) {
-                                Box(modifier = Modifier.graphicsLayer { alpha = backgroundAlpha() }) {
+                                // The blurred artwork is provably static between track
+                                // changes, but it lives inside the playerBackdrop source
+                                // subtree — without a static declaration, EVERY seekbar
+                                // position poll (100ms) or badge tick bumps the backdrop
+                                // version and re-captures + re-blurs the full screen for
+                                // each glass pill sampling this backdrop. Declared static,
+                                // pill captures whose rects fall inside this region reuse
+                                // their last capture; the only cost is that pill frost
+                                // lags the 800ms track-change crossfade by up to that
+                                // fade's duration (imperceptible tint shift).
+                                Box(
+                                    modifier = Modifier
+                                        .graphicsLayer { alpha = backgroundAlpha() }
+                                        .backdropStaticRegion(playerBackdrop)
+                                ) {
                                     // Modifier.blur is a no-op below API 31 (RenderEffect isn't
                                     // available) — without this gate, old Android shows the raw
                                     // 160x160 crop stretched to fill the screen, unblurred and
@@ -1312,6 +1327,7 @@ fun BottomSheetPlayer(
                                     Modifier
                                         .fillMaxSize()
                                         .graphicsLayer { alpha = backgroundAlpha() }
+                                        .backdropStaticRegion(playerBackdrop)
                                         .background(Brush.verticalGradient(colorStops = gradientColorStops))
                                         .background(Color.Black.copy(alpha = 0.2f))
                                 )
@@ -1490,6 +1506,7 @@ fun BottomSheetPlayer(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .graphicsLayer { alpha = backgroundAlpha() }
+                                        .backdropStaticRegion(playerBackdrop)
                                 ) {
                                     // Layer 1: Full-Screen Blurred Background. Modifier.blur is a
                                     // no-op below API 31 — an unblurred 48x48 crop stretched full
@@ -1762,6 +1779,7 @@ fun BottomSheetPlayer(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer { alpha = backgroundAlpha() }
+                                .backdropStaticRegion(playerBackdrop)
                                 .background(Color(staticColor))
                         )
                     }
@@ -1770,6 +1788,7 @@ fun BottomSheetPlayer(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer { alpha = backgroundAlpha() }
+                                .backdropStaticRegion(playerBackdrop)
                                 .tiltedGradient(gradientStops, gradientAngle)
                         )
                     }
