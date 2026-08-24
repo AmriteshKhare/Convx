@@ -136,7 +136,6 @@ import com.convx.music.constants.ResumeOnBluetoothConnectKey
 import com.convx.music.constants.ScrobbleDelayPercentKey
 import com.convx.music.constants.ScrobbleDelaySecondsKey
 import com.convx.music.constants.ScrobbleMinSongDurationKey
-import com.convx.music.constants.ShowLyricsKey
 import com.convx.music.constants.ShuffleModeKey
 import com.convx.music.constants.ShufflePlaylistFirstKey
 import com.convx.music.constants.PreventDuplicateTracksInQueueKey
@@ -824,7 +823,10 @@ class MusicService :
 
         combine(
             currentMediaMetadata.distinctUntilChangedBy { it?.id },
-            dataStore.data.map { (it[ShowLyricsKey] ?: false) && (it[DataSaverEnabledKey] != true) }.distinctUntilChanged(),
+            // ShowLyricsKey used to gate this but nothing in the app ever writes it,
+            // so it was permanently false and lyrics never prefetched for anyone --
+            // every player's lyrics pane sat on its loading placeholder forever.
+            dataStore.data.map { it[DataSaverEnabledKey] != true }.distinctUntilChanged(),
         ) { mediaMetadata, showLyrics ->
             mediaMetadata to showLyrics
         }.collectLatest(scope) { (mediaMetadata, showLyrics) ->

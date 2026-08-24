@@ -210,7 +210,10 @@ fun FloatingMiniPlayer(
             // overlay instead of in place, so the pill does not sit in the nav bar while
             // a copy of it is expanding across the screen.
             .recordPlayerLayer(
-                layer = { PlayerMorph.miniLayer },
+                // Only records while the morph is enabled -- see PlayerMorph.enabled --
+                // so this doesn't pay for a GraphicsLayer capture every frame for a morph
+                // that's currently off.
+                layer = { if (PlayerMorph.enabled) PlayerMorph.miniLayer else null },
                 drawInPlace = { !PlayerMorph.active },
             )
             .onSizeChanged { measuredHeightPx = it.height }
@@ -288,27 +291,31 @@ fun FloatingMiniPlayer(
                 }
             ),
     ) {
-        // Fixed sizes for the phone accessory strip (isInline) — it's a slim,
-        // constant-height dock, not meant to scale. The tablet pill's own
-        // height varies (FloatingMiniPlayerMinHeight..MaxHeight in
-        // FloatingSideBar), so its icons/thumbnail scale with it instead of
-        // looking tiny in a tall pill or cramped in a short one.
-        // Smoothed, not the raw per-frame measurement: artSize/controlSize below feed
-        // into this Row's own content, which is what onSizeChanged above measures, which
-        // sets measuredHeightPx -- a same-frame feedback loop. Reading the raw value here
-        // let each settle ping the next, snapping icon sizes by a pixel or two for several
-        // frames on every resize (the tablet pill growing/shrinking, most visibly) and
-        // reading as an icon flicker. Animating it breaks the loop: a resize now lags a
-        // few frames behind smoothly instead of both sides chasing each other to a stop.
+        // Fixed sizes for both phone accessory strips (isInline and the default
+        // !tabStyle wave bar) — neither's resting height ever changes, so there is
+        // nothing to scale against. Only the tablet pill's height actually varies
+        // (FloatingMiniPlayerMinHeight..MaxHeight in FloatingSideBar), so only it
+        // scales its icons/thumbnail off the measured height.
+        //
+        // The wave bar used to fall into the scaling branch too even though its
+        // height never changes: artSize/controlSize fed into this Row's own
+        // content, which is exactly what onSizeChanged above measures, which sets
+        // measuredHeightPx -- a same-frame feedback loop with itself. Smoothing
+        // the read with animateIntAsState (still done below, for the tablet pill)
+        // only dampened that loop's oscillation into a slow, continuous jitter
+        // instead of a one-frame pop -- still visible as the wave bar's icons
+        // subtly resizing on every recomposition. Only computing off
+        // measuredHeight for tabStyle removes the self-reference entirely for
+        // the wave bar, the case most phones actually see.
         val animatedHeightPx by animateIntAsState(
             targetValue = measuredHeightPx,
             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
             label = "miniPlayerMeasuredHeight",
         )
         val measuredHeight = with(density) { animatedHeightPx.toDp() }
-        val artSize = if (isInline) 36.dp else (measuredHeight * 0.6f).coerceIn(36.dp, 60.dp)
+        val artSize = if (tabStyle) (measuredHeight * 0.6f).coerceIn(36.dp, 60.dp) else if (isInline) 36.dp else 38.dp
         val artCornerRadius = if (isInline) 9.dp else artSize * 0.22f
-        val controlSize = if (isInline) 36.dp else (measuredHeight * 0.55f).coerceIn(36.dp, 52.dp)
+        val controlSize = if (tabStyle) (measuredHeight * 0.55f).coerceIn(36.dp, 52.dp) else 36.dp
 
         Row(
             verticalAlignment = Alignment.CenterVertically,

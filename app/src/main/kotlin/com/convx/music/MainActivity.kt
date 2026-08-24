@@ -22,6 +22,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -2107,8 +2108,19 @@ class MainActivity : ComponentActivity() {
                                     // sliding into place at once during a back-gesture drag.
                                     // Push keeps its slide/morph above -- only pop needed to
                                     // change, since only pop is ever gesture-driven.
+                                    //
+                                    // popEnterTransition is None, not a fade: fading BOTH
+                                    // screens (incoming 0->1 AND outgoing 1->0) meant mid-drag
+                                    // they sat at ~50% alpha each simultaneously -- a blend of
+                                    // two half-transparent screens over whatever's behind them,
+                                    // which read as a black flash (worse with pureBlack, where
+                                    // that backing is literally Color.Black) independent of
+                                    // whether the backing itself is opaque. The incoming screen
+                                    // was already fully revealed underneath the whole time, so
+                                    // it never needed to animate at all -- staying opaque means
+                                    // there is nothing to blend through, in any theme.
                                     popEnterTransition = {
-                                        fadeIn(tween(220))
+                                        EnterTransition.None
                                     },
                                     popExitTransition = {
                                         fadeOut(tween(220))

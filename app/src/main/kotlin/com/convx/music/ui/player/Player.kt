@@ -1175,7 +1175,18 @@ fun BottomSheetPlayer(
     BottomSheet(
         state = state,
         modifier = modifier,
-        morphEnabled = true,
+        // Off for now -- see PlayerMorph.enabled. Plain slide-up sheet until the
+        // handoff's black-gap flash is redone.
+        morphEnabled = PlayerMorph.enabled,
+        // The DIY editor mounts this same BottomSheetPlayer as a forced-open preview
+        // (editorPlayerState) sitting behind its own sticker-editing overlay. Without
+        // this, a drag that isn't fully consumed by the overlay (e.g. panning empty
+        // canvas with nothing selected) reaches this sheet's own swipe-to-collapse
+        // detector -- which read as the whole preview flickering/collapsing, and at
+        // dismissedBound could trigger onDismiss below, which stops playback and
+        // clears the real queue. The editor's own forced initialAnchor is the only
+        // state this preview should ever be in.
+        isExpandable = !isPreviewOnly,
         contentMaxWidth = playerContentMaxWidth,
         // The sheet rounds to the device's real screen radius as it reaches full size, so
         // its corners sit on the glass rather than near it, then opens out to square once
@@ -1851,7 +1862,14 @@ fun BottomSheetPlayer(
         },
     ) {
         if (useAppleMusicPlayer) {
-            PlayerV2(state = state, navController = navController, modifier = Modifier)
+            PlayerV2(
+                state = state,
+                navController = navController,
+                modifier = Modifier,
+                showDiyStickers = showDiyStickers,
+                forcedOrientation = forcedOrientation,
+                isPreviewOnly = isPreviewOnly,
+            )
             return@BottomSheet
         }
         val controlsContent: @Composable ColumnScope.(MediaMetadata) -> Unit = { mediaMetadata ->

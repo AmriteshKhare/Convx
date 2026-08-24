@@ -66,6 +66,8 @@ import com.convx.music.ui.component.expandedAnchor
 import androidx.compose.ui.platform.LocalConfiguration
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.first
 import com.convx.music.ui.component.LocalBottomSheetPageState
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.menu.LyricsMenu
@@ -99,6 +101,9 @@ import kotlinx.coroutines.launch
 
 enum class PlayerInternalState { COVER, LYRICS, QUEUE }
 
+/** Mirrors Player.kt's PARENT_SHEET_SETTLE_TIMEOUT_MS (private to that file). */
+private const val V2_PARENT_SHEET_SETTLE_TIMEOUT_MS = 1_000L
+
 private fun Modifier.customSoftShadow(elevation: androidx.compose.ui.unit.Dp, cornerRadius: androidx.compose.ui.unit.Dp, enabled: Boolean): Modifier =
     if (enabled) shadow(elevation, RoundedCornerShape(cornerRadius)) else this
 
@@ -107,24 +112,32 @@ private fun Modifier.customSoftShadow(elevation: androidx.compose.ui.unit.Dp, co
 fun PlayerV2(
     state: BottomSheetState,
     navController: NavController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDiyStickers: Boolean = true,
+    forcedOrientation: DiyOrientation? = null,
+    isPreviewOnly: Boolean = false,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // starting landscape not support
-    DisposableEffect(Unit) {
-        val activity = (context as? android.app.Activity) ?: run {
-            var ctx = context
-            while (ctx is android.content.ContextWrapper) {
-                if (ctx is android.app.Activity) break
-                ctx = ctx.baseContext
+    // starting landscape not support. Skipped for the DIY editor's preview mount
+    // (isPreviewOnly): pinning the real activity to portrait here would fight the
+    // editor's own design, which previews the landscape sticker layout by letting
+    // the user physically rotate the device.
+    if (!isPreviewOnly) {
+        DisposableEffect(Unit) {
+            val activity = (context as? android.app.Activity) ?: run {
+                var ctx = context
+                while (ctx is android.content.ContextWrapper) {
+                    if (ctx is android.app.Activity) break
+                    ctx = ctx.baseContext
+                }
+                ctx as? android.app.Activity
             }
-            ctx as? android.app.Activity
-        }
-        val originalOrientation = activity?.requestedOrientation ?: android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        onDispose {
-            activity?.requestedOrientation = originalOrientation
+            val originalOrientation = activity?.requestedOrientation ?: android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            onDispose {
+                activity?.requestedOrientation = originalOrientation
+            }
         }
     }
     // ended landscape not support
@@ -136,7 +149,40 @@ fun PlayerV2(
     val menuState = LocalMenuState.current
     val bottomSheetPageState = LocalBottomSheetPageState.current
     var playerState by remember { mutableStateOf(PlayerInternalState.COVER) }
-    
+
+    // The floating mini bar's lyrics/queue icons live outside this composable
+    // (FloatingSideBar/FloatingNavBar), so they signal here through
+    // PlayerConnection instead of calling local state directly -- same
+    // requestShowLyrics/requestShowQueue contract the classic player observes.
+    // V17 never collected these at all, so tapping those icons while V17 was
+    // active expanded the player sheet but never switched panes -- a dead tap.
+    LaunchedEffect(Unit) {
+        playerConnection.requestShowLyrics.collect { requested ->
+            if (requested) {
+                if (!state.isExpanded) {
+                    withTimeoutOrNull(V2_PARENT_SHEET_SETTLE_TIMEOUT_MS) {
+                        snapshotFlow { state.isExpanded }.first { it }
+                    }
+                }
+                playerState = PlayerInternalState.LYRICS
+                playerConnection.requestShowLyrics.value = false
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        playerConnection.requestShowQueue.collect { requested ->
+            if (requested) {
+                if (!state.isExpanded) {
+                    withTimeoutOrNull(V2_PARENT_SHEET_SETTLE_TIMEOUT_MS) {
+                        snapshotFlow { state.isExpanded }.first { it }
+                    }
+                }
+                playerState = PlayerInternalState.QUEUE
+                playerConnection.requestShowQueue.value = false
+            }
+        }
+    }
+
     val listenTogetherManager = com.convx.music.LocalListenTogetherManager.current
     val listenTogetherRoleState = listenTogetherManager?.role?.collectAsState(initial = com.convx.music.listentogether.RoomRole.NONE)
     val isListenTogetherGuest = listenTogetherRoleState?.value == com.convx.music.listentogether.RoomRole.GUEST
@@ -227,8 +273,9 @@ fun PlayerV2(
     val diyLayout = rememberDiyLayout()
     // Was hardcoded to PORTRAIT below, so rotating into landscape kept using the
     // portrait sticker placement -- same real-orientation read the classic player
-    // uses for its own diyOrientation.
-    val diyOrientation = if (
+    // uses for its own diyOrientation. forcedOrientation overrides it for the DIY
+    // editor's preview mount, same as the classic player's isLandscapeLayout.
+    val diyOrientation = forcedOrientation ?: if (
         LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     ) DiyOrientation.LANDSCAPE else DiyOrientation.PORTRAIT
 
@@ -440,7 +487,10 @@ fun PlayerV2(
                                     // band. Previously there was only one DiyStickerLayer call
                                     // after the artwork, so a sticker placed at negative z (meant
                                     // to sit behind the cover) rendered on top of it instead.
-                                    DiyStickerLayer(
+                                    // Gated on showDiyStickers so the DIY editor's own draft
+                                    // overlay (DiyEditorScreen's DiyDesignCanvas) isn't drawn
+                                    // twice on top of this live, saved-layout copy.
+                                    if (showDiyStickers) DiyStickerLayer(
                                         layout = diyLayout,
                                         orientation = diyOrientation,
                                         zFilter = { it < 0 },
@@ -460,7 +510,7 @@ fun PlayerV2(
                                         isPlaying = isPlaying,
                                         modifier = Modifier.fillMaxSize()
                                     )
-                                    DiyStickerLayer(
+                                    if (showDiyStickers) DiyStickerLayer(
                                         layout = diyLayout,
                                         orientation = diyOrientation,
                                         zFilter = { it >= 0 },

@@ -76,6 +76,12 @@ internal const val PLAYER_LAYER_HANDOFF_PROGRESS = 0.25f
 
 private const val BackdropFreezeSafetyNs = 900_000_000L
 
+/** ponytail: diagnostic slow-motion for the player<->mini sheet transition, at
+ *  the user's request, so the reported jitter is visible to the eye. Divides
+ *  every spring's stiffness (lower stiffness = slower settle). Revert to 1f
+ *  once the defect is actually pinned down from what this shows. */
+private const val DIAG_SLOWDOWN = 6f
+
 /**
  * Bottom Sheet
  * Modified from [ViMusic](https://github.com/vfsfitvnm/ViMusic)
@@ -380,7 +386,7 @@ class BottomSheetState(
         collapse(
             spring(
                 dampingRatio = 0.68f,
-                stiffness = bounceStiffnessFor(seed),
+                stiffness = bounceStiffnessFor(seed) / DIAG_SLOWDOWN,
             ),
             initialVelocity = with(density) { seed.toDp() },
         )
@@ -391,7 +397,7 @@ class BottomSheetState(
         expand(
             spring(
                 dampingRatio = 0.68f,
-                stiffness = bounceStiffnessFor(seed),
+                stiffness = bounceStiffnessFor(seed) / DIAG_SLOWDOWN,
             ),
             initialVelocity = with(density) { seed.toDp() },
         )
@@ -405,7 +411,7 @@ class BottomSheetState(
         collapse(
             spring(
                 dampingRatio = 0.85f,
-                stiffness = Spring.StiffnessLow,
+                stiffness = Spring.StiffnessLow / DIAG_SLOWDOWN,
             ),
         )
     }
@@ -415,7 +421,7 @@ class BottomSheetState(
         expand(
             spring(
                 dampingRatio = 0.85f,
-                stiffness = Spring.StiffnessLow,
+                stiffness = Spring.StiffnessLow / DIAG_SLOWDOWN,
             ),
         )
     }

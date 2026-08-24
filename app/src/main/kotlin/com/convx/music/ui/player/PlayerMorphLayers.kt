@@ -33,6 +33,14 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
  * `hideWhileArtworkMorphing` was fixed for).
  */
 object PlayerMorph {
+    /**
+     * Master switch, off for now: the shared container/artwork morph read as an ugly,
+     * jarring state-change (a black gap at the fraction 0/1 handoff) rather than a smooth
+     * transition. [active] short-circuits on this so every caller's own
+     * `morphEnabled && PlayerMorph.active` check goes false too, without each of them
+     * needing their own flag. Flip back to true to re-enable once the handoff is redone.
+     */
+    @JvmField var enabled: Boolean = false
     @JvmField var miniLayer: GraphicsLayer? = null
     @JvmField var fullLayer: GraphicsLayer? = null
 
@@ -60,6 +68,7 @@ object PlayerMorph {
      */
     val active: Boolean
         get() {
+            if (!enabled) return false
             val fraction = progress
             if (fraction <= 0f || fraction >= 1f) return false
             if (miniLayer == null || fullLayer == null) return false

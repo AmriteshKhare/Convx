@@ -132,11 +132,17 @@ import kotlin.math.sign
 
 
 
+// ponytail: diagnostic slow-motion for the inline<->expanded transition, at
+// the user's request, to make the reported jitter visible to the eye instead
+// of guessing from source. Revert to 1 once the defect is actually pinned
+// down from what this shows.
+private const val DIAG_SLOWDOWN = 6
+
 // Tuning for the gooey merge/split pulse across the inline<->expanded
 // crossfade — see GooeyTransition.kt. Not derived from fadeIn()/fadeOut()'s
 // own duration; just a reasonable match for it.
 private val GooeyPeakBlur = 12.dp
-private const val GooeyDurationMs = 300
+private const val GooeyDurationMs = 300 * DIAG_SLOWDOWN
 
 // Rim/shadow the selection puck keeps when it is NOT being pressed. Both used to
 // be driven straight off pressProgress, i.e. zero at rest, which left the puck
@@ -272,8 +278,8 @@ fun FloatingTabBar(
             Box {
                 transition.AnimatedContent(
                     transitionSpec = {
-                        fadeIn(tween(220, easing = FastOutSlowInEasing)) togetherWith
-                            fadeOut(tween(180, easing = FastOutSlowInEasing))
+                        fadeIn(tween(220 * DIAG_SLOWDOWN, easing = FastOutSlowInEasing)) togetherWith
+                            fadeOut(tween(180 * DIAG_SLOWDOWN, easing = FastOutSlowInEasing))
                     },
                     contentAlignment = Alignment.BottomCenter
                 ) { targetVisual ->
