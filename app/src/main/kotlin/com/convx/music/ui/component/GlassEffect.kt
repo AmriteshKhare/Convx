@@ -195,8 +195,20 @@ internal const val PLAYER_BLUR_MULTIPLIER = 4f
  */
 internal const val MIN_GLASS_RESOLUTION_SCALE = 0.30f
 
-/** Blur radius (dp) at or above which the minimum resolution scale is safe to use. */
-internal const val FULL_QUALITY_BLUR_DP = 8f
+/**
+ * Blur radius (dp) at or above which the minimum resolution scale is safe to use.
+ *
+ * Profiling note (framestats harness, SM-M346B @120Hz): persistent chrome glass
+ * (nav bar / mini player at the default 2dp) re-captures and re-processes its
+ * backdrop on every scrolled frame, and the previous 8f threshold put that
+ * capture at a 0.825 resolution scale — nearly full-screen-res work per frame.
+ * Frost fully masks resampling at moderate scales; the historical revert was at
+ * scale 0.05 where the pre-multiplied 2dp blur collapsed to ~0.3px under a 20x
+ * upscale. At 2.5f the default pill lands at ~0.44 scale (~0.9px in-layer frost,
+ * 2.3x upscale) with no visible change, while clear-content surfaces (0dp) stay
+ * at 1f and heavy player blurs still reach the [MIN_GLASS_RESOLUTION_SCALE] floor.
+ */
+internal const val FULL_QUALITY_BLUR_DP = 2.5f
 
 /**
  * Resolution fraction at which a glass surface records and processes its backdrop.
