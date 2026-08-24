@@ -76,11 +76,11 @@ internal const val PLAYER_LAYER_HANDOFF_PROGRESS = 0.25f
 
 private const val BackdropFreezeSafetyNs = 900_000_000L
 
-/** ponytail: diagnostic slow-motion for the player<->mini sheet transition, at
- *  the user's request, so the reported jitter is visible to the eye. Divides
- *  every spring's stiffness (lower stiffness = slower settle). Revert to 1f
- *  once the defect is actually pinned down from what this shows. */
-private const val DIAG_SLOWDOWN = 6f
+/** ponytail: diagnostic slow-motion for the player<->mini sheet transition.
+ *  Was left at 6f after a jitter hunt (every sheet spring divided → 6x slower
+ *  expand/collapse), which read as lag, dead taps during the crawl and
+ *  transition ghosting. Revert to 1f only to re-diagnose. */
+private const val DIAG_SLOWDOWN = 1f
 
 /**
  * Bottom Sheet
@@ -386,7 +386,7 @@ class BottomSheetState(
         collapse(
             spring(
                 dampingRatio = 0.68f,
-                stiffness = bounceStiffnessFor(seed) / DIAG_SLOWDOWN,
+                stiffness = bounceStiffnessFor(seed),
             ),
             initialVelocity = with(density) { seed.toDp() },
         )
@@ -397,7 +397,7 @@ class BottomSheetState(
         expand(
             spring(
                 dampingRatio = 0.68f,
-                stiffness = bounceStiffnessFor(seed) / DIAG_SLOWDOWN,
+                stiffness = bounceStiffnessFor(seed),
             ),
             initialVelocity = with(density) { seed.toDp() },
         )
@@ -411,7 +411,7 @@ class BottomSheetState(
         collapse(
             spring(
                 dampingRatio = 0.85f,
-                stiffness = Spring.StiffnessLow / DIAG_SLOWDOWN,
+                stiffness = Spring.StiffnessLow,
             ),
         )
     }
@@ -421,7 +421,7 @@ class BottomSheetState(
         expand(
             spring(
                 dampingRatio = 0.85f,
-                stiffness = Spring.StiffnessLow / DIAG_SLOWDOWN,
+                stiffness = Spring.StiffnessLow,
             ),
         )
     }

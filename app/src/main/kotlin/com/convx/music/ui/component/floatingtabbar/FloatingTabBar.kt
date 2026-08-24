@@ -132,11 +132,12 @@ import kotlin.math.sign
 
 
 
-// ponytail: diagnostic slow-motion for the inline<->expanded transition, at
-// the user's request, to make the reported jitter visible to the eye instead
-// of guessing from source. Revert to 1 once the defect is actually pinned
-// down from what this shows.
-private const val DIAG_SLOWDOWN = 6
+// ponytail: diagnostic slow-motion for the inline<->expanded transition.
+// Was left at 6 after a jitter hunt (gooey crossfade 300ms -> 1800ms, tab
+// fades 220/180ms -> ~1.4s): both bars rendered overlapping for seconds —
+// the reported "ghosting" and puck-behind-nav-bar — and taps during the
+// crawl felt dead. Keep at 1; raise only to re-diagnose.
+private const val DIAG_SLOWDOWN = 1
 
 // Tuning for the gooey merge/split pulse across the inline<->expanded
 // crossfade — see GooeyTransition.kt. Not derived from fadeIn()/fadeOut()'s
