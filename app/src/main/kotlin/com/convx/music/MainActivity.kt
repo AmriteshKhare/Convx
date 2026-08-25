@@ -1211,6 +1211,26 @@ class MainActivity : ComponentActivity() {
                 val hasDockedPlayerAccessory =
                     playerMediaMetadata != null && !showRail && shouldShowNavigationBar &&
                         (!inSearchScreen || !searchKeyboardActive)
+
+                // Does anything ON THIS SCREEN actually sample the app backdrop?
+                //
+                // `anyComponentEnabled` only asks whether a component is enabled ANYWHERE in
+                // the app, so with the nav bar's glass on -- the default -- every screen paid
+                // for the full-screen capture, including screens with no nav bar and no mini
+                // player on them at all. Measured on a Galaxy M34: skipping the capture takes
+                // a Home scroll from p50 105ms to 25ms, so this is worth being precise about.
+                //
+                // Each clause pairs "is this component's glass enabled" with "is that
+                // component on screen right now". The player's own glass only needs the
+                // backdrop once the sheet has left its collapsed anchor -- isCollapsed is
+                // derived state that flips once per open and once per close, NOT per frame,
+                // so it is safe to read here (unlike `progress`).
+                val backdropHasConsumer =
+                    (glassEffectConfig.navBarEnabled && shouldShowNavigationBar && !showRail) ||
+                        (glassEffectConfig.sidePanelEnabled && showRail) ||
+                        (glassEffectConfig.miniPlayerEnabled && hasDockedPlayerAccessory) ||
+                        (glassEffectConfig.playerEnabled && !playerBottomSheetState.isCollapsed)
+
                 val playerAwareWindowInsets = remember(
                     bottomInset,
                     shouldShowNavigationBar,
@@ -2017,6 +2037,7 @@ class MainActivity : ComponentActivity() {
                                             if (DIAG_DISABLE_BACKDROP ||
                                                 currentRoute in WebViewRoutes ||
                                                 !glassEffectConfig.anyComponentEnabled ||
+                                                !backdropHasConsumer ||
                                                 !glassAllowed
                                             ) {
                                                 Modifier

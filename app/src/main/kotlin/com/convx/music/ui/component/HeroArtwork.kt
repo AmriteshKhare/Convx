@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawWithContent
@@ -613,16 +612,19 @@ fun HeroBackground(
                     // bottom. Decoded at low resolution — a 48dp blur erases all
                     // detail, so a ~160px source is visually identical to full-res
                     // while cutting decode time and bitmap memory dramatically.
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(heroSource.url)
-                            .size(160)
-                            .build(),
-                        contentDescription = null,
+                    // Baked once per artwork rather than Modifier.blur, which is a
+                    // RenderEffect and so re-runs on EVERY frame -- full-screen, on every
+                    // screen that uses this background, for a picture that does not change
+                    // while the screen is up. Same 160px source and same 48dp screen-space
+                    // radius, so the result is the same; it is computed on the CPU once and
+                    // cached per artwork instead.
+                    BlurredBackdropImage(
+                        model = heroSource.url,
+                        screenBlurRadiusDp = HeroBlurRadius.value,
+                        decodeSize = 160,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
-                            .blur(HeroBlurRadius)
                             .graphicsLayer {
                                 this.alpha = alpha
                                 scaleX = heroScale
@@ -640,7 +642,7 @@ fun HeroBackground(
                                     blendMode = BlendMode.DstIn,
                                 )
                             },
-                        onSuccess = { visible = true },
+                        onReady = { visible = true },
                     )
                     // Sharp upper layer: the top half stays crisp, then dissolves
                     // so the blur takes over from roughly where the list begins.
@@ -650,6 +652,11 @@ fun HeroBackground(
                         model = heroSource.url,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        // Second, independent path to `visible`. This layer used to rely
+                        // entirely on the blurred one below flipping it; now that the blur
+                        // is a CPU bake, a slow or failed bake would otherwise leave the
+                        // whole hero pinned at alpha 0.
+                        onSuccess = { visible = true },
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {

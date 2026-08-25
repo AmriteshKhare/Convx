@@ -11,6 +11,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,13 @@ fun BlurredBackdropImage(
     contentScale: ContentScale = ContentScale.Crop,
     alignment: Alignment = Alignment.Center,
     colorFilter: ColorFilter? = null,
+    /**
+     * Fired once this has pixels to draw — on the bake completing, or immediately on a
+     * cache hit. The AsyncImage this replaces reported readiness through `onSuccess`, and
+     * callers use that to start their own fade; without an equivalent they would fade in
+     * against nothing.
+     */
+    onReady: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -95,6 +103,13 @@ fun BlurredBackdropImage(
         }
         blurredBackdropCache.put(cacheKey, blurred)
         baked = blurred
+    }
+
+    // Covers both paths in one place: the bake finishing above, and the cache hit that
+    // seeded `baked` before the effect ever ran.
+    val readyCallback by rememberUpdatedState(onReady)
+    LaunchedEffect(baked) {
+        if (baked != null) readyCallback?.invoke()
     }
 
     baked?.let { bitmap ->
