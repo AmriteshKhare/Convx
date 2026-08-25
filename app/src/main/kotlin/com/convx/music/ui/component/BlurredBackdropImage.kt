@@ -27,6 +27,8 @@ import coil3.request.allowHardware
 import coil3.toBitmap
 import com.convx.music.ui.utils.stackBlur
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Bounded session cache of baked blurred backdrops, keyed by
@@ -84,7 +86,13 @@ fun BlurredBackdropImage(
             .allowHardware(false) // pixel readback for the bake
             .build()
         val bmp = ImageLoader(context).execute(request).image?.toBitmap() ?: return@LaunchedEffect
-        val blurred = bmp.copy(Bitmap.Config.ARGB_8888, true).stackBlur(sourceRadius)
+        // LaunchedEffect runs on AndroidUiDispatcher, i.e. the MAIN thread inside a frame
+        // callback -- a pixel copy plus three blur passes there is a dropped frame every
+        // time a new backdrop is baked. The bake is pure CPU over a private bitmap, so it
+        // belongs on Default; only the state write below has to come back.
+        val blurred = withContext(Dispatchers.Default) {
+            bmp.copy(Bitmap.Config.ARGB_8888, true).stackBlur(sourceRadius)
+        }
         blurredBackdropCache.put(cacheKey, blurred)
         baked = blurred
     }
