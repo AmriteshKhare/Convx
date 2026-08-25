@@ -89,6 +89,8 @@ import com.convx.music.BuildConfig
 import com.convx.music.R
 import com.convx.music.utils.rememberPreference
 import com.convx.music.constants.AppTextColorKey
+import com.convx.music.constants.CompactPlayerInTabViewKey
+import com.convx.music.LocalTabView
 import com.convx.music.constants.ShowUpNextKey
 import com.convx.music.ui.player.customize.DiyStickerLayer
 import com.convx.music.ui.player.customize.PlayerGlyph
@@ -98,6 +100,7 @@ import com.convx.music.ui.player.customize.DiyOrientation
 import com.convx.music.ui.player.customize.DiyDesignCanvas
 import com.convx.music.LocalPlayerConnection
 import kotlinx.coroutines.launch
+import com.convx.music.ui.utils.Motion
 
 enum class PlayerInternalState { COVER, LYRICS, QUEUE }
 
@@ -378,6 +381,15 @@ fun PlayerV2(
         label = "adaptiveSurface"
     )
 
+    // Matches the classic player's own rule (Player.kt): side-by-side on a wide/
+    // landscape screen, unless the user asked tab view to keep the compact,
+    // phone-shaped player. V17 had no wide branch at all before this -- in landscape
+    // it stacked a squashed cover over the controls and ran out of height.
+    val (compactPlayerInTabView) = rememberPreference(CompactPlayerInTabViewKey, false)
+    val isWidePlayerLayout =
+        LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
+            !(LocalTabView.current && compactPlayerInTabView)
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -394,12 +406,13 @@ fun PlayerV2(
                 }
             }
     ) {
-        Column(
+        PlayerV2Frame(
+            isWide = isWidePlayerLayout,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = WindowInsets.systemBars.asPaddingValues().calculateTopPadding())
-                .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
-        ) {
+                .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()),
+            handle = {
             // Minimal drag handle header
             Row(
                 modifier = Modifier
@@ -416,21 +429,22 @@ fun PlayerV2(
                         .clickable { state.collapseSoft() }
                 )
             }
-
+            },
+            pane = { paneModifier ->
             // Morphing Content Area (Cover vs Lyrics vs Queue)
             androidx.compose.animation.SharedTransitionLayout(
-                    modifier = Modifier.weight(1f)
+                    modifier = paneModifier
                 ) {
                     AnimatedContent(
                         targetState = playerState,
                         transitionSpec = {
                             if (targetState == PlayerInternalState.LYRICS || targetState == PlayerInternalState.QUEUE) {
                                 // Pure crossfade: lets Shared Elements smoothly morph top-left while lyrics fade in calmly
-                                fadeIn(animationSpec = tween(600, easing = FastOutSlowInEasing)) togetherWith 
-                                fadeOut(animationSpec = tween(600, easing = FastOutSlowInEasing))
+                                fadeIn(animationSpec = Motion.appear()) togetherWith 
+                                fadeOut(animationSpec = Motion.appear())
                             } else {
-                                fadeIn(animationSpec = tween(600, easing = FastOutSlowInEasing)) togetherWith 
-                                fadeOut(animationSpec = tween(600, easing = FastOutSlowInEasing))
+                                fadeIn(animationSpec = Motion.appear()) togetherWith 
+                                fadeOut(animationSpec = Motion.appear())
                             }.using(
                                 // Ensure the Lyrics pane is drawn OVER the Cover pane during transition
                                 androidx.compose.animation.SizeTransform(clip = false)
@@ -759,8 +773,8 @@ fun PlayerV2(
                                     modifier = Modifier
                                         .weight(1f)
                                         .animateEnterExit(
-                                            enter = slideInVertically(animationSpec = tween(600, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(600)),
-                                            exit = fadeOut(animationSpec = tween(400)) + slideOutVertically(animationSpec = tween(400, easing = FastOutSlowInEasing)) { it }
+                                            enter = slideInVertically(animationSpec = Motion.appear()) { it } + fadeIn(Motion.appear()),
+                                            exit = fadeOut(animationSpec = Motion.appearExit()) + slideOutVertically(animationSpec = Motion.appearExit()) { it }
                                         )
                                 ) {
                                     if (targetState == PlayerInternalState.LYRICS) {
@@ -784,8 +798,26 @@ fun PlayerV2(
                                         // fresh, expanded queueSheetState. Tying the two together
                                         // is what makes a drag-to-dismiss here behave like actually
                                         // leaving the queue.
+                                        //
+                                        // But `initialAnchor` only ever applies ONCE:
+                                        // rememberBottomSheetState keeps the last anchor in a
+                                        // rememberSaveable, so after the queue has been dismissed
+                                        // even once, every later open remounts this sheet ALREADY
+                                        // dismissed. The effect below then fired on the very first
+                                        // frame and put playerState straight back to COVER -- which
+                                        // is exactly the reported dead queue button: it works once,
+                                        // then never again for the rest of the process. So re-open
+                                        // the sheet on mount, and only let a dismissal mean "leave
+                                        // the queue" once it has genuinely been open.
+                                        var queueOpened by remember { mutableStateOf(false) }
+                                        LaunchedEffect(Unit) {
+                                            queueSheetState.expandSoft()
+                                        }
+                                        LaunchedEffect(queueSheetState.isExpanded) {
+                                            if (queueSheetState.isExpanded) queueOpened = true
+                                        }
                                         LaunchedEffect(queueSheetState.isDismissed) {
-                                            if (queueSheetState.isDismissed) {
+                                            if (queueOpened && queueSheetState.isDismissed) {
                                                 playerState = PlayerInternalState.COVER
                                             }
                                         }
@@ -809,16 +841,17 @@ fun PlayerV2(
                         }
                 }
             }
-            
+            },
+            controls = {
             // Persistent Controls Array (Always at the bottom)
             AnimatedVisibility(
                     visible = controlsVisible,
-                    enter = fadeIn(animationSpec = tween(500, easing = LinearOutSlowInEasing)) +
-                            slideInVertically(animationSpec = tween(500, easing = LinearOutSlowInEasing)) { it / 2 } +
-                            androidx.compose.animation.expandVertically(animationSpec = tween(500, easing = LinearOutSlowInEasing)),
-                    exit = fadeOut(animationSpec = tween(500, easing = LinearOutSlowInEasing)) +
-                           slideOutVertically(animationSpec = tween(500, easing = LinearOutSlowInEasing)) { it / 2 } +
-                           androidx.compose.animation.shrinkVertically(animationSpec = tween(500, easing = LinearOutSlowInEasing))
+                    enter = fadeIn(animationSpec = Motion.appear()) +
+                            slideInVertically(animationSpec = Motion.appear()) { it / 2 } +
+                            androidx.compose.animation.expandVertically(animationSpec = Motion.appear()),
+                    exit = fadeOut(animationSpec = Motion.appearExit()) +
+                           slideOutVertically(animationSpec = Motion.appearExit()) { it / 2 } +
+                           androidx.compose.animation.shrinkVertically(animationSpec = Motion.appearExit())
                 ) {
                     Column(
                         modifier = Modifier
@@ -1015,12 +1048,12 @@ fun PlayerV2(
             // Bottom Utility Action Bar
             AnimatedVisibility(
                 visible = controlsVisible,
-                enter = fadeIn(animationSpec = tween(500, easing = LinearOutSlowInEasing)) +
-                        slideInVertically(animationSpec = tween(500, easing = LinearOutSlowInEasing)) { it / 2 } +
-                        androidx.compose.animation.expandVertically(animationSpec = tween(500, easing = LinearOutSlowInEasing)),
-                exit = fadeOut(animationSpec = tween(500, easing = LinearOutSlowInEasing)) +
-                       slideOutVertically(animationSpec = tween(500, easing = LinearOutSlowInEasing)) { it / 2 } +
-                       androidx.compose.animation.shrinkVertically(animationSpec = tween(500, easing = LinearOutSlowInEasing))
+                enter = fadeIn(animationSpec = Motion.appear()) +
+                        slideInVertically(animationSpec = Motion.appear()) { it / 2 } +
+                        androidx.compose.animation.expandVertically(animationSpec = Motion.appear()),
+                exit = fadeOut(animationSpec = Motion.appearExit()) +
+                       slideOutVertically(animationSpec = Motion.appearExit()) { it / 2 } +
+                       androidx.compose.animation.shrinkVertically(animationSpec = Motion.appearExit())
             ) {
                 Row(
                     modifier = Modifier
@@ -1106,11 +1139,59 @@ fun PlayerV2(
                 }
                 }
             }
-        }
-        
+            },
+        )
+
         if (showAudioDeviceBottomSheet) {
             AudioDeviceBottomSheet(onDismiss = { showAudioDeviceBottomSheet = false })
         }
     }
 }
 
+/**
+ * The V17 player's outer frame, in one of two arrangements.
+ *
+ * Portrait stacks the pane over the controls, exactly as before. Landscape (and tab
+ * view, unless it was set to stay compact) puts them side by side, which is what the
+ * classic player already does at `Player.kt`'s `isLandscapeLayout` branch: artwork or
+ * lyrics on one half, the whole control stack centred on the other. Stacking them on a
+ * short, wide screen left the cover a letterbox strip and pushed the transport row off
+ * the bottom.
+ *
+ * [pane] is handed the modifier that gives it its share of the space, because that is
+ * `weight` in one arrangement and `fillMaxSize` inside a weighted Box in the other.
+ */
+@Composable
+private fun PlayerV2Frame(
+    isWide: Boolean,
+    modifier: Modifier,
+    handle: @Composable ColumnScope.() -> Unit,
+    pane: @Composable (Modifier) -> Unit,
+    controls: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier = modifier) {
+        handle()
+        if (isWide) {
+            Row(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    pane(Modifier.fillMaxSize())
+                }
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    content = controls,
+                )
+            }
+        } else {
+            pane(Modifier.weight(1f))
+            controls()
+        }
+    }
+}

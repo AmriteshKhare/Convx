@@ -1382,17 +1382,29 @@ object YTPlayerUtils {
     private fun validateStatus(url: String): Boolean {
         Timber.tag(logTag).d("Validating stream URL status")
         try {
+            // A one-byte ranged GET, not HEAD. googlevideo answers HEAD for URLs it will
+            // then refuse to actually stream -- that is the whole failure mode this file
+            // already documents for VISIONOS ("passing validateStatus's HEAD check while
+            // still not actually streaming"), and it is what "the probe says the song is
+            // available but it never plays" looks like from the outside: validation passes,
+            // the client is accepted, and the real read by the player is the first request
+            // that ever asks the CDN to serve bytes. Asking for byte 0 makes this check the
+            // same kind of request the player makes, for one byte of traffic.
             val requestBuilder = okhttp3.Request.Builder()
-                .head()
+                .get()
                 .url(url)
+                .header("Range", "bytes=0-0")
                 .header("User-Agent", YouTubeClient.USER_AGENT_WEB)
 
             // Do NOT add Cookie header — googlevideo.com CDN rejects account cookies with 403.
             // Stream URLs are already authenticated via signed URL parameters.
 
-            val response = httpClient.newCall(requestBuilder.build()).execute()
-            val isSuccessful = response.isSuccessful
-            Timber.tag(logTag).d("Stream URL validation result: ${if (isSuccessful) "Success" else "Failed"} (${response.code})")
+            // use {} rather than leaking the (1-byte) body back into the pool unread.
+            // 206 is the honoured range; a server that ignores Range answers 200. Both
+            // mean bytes are being served, which is the only thing this asks.
+            val (isSuccessful, code) = httpClient.newCall(requestBuilder.build()).execute()
+                .use { it.isSuccessful to it.code }
+            Timber.tag(logTag).d("Stream URL validation result: ${if (isSuccessful) "Success" else "Failed"} ($code)")
             return isSuccessful
         } catch (e: Exception) {
             Timber.tag(logTag).e(e, "Stream URL validation failed with exception")

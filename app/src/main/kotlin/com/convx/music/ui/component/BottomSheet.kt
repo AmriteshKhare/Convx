@@ -455,24 +455,26 @@ class BottomSheetState(
                 collapse(velocity)
             }
         } else {
-            val l0 = dismissedBound
-            val l1 = (collapsedBound - dismissedBound) / 2
-            val l2 = (expandedBound - collapsedBound) / 2
-            val l3 = expandedBound
+            // Midpoints, not half-differences. `(collapsedBound - dismissedBound) / 2` is
+            // the SIZE of the lower band, not where it ends, so every slow-release decision
+            // was taken against thresholds that only happened to be right when both bounds
+            // were 0. Worse, the old `when (value)` ended in `else -> Unit`: the drag is
+            // unbounded above expandedBound (see updateBounds in rememberBottomSheetState),
+            // so a drag-up that overshot the top matched no `in` range at all and the sheet
+            // was left frozen exactly where the finger let go -- the stuck-mid-air bug.
+            // These branches are exhaustive over the whole line, so there is no way out
+            // of a fling without landing on an anchor.
+            val dismissMidpoint = dismissedBound + (collapsedBound - dismissedBound) / 2
+            val collapseMidpoint = collapsedBound + (expandedBound - collapsedBound) / 2
 
-            when (value) {
-                in l0..l1 -> {
-                    if (onDismiss != null) {
-                        dismiss()
-                        onDismiss.invoke()
-                    } else {
-                        collapse()
-                    }
+            when {
+                onDismiss != null && value <= dismissMidpoint -> {
+                    dismiss()
+                    onDismiss.invoke()
                 }
 
-                in l1..l2 -> collapse()
-                in l2..l3 -> expand()
-                else -> Unit
+                value < collapseMidpoint -> collapse()
+                else -> expand()
             }
         }
     }
@@ -569,7 +571,23 @@ fun rememberBottomSheetState(
         BottomSheetState(
             draggableState = DraggableState { delta ->
                 coroutineScope.launch {
-                    animatable.snapTo(animatable.value - with(density) { delta.toDp() })
+                    // Stop AT the top, don't run past it. The animatable's upper bound is
+                    // deliberately null so the settle springs have room to overshoot, but a
+                    // raw drag using that room carried the sheet arbitrarily far above the
+                    // screen -- translationY goes negative and the content leaves the
+                    // display, and performFling then had no anchor to resolve to.
+                    //
+                    // A rubber band here does NOT work, and briefly shipped: the curve has
+                    // to be applied to the RAW accumulated pull, but each delta is measured
+                    // against `animatable.value`, which is already compressed. Every frame
+                    // then re-compresses the previous frame's compressed value, the sheet
+                    // pushes back harder than the finger moves, and dragging up reads as
+                    // jitter -- "it doesn't want to go up". Tracking raw pull separately is
+                    // what IosOverscrollEffect does, and it needs state this DraggableState
+                    // does not own. A hard stop at the top is what a fully-open sheet does
+                    // on iOS anyway: there is nothing above it to stretch toward.
+                    val next = animatable.value - with(density) { delta.toDp() }
+                    animatable.snapTo(next.coerceAtMost(expandedBound))
                 }
             },
             onAnchorChanged = { previousAnchor = it },
