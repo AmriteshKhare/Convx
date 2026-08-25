@@ -145,11 +145,18 @@ private const val DIAG_SLOWDOWN = 1
 private val GooeyPeakBlur = 12.dp
 private const val GooeyDurationMs = 300 * DIAG_SLOWDOWN
 
-// Rim/shadow the selection puck keeps when it is NOT being pressed. Both used to
-// be driven straight off pressProgress, i.e. zero at rest, which left the puck
-// defined only by its own dark surface wash — invisible against a dark bar.
-private const val PuckRestHighlightAlpha = 0.5f
+// Shadow the selection puck keeps when it is NOT being pressed. It used to be
+// driven straight off pressProgress, i.e. zero at rest, which left the puck
+// defined only by its own surface wash — invisible against a dark bar.
+// (The matching rim light is gone: the iOS 26 reference bars render the selected
+// capsule as a plain fill with no specular edge. Separation at rest is the
+// shadow's job now, which is what the reference does too.)
 private const val PuckRestShadowAlpha = 0.35f
+
+/** How long after the last scroll event the bar's backdrop stays frozen. Long enough to
+ *  cover a fling's frame gaps, short enough that the glass refreshes as soon as the list
+ *  actually settles. */
+private const val ScrollFreezeTailNs = 120_000_000L
 
 // Vendored addition: the three shapes the bar can render. INLINE is the
 // scroll-collapsed row (unchanged by search mode); EXPANDED is the normal
@@ -272,8 +279,14 @@ fun FloatingTabBar(
         // Held as a lambda rather than a Boolean so flipping it costs no
         // recomposition — the glass surfaces call it during draw. See
         // LocalTabBarBackdropFrozen.
-        val frozenWhileAnimating = remember(transition) {
-            { transition.currentState != transition.targetState }
+        // Frozen while the bar's own inline/expand transition runs AND while the list
+        // under it is scrolling. Only the first half existed before, so the one case that
+        // actually re-captures the backdrop every frame -- scrolling content passing under
+        // the glass -- was the one case not covered.
+        val frozenWhileAnimating = remember(transition, scrollConnection) {
+            {
+                transition.currentState != transition.targetState || scrollConnection.isScrolling()
+            }
         }
         CompositionLocalProvider(LocalTabBarBackdropFrozen provides frozenWhileAnimating) {
             Box {
@@ -367,6 +380,32 @@ class FloatingTabBarScrollConnection(
 
     private var accumulatedScroll = 0f
 
+    // Plain array, NOT snapshot state -- exactly the technique BottomSheetState.dragClockNs
+    // uses and for the same reason: the glass surfaces read this during the DRAW phase, and
+    // a snapshot read there would register a draw dependency, so every write would
+    // re-invalidate the frame forever.
+    private val scrollClockNs = longArrayOf(0L)
+
+    /**
+     * True while the list under the bar is scrolling, and for [ScrollFreezeTailNs] after the
+     * last scroll event so a fling stays covered.
+     *
+     * Pass to a glass surface's `frozen` so the bar stops re-capturing the app backdrop for
+     * the duration of a scroll. Measured on a SM-M346B: with the nav bar's glass live, a
+     * scroll costs 35.5 ms p50 in issue-draw-commands against 14.7 ms with the glass off --
+     * the capture plus its blur/lens chain was being rebuilt for every scrolled frame. The
+     * content behind a 20-30dp blur cannot show the difference between a capture from this
+     * frame and one from 100 ms ago, so re-capturing at scroll cadence buys nothing.
+     */
+    fun isScrolling(): Boolean {
+        val last = scrollClockNs[0]
+        return last != 0L && System.nanoTime() - last < ScrollFreezeTailNs
+    }
+
+    private fun markScrolled() {
+        scrollClockNs[0] = System.nanoTime()
+    }
+
     fun expand() {
         isInline = false
         accumulatedScroll = 0f
@@ -378,10 +417,15 @@ class FloatingTabBarScrollConnection(
     }
 
     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-        // If behavior is Never, don't change state
+        // If behavior is Never, don't change state. The scroll clock is still stamped:
+        // a bar that never collapses still sits over moving content, and freezing its
+        // backdrop is worth just as much there.
         if (inlineBehavior == FloatingTabBarInlineBehavior.Never) {
+            markScrolled()
             return Offset.Zero
         }
+
+        markScrolled()
 
         val scrollDelta = available.y
 
@@ -1456,6 +1500,11 @@ private fun SharedTransitionScope.ExpandedTabs(
         // each tab's own clickable — the puck only intercepts drags.
         Box(
             Modifier
+                // The pill's own content padding and NOTHING else, so the gap above,
+                // below and beside the puck is the same number on all four sides --
+                // that even inset is what the reference bars have, and an extra
+                // vertical inset here is what made the side gap read as wrong and
+                // left the capsule short of the bar's inner height.
                 .padding(sizes.tabBarContentPadding)
                 .graphicsLayer {
                     translationX =
@@ -1494,19 +1543,13 @@ private fun SharedTransitionScope.ExpandedTabs(
                                     chromaticAberration = progress > 0.01f
                                 )
                             },
-                            highlight = {
-                                val progress = dampedDragAnimation.pressProgress
-                                // Floored, not 0-at-rest. With no rim the puck's
-                                // shape came entirely from its dark wash below,
-                                // so it vanished into the bar whenever the bar
-                                // itself sat on dark content. A specular rim
-                                // reads against light AND dark, and unlike
-                                // lightening the wash it leaves the selected
-                                // icon (white by default, drawn on top) legible.
-                                Highlight.Default.copy(
-                                    alpha = lerp(PuckRestHighlightAlpha, 1f, progress)
-                                )
-                            },
+                            // No rim, at rest or pressed. The reference bars
+                            // (designRefrence/navbar.png, navbar.webp) draw the
+                            // selected capsule as a plain fill; a specular edge on
+                            // top of it is the single thing that stopped ours
+                            // reading as the same object. The wash below plus the
+                            // resting shadow carry the shape instead.
+                            highlight = { null },
                             shadow = {
                                 val progress = dampedDragAnimation.pressProgress
                                 // Same reasoning: a little separation at rest so
@@ -1647,7 +1690,7 @@ private fun Tab(
         // position without growing the Column's measured height and gets it
         // clipped by the tab bar's own bounds.
         verticalArrangement = if (showTitle) {
-            Arrangement.spacedBy((-2).dp, Alignment.CenterVertically)
+            Arrangement.spacedBy((-6).dp, Alignment.CenterVertically)
         } else {
             Arrangement.Center
         },

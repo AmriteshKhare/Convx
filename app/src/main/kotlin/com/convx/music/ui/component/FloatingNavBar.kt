@@ -94,11 +94,15 @@ private val NavBarSearchBarHeight = 48.dp
 // Width the expanded row needs for everything that is NOT a tab slot: the
 // standalone search circle (a square as tall as the row — ~57dp at fontScale 1,
 // more as the label grows) plus the gap before it and the pill's own horizontal
-// content padding. Whatever is left is split between the tabs. Deliberately a
-// couple of dp generous: under-reserving starves the circle, and the Row hands
-// it the leftover width, which is what made the search icon render smaller than
-// the bar it sits beside.
-private val NavBarStandaloneReserve = 80.dp
+// content padding. Whatever is left is split between the tabs.
+//
+// 57 (circle) + 8 (componentSpacing) + 4 (pill horizontal padding) = 69, so the
+// old 80dp handed the circle 11dp it never used and took that width off the tab
+// pill. The reference bars (designRefrence/navbar.png, navbar.webp) run the tab
+// pill right up to the circle; the pill is the wide element, the circle only as
+// wide as it needs to be. Held one dp under the arithmetic minimum's rounding so
+// the circle still measures square at fontScale 1.
+private val NavBarStandaloneReserve = 70.dp
 
 // Floor for a tab slot. Below this the icon and its label stop reading as one
 // target; a phone narrow enough to hit this floor gets a bar that overflows
