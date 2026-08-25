@@ -165,12 +165,16 @@ fun HeroMergeBand(
             },
     ) {
         if (!artworkUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(artworkUrl)
-                    .size(160)
-                    .build(),
-                contentDescription = null,
+            // Baked once per track rather than `Modifier.blur(100.dp)`, which is a
+            // RenderEffect and therefore re-runs on EVERY frame the band is on screen --
+            // for a picture that never changes while the screen is up. This band is on
+            // every hero screen, so that was a static blur being recomputed at scroll
+            // cadence. BlurredBackdropImage decodes small and blurs on the CPU once; at
+            // this magnification the result is indistinguishable.
+            BlurredBackdropImage(
+                model = artworkUrl,
+                screenBlurRadiusDp = blurRadius.value,
+                decodeSize = 160,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -181,8 +185,7 @@ fun HeroMergeBand(
                         layout(placeable.width, placeable.height) {
                             placeable.placeRelative(0, bandHeightPx / 2 - placeable.height)
                         }
-                    }
-                    .blur(blurRadius),
+                    },
             )
         }
     }

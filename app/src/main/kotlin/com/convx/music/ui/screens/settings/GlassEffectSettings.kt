@@ -71,6 +71,7 @@ import com.convx.music.constants.LiquidGlassDepthEffectKey
 import com.convx.music.constants.LiquidGlassBlurRadiusKey
 import com.convx.music.constants.LiquidGlassLensAmountKey
 import com.convx.music.constants.LiquidGlassLensHeightKey
+import com.convx.music.constants.LiquidGlassPlayerEnabledKey
 import com.convx.music.constants.LiquidGlassMiniPlayerEnabledKey
 import com.convx.music.constants.LiquidGlassNavBarEnabledKey
 import com.convx.music.constants.LiquidGlassSidePanelEnabledKey
@@ -202,6 +203,13 @@ fun GlassEffectSettings(
         Color.White
     }
     val textColor = if (textColorInt == 0) adaptiveTextColor else Color(textColorInt)
+    // The key already existed and MainActivity already read it, but nothing ever
+    // surfaced it -- so it sat at `true` forever, which pinned
+    // GlassEffectConfig.anyComponentEnabled true and made the full-screen backdrop
+    // capture in MainActivity unskippable no matter what the other switches said.
+    val (playerEnabled, onPlayerEnabledChange) = rememberPreference(
+        LiquidGlassPlayerEnabledKey, defaultValue = true
+    )
     val (miniPlayerEnabled, onMiniPlayerEnabledChange) = rememberPreference(
         LiquidGlassMiniPlayerEnabledKey, defaultValue = true
     )
@@ -471,6 +479,27 @@ fun GlassEffectSettings(
         Material3SettingsGroup(
             title = stringResource(R.string.liquid_glass_per_component),
             items = listOf(
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.music_note),
+                    title = { Text(stringResource(R.string.liquid_glass_player)) },
+                    description = { Text(stringResource(R.string.liquid_glass_player_desc)) },
+                    trailingContent = {
+                        Switch(
+                            checked = playerEnabled,
+                            onCheckedChange = onPlayerEnabledChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (playerEnabled) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onPlayerEnabledChange(!playerEnabled) }
+                ),
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.music_note),
                     title = { Text(stringResource(R.string.liquid_glass_mini_player)) },

@@ -1197,6 +1197,7 @@
     <string name="liquid_glass_text_color">Glass Text Color</string>
     <string name="liquid_glass_text_color_desc">Text color used on glass surfaces</string>
     <string name="liquid_glass_player">Glass Player</string>
+    <string name="liquid_glass_player_desc">Glass on the full player controls. Turning every component off here also stops the app capturing the screen behind the glass at all, which is the single largest render cost.</string>
     <string name="liquid_glass_mini_player">Glass Mini Player</string>
     <string name="liquid_glass_nav_bar">Glass Navigation Bar</string>
     <string name="liquid_glass_side_panel">Glass Side Panel</string>
