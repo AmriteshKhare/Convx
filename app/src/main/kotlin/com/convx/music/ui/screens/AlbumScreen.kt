@@ -166,6 +166,8 @@ import com.convx.music.utils.listItemShape
 import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.viewmodels.AlbumViewModel
+import com.convx.music.ui.component.HeroMergeBand
+import com.convx.music.ui.component.HeroMergeBandHeight
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -292,7 +294,11 @@ fun AlbumScreen(
 
     val heroPalette = com.convx.music.ui.component.rememberHeroPalette(albumWithSongs?.album?.thumbnailUrl)
     val tint = heroPalette.background
-    val onTint = com.convx.music.ui.theme.AppleTokens.onColor(tint)
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
@@ -418,8 +424,12 @@ fun AlbumScreen(
                 Box(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Album Image with offset (like ArtistScreen)
-                    if (!tabView) Box(
+                    // Album Image with offset (like ArtistScreen). Wrapped in a Box of its
+                    // own so the merge band below can align to the ARTWORK's bottom edge --
+                    // the outer Box's height is driven by the content column underneath it,
+                    // which is nowhere near the join.
+                    if (!tabView) Box(modifier = Modifier.fillMaxWidth()) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
@@ -490,6 +500,22 @@ fun AlbumScreen(
                                 )
                             }
                         }
+                    }
+
+                    // BitChord-style join, same as ArtistScreen: a heavily blurred copy of
+                    // the artwork smeared across the seam, so the artwork's own colour is
+                    // carried down into the page instead of the picture simply stopping.
+                    // Rides `headerOffset` with the artwork so the two never separate
+                    // while the header parallaxes.
+                    HeroMergeBand(
+                        artworkUrl = albumWithSongs.album.thumbnailUrl,
+                        heroRatio = 1f,
+                        pageColor = tint,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .offset { IntOffset(x = 0, y = headerOffset) }
+                            .offset(y = HeroMergeBandHeight / 2),
+                    )
                     }
 
                     // Content column positioned at bottom part of the image
@@ -802,7 +828,8 @@ fun AlbumScreen(
                         )
 
                         androidx.compose.runtime.CompositionLocalProvider(
-                            androidx.compose.material3.LocalContentColor provides onTint,
+                            // Engine-derived secondary tier, not the heading colour.
+                            androidx.compose.material3.LocalContentColor provides heroPalette.secondaryText,
                         ) {
                             ExpandableText(
                                 text = description ?: staticDescription,

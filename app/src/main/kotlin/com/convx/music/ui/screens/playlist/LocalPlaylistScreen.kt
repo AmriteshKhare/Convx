@@ -193,6 +193,7 @@ import com.convx.music.ui.component.HeroBackground
 import com.convx.music.ui.component.HeroCardHeader
 import com.convx.music.ui.component.rememberHeroSource
 import com.convx.music.ui.component.rememberHeroTint
+import com.convx.music.ui.component.rememberHeroPalette
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.utils.backToMain
@@ -585,8 +586,13 @@ fun LocalPlaylistScreen(
         heroUrl = rawHeroUrl
     }
 
-    val tint = rememberHeroTint(heroUrl)
-    val onTint = com.convx.music.ui.theme.AppleTokens.onColor(tint)
+    val heroPalette = rememberHeroPalette(heroUrl)
+    val tint = heroPalette.background
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
@@ -1286,8 +1292,13 @@ fun LocalPlaylistHeader(
         staticArt = heroUrl,
         songs = songs.map { it.song.song.thumbnailUrl to false },
     )
-    val tint = rememberHeroTint(heroUrl)
-    val onTint = AppleTokens.onColor(tint)
+    val heroPalette = rememberHeroPalette(heroUrl)
+    val tint = heroPalette.background
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -1612,7 +1623,7 @@ fun LocalPlaylistHeader(
                 )
 
                 androidx.compose.runtime.CompositionLocalProvider(
-                    androidx.compose.material3.LocalContentColor provides onTint,
+                    androidx.compose.material3.LocalContentColor provides heroPalette.secondaryText,
                 ) {
                     ExpandableText(
                         text = staticDescription,

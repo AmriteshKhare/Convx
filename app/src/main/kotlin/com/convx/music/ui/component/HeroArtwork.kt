@@ -78,6 +78,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.convx.music.ui.theme.colorengine.textHierarchyOn
 
 /**
  * Resolved hero image source with priority chain:
@@ -305,12 +306,22 @@ suspend fun heroPaletteOf(context: Context, url: String): HeroPalette? {
                 .allowHardware(false)
                 .build()
             context.imageLoader.execute(request).image?.toBitmap()
-                ?.extractHeroPalette()
+                ?.extractHeroPalette(cacheKey = url)
                 ?.let { raw ->
+                    val background = raw.background.asDeepTint()
+                    val accent = raw.accent.asVividAccent()
+                    // Type is derived AFTER the tint clamps, not before: the engine's own
+                    // scheme is built against the background IT chose, and asDeepTint then
+                    // moves that background. Running the same ladder against the colour the
+                    // screen actually paints is what keeps the contrast targets true --
+                    // and it is what replaces "white at 70% alpha" for descriptions.
+                    val text = textHierarchyOn(background = background, tint = accent)
                     HeroPalette(
-                        background = raw.background.asDeepTint(),
-                        accent = raw.accent.asVividAccent(),
+                        background = background,
+                        accent = accent,
                         wash = raw.wash.asWashTint(),
+                        primaryText = text[0],
+                        secondaryText = text[1],
                     )
                 }
                 // Not cached on a miss: a later visit with a working network should still

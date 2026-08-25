@@ -236,7 +236,11 @@ fun CachePlaylistScreen(
     )
     val heroPalette = rememberHeroPalette(heroUrl)
     val tint = heroPalette.background
-    val onTint = AppleTokens.onColor(tint)
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
@@ -645,8 +649,13 @@ private fun CachePlaylistHeader(
         staticArt = heroUrl,
         songs = songs.map { it.thumbnailUrl to false },
     )
-    val tint = com.convx.music.ui.component.rememberHeroTint(heroUrl)
-    val onTint = com.convx.music.ui.theme.AppleTokens.onColor(tint)
+    val heroPalette = com.convx.music.ui.component.rememberHeroPalette(heroUrl)
+    val tint = heroPalette.background
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -858,7 +867,7 @@ private fun CachePlaylistHeader(
             )
 
             androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.material3.LocalContentColor provides onTint,
+                androidx.compose.material3.LocalContentColor provides heroPalette.secondaryText,
             ) {
                 ExpandableText(
                     text = staticDescription,

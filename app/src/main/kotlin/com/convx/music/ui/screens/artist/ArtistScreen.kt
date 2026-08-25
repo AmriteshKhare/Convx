@@ -293,7 +293,11 @@ fun ArtistScreen(
 
     val heroPalette = com.convx.music.ui.component.rememberHeroPalette(artistThumbnail)
     val tint = heroPalette.background
-    val onTint = com.convx.music.ui.theme.AppleTokens.onColor(tint)
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     // Fills the screen tint into the capture BEFORE the content, exactly like
     // MainActivity's appBackdrop does with its own background. Without it the
@@ -852,7 +856,10 @@ fun ArtistScreen(
                                             )
                                             
                                             androidx.compose.runtime.CompositionLocalProvider(
-                                                androidx.compose.material3.LocalContentColor provides onTint,
+                                                // Engine-derived secondary tier, not the
+                                                // heading colour: contrast-checked against
+                                                // the tint this screen actually paints.
+                                                androidx.compose.material3.LocalContentColor provides heroPalette.secondaryText,
                                             ) {
                                                 ExpandableText(
                                                     text = description.orEmpty(),

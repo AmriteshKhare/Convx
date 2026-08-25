@@ -266,7 +266,11 @@ fun AutoPlaylistScreen(
     )
     val heroPalette = rememberHeroPalette(heroUrl)
     val tint = heroPalette.background
-    val onTint = AppleTokens.onColor(tint)
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     val heroBackdrop = rememberLayerBackdrop()
 
@@ -716,8 +720,13 @@ private fun AutoPlaylistHeader(
     val totalLength = remember(songs) { songs.fastSumBy { it.song.duration } }
 
     val heroUrl = songs.firstOrNull()?.thumbnailUrl
-    val tint = rememberHeroTint(heroUrl)
-    val onTint = AppleTokens.onColor(tint)
+    val heroPalette = rememberHeroPalette(heroUrl)
+    val tint = heroPalette.background
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     Column(
         modifier = modifier
@@ -910,7 +919,7 @@ private fun AutoPlaylistHeader(
                 modifier = Modifier.padding(bottom = 8.dp),
             )
 
-            CompositionLocalProvider(LocalContentColor provides onTint) {
+            CompositionLocalProvider(LocalContentColor provides heroPalette.secondaryText) {
                 ExpandableText(
                     text = staticDescription,
                     runs = null,

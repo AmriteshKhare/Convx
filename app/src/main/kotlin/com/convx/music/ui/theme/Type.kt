@@ -138,55 +138,60 @@ val PlusJakartaSansFontFamily = FontFamily(
 // Takes the user's custom-installed font (see rememberCustomFontFamily in
 // Font.kt) so every text role in the app renders in it; falls back to the
 // system default when none is installed.
+// Tracking is size-specific, which is the point: Material's scale leaves every role
+// above 22sp at 0, and letters read as drifting apart the larger the type gets. Apple's
+// own rule is roughly -0.02em on display sizes, tapering to 0 by the time text is body
+// sized (small text wants slightly POSITIVE tracking, which the body/label roles below
+// already carry from M3). These are that curve, in sp at each role's own size.
 fun AppTypography(fontFamily: FontFamily = FontFamily.Default) = Typography(
     displayLarge = TextStyle(
         fontFamily = fontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 57.sp,
         lineHeight = 64.sp,
-        letterSpacing = (-0.25).sp
+        letterSpacing = (-1.1).sp
     ),
     displayMedium = TextStyle(
         fontFamily = fontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 45.sp,
         lineHeight = 52.sp,
-        letterSpacing = 0.sp
+        letterSpacing = (-0.9).sp
     ),
     displaySmall = TextStyle(
         fontFamily = fontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 36.sp,
         lineHeight = 44.sp,
-        letterSpacing = 0.sp
+        letterSpacing = (-0.7).sp
     ),
     headlineLarge = TextStyle(
         fontFamily = fontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 32.sp,
         lineHeight = 40.sp,
-        letterSpacing = 0.sp
+        letterSpacing = (-0.6).sp
     ),
     headlineMedium = TextStyle(
         fontFamily = fontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 28.sp,
         lineHeight = 36.sp,
-        letterSpacing = 0.sp
+        letterSpacing = (-0.45).sp
     ),
     headlineSmall = TextStyle(
         fontFamily = fontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 24.sp,
         lineHeight = 32.sp,
-        letterSpacing = 0.sp
+        letterSpacing = (-0.3).sp
     ),
     titleLarge = TextStyle(
         fontFamily = fontFamily,
         fontWeight = FontWeight.Normal, // M3 uses Normal, M2 used Medium
         fontSize = 22.sp,
         lineHeight = 28.sp,
-        letterSpacing = 0.sp
+        letterSpacing = (-0.2).sp
     ),
     titleMedium = TextStyle(
         fontFamily = fontFamily,

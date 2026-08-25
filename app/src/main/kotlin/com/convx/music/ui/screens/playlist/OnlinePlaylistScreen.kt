@@ -157,6 +157,7 @@ import com.convx.music.ui.utils.rememberHeroZoom
 import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.component.rememberHeroTint
+import com.convx.music.ui.component.rememberHeroPalette
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.theme.rememberArtworkTint
@@ -325,8 +326,13 @@ fun OnlinePlaylistScreen(
         staticArt = playlist?.thumbnail,
         songs = songs.map { it.thumbnail to false },
     )
-    val tint = rememberHeroTint(playlist?.thumbnail)
-    val onTint = com.convx.music.ui.theme.AppleTokens.onColor(tint)
+    val heroPalette = rememberHeroPalette(playlist?.thumbnail)
+    val tint = heroPalette.background
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     // Fills the screen tint into the capture BEFORE the content, exactly like
     // MainActivity's appBackdrop does with its own background. Without it the
@@ -802,8 +808,13 @@ private fun OnlinePlaylistHeader(
         staticArt = heroUrl,
         songs = songs.map { it.thumbnail to false },
     )
-    val tint = rememberHeroTint(heroUrl)
-    val onTint = AppleTokens.onColor(tint)
+    val heroPalette = rememberHeroPalette(heroUrl)
+    val tint = heroPalette.background
+    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
+    // now the colour engine's own primary text tier for THIS artwork -- derived against
+    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
+    // a fixed shift of the background.
+    val onTint = heroPalette.primaryText
 
     Column(
         modifier = modifier.fillMaxWidth(),

@@ -28,6 +28,7 @@ import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 import com.materialkolor.score.Score
 import kotlin.math.sqrt
+import com.convx.music.ui.theme.colorengine.ColorEngine
 
 val DefaultThemeColor = AppleTokens.AccentRed
 
@@ -154,6 +155,13 @@ data class HeroPalette(
     /** Mean colour of the artwork's own bottom edge, for a wash that reads as
      *  a continuation of the artwork rather than a second surface starting. */
     val wash: Color,
+    /** Titles on [background], from the colour engine's own WCAG-enforced text ladder
+     *  rather than a fixed white. Defaults to the token pair for callers (fallbacks,
+     *  pure-black override) that have no artwork to derive from. */
+    val primaryText: Color = AppleTokens.onColor(background),
+    /** Descriptions, counts and metadata on [background] — the tier that carries the
+     *  artwork's hue without losing legibility. */
+    val secondaryText: Color = AppleTokens.onColorSecondary(background),
 )
 
 /** Saturation weighted against the square root of population, not population
@@ -165,7 +173,18 @@ private fun Palette.Swatch.vibrancy(): Float {
     return hsv[1] * sqrt(population.toFloat())
 }
 
-fun Bitmap.extractHeroPalette(): HeroPalette? {
+/**
+ * [cacheKey] is the artwork URL — the colour engine caches its analysis by it, so a
+ * second screen showing the same cover pays a map lookup instead of a second run.
+ */
+suspend fun Bitmap.extractHeroPalette(cacheKey: String): HeroPalette? {
+    // The colour engine is the preferred source: it picks real observed medoids with
+    // identity weighting, where Palette's vibrancy heuristic happily returns a stray
+    // highlight, or grey for anything low-chroma. Palette stays as the fallback for the
+    // cases the engine declines (an image it cannot sample, or one that clusters to
+    // nothing), so a hero screen never loses its tint outright.
+    engineHeroPalette(cacheKey)?.let { return it }
+
     val swatches = Palette.from(this)
         .maximumColorCount(16)
         .generate()
@@ -193,6 +212,16 @@ fun Bitmap.extractHeroPalette(): HeroPalette? {
         ?: background
 
     return HeroPalette(background = background, accent = accent, wash = bottomEdgeMean())
+}
+
+/** The colour engine's answer for this bitmap, in [HeroPalette] shape. */
+private suspend fun Bitmap.engineHeroPalette(cacheKey: String): HeroPalette? {
+    val result = ColorEngine.analyze(this, cacheKey) ?: return null
+    return HeroPalette(
+        background = result.palette.dominant,
+        accent = result.palette.accent,
+        wash = bottomEdgeMean(),
+    )
 }
 
 /** Flat mean of the artwork's bottom band. */

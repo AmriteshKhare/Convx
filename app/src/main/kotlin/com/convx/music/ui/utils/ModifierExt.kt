@@ -12,7 +12,15 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /**
  * Springy "wobble" on press for an existing [interactionSource]: the target scales down
@@ -84,3 +92,45 @@ fun Modifier.combinedBounceClick(
     onDoubleClick = onDoubleClick,
     onClick = onClick
 )
+
+/**
+ * Apple's specular edge: a hairline that catches light along the top of a surface and
+ * has faded out by its equator, so a sheet, pill or button reads as a raised material
+ * instead of a flat fill.
+ *
+ * Traced from [shape]'s own outline rather than a `border()`, so it follows continuous
+ * (superellipse) corners exactly instead of approximating them with circular arcs. Drawn
+ * over the content, which is what makes it read as light on the surface rather than a
+ * line under it.
+ *
+ * This is the *plain* rim. Surfaces that already sample the backdrop through
+ * `Modifier.liquidGlass` get theirs from the glass system's own `Highlight` instead —
+ * do not stack both.
+ */
+fun Modifier.rimLight(
+    shape: Shape,
+    color: Color = Color.White,
+    /** Alpha at the very top edge. Fades to nothing by halfway down. */
+    strength: Float = 0.55f,
+    width: Dp = 1.dp,
+): Modifier = drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val stroke = Stroke(width = width.toPx())
+    val brush = Brush.verticalGradient(
+        0f to color.copy(alpha = strength),
+        0.5f to color.copy(alpha = strength * 0.12f),
+        1f to Color.Transparent,
+    )
+    onDrawWithContent {
+        drawContent()
+        drawOutline(outline = outline, brush = brush, style = stroke)
+    }
+}
+
+/**
+ * The radius an inner element needs for its curve to stay concentric with the [outer]
+ * one it sits [inset] inside. Apple's rule, and the reason a card inside a sheet looks
+ * wrong at the same radius as the sheet: parallel curves must differ by the gap between
+ * them. Floors at 4dp so a large inset cannot square the corners off entirely.
+ */
+fun concentricRadius(outer: Dp, inset: Dp): Dp = (outer - inset).coerceAtLeast(4.dp)

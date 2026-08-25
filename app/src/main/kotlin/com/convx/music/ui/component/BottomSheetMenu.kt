@@ -39,6 +39,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.utils.concentricRadius
+import com.convx.music.ui.utils.rimLight
 
 val LocalMenuState = compositionLocalOf { MenuState() }
 
@@ -115,6 +118,22 @@ fun AnimatedBottomSheet(
     )
 }
 
+/**
+ * Outer corner radius shared by every menu sheet. Continuous (superellipse) corners at
+ * this size are the iOS sheet silhouette; Material's default is both smaller and drawn
+ * with circular arcs, which is most of why our sheets did not read as the reference.
+ */
+val MenuSheetCornerRadius = 28.dp
+
+/** Horizontal inset the sheet's content sits at, and the basis for [MenuSheetItemRadius]. */
+val MenuSheetContentInset = 20.dp
+
+/**
+ * Radius for anything drawn as a card/row inside a menu sheet, so its curve stays
+ * concentric with the sheet's own. Use this instead of picking a radius per screen.
+ */
+val MenuSheetItemRadius: Dp = concentricRadius(MenuSheetCornerRadius, MenuSheetContentInset)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomSheetMenu(
@@ -124,6 +143,16 @@ fun BottomSheetMenu(
 ) {
     val focusManager = LocalFocusManager.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    // Top corners only: the sheet is anchored to the bottom edge, so rounding the bottom
+    // would round a corner that is never on screen.
+    val sheetShape = remember {
+        ContinuousRoundedRectangle(
+            topStart = MenuSheetCornerRadius,
+            topEnd = MenuSheetCornerRadius,
+            bottomEnd = 0.dp,
+            bottomStart = 0.dp,
+        )
+    }
 
     AnimatedBottomSheet(
         isVisible = state.isVisible,
@@ -132,6 +161,7 @@ fun BottomSheetMenu(
             state.isVisible = false
         },
         sheetState = sheetState,
+        shape = sheetShape,
         containerColor = background,
         contentColor = MaterialTheme.colorScheme.onSurface,
         dragHandle = {
@@ -143,12 +173,17 @@ fun BottomSheetMenu(
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
             )
         },
-        modifier = modifier.fillMaxHeight()
+        // The rim goes on the sheet itself, not on the content column below -- the
+        // content starts under the drag handle, so a rim there would draw a line across
+        // the middle of the sheet instead of along its top edge.
+        modifier = modifier
+            .fillMaxHeight()
+            .rimLight(sheetShape)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .padding(horizontal = MenuSheetContentInset)
         ) {
             state.content(this)
         }

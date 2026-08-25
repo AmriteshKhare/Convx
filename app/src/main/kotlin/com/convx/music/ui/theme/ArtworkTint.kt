@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import android.util.LruCache
 import androidx.palette.graphics.Palette
+import com.convx.music.ui.theme.colorengine.ColorEngine
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
@@ -70,16 +71,24 @@ fun rememberArtworkTint(thumbnailUrl: String?): List<Color> {
                 val bitmap = result.image?.toBitmap()
 
                 if (bitmap != null) {
-                    val palette = withContext(Dispatchers.Default) {
-                        Palette.from(bitmap)
-                            .maximumColorCount(8)
-                            .resizeBitmapArea(100 * 100)
-                            .generate()
-                    }
-                    val colors = PlayerColorExtractor.extractGradientColors(
-                        palette = palette,
-                        fallbackColor = fallbackColorInt
-                    )
+                    // Colour engine first: it picks a real observed medoid with identity
+                    // weighting, where Palette's vibrancy heuristic will happily return a
+                    // stray highlight from a dozen pixels. Same three-stop contract either
+                    // way (primary, darker variant, black) so no caller changes.
+                    val colors = ColorEngine.analyze(bitmap, cacheKey = thumbnailUrl)
+                        ?.let { result -> gradientStopsFrom(result.palette.dominant) }
+                        ?: run {
+                            val palette = withContext(Dispatchers.Default) {
+                                Palette.from(bitmap)
+                                    .maximumColorCount(8)
+                                    .resizeBitmapArea(100 * 100)
+                                    .generate()
+                            }
+                            PlayerColorExtractor.extractGradientColors(
+                                palette = palette,
+                                fallbackColor = fallbackColorInt
+                            )
+                        }
                     artworkTintCache.put(thumbnailUrl, colors)
                     extractedColors = colors
                 }
@@ -91,3 +100,19 @@ fun rememberArtworkTint(thumbnailUrl: String?): List<Color> {
 
     return extractedColors
 }
+
+/**
+ * The three-stop gradient [rememberArtworkTint] callers expect, from one primary colour.
+ *
+ * Identical arithmetic to [PlayerColorExtractor.extractGradientColors]' own tail, so the
+ * engine path and the Palette fallback hand back the same shape and the same middle stop.
+ */
+private fun gradientStopsFrom(primary: Color): List<Color> = listOf(
+    primary,
+    primary.copy(
+        red = (primary.red * 0.6f).coerceAtLeast(0f),
+        green = (primary.green * 0.6f).coerceAtLeast(0f),
+        blue = (primary.blue * 0.6f).coerceAtLeast(0f),
+    ),
+    Color.Black,
+)

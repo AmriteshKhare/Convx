@@ -26,6 +26,7 @@ import android.graphics.Bitmap
 import coil3.request.allowHardware
 import coil3.request.bitmapConfig
 import coil3.request.crossfade
+import com.convx.music.utils.ArtworkQualityInterceptor
 import com.music.innertube.YouTube
 import com.music.innertube.models.IpVersion
 import com.music.innertube.models.YouTubeLocale
@@ -297,6 +298,9 @@ class App : Application(), SingletonImageLoader.Factory {
                 // User-supplied SVGs (player icons, DIY stickers). Vectors rasterise at the
                 // size they are drawn at, so a custom icon never goes soft when scaled up.
                 add(SvgDecoder.Factory())
+                // Steps YouTube artwork down a size when the requested filename 404s, so
+                // asking for maxresdefault is safe on the videos that do not have one.
+                add(ArtworkQualityInterceptor())
             }
             // Memory cache for fast image loading (prevents network requests on recomposition)
             memoryCache {
