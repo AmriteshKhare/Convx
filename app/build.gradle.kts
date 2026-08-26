@@ -33,7 +33,7 @@ plugins {
 android {
     namespace = "com.convx.music"
     compileSdk = 37
-    ndkVersion = "27.0.12077973"
+    // ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.convx.music"
@@ -80,21 +80,16 @@ android {
         create("universal") {
             dimension = "abi"
             buildConfigField("String", "ARCHITECTURE", "\"universal\"")
+            // 64-bit only: MMKV (native KV store) ships no 32-bit binaries, so a
+            // 32-bit slice would crash at load time. armeabi/x86 flavors removed.
+            ndk {
+                abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
+            }
         }
         create("arm64") {
             dimension = "abi"
             buildConfigField("String", "ARCHITECTURE", "\"arm64\"")
             ndk { abiFilters.add("arm64-v8a") }
-        }
-        create("armeabi") {
-            dimension = "abi"
-            buildConfigField("String", "ARCHITECTURE", "\"armeabi\"")
-            ndk { abiFilters.add("armeabi-v7a") }
-        }
-        create("x86") {
-            dimension = "abi"
-            buildConfigField("String", "ARCHITECTURE", "\"x86\"")
-            ndk { abiFilters.add("x86") }
         }
         create("x86_64") {
             dimension = "abi"
@@ -188,6 +183,13 @@ android {
         generateLocaleConfig = true
     }
 
+    // externalNativeBuild {  // NDK disabled temporarily — NDK installation incomplete
+    //     cmake {
+    //         path = file("src/main/cpp/analyzer/CMakeLists.txt")
+    //         version = "3.22.1"
+    //     }
+    // }
+
     packaging {
         jniLibs {
             useLegacyPackaging = false
@@ -255,6 +257,7 @@ dependencies {
     implementation(libs.activity)
     implementation(libs.hilt.navigation)
     implementation(libs.datastore)
+    implementation(libs.mmkv)
     implementation(libs.webkit)
 
     implementation(libs.compose.runtime)
@@ -346,6 +349,9 @@ dependencies {
     implementation(libs.androidx.material.icons.extended.v178)
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.core.splashscreen)
+
+    // Smart analysis ONNX models (Beat This + Open-Unmix vocal separator)
+    implementation(libs.onnxruntime)
 
     testImplementation(libs.junit)
 }

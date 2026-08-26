@@ -45,6 +45,8 @@ work = "2.10.0"
 coreSplashscreen = "1.2.0"
 material3Version = "1.4.0"
 webkit = "1.16.0"
+mmkv = "2.4.2"
+onnxruntime = "1.22.0"
 
 
 [libraries]
@@ -57,6 +59,7 @@ gradle = { module = "com.android.tools.build:gradle", version.ref = "androidGrad
 activity = { module = "androidx.activity:activity-compose", version.ref = "activity" }
 hilt-navigation = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigation" }
 datastore = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+mmkv = { module = "com.tencent:mmkv", version.ref = "mmkv" }
 webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
 
 compose-runtime = { module = "androidx.compose.runtime:runtime", version.ref = "compose" }
@@ -143,6 +146,7 @@ work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "w
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3Version" }
 quickjs-kt = { module = "io.github.dokar3:quickjs-kt-android", version = "1.0.5" }
+onnxruntime = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime" }
 
 
 [plugins]
