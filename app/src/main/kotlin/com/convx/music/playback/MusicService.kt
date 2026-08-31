@@ -3471,7 +3471,7 @@ class MusicService :
         djTail: DjTailAudioProcessor,
         djDelay: DelayAudioProcessor,
     ) =
-        object : NextRenderersFactory(this) {
+        object : NextRenderersFactory(this@MusicService) {
             override fun buildAudioSink(
                 context: Context,
                 enableFloatOutput: Boolean,
@@ -3501,7 +3501,7 @@ class MusicService :
             // one exists at all). ON tries the platform decoder first per format and
             // only falls back to NextRenderersFactory's bundled FfmpegAudioRenderer —
             // this doesn't change decode for any format a device already handles.
-            setExtensionRendererMode(EXTENSION_RENDERER_MODE_ON)
+            setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
         }
 
     override fun onPlaybackStatsReady(
