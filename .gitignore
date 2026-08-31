@@ -120,6 +120,7 @@ app/keystore/
 !README.md
 !SECURITY.md
 !.github/CONTRIBUTING.md
+!automation/**/*.md
 !.github/pull_request_template.md
 app/src/main/kotlin/com/designRefrence/
 
