@@ -32,15 +32,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.IconButton
+import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -179,8 +179,8 @@ fun ArtistSongsScreen(
 
                     Text(
                         text = pluralStringResource(R.plurals.n_song, songs.size, songs.size),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                        style = AppTheme.typography.titleSmall,
+                        color = AppTheme.colorScheme.secondary,
                     )
                 }
             }

@@ -16,14 +16,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -45,7 +45,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.CircularWavyProgressIndicator
+import com.convx.music.ui.ios.compat.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.ui.Alignment
 import com.convx.music.constants.InnerTubeCookieKey
@@ -74,8 +74,8 @@ import com.convx.music.playback.removeDownloads
 import com.convx.music.playback.queues.ListQueue
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.DefaultDialog
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.rememberPlaylistCoverPicker
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
@@ -210,7 +210,7 @@ fun PlaylistMenu(
                         R.string.remove_download_playlist_confirm,
                         playlist.playlist.name
                     ),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp),
                 )
             },
@@ -245,7 +245,7 @@ fun PlaylistMenu(
             content = {
                 Text(
                     text = stringResource(R.string.delete_playlist_confirm, playlist.playlist.name),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp)
                 )
             },
@@ -305,7 +305,7 @@ fun PlaylistMenu(
                 ) {
                     Icon(
                         painter = painterResource(if (dbPlaylist?.playlist?.bookmarkedAt != null) R.drawable.favorite else R.drawable.favorite_border),
-                        tint = if (dbPlaylist?.playlist?.bookmarkedAt != null) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                        tint = if (dbPlaylist?.playlist?.bookmarkedAt != null) AppTheme.colorScheme.error else LocalContentColor.current,
                         contentDescription = null
                     )
                 }
@@ -338,7 +338,7 @@ fun PlaylistMenu(
                                     painter = painterResource(R.drawable.play),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.play),
@@ -360,7 +360,7 @@ fun PlaylistMenu(
                                     painter = painterResource(R.drawable.shuffle),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.shuffle),
@@ -383,7 +383,7 @@ fun PlaylistMenu(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share),
@@ -404,12 +404,12 @@ fun PlaylistMenu(
         }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     if (!isGuest) {
                         playlist.playlist.browseId?.let { browseId ->
                             add(
-                                Material3MenuItemData(
+                                IosMenuItemData(
                                     title = { Text(text = stringResource(R.string.start_radio)) },
                                     description = { Text(text = stringResource(R.string.start_radio_desc)) },
                                     icon = {
@@ -436,7 +436,7 @@ fun PlaylistMenu(
                     }
                     if (!isGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.play_next)) },
                                 description = { Text(text = stringResource(R.string.play_next_desc)) },
                                 icon = {
@@ -456,7 +456,7 @@ fun PlaylistMenu(
                     }
                     if (!isGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.add_to_queue)) },
                                 description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                                 icon = {
@@ -479,11 +479,11 @@ fun PlaylistMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     if (editable && autoPlaylist != true && !isGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.edit)) },
                                 description = { Text(text = stringResource(R.string.edit_desc)) },
                                 icon = {
@@ -502,7 +502,7 @@ fun PlaylistMenu(
                     // override), so it isn't gated by `editable` like rename is.
                     if (!isGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.edit_playlist_cover)) },
                                 icon = {
                                     Icon(
@@ -522,7 +522,7 @@ fun PlaylistMenu(
                             
                             if (!currentThumbnail.isNullOrBlank()) {
                                 add(
-                                    Material3MenuItemData(
+                                    IosMenuItemData(
                                         title = { Text(text = stringResource(R.string.remove_custom_image)) },
                                         icon = {
                                             Icon(
@@ -544,7 +544,7 @@ fun PlaylistMenu(
                         }
                     }
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { 
                                 Text(
                                     text = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial" 
@@ -576,11 +576,35 @@ fun PlaylistMenu(
                             }
                         )
                     )
+                    if (autoPlaylist != true) {
+                        val isPinnedToLibrary = dbPlaylist?.playlist?.pinnedAt != null
+                        add(
+                            IosMenuItemData(
+                                title = {
+                                    Text(
+                                        text = if (isPinnedToLibrary) stringResource(R.string.unpin_from_library) else stringResource(R.string.pin_to_library)
+                                    )
+                                },
+                                icon = {
+                                    Icon(
+                                        painter = painterResource(if (isPinnedToLibrary) R.drawable.remove else R.drawable.ic_push_pin),
+                                        contentDescription = null,
+                                    )
+                                },
+                                onClick = {
+                                    database.query {
+                                        dbPlaylist?.playlist?.togglePin()?.let { update(it) }
+                                    }
+                                    onDismiss()
+                                }
+                            )
+                        )
+                    }
                     if (downloadPlaylist != true) {
                         add(
                             when (downloadState) {
                                 Download.STATE_COMPLETED -> {
-                                    Material3MenuItemData(
+                                    IosMenuItemData(
                                         title = {
                                             Text(
                                                 text = stringResource(R.string.remove_download)
@@ -598,7 +622,7 @@ fun PlaylistMenu(
                                     )
                                 }
                                 Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                                    Material3MenuItemData(
+                                    IosMenuItemData(
                                         title = { Text(text = stringResource(R.string.downloading)) },
                                         icon = {
                                             CircularProgressIndicator(
@@ -616,7 +640,7 @@ fun PlaylistMenu(
                                     )
                                 }
                                 else -> {
-                                    Material3MenuItemData(
+                                    IosMenuItemData(
                                         title = { Text(text = stringResource(R.string.action_download)) },
                                         description = { Text(text = stringResource(R.string.download_desc)) },
                                         icon = {
@@ -639,7 +663,7 @@ fun PlaylistMenu(
                     }
                     if (autoPlaylist != true && !isGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.delete)) },
                                 description = { Text(text = stringResource(R.string.delete_desc)) },
                                 icon = {
@@ -657,7 +681,7 @@ fun PlaylistMenu(
                     val currentBrowseId = dbPlaylist?.playlist?.browseId ?: playlist.playlist.browseId
                     if (currentBrowseId == null && isSignedIn && !isGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.sync_playlist)) },
                                 description = { Text(text = stringResource(R.string.sync_playlist_desc)) },
                                 icon = {
@@ -732,7 +756,7 @@ fun PlaylistMenu(
                     }
                     playlist.playlist.shareLink?.let { shareLink ->
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.share)) },
                                 description = { Text(text = stringResource(R.string.share_desc)) },
                                 icon = {
@@ -799,12 +823,12 @@ fun PlaylistMenu(
                             painter = painterResource(R.drawable.check),
                             contentDescription = null,
                             modifier = Modifier.size(36.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = AppTheme.colorScheme.primary
                         )
                     }
                     Text(
                         text = stringResource(R.string.playlist_uploaded),
-                        style = MaterialTheme.typography.bodyLarge
+                        style = AppTheme.typography.bodyLarge
                     )
                 } else {
                     val progressValue = if (songs.isEmpty()) 0f else syncedCount.toFloat() / songs.size
@@ -818,7 +842,7 @@ fun PlaylistMenu(
                         )
                         Text(
                             text = "${(progressValue * 100).toInt()}%",
-                            style = MaterialTheme.typography.titleMedium
+                            style = AppTheme.typography.titleMedium
                         )
                     }
                     Text(
@@ -827,7 +851,7 @@ fun PlaylistMenu(
                         } else {
                             stringResource(R.string.syncing_progress, syncedCount, songs.size)
                         },
-                        style = MaterialTheme.typography.bodyLarge
+                        style = AppTheme.typography.bodyLarge
                     )
                 }
             }

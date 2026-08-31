@@ -72,23 +72,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularWavyProgressIndicator
-import androidx.compose.material3.ContainedLoadingIndicator
+import com.convx.music.ui.ios.compat.AlertDialog
+import com.convx.music.ui.ios.compat.CircularWavyProgressIndicator
+import com.convx.music.ui.ios.compat.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.material3.OutlinedIconButton
-import androidx.compose.material3.ProvideTextStyle
+import com.convx.music.ui.ios.compat.ProvideTextStyle
 import androidx.compose.runtime.produceState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -132,6 +132,8 @@ import coil3.size.Size as CoilSize
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -177,7 +179,6 @@ import com.convx.music.constants.CropAlbumArtKey
 import com.convx.music.constants.DarkModeKey
 import com.convx.music.constants.CompactPlayerInTabViewKey
 import com.convx.music.constants.CompactPlayerMaxWidth
-import com.convx.music.constants.AppTextColorKey
 import com.convx.music.constants.HidePlayerThumbnailKey
 import com.convx.music.constants.HideVolumeBarKey
 import com.convx.music.constants.EnableLyricsThumbnailPlayPauseKey
@@ -226,12 +227,16 @@ import com.convx.music.ui.component.Lyrics
 import com.convx.music.ui.component.PlayerSliderTrack
 import com.convx.music.ui.component.ResizableIconButton
 import com.convx.music.ui.utils.resize
+import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.player.customize.DiyDesignCanvas
 import com.convx.music.ui.player.customize.DiyOrientation
 import com.convx.music.ui.player.customize.DiyStickerLayer
+import com.convx.music.ui.utils.additiveChrome
+import com.convx.music.ui.player.customize.AnimatedPlayerGlyph
 import com.convx.music.ui.player.customize.PlayerGlyph
 import com.convx.music.ui.player.customize.PlayerIconSlot
 import com.convx.music.ui.player.customize.rememberDiyLayout
+import com.convx.music.ui.player.customize.AbsoluteFrameDiyStickers
 import com.convx.music.ui.player.customize.rememberPlayerIcon
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
@@ -241,7 +246,9 @@ import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.ScrollingWaveformSeekBar
 import com.convx.music.ui.component.rememberPlaybackFraction
 import com.convx.music.ui.component.WavySlider
+import androidx.compose.material3.IconButton
 import com.convx.music.ui.component.GlassCircleButton
+import com.convx.music.ui.component.asRimPop
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalBackdropLoopBucket
 import com.convx.music.ui.component.backdrop.backdrops.backdropStaticRegion
@@ -249,12 +256,12 @@ import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.rememberBottomSheetState
 import com.convx.music.ui.component.rememberHeroTint
-import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.menu.OldPlayerMenu
 import com.convx.music.ui.menu.PlayerMenu
 import com.convx.music.ui.component.VolumeSlider
 import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.theme.PlayerColorExtractor
+import com.convx.music.ui.theme.colorengine.ColorEngine
 import com.convx.music.ui.theme.PlayerSliderColors
 import com.convx.music.ui.utils.ShowMediaInfo
 import com.convx.music.ui.utils.ShowOffsetDialog
@@ -308,6 +315,13 @@ private const val VideoLoopBucketMs = 100L
 
 /** Upper bound on waiting for the player sheet before opening the queue inside it. */
 private const val PARENT_SHEET_SETTLE_TIMEOUT_MS = 1_000L
+
+/**
+ * Strength of white content added onto the background under `additiveChrome`. Below full so
+ * the blend doesn't clip to plain white -- the background's own colour and saturation stay
+ * visible through the tint instead of getting washed out.
+ */
+private const val AdditiveChromeContentAlpha = 0.45f
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -400,7 +414,7 @@ fun BottomSheetPlayer(
 
     val shouldUseDarkButtonColors = remember(playerBackground, useDarkTheme) {
         when (playerBackground) {
-            PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> true
+            PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> true
             PlayerBackgroundStyle.DEFAULT -> useDarkTheme
         }
     }
@@ -421,7 +435,7 @@ fun BottomSheetPlayer(
             val insetsController = WindowCompat.getInsetsController(window, window.decorView)
             
             when (playerBackground) {
-                PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> {
+                PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> {
                     insetsController.isAppearanceLightStatusBars = false
                 }
                 PlayerBackgroundStyle.DEFAULT -> {
@@ -449,8 +463,8 @@ fun BottomSheetPlayer(
     val gradientAngle by rememberPreference(PlayerGradientAngleKey, defaultValue = 90f)
 
     val onBackgroundColor = when (playerBackground) {
-        PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.onSurface
+        PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.secondary
+        else -> AppTheme.colorScheme.onSurface
     }
     val useBlackBackground =
         remember(isSystemInDarkTheme, darkTheme, pureBlack) {
@@ -660,8 +674,8 @@ fun BottomSheetPlayer(
         }
     }
 
-    val defaultGradientColors = listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant)
-    val fallbackColor = MaterialTheme.colorScheme.surface.toArgb()
+    val defaultGradientColors = listOf(AppTheme.colorScheme.surface, AppTheme.colorScheme.surfaceVariant)
+    val fallbackColor = AppTheme.colorScheme.surface.toArgb()
 
     LaunchedEffect(mediaMetadata?.id, playerBackground) {
         if (playerBackground == PlayerBackgroundStyle.GRADIENT || playerBackground == PlayerBackgroundStyle.GLOW_ANIMATED) {
@@ -675,7 +689,7 @@ fun BottomSheetPlayer(
                 withContext(Dispatchers.IO) {
                     val request = ImageRequest.Builder(context)
                         .data(currentMetadata.thumbnailUrl)
-                        .size(100, 100)
+                        .size(200, 200)
                         .allowHardware(false)
                         .memoryCacheKey("gradient_${currentMetadata.id}")
                         .build()
@@ -700,10 +714,23 @@ fun BottomSheetPlayer(
                                     palette.getDarkMutedColor(fallbackColor).let { Color(it) }
                                 ).distinct()
                             } else {
-                                PlayerColorExtractor.extractGradientColors(
-                                    palette = palette,
-                                    fallbackColor = fallbackColor
-                                )
+                                ColorEngine.analyze(bitmap, cacheKey = currentMetadata.thumbnailUrl)
+                                    ?.let { result ->
+                                        val dominant = result.palette.dominant
+                                        listOf(
+                                            dominant,
+                                            dominant.copy(
+                                                red = (dominant.red * 0.6f).coerceAtLeast(0f),
+                                                green = (dominant.green * 0.6f).coerceAtLeast(0f),
+                                                blue = (dominant.blue * 0.6f).coerceAtLeast(0f),
+                                            ),
+                                            Color.Black,
+                                        )
+                                    }
+                                    ?: PlayerColorExtractor.extractGradientColors(
+                                        palette = palette,
+                                        fallbackColor = fallbackColor
+                                    )
                             }
                             gradientColorsCache[currentMetadata.id] = extractedColors
                             withContext(Dispatchers.Main) { gradientColors = extractedColors }
@@ -716,20 +743,18 @@ fun BottomSheetPlayer(
         }
     }
 
-    // Every non-DEFAULT background style hardcodes White regardless of the
-    // user's global button/text color choice (AppTextColorKey) — DEFAULT alone
-    // read it indirectly via MaterialTheme.colorScheme.onBackground. Take the
-    // global color directly, for every style, whenever the user has set one.
-    val (appTextColorInt) = rememberPreference(AppTextColorKey, defaultValue = 0)
     val (showUpNext) = rememberPreference(ShowUpNextKey, defaultValue = false)
+    // Back to the original per-background/theme pick -- no mesh blend, no global custom
+    // colour override, just what it looked like before either of those existed.
     val TextBackgroundColor by animateColorAsState(
-        targetValue = if (appTextColorInt != 0) Color(appTextColorInt) else when (playerBackground) {
-            PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.onBackground
+        targetValue = when (playerBackground) {
+            PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.onBackground
             PlayerBackgroundStyle.BLUR -> Color.White
             PlayerBackgroundStyle.GRADIENT -> Color.White
             PlayerBackgroundStyle.GLOW_ANIMATED -> Color.White
             PlayerBackgroundStyle.APPLE_MUSIC -> Color.White
             PlayerBackgroundStyle.LIVE_MESH -> Color.White
+            PlayerBackgroundStyle.BITCHORD_MESH -> Color.White
             PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.White
         },
         label = "TextBackgroundColor"
@@ -737,12 +762,13 @@ fun BottomSheetPlayer(
 
     val icBackgroundColor by animateColorAsState(
         targetValue = when (playerBackground) {
-            PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.surface
+            PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.surface
             PlayerBackgroundStyle.BLUR -> Color.Black
             PlayerBackgroundStyle.GRADIENT -> Color.Black
             PlayerBackgroundStyle.GLOW_ANIMATED -> Color.Black
             PlayerBackgroundStyle.APPLE_MUSIC -> Color.Black
             PlayerBackgroundStyle.LIVE_MESH -> Color.Black
+            PlayerBackgroundStyle.BITCHORD_MESH -> Color.Black
             PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.Black
         },
         label = "icBackgroundColor"
@@ -837,21 +863,25 @@ fun BottomSheetPlayer(
         }
     }
 
+    // Back to the original branching: artwork-ish backgrounds are always white/black,
+    // DEFAULT/STATIC/CUSTOM_GRADIENT flip with the theme so DEFAULT-in-light-mode stays
+    // legible instead of white-on-white.
     val (textButtonColor, iconButtonColor) = when {
-        playerBackground == PlayerBackgroundStyle.BLUR || 
+        playerBackground == PlayerBackgroundStyle.BLUR ||
         playerBackground == PlayerBackgroundStyle.GRADIENT ||
         playerBackground == PlayerBackgroundStyle.GLOW_ANIMATED ||
         playerBackground == PlayerBackgroundStyle.APPLE_MUSIC ||
-        playerBackground == PlayerBackgroundStyle.LIVE_MESH -> {
+        playerBackground == PlayerBackgroundStyle.LIVE_MESH ||
+        playerBackground == PlayerBackgroundStyle.BITCHORD_MESH -> {
             when (playerButtonsStyle) {
                 PlayerButtonsStyle.DEFAULT -> Pair(Color.White, Color.Black)
                 PlayerButtonsStyle.PRIMARY -> Pair(
-                    MaterialTheme.colorScheme.primary,
-                    MaterialTheme.colorScheme.onPrimary
+                    AppTheme.colorScheme.primary,
+                    AppTheme.colorScheme.onPrimary
                 )
                 PlayerButtonsStyle.TERTIARY -> Pair(
-                    MaterialTheme.colorScheme.tertiary,
-                    MaterialTheme.colorScheme.onTertiary
+                    AppTheme.colorScheme.tertiary,
+                    AppTheme.colorScheme.onTertiary
                 )
             }
         }
@@ -861,71 +891,74 @@ fun BottomSheetPlayer(
                     if (useDarkTheme) Pair(Color.White, Color.Black)
                     else Pair(Color.Black, Color.White)
                 PlayerButtonsStyle.PRIMARY -> Pair(
-                    MaterialTheme.colorScheme.primary,
-                    MaterialTheme.colorScheme.onPrimary
+                    AppTheme.colorScheme.primary,
+                    AppTheme.colorScheme.onPrimary
                 )
                 PlayerButtonsStyle.TERTIARY -> Pair(
-                    MaterialTheme.colorScheme.tertiary,
-                    MaterialTheme.colorScheme.onTertiary
+                    AppTheme.colorScheme.tertiary,
+                    AppTheme.colorScheme.onTertiary
                 )
             }
         }
     }
 
-    // Seek bar's loaded (active) color: the user's global text/button color when set,
-    // else the same textButtonColor every other player control already uses. Every
-    // slider style's inactive track is a faded version of this same color (see
+    // Seek bar's loaded (active) color: the same textButtonColor every other player control
+    // uses. Every slider style's inactive track is a faded version of this same color (see
     // PlayerSliderColors), so both halves of the seek bar read as one color, not two.
-    val seekBarActiveColor = if (appTextColorInt != 0) Color(appTextColorInt) else textButtonColor
+    val seekBarActiveColor = textButtonColor
+    // Back on, per user request: player chrome is composited additively onto the
+    // background/mesh again.
+    val additiveChrome = true
 
-    // Separate colors for Previous/Next buttons in PRIMARY/TERTIARY modes
+    // Separate colors for Previous/Next buttons in PRIMARY/TERTIARY modes -- back to the
+    // original per-background split.
     val (sideButtonContainerColor, sideButtonContentColor) = when {
-        playerBackground == PlayerBackgroundStyle.BLUR || 
+        playerBackground == PlayerBackgroundStyle.BLUR ||
         playerBackground == PlayerBackgroundStyle.GRADIENT -> {
             when (playerButtonsStyle) {
                 PlayerButtonsStyle.DEFAULT -> Pair(
-                    Color.White.copy(alpha = 0.2f), 
+                    Color.White.copy(alpha = 0.2f),
                     Color.White
                 )
                 PlayerButtonsStyle.PRIMARY -> Pair(
-                    MaterialTheme.colorScheme.primaryContainer,
-                    MaterialTheme.colorScheme.onPrimaryContainer
+                    AppTheme.colorScheme.primaryContainer,
+                    AppTheme.colorScheme.onPrimaryContainer
                 )
                 PlayerButtonsStyle.TERTIARY -> Pair(
-                    MaterialTheme.colorScheme.tertiaryContainer,
-                    MaterialTheme.colorScheme.onTertiaryContainer
+                    AppTheme.colorScheme.tertiaryContainer,
+                    AppTheme.colorScheme.onTertiaryContainer
                 )
             }
         }
         playerBackground == PlayerBackgroundStyle.GLOW_ANIMATED -> {
             when (playerButtonsStyle) {
                 PlayerButtonsStyle.DEFAULT -> Pair(
-                    Color.White.copy(alpha = 0.2f), 
+                    Color.White.copy(alpha = 0.2f),
                     Color.White
                 )
                 PlayerButtonsStyle.PRIMARY -> Pair(
-                    MaterialTheme.colorScheme.primaryContainer,
-                    MaterialTheme.colorScheme.onPrimaryContainer
+                    AppTheme.colorScheme.primaryContainer,
+                    AppTheme.colorScheme.onPrimaryContainer
                 )
                 PlayerButtonsStyle.TERTIARY -> Pair(
-                    MaterialTheme.colorScheme.tertiaryContainer,
-                    MaterialTheme.colorScheme.onTertiaryContainer
+                    AppTheme.colorScheme.tertiaryContainer,
+                    AppTheme.colorScheme.onTertiaryContainer
                 )
             }
         }
         else -> {
             when (playerButtonsStyle) {
                 PlayerButtonsStyle.DEFAULT -> Pair(
-                    MaterialTheme.colorScheme.surfaceContainerHighest,
-                    MaterialTheme.colorScheme.onSurface
+                    AppTheme.colorScheme.surfaceContainerHighest,
+                    AppTheme.colorScheme.onSurface
                 )
                 PlayerButtonsStyle.PRIMARY -> Pair(
-                    MaterialTheme.colorScheme.primaryContainer,
-                    MaterialTheme.colorScheme.onPrimaryContainer
+                    AppTheme.colorScheme.primaryContainer,
+                    AppTheme.colorScheme.onPrimaryContainer
                 )
                 PlayerButtonsStyle.TERTIARY -> Pair(
-                    MaterialTheme.colorScheme.tertiaryContainer,
-                    MaterialTheme.colorScheme.onTertiaryContainer
+                    AppTheme.colorScheme.tertiaryContainer,
+                    AppTheme.colorScheme.onTertiaryContainer
                 )
             }
         }
@@ -1003,7 +1036,7 @@ fun BottomSheetPlayer(
                             sleepTimerValue.roundToInt(),
                             sleepTimerValue.roundToInt()
                         ),
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = AppTheme.typography.bodyLarge,
                     )
 
                     Slider(
@@ -1128,12 +1161,12 @@ fun BottomSheetPlayer(
 
     val bottomSheetBackgroundColor = when (playerBackground) {
         PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC ->
-            MaterialTheme.colorScheme.surfaceContainer
-        PlayerBackgroundStyle.LIVE_MESH ->
+            AppTheme.colorScheme.surfaceContainer
+        PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH ->
             Color.Black
         else ->
             if (useBlackBackground) Color.Black
-            else MaterialTheme.colorScheme.surfaceContainer
+            else AppTheme.colorScheme.surfaceContainer
     }
 
     // state.progress changes on every frame of a sheet drag or expand/collapse
@@ -1164,6 +1197,19 @@ fun BottomSheetPlayer(
     val isLandscapeLayout = forcedOrientation?.let { it == DiyOrientation.LANDSCAPE }
         ?: (LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
     val diyOrientation = if (isLandscapeLayout) DiyOrientation.LANDSCAPE else DiyOrientation.PORTRAIT
+
+    // Captured from a plain sibling Box in `overlayContent` below and read by the z < 0
+    // sticker band (here and in Player_v2.kt) so both player skins resolve stickers
+    // against the same frame -- see AbsoluteFrameDiyStickers' doc for why.
+    var diyRootCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    // V17's own Cover/Lyrics/Queue state, reported up from PlayerV2 (its own internal
+    // AnimatedContent state, invisible from here otherwise). The z >= 0 sticker band
+    // used to live inside that same AnimatedContent's Cover branch, so switching to
+    // Lyrics or Queue hid it as a side effect of the branch not being composed. Moving
+    // it to overlayContent (this file's own sibling slot, shared with classic) severed
+    // that: without this, V17's Queue/Lyrics buttons stopped hiding the stickers.
+    var v17ShowingCover by remember { mutableStateOf(true) }
 
     // Publishes this sheet's progress to the shared container morph. Read only in the
     // draw phase (see PlayerMorph), so nothing recomposes per frame because of it.
@@ -1208,13 +1254,59 @@ fun BottomSheetPlayer(
             // the same window and has to ride above the surface it is growing out of.
             PlayerContainerMorphOverlay(
                 progress = { state.progress },
-                color = MaterialTheme.colorScheme.surfaceContainer,
+                color = AppTheme.colorScheme.surfaceContainer,
                 expandedCornerRadius = rememberScreenCornerRadius(),
             )
             PlayerArtworkMorphOverlay(
                 thumbnailUrl = mediaMetadata?.thumbnailUrl,
                 progress = { state.progress },
             )
+
+            // A plain, unshifted sibling of the sheet's own draggable content (see this
+            // param's own doc above) -- the one frame both classic and V17 (Player_v2.kt)
+            // can anchor the z < 0 sticker band to regardless of which skin's own chrome
+            // is active. Captured here, read in this file's z < 0 call site and threaded
+            // into PlayerV2 for its own.
+            Box(modifier = Modifier.fillMaxSize().onGloballyPositioned { diyRootCoordinates = it })
+
+            // The z >= 0 sticker band: everything drawn over the artwork and the
+            // transport controls. This slot is already the topmost sibling of the
+            // sheet's content, on top of whichever skin is active, so it needs no
+            // frame-matching trick the way the z < 0 band (still nested inside each
+            // skin's own content, to sit behind its artwork) does.
+            //
+            // ponytail: only two z bands, not three -- everything here draws over the
+            // transport controls too, so a sticker parked on the play button hides it
+            // (the button still responds). A real "above artwork, below controls" band
+            // needs each skin's controlsContent hoisted into its own overlay slot.
+            //
+            // Hidden on Lyrics/Queue -- classic's own showInlineLyrics, or V17's
+            // reported-up v17ShowingCover, whichever skin is active. Wrapped in
+            // AnimatedVisibility (Motion.appear(), the app's "arriving/leaving in
+            // place" spring) so that switch crossfades instead of cutting -- it used
+            // to ride for free on V17's own AnimatedContent before this band moved
+            // here to share a frame with classic; now it needs its own transition.
+            val stickersHidden = if (useAppleMusicPlayer) !v17ShowingCover else showInlineLyrics
+            AnimatedVisibility(
+                visible = showDiyStickers && !stickersHidden && !state.isCollapsed,
+                enter = fadeIn(Motion.appear()),
+                exit = fadeOut(Motion.appear()),
+            ) {
+                val revealAlpha = ((state.progress - PLAYER_LAYER_HANDOFF_PROGRESS) / 0.2f).coerceIn(0f, 1f)
+                DiyDesignCanvas(
+                    orientation = diyOrientation,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Fades out with the queue's own drag instead of vanishing the
+                        // instant the sheet reports itself expanded, same reason as the
+                        // original call site's comment (see git history).
+                        .graphicsLayer {
+                            alpha = revealAlpha * (1f - queueSheetState.progress.coerceIn(0f, 1f))
+                        },
+                ) {
+                    DiyStickerLayer(layout = diyLayout, orientation = diyOrientation, zFilter = { it >= 0 })
+                }
+            }
         },
         background = {
             val glassConfig = LocalGlassEffectConfig.current
@@ -1682,7 +1774,7 @@ fun BottomSheetPlayer(
                                     BlurredBackdropImage(
                                         model = thumbnailUrl,
                                         screenBlurRadiusDp = 100f,
-                                        decodeSize = 48,
+                                        decodeSize = 160,
                                         colorFilter = colorFilter,
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -1693,7 +1785,7 @@ fun BottomSheetPlayer(
                                     BlurredBackdropImage(
                                         model = thumbnailUrl,
                                         screenBlurRadiusDp = 120f,
-                                        decodeSize = 48,
+                                        decodeSize = 160,
                                         alignment = Alignment.TopStart,
                                         colorFilter = colorFilter,
                                         modifier = Modifier
@@ -1708,7 +1800,7 @@ fun BottomSheetPlayer(
                                     BlurredBackdropImage(
                                         model = thumbnailUrl,
                                         screenBlurRadiusDp = 120f,
-                                        decodeSize = 48,
+                                        decodeSize = 160,
                                         alignment = Alignment.BottomEnd,
                                         colorFilter = colorFilter,
                                         modifier = Modifier
@@ -1740,6 +1832,20 @@ fun BottomSheetPlayer(
                                 }
                             }
                         }
+                    }
+                    PlayerBackgroundStyle.BITCHORD_MESH -> {
+                        // Four colour blobs off the sleeve rather than the sleeve itself.
+                        // No AnimatedContent wrapper: the palette crossfades its own
+                        // colours over 1.4s, so fading two whole meshes past each other
+                        // would be the same transition drawn twice at double the cost.
+                        val meshPalette = rememberArtworkMeshPalette(mediaMetadata?.thumbnailUrl)
+                        MeshGradientBackground(
+                            palette = meshPalette,
+                            trackKey = mediaMetadata?.id,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { alpha = backgroundAlpha() },
+                        )
                     }
                     PlayerBackgroundStyle.STATIC -> {
                         Box(
@@ -1808,22 +1914,25 @@ fun BottomSheetPlayer(
                 // video, below everything the player actually draws. The Canvas keeps the very
                 // bottom of the stack — nothing is allowed behind it.
                 //
-                // Wrapped in the editor's own fixed design canvas so a sticker's normalised
-                // position resolves against the same rectangle here as it did in the editor —
-                // the real player's actual bounds are a different aspect ratio otherwise, and a
-                // sticker placed there would land in the wrong spot on screen.
+                // Anchored to diyRootCoordinates (captured in overlayContent, above) rather than
+                // this Box's own fillMaxSize() -- see AbsoluteFrameDiyStickers' doc for why: V17
+                // (Player_v2.kt) uses this same call with a smaller local frame otherwise.
                 //
-                // Gated on lyrics NOT being shown: this sits in the same artwork Box the inline
-                // lyrics swap into (AnimatedContent below), so with no gate a sticker bleeds over
+                // Hidden on lyrics: this sits in the same artwork Box the inline lyrics
+                // swap into (AnimatedContent below), so with no gate a sticker bleeds over
                 // the lyrics text the same way it bled over the expanded queue sheet.
-                if (!showInlineLyrics && showDiyStickers) {
-                    DiyDesignCanvas(orientation = diyOrientation, modifier = Modifier.fillMaxSize()) {
-                        DiyStickerLayer(
-                            layout = diyLayout,
-                            orientation = diyOrientation,
-                            zFilter = { it < 0 },
-                        )
-                    }
+                // AnimatedVisibility crossfades that switch instead of cutting it.
+                AnimatedVisibility(
+                    visible = !showInlineLyrics && showDiyStickers,
+                    enter = fadeIn(Motion.appear()),
+                    exit = fadeOut(Motion.appear()),
+                ) {
+                    AbsoluteFrameDiyStickers(
+                        rootCoordinates = diyRootCoordinates,
+                        orientation = diyOrientation,
+                        layout = diyLayout,
+                        zFilter = { it < 0 },
+                    )
                 }
             }
         },
@@ -1855,6 +1964,8 @@ fun BottomSheetPlayer(
                 showDiyStickers = showDiyStickers,
                 forcedOrientation = forcedOrientation,
                 isPreviewOnly = isPreviewOnly,
+                diyRootCoordinates = diyRootCoordinates,
+                onCoverShowingChange = { v17ShowingCover = it },
             )
             return@BottomSheet
         }
@@ -1884,7 +1995,7 @@ fun BottomSheetPlayer(
                                     modifier = Modifier
                                         .size(56.dp)
                                         .clip(ThumbnailRoundedShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        .background(AppTheme.colorScheme.surfaceVariant),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
@@ -1960,7 +2071,7 @@ fun BottomSheetPlayer(
                     ) { title ->
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = AppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -2016,12 +2127,14 @@ fun BottomSheetPlayer(
                                     .fillMaxWidth()
                                     .basicMarquee(iterations = 1, initialDelayMillis = 3000, velocity = 30.dp)
                                     .padding(end = 12.dp)
+                                    .additiveChrome(additiveChrome)
+                                    .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                             ) {
                                 var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
                                 var clickOffset by remember { mutableStateOf<Offset?>(null) }
                                 Text(
                                     text = annotatedString,
-                                    style = MaterialTheme.typography.titleMedium.copy(color = TextBackgroundColor),
+                                    style = AppTheme.typography.titleMedium.copy(color = TextBackgroundColor),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     onTextLayout = { layoutResult = it },
@@ -2079,7 +2192,11 @@ fun BottomSheetPlayer(
                         }
                     }
 
-                    DjReadout(modifier = Modifier.padding(top = 2.dp))
+                    DjReadout(
+                        modifier = Modifier.padding(top = 2.dp)
+                            .additiveChrome(additiveChrome)
+                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
@@ -2117,7 +2234,9 @@ fun BottomSheetPlayer(
                                         containerColor = textButtonColor,
                                         contentColor = iconButtonColor,
                                     ),
-                                    modifier = Modifier.size(42.dp),
+                                    modifier = Modifier.size(42.dp)
+                                        .additiveChrome(additiveChrome)
+                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.fullscreen),
@@ -2163,7 +2282,9 @@ fun BottomSheetPlayer(
                                         containerColor = textButtonColor,
                                         contentColor = iconButtonColor,
                                     ),
-                                    modifier = Modifier.size(42.dp),
+                                    modifier = Modifier.size(42.dp)
+                                        .additiveChrome(additiveChrome)
+                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                 ) {
                                     when (download?.state) {
                                         Download.STATE_COMPLETED -> {
@@ -2216,7 +2337,9 @@ fun BottomSheetPlayer(
                                         containerColor = textButtonColor,
                                         contentColor = iconButtonColor,
                                     ),
-                                    modifier = Modifier.size(42.dp),
+                                    modifier = Modifier.size(42.dp)
+                                        .additiveChrome(additiveChrome)
+                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                 ) {
                                     PlayerGlyph(
                                         slot = PlayerIconSlot.MORE,
@@ -2233,7 +2356,9 @@ fun BottomSheetPlayer(
                                         containerColor = textButtonColor,
                                         contentColor = iconButtonColor,
                                     ),
-                                    modifier = Modifier.size(42.dp),
+                                    modifier = Modifier.size(42.dp)
+                                        .additiveChrome(additiveChrome)
+                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                 ) {
                                     PlayerGlyph(
                                         slot = if (currentSong?.song?.liked == true)
@@ -2269,15 +2394,19 @@ fun BottomSheetPlayer(
                                     isFullScreen = !isFullScreen
                                     if (oneTapFullscreenLyrics && !isFullScreen) showInlineLyrics = false
                                 },
+                                rimTintColor = TextBackgroundColor.asRimPop(),
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.fullscreen),
                                     contentDescription = null,
+                                    tint = TextBackgroundColor,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
                         } else {
-                            GlassCircleButton(
+                            // Bare icon, same as V17's own more-menu button — no glass
+                            // circle behind it, same glyph, same 32dp size.
+                            IconButton(
                                 onClick = {
                                     menuState.show {
                                         OldPlayerMenu(
@@ -2298,9 +2427,11 @@ fun BottomSheetPlayer(
                             ) {
                                 PlayerGlyph(
                                     slot = PlayerIconSlot.MORE,
-                                    fallback = R.drawable.more_vert,
-                                    tint = LocalContentColor.current,
-                                    modifier = Modifier.size(24.dp)
+                                    fallback = R.drawable.flamingo_more,
+                                    tint = TextBackgroundColor,
+                                    modifier = Modifier.size(32.dp)
+                                        .additiveChrome(additiveChrome)
+                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                 )
                             }
                         }
@@ -2329,25 +2460,30 @@ fun BottomSheetPlayer(
                                         )
                                     }
                                 },
+                                rimTintColor = TextBackgroundColor.asRimPop(),
                             ) {
                                 PlayerGlyph(
                                     slot = PlayerIconSlot.MORE,
                                     fallback = R.drawable.more_horiz,
-                                    tint = LocalContentColor.current,
+                                    tint = TextBackgroundColor,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
                         } else {
-                            GlassCircleButton(
+                            // Bare icon, same as V17's own like button — no glass circle,
+                            // same glyph pair, same 32dp size.
+                            IconButton(
                                 onClick = playerConnection::toggleLike,
                             ) {
                                 PlayerGlyph(
                                     slot = if (currentSong?.song?.liked == true)
                                         PlayerIconSlot.LIKED else PlayerIconSlot.LIKE,
                                     fallback = if (currentSong?.song?.liked == true)
-                                        R.drawable.favorite else R.drawable.favorite_border,
-                                    tint = if (currentSong?.song?.liked == true) MaterialTheme.colorScheme.error else LocalContentColor.current,
-                                    modifier = Modifier.size(24.dp),
+                                        R.drawable.flamingo_favorited else R.drawable.flamingo_favorite,
+                                    tint = if (currentSong?.song?.liked == true) AppTheme.colorScheme.error else TextBackgroundColor,
+                                    modifier = Modifier.size(32.dp)
+                                        .additiveChrome(additiveChrome)
+                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                 )
                             }
                         }
@@ -2389,8 +2525,14 @@ fun BottomSheetPlayer(
                         enabled = !isListenTogetherGuest,
                         colors = PlayerSliderColors.getSliderColors(
                             activeColor = if (useNewPlayerDesign) seekBarActiveColor else seekBarActiveColor.copy(alpha = 0.7f),
+                            // A hairline, not a grey rail: it only reads this faint because
+                            // the bar is added onto the artwork rather than laid over it.
+                            inactiveAlpha = if (additiveChrome) 0.05f else 0.3f,
                         ),
-                        modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                        modifier = Modifier
+                            .padding(horizontal = PlayerHorizontalPadding)
+                            .additiveChrome(additiveChrome)
+                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                     )
                 }
 
@@ -2419,6 +2561,9 @@ fun BottomSheetPlayer(
                             },
                             colors = PlayerSliderColors.getSliderColors(
                                 activeColor = if (useNewPlayerDesign) seekBarActiveColor else seekBarActiveColor.copy(alpha = 0.7f),
+                            // A hairline, not a grey rail: it only reads this faint because
+                            // the bar is added onto the artwork rather than laid over it.
+                            inactiveAlpha = if (additiveChrome) 0.05f else 0.3f,
                             ),
                             modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
                             isPlaying = effectiveIsPlaying
@@ -2486,16 +2631,28 @@ fun BottomSheetPlayer(
                                 trackHeight = trackHeight,
                                 colors = PlayerSliderColors.getSliderColors(
                                     activeColor = if (useNewPlayerDesign) seekBarActiveColor else seekBarActiveColor.copy(alpha = 0.7f),
+                            // A hairline, not a grey rail: it only reads this faint because
+                            // the bar is added onto the artwork rather than laid over it.
+                            inactiveAlpha = if (additiveChrome) 0.05f else 0.3f,
                                 )
                             )
                         },
-                        modifier = Modifier.padding(horizontal = PlayerHorizontalPadding)
+                        modifier = Modifier
+                            .padding(horizontal = PlayerHorizontalPadding)
+                            .additiveChrome(additiveChrome)
+                            // After additiveChrome, never before: alpha applied first
+                            // is folded into the saved layer and the add then runs at
+                            // full strength.
+                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                     )
                 }
 
                 SliderStyle.WAVEFORM -> {
                     val waveColors = PlayerSliderColors.getSliderColors(
                         activeColor = if (useNewPlayerDesign) seekBarActiveColor else seekBarActiveColor.copy(alpha = 0.7f),
+                        // A hairline, not a grey rail: it only reads this faint because the
+                        // bar is added onto the artwork rather than laid over it.
+                        inactiveAlpha = if (additiveChrome) 0.05f else 0.3f,
                     )
                     // Per-frame off the player clock, so the waveform glides rather
                     // than stepping with the once-a-second position state.
@@ -2542,11 +2699,13 @@ fun BottomSheetPlayer(
                 modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = PlayerHorizontalPadding + 4.dp),
+                    .padding(horizontal = PlayerHorizontalPadding + 4.dp)
+                    .additiveChrome(additiveChrome)
+                    .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
             ) {
                 Text(
                     text = makeTimeString(sliderPosition ?: effectivePosition),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = AppTheme.typography.labelMedium,
                     color = TextBackgroundColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -2597,7 +2756,7 @@ fun BottomSheetPlayer(
                                     )
                                     Text(
                                         text = makeTimeString(sleepTimerTimeLeft.coerceAtLeast(0)),
-                                        style = MaterialTheme.typography.labelSmall.copy(
+                                        style = AppTheme.typography.labelSmall.copy(
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             letterSpacing = 1.5.sp
@@ -2693,7 +2852,7 @@ fun BottomSheetPlayer(
                                                 if (sampleRateLabel != null) append(" • $sampleRateLabel")
                                             }
                                         },
-                                        style = MaterialTheme.typography.labelSmall.copy(
+                                        style = AppTheme.typography.labelSmall.copy(
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             letterSpacing = 1.0.sp
@@ -2709,7 +2868,7 @@ fun BottomSheetPlayer(
 
                 Text(
                     text = if (duration != C.TIME_UNSET) makeTimeString(duration) else "",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = AppTheme.typography.labelMedium,
                     color = TextBackgroundColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -2731,6 +2890,7 @@ fun BottomSheetPlayer(
                     titleColor = TextBackgroundColor,
                     subtitleColor = TextBackgroundColor.copy(alpha = 0.7f),
                     modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                    additiveChrome = additiveChrome,
                 )
                 Spacer(Modifier.height(8.dp))
             }
@@ -2751,7 +2911,7 @@ fun BottomSheetPlayer(
                     if (isListenTogetherGuest) {
                         Text(
                             text = stringResource(R.string.listen_together_locked),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = AppTheme.typography.labelMedium,
                             color = textButtonColor.copy(alpha = 0.7f),
                             textAlign = TextAlign.Center,
                             maxLines = 1,
@@ -2816,6 +2976,8 @@ fun BottomSheetPlayer(
                                     .height(68.dp)
                                     .weight(backButtonWeight)
                                     .widthIn(min = 44.dp)
+                                    .additiveChrome(additiveChrome)
+                                    .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                             ) {
                                 PlayerGlyph(
                                     slot = PlayerIconSlot.PREVIOUS,
@@ -2856,43 +3018,34 @@ fun BottomSheetPlayer(
                                     .height(68.dp)
                                     .weight(playPauseWeight)
                                     .widthIn(min = 44.dp)
+                                    .additiveChrome(additiveChrome)
+                                    .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    PlayerGlyph(
+                                    if (isListenTogetherGuest) {
                                         // Guests get a mute toggle in this position rather than
-                                        // transport, and that button is not a customisable slot.
-                                        slot = when {
-                                            isListenTogetherGuest -> null
-                                            effectiveIsPlaying -> PlayerIconSlot.PAUSE
-                                            else -> PlayerIconSlot.PLAY
-                                        },
-                                        fallback = if (isListenTogetherGuest) {
-                                            if (isMuted) R.drawable.volume_off else R.drawable.volume_down
-                                        } else {
-                                            if (effectiveIsPlaying) R.drawable.pause_applemusic else R.drawable.play_applemusic
-                                        },
-                                        tint = LocalContentColor.current,
-                                        contentDescription = if (isListenTogetherGuest) {
-                                            if (isMuted) stringResource(R.string.unmute) else stringResource(R.string.mute)
-                                        } else {
-                                            if (effectiveIsPlaying) stringResource(R.string.pause) else stringResource(R.string.play)
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (isListenTogetherGuest) {
-                                            if (isMuted) stringResource(R.string.unmute) else stringResource(R.string.mute)
-                                        } else {
-                                            if (effectiveIsPlaying) stringResource(R.string.pause) else stringResource(R.string.play)
-                                        },
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
+                                        // transport, and that button is not a customisable slot
+                                        // (nor a play/pause pair to animate between).
+                                        PlayerGlyph(
+                                            slot = null,
+                                            fallback = if (isMuted) R.drawable.volume_off else R.drawable.volume_down,
+                                            tint = LocalContentColor.current,
+                                            contentDescription = if (isMuted) stringResource(R.string.unmute) else stringResource(R.string.mute),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    } else {
+                                        AnimatedPlayerGlyph(
+                                            isPlaying = effectiveIsPlaying,
+                                            playSlot = PlayerIconSlot.PLAY,
+                                            pauseSlot = PlayerIconSlot.PAUSE,
+                                            playFallback = R.drawable.play_applemusic,
+                                            pauseFallback = R.drawable.pause_applemusic,
+                                            tint = LocalContentColor.current,
+                                            playDescription = stringResource(R.string.play),
+                                            pauseDescription = stringResource(R.string.pause),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
                                 }
-                            }
 
                             Spacer(modifier = Modifier.width(8.dp))
 
@@ -2909,6 +3062,8 @@ fun BottomSheetPlayer(
                                     .height(68.dp)
                                     .weight(nextButtonWeight)
                                     .widthIn(min = 44.dp)
+                                    .additiveChrome(additiveChrome)
+                                    .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                             ) {
                                 PlayerGlyph(
                                     slot = PlayerIconSlot.NEXT,
@@ -2956,7 +3111,9 @@ fun BottomSheetPlayer(
                                 Modifier
                                     .size(48.dp)
                                     .align(Alignment.Center)
-                                    .alpha(if (isListenTogetherGuest) 0.5f else 1f),
+                                    .alpha(if (isListenTogetherGuest) 0.5f else 1f)
+                                    .additiveChrome(additiveChrome)
+                                    .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                     onClick = playerConnection::seekToPrevious,
                                 )
                             }
@@ -2966,8 +3123,13 @@ fun BottomSheetPlayer(
                             Box(
                                 modifier =
                                 Modifier
-                                    .size(100.dp) //100
+                                    // Matches Player_v2's play/pause button size (58.5dp) --
+                                    // was 48dp with a 48dp glyph filling it exactly, which
+                                    // clipped the icon against the rounded-corner shape.
+                                    .size(58.5.dp)
                                     .clip(RoundedCornerShape(playPauseRoundness))
+                                    .additiveChrome(additiveChrome)
+                                    .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                     .clickable {
                                         if (isListenTogetherGuest) {
                                             playerConnection.toggleMute()
@@ -2987,28 +3149,40 @@ fun BottomSheetPlayer(
                                         }
                                     },
                             ) {
-                                PlayerGlyph(
-                                    slot = when {
-                                        isListenTogetherGuest -> null
-                                        playbackState == STATE_ENDED -> PlayerIconSlot.REPLAY
-                                        effectiveIsPlaying -> PlayerIconSlot.PAUSE
-                                        else -> PlayerIconSlot.PLAY
-                                    },
-                                    fallback = if (isListenTogetherGuest) {
-                                        if (isMuted) R.drawable.volume_mute else R.drawable.volume_down
-                                    } else if (playbackState == STATE_ENDED) {
-                                        R.drawable.replay
-                                    } else if (effectiveIsPlaying) {
-                                        R.drawable.pause_applemusic
-                                    } else {
-                                        R.drawable.play_applemusic
-                                    },
-                                    tint = TextBackgroundColor,
-                                    modifier =
-                                    Modifier
-                                        .align(Alignment.Center)
-                                        .size(72.dp),
-                                )
+                                // Mute (guest) and replay (ended) are single states with no
+                                // partner to animate between, so only the transport pair gets
+                                // the pop.
+                                if (isListenTogetherGuest || playbackState == STATE_ENDED) {
+                                    PlayerGlyph(
+                                        slot = if (isListenTogetherGuest) null else PlayerIconSlot.REPLAY,
+                                        fallback = if (isListenTogetherGuest) {
+                                            if (isMuted) R.drawable.volume_mute else R.drawable.volume_down
+                                        } else {
+                                            R.drawable.replay
+                                        },
+                                        tint = TextBackgroundColor,
+                                        modifier =
+                                        Modifier
+                                            .align(Alignment.Center)
+                                            .size(40.5.dp),
+                                    )
+                                } else {
+                                    AnimatedPlayerGlyph(
+                                        isPlaying = effectiveIsPlaying,
+                                        playSlot = PlayerIconSlot.PLAY,
+                                        pauseSlot = PlayerIconSlot.PAUSE,
+                                        playFallback = R.drawable.play_applemusic,
+                                        pauseFallback = R.drawable.pause_applemusic,
+                                        tint = TextBackgroundColor,
+                                        playDescription = stringResource(R.string.play),
+                                        pauseDescription = stringResource(R.string.pause),
+                                        playSize = 40.5.dp,
+                                        pauseSize = 38.5.dp,
+                                        modifier =
+                                        Modifier
+                                            .align(Alignment.Center),
+                                    )
+                                }
                             }
 
                             Spacer(Modifier.width(8.dp))
@@ -3023,7 +3197,9 @@ fun BottomSheetPlayer(
                                 Modifier
                                     .size(48.dp)
                                     .align(Alignment.Center)
-                                    .alpha(if (isListenTogetherGuest) 0.5f else 1f),
+                                    .alpha(if (isListenTogetherGuest) 0.5f else 1f)
+                                    .additiveChrome(additiveChrome)
+                                    .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                     onClick = playerConnection::seekToNext,
                                 )
                             }
@@ -3031,7 +3207,7 @@ fun BottomSheetPlayer(
 //                            Box(modifier = Modifier.weight(1f)) {
 //                                ResizableIconButton(
 //                                    icon = if (currentSong?.song?.liked == true) R.drawable.favorite else R.drawable.favorite_border,
-//                                    color = if (currentSong?.song?.liked == true) MaterialTheme.colorScheme.error else TextBackgroundColor,
+//                                    color = if (currentSong?.song?.liked == true) AppTheme.colorScheme.error else TextBackgroundColor,
 //                                    modifier =
 //                                    Modifier
 //                                        .size(32.dp)
@@ -3053,6 +3229,8 @@ fun BottomSheetPlayer(
                                 .padding(horizontal = PlayerHorizontalPadding)
                                 .alpha(if (hideVolumeBar) 0f else 1f)
                                 .then(if (hideVolumeBar) Modifier.clearAndSetSemantics {} else Modifier)
+                                .additiveChrome(additiveChrome)
+                                .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                         ) {
                             val volumeInteractionSource = remember { MutableInteractionSource() }
                             val isVolumeDragged by volumeInteractionSource.collectIsDraggedAsState()
@@ -3134,7 +3312,9 @@ fun BottomSheetPlayer(
                                             activeTrackColor = seekBarActiveColor.copy(alpha = 0.7f),
                                             inactiveTrackColor = seekBarActiveColor.copy(alpha = 0.15f)
                                         ),
-                                        trackHeight = volumeTrackHeight
+                                        trackHeight = volumeTrackHeight,
+                                        // Volume, not position: the mix window means nothing here.
+                                        showAutomix = false
                                     )
                                 }
                             )
@@ -3173,6 +3353,8 @@ fun BottomSheetPlayer(
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.fillMaxWidth()
+                                        .additiveChrome(additiveChrome)
+                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                 ) {
                                     Icon(
                                         painter = painterResource(
@@ -3195,7 +3377,7 @@ fun BottomSheetPlayer(
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         text = nameToShow ?: "",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = AppTheme.typography.labelSmall,
                                         color = textButtonColor.copy(alpha = 0.7f),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -3370,11 +3552,10 @@ fun BottomSheetPlayer(
             navController = navController,
             background = queueBackground,
             onBackgroundColor = onBackgroundColor,
-            // Same adaptive-contrast pattern as the playlist screens' onTint —
-            // computed from the queue's own song-tinted background, not the
-            // player-wide TextBackgroundColor (which tracks playerBackground
-            // style instead and can clash with an arbitrary song tint).
-            TextBackgroundColor = AppleTokens.onColor(queueBackground),
+            // Same adaptive tint as the seek bar and every other classic-player
+            // icon (and as Player_v2's queue sheet) instead of a colour derived
+            // from the queue's own song-tinted background.
+            TextBackgroundColor = TextBackgroundColor,
             textButtonColor = textButtonColor,
             iconButtonColor = iconButtonColor,
             pureBlack = pureBlack,
@@ -3391,39 +3572,9 @@ fun BottomSheetPlayer(
             )
         }
 
-        // The rest of the stickers, over the player content. The layer takes no pointer input,
-        // so a sticker can cover a control without ever swallowing a tap meant for it.
-        //
-        // ponytail: only two z bands, not three — everything at z >= 0 draws over the transport
-        // controls as well as the artwork, so a sticker parked on the play button hides it (the
-        // button still responds). A real "above artwork, below controls" band needs controlsContent
-        // hoisted out of its Column into a sibling overlay of this Box, in all three layout
-        // branches; this is the only place with full-player bounds to insert into.
-        //
-        // Gated on the queue sheet NOT being expanded: this layer is a sibling of the Queue
-        // bottom sheet in the same Box, so with no gate it paints on top of the expanded sheet too.
-        // Also gated on lyrics NOT being shown, for the same reason as the z < 0 layer above.
-        if (!showInlineLyrics && showDiyStickers) {
-            // Same fixed design canvas as the z < 0 layer above and the editor itself — see the
-            // comment there for why a plain fillMaxSize bounds would misplace stickers.
-            DiyDesignCanvas(
-                orientation = diyOrientation,
-                modifier = Modifier
-                    .fillMaxSize()
-                    // Fades out with the queue's own drag instead of vanishing the instant
-                    // the sheet reports itself expanded, so dragging the queue up dissolves
-                    // the stickers with it. Read inside graphicsLayer's lambda: that is a
-                    // draw-phase read, so a sheet drag doesn't recompose this ~3000-line
-                    // composable once per frame the way reading progress in the body would.
-                    .graphicsLayer { alpha = 1f - queueSheetState.progress.coerceIn(0f, 1f) },
-            ) {
-                DiyStickerLayer(
-                    layout = diyLayout,
-                    orientation = diyOrientation,
-                    zFilter = { it >= 0 },
-                )
-            }
-        }
+        // The z >= 0 sticker band now renders from BottomSheet's overlayContent slot
+        // instead of here -- see that call site's comment. It doesn't need this Box's
+        // own bounds the way the z < 0 band still does.
     }
 }
 
@@ -3475,8 +3626,8 @@ fun InlineLyricsView(
             lyrics == LyricsEntity.LYRICS_NOT_FOUND -> {
                 Text(
                     text = stringResource(R.string.lyrics_not_found),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center
                 )
             }
@@ -3489,7 +3640,7 @@ fun InlineLyricsView(
                     )
                 }
                 ProvideTextStyle(
-                    value = MaterialTheme.typography.bodyMedium.copy(
+                    value = AppTheme.typography.bodyMedium.copy(
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
                     )

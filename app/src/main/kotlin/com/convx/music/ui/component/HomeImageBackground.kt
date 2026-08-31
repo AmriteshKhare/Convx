@@ -19,16 +19,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.MaterialTheme
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.constants.AppBackgroundColorKey
 import com.convx.music.constants.HomeBackgroundAnimateKey
 import com.convx.music.constants.HomeBackgroundBlurKey
@@ -46,6 +42,11 @@ import java.io.File
  *  of the quality preference or how large the device's own screen is — keeps
  *  an exotic tablet/foldable from decoding an unreasonably large bitmap. */
 private const val BackgroundAbsoluteMaxEdge = 2560
+
+/** Longest edge the blurred backdrop is baked from, at quality 1. The bake output is
+ *  upscaled to fill the screen, and it is a heavy blur by the time anyone sees it, so
+ *  it does not need the stored image's own resolution to look identical. */
+private const val BackgroundBakeMaxEdge = 512
 
 /**
  * The size a background image is stored at (HomeBackgroundSettings.kt's
@@ -169,45 +170,44 @@ fun BoxScope.HomeImageBackground(
             blurAnimatedThisSession = true
         }
     }
-    val animatedBlur by animateFloatAsState(
-        targetValue = if (appeared && contentLoaded) blur else 0f,
+    // A baked bitmap has one fixed radius, so the intro can no longer ramp the radius
+    // itself; it fades the finished blur in over the same curve instead. The preference
+    // defaults off, in which case `appeared` starts true and this sits at 1f from the
+    // first frame without animating.
+    val introAlpha by animateFloatAsState(
+        targetValue = if (appeared && contentLoaded) 1f else 0f,
         // Long, gentle ease-out (easeOutExpo-like) for a fluid, unhurried settle.
         animationSpec = tween(
             durationMillis = 2200,
             easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f),
         ),
-        label = "homeBgBlur",
+        label = "homeBgIntro",
     )
-    val effectiveBlur = if (animate) animatedBlur else blur
-    val context = LocalContext.current
 
-    // Was a flat 1080x1920 request regardless of what the image was actually
-    // stored at — so even after raising the stored resolution to the
-    // device's own screen size (HomeBackgroundSettings.kt), this decode step
-    // downsampled it right back down on every render, on any screen bigger
-    // than 1080x1920. Match the same quality-scaled target used at store time.
+    // Baked once per (image, radius) and cached, not a screen-size RenderEffect on every
+    // frame. A non-null RenderEffect is re-evaluated on every composite, so a background
+    // that never changes was costing a full-screen blur pass per frame on Home, Library
+    // and both search screens.
+    //
+    // The bake earlier rejected here resampled by successive downscale/upscale, which is
+    // what produced the visible seams and blocking; this is a real stack blur over a
+    // decoded source, the same one HeroArtwork's backdrop has used since. The quality
+    // preference now sizes that source: it is the only thing left that governs how much
+    // detail survives into the blurred result.
     val (quality) = rememberPreference(HomeBackgroundQualityKey, 1f)
-    val (targetWidth, targetHeight) = rememberHomeBackgroundTargetSize(quality)
-    val imageRequest = remember(path, targetWidth, targetHeight) {
-        ImageRequest.Builder(context)
-            .data(File(path))
-            .size(targetWidth, targetHeight)
-            .crossfade(false)
-            .build()
+    val bakeSize = remember(quality) {
+        (BackgroundBakeMaxEdge * quality.coerceIn(0.3f, 1f)).toInt()
     }
+    val backdropFile = remember(path) { File(path) }
 
-    // Always the live RenderEffect blur — a prior version swapped in a bitmap
-    // pre-blurred via successive downscale/upscale once "settled" (cheaper per
-    // frame while scrolling), but that resample approximation showed visible
-    // seams/blocking versus a real blur. Simplicity + correctness over the
-    // per-frame GPU cost for a background that doesn't otherwise animate.
-    AsyncImage(
-        model = imageRequest,
-        contentDescription = null,
+    BlurredBackdropImage(
+        model = backdropFile,
+        screenBlurRadiusDp = blur,
+        decodeSize = bakeSize,
         contentScale = ContentScale.Crop,
         modifier = Modifier
             .matchParentSize()
-            .blur(effectiveBlur.dp),
+            .then(if (animate) Modifier.graphicsLayer { alpha = introAlpha } else Modifier),
     )
     Box(
         modifier = Modifier
@@ -215,7 +215,7 @@ fun BoxScope.HomeImageBackground(
             .background(Color.Black.copy(alpha = dim)),
     )
     if (withGradient) {
-        val primary = MaterialTheme.colorScheme.primary
+        val primary = AppTheme.colorScheme.primary
         Box(
             modifier = Modifier
                 .matchParentSize()

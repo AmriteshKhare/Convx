@@ -25,10 +25,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -67,6 +67,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.size.Size as CoilSize
 import androidx.compose.ui.platform.LocalContext
+import com.convx.music.ui.component.rememberNoArtworkPainter
 import com.convx.music.LocalListenTogetherManager
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
@@ -147,8 +148,11 @@ fun FloatingMiniPlayer(
     val offsetXAnimatable = remember { Animatable(0f) }
     var dragStartTime by remember { mutableLongStateOf(0L) }
     var totalDragDistance by remember { mutableFloatStateOf(0f) }
+    // Underdamped on purpose: releasing the pill (drag-cancel, or after a skip
+    // commits) should overshoot past center and settle back with one visible
+    // bounce -- a rubber-band snap, not a flat glide to rest.
     val animationSpec = remember {
-        spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)
+        spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
     }
     // Commit distance for the swipe. The logistic curve this replaces produced
     // ~400dp — about 1200px at 3x, on a screen 1080px wide — so releasing the pill
@@ -344,8 +348,8 @@ fun FloatingMiniPlayer(
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    placeholder = painterResource(R.drawable.thumbnail_fallback),
-                    error = painterResource(R.drawable.thumbnail_fallback),
+                    placeholder = rememberNoArtworkPainter(),
+                    error = rememberNoArtworkPainter(),
                     modifier = Modifier
                         .size(artSize)
                         // Registers this box's on-screen bounds for
@@ -366,14 +370,14 @@ fun FloatingMiniPlayer(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = mediaMetadata?.title.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = AppTheme.typography.bodySmall,
                         color = contentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                        style = AppTheme.typography.bodySmall.copy(fontSize = 10.sp),
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -413,8 +417,8 @@ fun FloatingMiniPlayer(
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    placeholder = painterResource(R.drawable.thumbnail_fallback),
-                    error = painterResource(R.drawable.thumbnail_fallback),
+                    placeholder = rememberNoArtworkPainter(),
+                    error = rememberNoArtworkPainter(),
                     modifier = Modifier
                         .size(artSize)
                         // Registers this box's on-screen bounds for
@@ -435,14 +439,14 @@ fun FloatingMiniPlayer(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = mediaMetadata?.title.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = AppTheme.typography.bodyMedium,
                         color = contentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = AppTheme.typography.bodySmall,
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -574,8 +578,8 @@ fun FloatingMiniPlayer(
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    placeholder = painterResource(R.drawable.thumbnail_fallback),
-                    error = painterResource(R.drawable.thumbnail_fallback),
+                    placeholder = rememberNoArtworkPainter(),
+                    error = rememberNoArtworkPainter(),
                     modifier = Modifier
                         .size(artSize)
                         // Registers this box's on-screen bounds for
@@ -596,14 +600,14 @@ fun FloatingMiniPlayer(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = mediaMetadata?.title.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = AppTheme.typography.bodyMedium,
                         color = contentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = AppTheme.typography.bodySmall,
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

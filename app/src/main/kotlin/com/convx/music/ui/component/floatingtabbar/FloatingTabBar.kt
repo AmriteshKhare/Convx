@@ -35,6 +35,7 @@ import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -68,7 +69,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.theme.LocalAccentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -109,13 +111,16 @@ import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.graphics.isSpecified
-import androidx.compose.ui.graphics.luminance
+import com.convx.music.constants.NavBarMeltTransitionKey
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.elasticStretchLayerBlock
 import com.convx.music.ui.component.glassResolutionScale
+import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.component.backdrop.Backdrop
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberCombinedBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.convx.music.ui.component.LocalAppBackdropFrozen
 import com.convx.music.ui.component.backdrop.catalog.utils.DampedDragAnimation
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.backdrop.drawBackdrop
@@ -128,7 +133,10 @@ import com.convx.music.ui.component.backdrop.shadow.Shadow
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.sign
+import kotlin.math.tanh
 
 
 
@@ -158,6 +166,18 @@ private const val PuckRestShadowAlpha = 0.35f
  *  actually settles. */
 private const val ScrollFreezeTailNs = 120_000_000L
 
+// Tuning for FloatingTabBarScrollConnection.momentumStretch(). Deliberately decoupled
+// from ScrollFreezeTailNs above (that one's about how long the glass backdrop stays
+// unrecaptured, a cost concern; this is about how long the spring visually takes to
+// settle, a feel concern -- tying them together is what made the original version
+// too short-lived to read as anything).
+private const val MomentumVelocityEmaAlpha = 0.35f
+private const val MomentumVelocityDivisor = 60f
+private const val MomentumLiveWindowNs = 48_000_000L
+private const val MomentumSpringWindowNs = 450_000_000L
+private const val MomentumSpringZeta = 0.22f
+private const val MomentumSpringOmega = 14f
+
 // Vendored addition: the three shapes the bar can render. INLINE is the
 // scroll-collapsed row (unchanged by search mode); EXPANDED is the normal
 // all-tabs pill; SEARCH_EXPANDED replaces EXPANDED while search mode is
@@ -169,6 +189,15 @@ private enum class FloatingTabBarVisual { INLINE, EXPANDED, SEARCH_EXPANDED }
 // player's own ~48dp content height) so the search-expanded row doesn't read
 // shorter than the bar's own shrunk state.
 private val SearchBarRowHeight = 48.dp
+
+// The standalone tab's outer size is fixed by the row's aspectRatio, and the
+// parent AnimatedContent(SizeTransform(clip = true)) clips to exactly that
+// box — so elasticStretchLayerBlock's press/drag overshoot (a draw-only
+// graphicsLayer transform, doesn't grow the layout box) got sliced at the
+// bar's edge instead of protruding. Insetting the circle by this much before
+// it sizes/clips itself reserves the room to grow into without touching the
+// outer bounds AnimatedContent actually clips.
+private val StandaloneTabOvershootInset = 3.dp
 
 /**
  * A floating tab bar that transitions between inline and expanded states based on scroll behavior.
@@ -251,6 +280,11 @@ fun FloatingTabBar(
     // the transition object is available here to drive the gooey blur pulse,
     // not just inside the content lambda.
     val transition = updateTransition(targetState = visual, label = "floatingTabBarVisual")
+    // User-facing toggle: melt (gooey blur + SizeTransform morph) vs. the plain
+    // fade this bar had before — melt costs a real offscreen blur pass on every
+    // transition, so lower-end devices or anyone who just doesn't like the look
+    // can drop back to the cheap crossfade.
+    val meltTransitionEnabled by rememberPreference(NavBarMeltTransitionKey, defaultValue = true)
     val gooeyBlurPx = with(LocalDensity.current) { GooeyPeakBlur.toPx() }
     // Liquid "gooey" merge/split (see GooeyTransition.kt): peaks mid-crossfade
     // and returns to 0 at rest, on every transition regardless of direction —
@@ -289,11 +323,46 @@ fun FloatingTabBar(
             }
         }
         CompositionLocalProvider(LocalTabBarBackdropFrozen provides frozenWhileAnimating) {
-            Box {
+            // Shape morph, not a crossfade: SizeTransform makes the container itself
+            // grow/shrink between the inline and expanded bounds (clip = true, so
+            // each bar is actually cropped by the animating rect, not just faded in
+            // place at its own full size) — that continuous resize is what reads as
+            // one pill becoming the other instead of two static shapes dissolving.
+            // gooey() then wraps the whole resizing container in one offscreen
+            // layer (see GooeyTransition.kt), so the outgoing/incoming edges bleed
+            // together through the blur and snap back to a crisp, molten seam
+            // instead of a hard-clipped rectangle edge.
+            Box(
+                Modifier
+                    .gooey { if (meltTransitionEnabled) gooeyBlurPx * gooeyProgress else 0f }
+                    // Momentum squash/stretch: the whole bar reacts to scroll speed of
+                    // the content under it, like it's being tugged along and springing
+                    // back -- not a drag on the bar itself. Draw-phase only (graphicsLayer
+                    // block), reads the connection's plain-array momentumStretch(), same
+                    // no-recomposition contract as LocalTabBarBackdropFrozen above.
+                    .graphicsLayer {
+                        val stretch = scrollConnection.momentumStretch()
+                        // Fast scroll DOWN (bar collapsing, available.y negative) squashes
+                        // height and widens; fast scroll UP stretches taller and narrows --
+                        // matches the rubber-band read of "being pulled by the list".
+                        scaleY = 1f + stretch * 0.14f
+                        scaleX = 1f - stretch * 0.09f
+                    }
+            ) {
                 transition.AnimatedContent(
                     transitionSpec = {
-                        fadeIn(tween(220 * DIAG_SLOWDOWN, easing = FastOutSlowInEasing)) togetherWith
-                            fadeOut(tween(180 * DIAG_SLOWDOWN, easing = FastOutSlowInEasing))
+                        if (meltTransitionEnabled) {
+                            (fadeIn(tween(GooeyDurationMs, easing = FastOutSlowInEasing)) togetherWith
+                                fadeOut(tween(GooeyDurationMs, easing = FastOutSlowInEasing)))
+                                .using(
+                                    SizeTransform(clip = true) { _, _ ->
+                                        tween(GooeyDurationMs, easing = FastOutSlowInEasing)
+                                    }
+                                )
+                        } else {
+                            fadeIn(tween(220 * DIAG_SLOWDOWN, easing = FastOutSlowInEasing)) togetherWith
+                                fadeOut(tween(180 * DIAG_SLOWDOWN, easing = FastOutSlowInEasing))
+                        }
                     },
                     contentAlignment = Alignment.BottomCenter
                 ) { targetVisual ->
@@ -386,6 +455,39 @@ class FloatingTabBarScrollConnection(
     // re-invalidate the frame forever.
     private val scrollClockNs = longArrayOf(0L)
 
+    // Same plain-array technique for the bar's momentum stretch: an EMA'd scroll
+    // velocity plus the timestamp of the last event. Read only from a graphicsLayer
+    // block (draw phase), never from composition, so writing it every scroll event
+    // costs no recomposition.
+    private val smoothedVelocityPx = floatArrayOf(0f)
+    private val lastDeltaClockNs = longArrayOf(0L)
+
+    /**
+     * How much the bar should squash/stretch right now, roughly -1f..1f.
+     *
+     * Two phases, both driven off the same [smoothedVelocityPx] value so there's no
+     * seam between them: while events are still arriving (mid-scroll/mid-fling) this
+     * live-tracks scroll speed directly; once they stop it free-decays as a damped
+     * spring released from wherever the live value left off -- `cos` rather than
+     * `sin` so the decay curve starts exactly at that value instead of jumping to
+     * it, and crossing zero on the way down is what reads as the actual "magnetic
+     * snap-back" overshoot instead of a flat relax to identity.
+     *
+     * The original version fed a single instantaneous [NestedScrollConnection]
+     * delta (typically well under 100px per event) through `tanh(delta / 260f)` and
+     * a linear decay -- both the divisor and a monotonic decay meant it never got
+     * anywhere near saturating or oscillating, so it was there but unfeelable.
+     */
+    fun momentumStretch(): Float {
+        val ageNs = System.nanoTime() - lastDeltaClockNs[0]
+        if (lastDeltaClockNs[0] == 0L || ageNs > MomentumLiveWindowNs + MomentumSpringWindowNs) return 0f
+        val seed = tanh(smoothedVelocityPx[0] / MomentumVelocityDivisor)
+        if (ageNs <= MomentumLiveWindowNs) return seed
+        val t = (ageNs - MomentumLiveWindowNs) / 1_000_000_000f
+        val envelope = exp(-MomentumSpringZeta * MomentumSpringOmega * t)
+        return seed * envelope * cos(MomentumSpringOmega * t)
+    }
+
     /**
      * True while the list under the bar is scrolling, and for [ScrollFreezeTailNs] after the
      * last scroll event so a fling stays covered.
@@ -426,6 +528,13 @@ class FloatingTabBarScrollConnection(
         }
 
         markScrolled()
+        // EMA rather than a raw per-event overwrite: onPreScroll deltas are noisy
+        // frame to frame (a real list doesn't move the same px every callback), and
+        // an unsmoothed value read straight into the live phase above would jitter
+        // the bar's scale instead of tracking scroll speed.
+        smoothedVelocityPx[0] = smoothedVelocityPx[0] * (1f - MomentumVelocityEmaAlpha) +
+            available.y * MomentumVelocityEmaAlpha
+        lastDeltaClockNs[0] = System.nanoTime()
 
         val scrollDelta = available.y
 
@@ -744,6 +853,7 @@ private fun SharedTransitionScope.InlineStandaloneTab(
         isInline = true,
         isStandalone = true,
         modifier = modifier
+            .padding(StandaloneTabOvershootInset)
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
                 animatedVisibilityScope = animatedVisibilityScope,
@@ -753,6 +863,7 @@ private fun SharedTransitionScope.InlineStandaloneTab(
                 shape = shapes.standaloneTabShape,
                 elevation = elevations.inlineElevation
             )
+            .graphicsLayer(elasticStretchLayerBlock(glow))
             .background(
                 color = colors.backgroundColor,
                 shape = shapes.standaloneTabShape
@@ -1048,6 +1159,7 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
         isInline = true,
         isStandalone = true,
         modifier = modifier
+            .padding(StandaloneTabOvershootInset)
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
                 animatedVisibilityScope = animatedVisibilityScope,
@@ -1057,6 +1169,7 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
                 shape = shapes.standaloneTabShape,
                 elevation = elevations.expandedElevation
             )
+            .graphicsLayer(elasticStretchLayerBlock(glow))
             .background(
                 color = colors.backgroundColor,
                 shape = shapes.standaloneTabShape
@@ -1146,15 +1259,13 @@ private fun SharedTransitionScope.ExpandedTabs(
     val isLtr = layoutDirection == LayoutDirection.Ltr
     val animationScope = rememberCoroutineScope()
     val glassConfig = LocalGlassEffectConfig.current
-    // Puck wash. Unset follows the theme rather than assuming a dark bar: a light
-    // scheme gets a light wash, so the pill still reads as a raised surface instead
-    // of a black patch.
+    // Puck wash. Unset follows the app's current accent (the same colour the
+    // hero/nav chrome derives from the background) so the pill tracks whatever is
+    // playing instead of a flat grey.
     val puckWash = if (glassConfig.puckColor.isSpecified) {
         glassConfig.puckColor
-    } else if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color(0xFFF2F2F2)
     } else {
-        Color(28, 27, 28)
+        LocalAccentColor.current
     }
     val puckRestAlpha = glassConfig.puckOpacity.coerceIn(0f, 1f)
 
@@ -1314,6 +1425,17 @@ private fun SharedTransitionScope.ExpandedTabs(
     // selected icon shows through the glass in the accent color.
     val tabsBackdrop = rememberLayerBackdrop()
 
+    // This is the app's SECOND layerBackdrop, and it was the only one never told to
+    // sit out app-level motion. The app backdrop takes `frozen = backdropFrozenProvider`
+    // in MainActivity; this one took the `{ false }` default, so it ran the full
+    // `layer.record { drawContent() }` path -- which cannot reuse unchanged child
+    // RenderNodes -- on every frame of every scroll, on every screen the bar appears on.
+    // What it captures is this bar's own icon row sampling the screen behind it, so
+    // while the screen is moving the capture is stale a frame later anyway; the puck's
+    // lens lagging during motion is the same invisible-against-moving-content trade the
+    // app backdrop already makes.
+    val appBackdropFrozen = LocalAppBackdropFrozen.current
+
     Box(modifier.width(with(density) { totalWidthPx.toDp() })) {
         Row(
             Modifier
@@ -1347,6 +1469,14 @@ private fun SharedTransitionScope.ExpandedTabs(
                                     // Unselected tabs sit back; the selected one is
                                     // never dimmed, so the puck must not darken it.
                                     alpha = if (tab.key == selectedTabKey) 1f else 0.6f
+                                    // A tab icon is a single Icon draw, so there is no
+                                    // self-overlap for an offscreen buffer to resolve.
+                                    // CompositingStrategy.Auto would still allocate one
+                                    // per dimmed tab because alpha < 1; modulating the
+                                    // alpha into the draw is pixel-identical here and
+                                    // costs no render target. Same call this file's
+                                    // animateEnterExitAccessory already makes.
+                                    compositingStrategy = CompositingStrategy.ModulateAlpha
                                 }
                                 .then(
                                     if (tab.key == selectedTabKey) {
@@ -1411,7 +1541,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                     .fillMaxWidth()
                     .clearAndSetSemantics {}
                     .alpha(0f)
-                    .layerBackdrop(tabsBackdrop)
+                    .layerBackdrop(tabsBackdrop, frozen = appBackdropFrozen)
                     .graphicsLayer { translationX = panelOffset }
                     // Padding here (not after drawBackdrop, like the tail
                     // .padding below) so it actually shrinks this row's own
@@ -1559,7 +1689,16 @@ private fun SharedTransitionScope.ExpandedTabs(
                             },
                             innerShadow = {
                                 val progress = dampedDragAnimation.pressProgress
-                                InnerShadow(radius = 8f.dp * progress, alpha = progress)
+                                // Press-only. InnerShadowModifier bails out solely on a
+                                // null return: handing it alpha = 0 still costs an
+                                // Offscreen render target, an outline build and a layer
+                                // record every frame, to composite something fully
+                                // transparent. A puck at rest should pay nothing.
+                                if (progress > 0f) {
+                                    InnerShadow(radius = 8f.dp * progress, alpha = progress)
+                                } else {
+                                    null
+                                }
                             },
                             layerBlock = {
                                 scaleX = dampedDragAnimation.scaleX
@@ -1690,7 +1829,7 @@ private fun Tab(
         // position without growing the Column's measured height and gets it
         // clipped by the tab bar's own bounds.
         verticalArrangement = if (showTitle) {
-            Arrangement.spacedBy((-6).dp, Alignment.CenterVertically)
+            Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
         } else {
             Arrangement.Center
         },
@@ -1790,10 +1929,18 @@ private fun Modifier.animateEnterExitTab(
 
         graphicsLayer {
             alpha = animatedAlpha
-            renderEffect = BlurEffect(
-                radiusX = animatedBlur,
-                radiusY = animatedBlur
-            )
+            // BlurEffect(0f, 0f) is still a *non-null* RenderEffect, and a non-null
+            // RenderEffect forces its own offscreen render target and is re-evaluated
+            // on every composite -- not only while recording. Leaving one set at rest
+            // made every unselected tab icon and every tab title its own permanently
+            // blurred layer, for the whole life of the bar, to render a blur of radius
+            // zero. Null it once the 150ms transition lands, the way Modifier.gooey
+            // already does in GooeyTransition.kt.
+            renderEffect = if (animatedBlur > 0f) {
+                BlurEffect(radiusX = animatedBlur, radiusY = animatedBlur)
+            } else {
+                null
+            }
         }
     }
 }
@@ -1927,8 +2074,8 @@ object FloatingTabBarDefaults {
      */
     @Composable
     fun colors(
-        backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        accessoryBackgroundColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        backgroundColor: Color = AppTheme.colorScheme.surfaceContainerHigh,
+        accessoryBackgroundColor: Color = AppTheme.colorScheme.surfaceContainerHigh,
     ): FloatingTabBarColors = FloatingTabBarColors(
         backgroundColor = backgroundColor,
         accessoryBackgroundColor = accessoryBackgroundColor,

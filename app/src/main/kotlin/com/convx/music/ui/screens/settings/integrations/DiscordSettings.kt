@@ -49,7 +49,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Card
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.CardDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -57,27 +57,27 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.LinearProgressIndicator
+import com.convx.music.ui.ios.compat.LinearProgressIndicator
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.LinearWavyProgressIndicator
+import com.convx.music.ui.ios.compat.LinearWavyProgressIndicator
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SnackbarHostState
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.OutlinedButton
+import com.convx.music.ui.ios.compat.OutlinedButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Surface
+import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
+import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -179,9 +179,9 @@ import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.InfoLabel
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
+import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.TextFieldDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -343,8 +343,8 @@ fun DiscordSettings(
                 if (error != null) {
                     Text(
                         text = error!!,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
+                        color = AppTheme.colorScheme.error,
+                        style = AppTheme.typography.bodySmall,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
@@ -468,7 +468,7 @@ fun DiscordSettings(
         AnimatedVisibility(visible = !infoDismissed) {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    containerColor = AppTheme.colorScheme.surfaceContainerHighest,
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -481,15 +481,15 @@ fun DiscordSettings(
                     Icon(
                         painter = painterResource(R.drawable.warning),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        tint = AppTheme.colorScheme.onSurface,
                         modifier = Modifier.size(24.dp),
                     )
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.discord_information_warning),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            style = AppTheme.typography.bodyMedium,
+                            color = AppTheme.colorScheme.onSurface,
                         )
                         Spacer(Modifier.height(8.dp))
                         TextButton(
@@ -507,7 +507,7 @@ fun DiscordSettings(
         Card(
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                containerColor = AppTheme.colorScheme.surfaceContainerHigh,
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -542,9 +542,9 @@ fun DiscordSettings(
                     }
                     if (isLoggedIn) {
                         val statusColor = when (discordStatus) {
-                            "idle" -> MaterialTheme.colorScheme.tertiary
-                            "dnd" -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.primary
+                            "idle" -> AppTheme.colorScheme.tertiary
+                            "dnd" -> AppTheme.colorScheme.error
+                            else -> AppTheme.colorScheme.primary
                         }
                         Surface(
                             color = statusColor,
@@ -554,7 +554,7 @@ fun DiscordSettings(
                                 .align(Alignment.BottomEnd)
                                 .border(
                                     2.dp,
-                                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    AppTheme.colorScheme.surfaceContainerHigh,
                                     CircleShape
                                 ),
                             content = {},
@@ -568,22 +568,22 @@ fun DiscordSettings(
                     Text(
                         text = if (isLoggedIn) discordName
                                else stringResource(R.string.not_logged_in),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.alpha(if (isLoggedIn) 1f else 0.5f),
                     )
                     if (discordUsername.isNotEmpty()) {
                         Text(
                             text = "@$discordUsername",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.typography.bodyMedium,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     if (!isLoggedIn) {
                         Text(
                             text = stringResource(R.string.discord_connect_description),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.typography.bodySmall,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -630,10 +630,10 @@ fun DiscordSettings(
         }
 
         // Options section (card-based)
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.options),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.enable_discord_rpc)) },
                     trailingContent = {
                         Switch(
@@ -645,7 +645,7 @@ fun DiscordSettings(
                     enabled = isLoggedIn,
                     onClick = { if (isLoggedIn) onDiscordRPCChange(!discordRPC) },
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.discord_use_details)) },
                     description = {
                         Text(stringResource(R.string.discord_use_details_description))
@@ -662,7 +662,7 @@ fun DiscordSettings(
                         if (isLoggedIn && discordRPC) onUseDetailsChange(!useDetails)
                     },
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.discord_advanced_mode)) },
                     description = {
                         Text(stringResource(R.string.discord_advanced_mode_description))
@@ -688,10 +688,10 @@ fun DiscordSettings(
         AnimatedVisibility(visible = isLoggedIn && discordRPC && advancedMode) {
             Column(modifier = Modifier.animateContentSize()) {
                 // Presence settings
-                Material3SettingsGroup(
+                IosSettingsGroup(
                     title = stringResource(R.string.discord_presence),
                     items = listOf(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             title = { Text(stringResource(R.string.discord_status)) },
                             description = {
                                 Text(
@@ -707,7 +707,7 @@ fun DiscordSettings(
                             },
                             onClick = { showStatusDialog = true },
                         ),
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             title = { Text(stringResource(R.string.discord_activity_type)) },
                             description = {
                                 Text(
@@ -725,7 +725,7 @@ fun DiscordSettings(
                             },
                             onClick = { showActivityTypeDialog = true },
                         ),
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             title = { Text(stringResource(R.string.discord_activity_name)) },
                             description = {
                                 Text(
@@ -742,10 +742,10 @@ fun DiscordSettings(
                 Spacer(Modifier.height(8.dp))
 
                 // Button customization
-                Material3SettingsGroup(
+                IosSettingsGroup(
                     title = stringResource(R.string.discord_buttons),
                     items = listOf(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             title = { Text(stringResource(R.string.discord_button_1)) },
                             description = {
                                 Text(button1Text.ifEmpty { "Listen on YouTube Music" })
@@ -758,7 +758,7 @@ fun DiscordSettings(
                             },
                             onClick = { showButton1TextDialog = true },
                         ),
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             title = { Text(stringResource(R.string.discord_button_2)) },
                             description = {
                                 Text(button2Text.ifEmpty { "Visit Convx" })
@@ -777,7 +777,7 @@ fun DiscordSettings(
                 // Variable hint
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        containerColor = AppTheme.colorScheme.secondaryContainer,
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -790,14 +790,14 @@ fun DiscordSettings(
                         Icon(
                             painter = painterResource(R.drawable.info),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            tint = AppTheme.colorScheme.onSecondaryContainer,
                             modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.discord_button_text_variables),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = AppTheme.typography.bodySmall,
+                            color = AppTheme.colorScheme.onSecondaryContainer,
                         )
                     }
                 }
@@ -811,8 +811,8 @@ fun DiscordSettings(
 
         Text(
             text = stringResource(R.string.discord_rpc_preview),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
+            style = AppTheme.typography.labelLarge,
+            color = AppTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 8.dp, top = 8.dp),
         )
 
@@ -870,8 +870,8 @@ fun RichPresence(
     }
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = MaterialTheme.shapes.medium,
+        color = AppTheme.colorScheme.surfaceContainer,
+        shape = AppTheme.shapes.medium,
         shadowElevation = 6.dp,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -881,7 +881,7 @@ fun RichPresence(
         ) {
             Text(
                 text = if (activityName.isNotEmpty()) activityName else activityLabel,
-                style = MaterialTheme.typography.labelLarge,
+                style = AppTheme.typography.labelLarge,
                 textAlign = TextAlign.Start,
                 fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.fillMaxWidth(),
@@ -902,7 +902,7 @@ fun RichPresence(
                                 if (song == null) {
                                     border(
                                         2.dp,
-                                        MaterialTheme.colorScheme.onSurface,
+                                        AppTheme.colorScheme.onSurface,
                                         RoundedCornerShape(3.dp)
                                     )
                                 } else {
@@ -916,7 +916,7 @@ fun RichPresence(
                             modifier = Modifier
                                 .border(
                                     2.dp,
-                                    MaterialTheme.colorScheme.surfaceContainer,
+                                    AppTheme.colorScheme.surfaceContainer,
                                     CircleShape
                                 )
                                 .padding(2.dp)
@@ -940,7 +940,7 @@ fun RichPresence(
                 ) {
                     Text(
                         text = song?.song?.title ?: "Song Title",
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = AppTheme.colorScheme.onSurface,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         maxLines = 1,
@@ -949,7 +949,7 @@ fun RichPresence(
 
                     Text(
                         text = song?.artists?.joinToString { it.name } ?: "Artist",
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = AppTheme.colorScheme.secondary,
                         fontSize = 16.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -958,7 +958,7 @@ fun RichPresence(
                     song?.album?.title?.let {
                         Text(
                             text = it,
-                            color = MaterialTheme.colorScheme.secondary,
+                            color = AppTheme.colorScheme.secondary,
                             fontSize = 16.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,

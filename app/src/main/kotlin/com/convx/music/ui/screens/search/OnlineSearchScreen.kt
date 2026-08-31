@@ -30,11 +30,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,13 +67,12 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.convx.music.constants.SuggestionItemHeight
-import com.convx.music.models.toMediaMetadata
-import com.convx.music.playback.queues.YouTubeQueue
+import com.convx.music.playback.queues.searchResultQueue
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.YouTubeListItem
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.utils.listItemShape
-import androidx.compose.material3.Surface
+import com.convx.music.ui.ios.compat.Surface
 import com.music.innertube.utils.YouTubeUrlParser
 import com.convx.music.ui.menu.YouTubeAlbumMenu
 import com.convx.music.ui.menu.YouTubeArtistMenu
@@ -97,7 +96,7 @@ fun OnlineSearchScreen(
     // Caller's own hero-derived contrast color (AppleTokens.onColor(tint)) — this
     // screen renders transparent over the caller's existing blurred hero backdrop
     // instead of painting its own, so text/icons need to match that same contrast.
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    contentColor: Color = AppTheme.colorScheme.onSurface,
     viewModel: OnlineSearchSuggestionViewModel = hiltViewModel(),
 ) {
     val database = LocalDatabase.current
@@ -115,6 +114,7 @@ fun OnlineSearchScreen(
     val viewState by viewModel.viewState.collectAsState()
 
     val lazyListState = rememberLazyListState()
+    val searchedSongsTitle = stringResource(R.string.queue_searched_songs)
 
     LaunchedEffect(Unit) {
         snapshotFlow { lazyListState.firstVisibleItemScrollOffset }
@@ -150,7 +150,7 @@ fun OnlineSearchScreen(
             item(key = "history_header") {
                 Text(
                     text = stringResource(R.string.search_history),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = contentColor,
                     modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp).animateItem()
@@ -189,7 +189,7 @@ fun OnlineSearchScreen(
             item(key = "suggestions_header") {
                 Text(
                     text = stringResource(R.string.suggestions),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = contentColor,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp).animateItem()
@@ -223,7 +223,7 @@ fun OnlineSearchScreen(
             item(key = "search_divider") {
                 Text(
                     text = stringResource(if (viewState.isFromLink) R.string.parsed_from_link else R.string.top_result),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = contentColor,
                     modifier = Modifier.padding(start = 16.dp, top = 8.dp).animateItem()
@@ -299,8 +299,11 @@ fun OnlineSearchScreen(
                                     if (item.id == mediaMetadata?.id) {
                                         playerConnection.togglePlayPause()
                                     } else {
+                                        // Queue the whole suggestion list, not a one-song
+                                        // radio: the other rows the user can see should not
+                                        // vanish the moment one of them is tapped.
                                         playerConnection.playQueue(
-                                            YouTubeQueue.radio(item.toMediaMetadata())
+                                            searchResultQueue(item, viewState.items, searchedSongsTitle)
                                         )
                                         onDismiss()
                                     }

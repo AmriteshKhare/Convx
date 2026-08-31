@@ -60,6 +60,13 @@ private fun DataStore<Preferences>.startPreferenceMirror() {
 }
 
 /**
+ * Starts the mirror without reading through it. Call once, off Main, at process start:
+ * every [snapshot] caller after the first emission then finds a populated cache instead
+ * of paying the blocking seed read on whichever frame it happens to run in. Idempotent.
+ */
+fun DataStore<Preferences>.warmPreferenceMirror() = startPreferenceMirror()
+
+/**
  * The current snapshot, blocking only if nothing has been read yet.
  *
  * The mirror lags a write by however long DataStore takes to emit it. That window does

@@ -732,28 +732,29 @@ object YTPlayerUtils {
                     .replace(Regex("\\s+"), " ")
                     .trim()
 
-                    suspend fun findMatch(searchQuery: String): com.music.jiosaavn.SaavnSong? {
+                    suspend fun findMatch(searchQuery: String): com.music.jiosaavn.RawSongItem? {
                         if (searchQuery.isBlank()) return null
                         Timber.tag(TAG).d("Saavn: searching with query: \"$searchQuery\"")
-                        val songs = SaavnService.searchSongs(searchQuery).getOrNull() ?: return null
+                        val songs = SaavnService.searchSongs(searchQuery)
+                        if (songs.isEmpty()) return null
                         return songs.firstOrNull { candidate ->
-                            val candidateTitleLower = candidate.name.lowercase(java.util.Locale.US)
-                            val candidateArtists = candidate.artists.primary.map { it.name.lowercase(java.util.Locale.US) }
-                            
+                            val candidateTitleLower = candidate.title.lowercase(java.util.Locale.US)
+                            val candidateArtists = candidate.moreInfo.artistMap.primaryArtists.map { it.name.lowercase(java.util.Locale.US) }
+
                             val titleMatches = candidateTitleLower.contains(wantedTitleLower) || wantedTitleLower.contains(candidateTitleLower)
                             val artistMatches = wantedArtistsLower.isEmpty() || wantedArtistsLower.any { wanted ->
                                 candidateArtists.any { candidateArtist ->
                                     candidateArtist.contains(wanted) || wanted.contains(candidateArtist)
                                 }
                             }
-                            
+
                             // Title matching is substring-based in both directions, so a
                             // short title matches plenty of unrelated songs. Runtime is
                             // the cheap tiebreak that stops a different track being
                             // served as this one. When either duration is unknown
                             // there's nothing to tiebreak with — require an exact
                             // title match instead of skipping the guard entirely.
-                            val candidateDuration = candidate.duration
+                            val candidateDuration = candidate.moreInfo.duration.toIntOrNull()
                             val durationMatches = if (wantedDurationSec != null && candidateDuration != null) {
                                 kotlin.math.abs(candidateDuration - wantedDurationSec) <= 10
                             } else {
@@ -762,9 +763,9 @@ object YTPlayerUtils {
 
                             val isMatch = titleMatches && artistMatches && durationMatches
                             if (isMatch) {
-                                Timber.tag(TAG).d("Saavn: candidate matched: \"${candidate.name}\" on album \"${candidate.album?.name}\" by ${candidate.artists.primary.joinToString { it.name }}")
+                                Timber.tag(TAG).d("Saavn: candidate matched: \"${candidate.title}\" on album \"${candidate.moreInfo.album}\" by ${candidate.moreInfo.artistMap.primaryArtists.joinToString { it.name }}")
                             } else {
-                                Timber.tag(TAG).d("Saavn: candidate rejected (name/artist/duration mismatch): \"${candidate.name}\" on album \"${candidate.album?.name}\" by ${candidate.artists.primary.joinToString { it.name }}")
+                                Timber.tag(TAG).d("Saavn: candidate rejected (name/artist/duration mismatch): \"${candidate.title}\" on album \"${candidate.moreInfo.album}\" by ${candidate.moreInfo.artistMap.primaryArtists.joinToString { it.name }}")
                             }
                             isMatch
                         }
@@ -781,33 +782,51 @@ object YTPlayerUtils {
                         return@runCatching null
                     }
 
-                    Timber.tag(TAG).i("Saavn: matched \"${bestSong.name}\" (id=${bestSong.id}, album=\"${bestSong.album?.name}\")")
+                    Timber.tag(TAG).i("Saavn: matched \"${bestSong.title}\" (id=${bestSong.id}, album=\"${bestSong.moreInfo.album}\")")
 
-                    // Step 4: resolve stream URL at requested quality
+                    // Step 4: resolve the stream. The API has no "give me this
+                    // bitrate" parameter — it hands back whatever rendition the
+                    // CDN actually has for the track (upgraded to 320 only when
+                    // the catalogue says one exists, see SaavnService.bestStream).
+                    // The quality preference becomes a floor instead of a
+                    // request: a delivered bitrate below it is treated as a miss
+                    // so playback falls through to YouTube rather than silently
+                    // serving worse than the user asked for.
                     val qualityKey = context.dataStore.get(SaavnAudioQualityKey, SaavnAudioQuality.QUALITY_320.name)
-                    val quality = runCatching { SaavnAudioQuality.valueOf(qualityKey) }
+                    val minQuality = runCatching { SaavnAudioQuality.valueOf(qualityKey) }
                         .getOrDefault(SaavnAudioQuality.QUALITY_320)
-
-                    // First try to resolve stream URL directly from the search result's downloadUrl list
-                    // to avoid an extra details API call (saves 300ms-800ms).
-                    var streamUrl = SaavnService.selectBestUrl(bestSong.downloadUrl, quality.toApiValue())
-                    if (streamUrl.isNullOrBlank()) {
-                        Timber.tag(TAG).d("Saavn: downloadUrl list empty in search results, fetching via getBestStreamUrl for songId=${bestSong.id}")
-                        streamUrl = SaavnService.getBestStreamUrl(bestSong.id, quality.toApiValue())
-                    } else {
-                        Timber.tag(TAG).d("Saavn: resolved stream URL directly from search results: $streamUrl")
+                    val minKbps = when (minQuality) {
+                        SaavnAudioQuality.QUALITY_320 -> 320
+                        SaavnAudioQuality.QUALITY_160 -> 160
+                        SaavnAudioQuality.QUALITY_96  -> 96
                     }
 
-                    if (streamUrl.isNullOrBlank()) {
+                    val stream = SaavnService.getStreamUrl(bestSong.id)
+                    if (stream == null || stream.url.isBlank()) {
                         Timber.tag(TAG).d("Saavn: no stream URL for songId=${bestSong.id} — falling back to YT")
                         return@runCatching null
+                    }
+                    val streamKbps = stream.kbps
+                    if (streamKbps != null && streamKbps < minKbps) {
+                        Timber.tag(TAG).d("Saavn: only ${streamKbps}kbps available for songId=${bestSong.id}, below the ${minKbps}kbps floor — falling back to YT")
+                        return@runCatching null
+                    }
+                    val streamUrl = stream.url
+                    // Unknown bitrate (no recognisable rung in the CDN URL) is
+                    // reported at the requested floor rather than left blank —
+                    // best-effort labeling only, doesn't affect playback.
+                    val deliveredKbps = stream.kbps ?: minKbps
+                    val (itag, qualityLabel) = when {
+                        deliveredKbps >= 320 -> 141 to "320kbps"
+                        deliveredKbps >= 160 -> 140 to "160kbps"
+                        else                 -> 139 to "96kbps"
                     }
 
                     // Optimization: Skip synchronous HTTP HEAD request to get content length during playback.
                     // ExoPlayer parses the content length automatically from HTTP GET response headers on buffer.
                     val contentLength: Long? = null
 
-                    Timber.tag(TAG).i("Saavn: streaming from JioSaavn (quality=${quality.toApiValue()}) for videoId=$videoId")
+                    Timber.tag(TAG).i("Saavn: streaming from JioSaavn (${deliveredKbps}kbps) for videoId=$videoId")
                     // Return a minimal PlaybackData using the Saavn URL.
                     // Reuse the YouTube metadata already fetched in Step 1 — no second
                     // network call needed. This keeps audioConfig/videoDetails/playbackTracking
@@ -817,28 +836,20 @@ object YTPlayerUtils {
                         videoDetails     = meta?.videoDetails,
                         playbackTracking = meta?.playbackTracking,
                         format           = PlayerResponse.StreamingData.Format(
-                            itag             = when (quality) {
-                                SaavnAudioQuality.QUALITY_320 -> 141
-                                SaavnAudioQuality.QUALITY_160 -> 140
-                                SaavnAudioQuality.QUALITY_96  -> 139
-                            },
+                            itag             = itag,
                             url              = streamUrl,
                             // JioSaavn delivers AAC-LC audio inside a regular MP4 container
                             // (e.g. https://aac.saavncdn.com/.../{id}_320.mp4)
                             mimeType         = "audio/mp4; codecs=\"mp4a.40.2\"",
-                            bitrate          = when (quality) {
-                                SaavnAudioQuality.QUALITY_320 -> 320_000
-                                SaavnAudioQuality.QUALITY_160 -> 160_000
-                                SaavnAudioQuality.QUALITY_96  -> 96_000
-                            },
+                            bitrate          = deliveredKbps * 1_000,
                             width            = null,
                             height           = null,
                             contentLength    = contentLength,
-                            quality          = quality.toApiValue(),
+                            quality          = qualityLabel,
                             fps              = null,
                             qualityLabel     = null,
                             averageBitrate   = null,
-                            audioQuality     = quality.toApiValue(),
+                            audioQuality     = qualityLabel,
                             approxDurationMs = null,
                             audioSampleRate  = null,
                             audioChannels    = null,

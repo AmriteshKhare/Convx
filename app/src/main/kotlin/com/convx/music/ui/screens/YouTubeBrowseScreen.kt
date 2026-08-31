@@ -28,9 +28,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,6 +73,8 @@ import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.rememberHeroSource
+import com.convx.music.ui.component.rememberHeroTopBlur
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import com.convx.music.ui.component.rememberHeroTint
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.menu.YouTubeAlbumMenu
@@ -132,6 +134,7 @@ fun YouTubeBrowseScreen(
     val heroBackdrop = rememberLayerBackdrop()
 
     val heroZoom = rememberHeroZoom()
+    val lazyGridState = rememberLazyGridState()
 
     HeroBackground(
         tint = tint,
@@ -141,6 +144,9 @@ fun YouTubeBrowseScreen(
         blurArtwork = true,
         fullBlur = true,
         heroScale = heroZoom.scale,
+        // Progressive top blur: the artwork dissolves under the status bar as
+        // the grid scrolls up — same treatment as the other hero screens.
+        topBlurProgress = rememberHeroTopBlur(lazyGridState),
         modifier = Modifier.fillMaxSize(),
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -148,6 +154,7 @@ fun YouTubeBrowseScreen(
 
         Box(modifier = Modifier.fillMaxSize()) {
             LazyVerticalGrid(
+                state = lazyGridState,
                 // No bounce here: the top pull drives the hero zoom instead.
                 overscrollEffect = heroZoom.listOverscroll(),
                 modifier = Modifier.heroPullZoom(heroZoom).fillMaxSize(),

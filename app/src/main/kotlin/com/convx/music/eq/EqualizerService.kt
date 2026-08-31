@@ -22,6 +22,7 @@ class EqualizerService @Inject constructor() {
     private val audioProcessors = mutableListOf<CustomEqualizerAudioProcessor>()
     private var pendingProfile: SavedEQProfile? = null
     private var shouldDisable: Boolean = false
+    private var bitPerfectBypass: Boolean = false
 
     companion object {
         private const val TAG = "EqualizerService"
@@ -34,6 +35,7 @@ class EqualizerService @Inject constructor() {
     @OptIn(UnstableApi::class)
     fun addAudioProcessor(processor: CustomEqualizerAudioProcessor) {
         audioProcessors.add(processor)
+        processor.forceBypass = bitPerfectBypass
         Timber.tag(TAG).d("Audio processor added. Total: ${audioProcessors.size}")
 
         // Apply pending profile if one was set before processor was available
@@ -118,6 +120,16 @@ class EqualizerService @Inject constructor() {
             }
         }
         Timber.tag(TAG).d("Equalizer disabled on all processors")
+    }
+
+    /**
+     * Bit Perfect mode: force a flat passthrough on every processor without
+     * touching the saved profile or [shouldDisable], so it restores exactly
+     * as it was when Bit Perfect is turned back off.
+     */
+    fun setBitPerfectBypass(bypass: Boolean) {
+        bitPerfectBypass = bypass
+        audioProcessors.forEach { it.forceBypass = bypass }
     }
 
     /**

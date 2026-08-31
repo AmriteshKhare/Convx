@@ -25,14 +25,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -104,7 +104,7 @@ fun AppNavigationRail(
     pureBlack: Boolean = false,
     onSearchLongClick: (() -> Unit)? = null
 ) {
-    val containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+    val containerColor = if (pureBlack) Color.Black else AppTheme.colorScheme.surfaceContainer
     val haptics = LocalHapticFeedback.current
     val viewConfiguration = LocalViewConfiguration.current
 
@@ -193,7 +193,7 @@ fun AppLandscapeRail(
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
         appBackgroundColorInt != 0 -> Color(appBackgroundColorInt)
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> AppTheme.colorScheme.surfaceContainerHigh
     }
 
     val selectedContentColor = com.convx.music.ui.theme.LocalAccentColor.current
@@ -203,7 +203,7 @@ fun AppLandscapeRail(
     val unselectedContentColor = when {
         appTextColorInt != 0 -> Color(appTextColorInt)
         useGlass -> glassConfig.textColor
-        else -> MaterialTheme.colorScheme.onSurface
+        else -> AppTheme.colorScheme.onSurface
     }
 
     val railModifier = if (useGlass) {
@@ -250,7 +250,7 @@ fun AppLandscapeRail(
 
                 Text(
                     text = stringResource(screen.titleId),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTheme.typography.labelLarge,
                     color = if (isSelected) selectedContentColor else unselectedContentColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis

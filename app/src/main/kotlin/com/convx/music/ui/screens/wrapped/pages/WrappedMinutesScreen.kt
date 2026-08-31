@@ -18,8 +18,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -111,12 +111,12 @@ fun WrappedMinutesScreen(
         ) {
             FormattedText(
                 text = messagePair?.tease ?: "", modifier = Modifier.padding(horizontal = 24.dp),
-                style = MaterialTheme.typography.headlineSmall.copy(color = Color.White, textAlign = TextAlign.Center)
+                style = AppTheme.typography.headlineSmall.copy(color = Color.White, textAlign = TextAlign.Center)
             )
             Spacer(Modifier.height(32.dp))
             BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 val density = LocalDensity.current
-                val baseStyle = MaterialTheme.typography.displayLarge.copy(
+                val baseStyle = AppTheme.typography.displayLarge.copy(
                     color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
                     fontFamily = bbh_bartle, drawStyle = Stroke(with(density) { 2.dp.toPx() })
                 )
@@ -141,7 +141,7 @@ fun WrappedMinutesScreen(
             Spacer(Modifier.height(16.dp))
             FormattedText(
                 text = messagePair?.reveal ?: "", modifier = Modifier.padding(horizontal = 24.dp),
-                style = MaterialTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.8f), textAlign = TextAlign.Center)
+                style = AppTheme.typography.bodyLarge.copy(color = Color.White.copy(alpha = 0.8f), textAlign = TextAlign.Center)
             )
         }
     }

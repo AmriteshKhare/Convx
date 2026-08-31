@@ -28,16 +28,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import com.convx.music.ui.ios.compat.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -74,6 +74,9 @@ import com.convx.music.extensions.toMediaItem
 import com.convx.music.playback.queues.ListQueue
 import com.convx.music.ui.component.ListScrollRail
 import com.convx.music.ui.component.LargeScreenTitle
+import com.convx.music.ui.component.TopFadeBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.component.buildAlphabetSectionIndex
 import com.convx.music.ui.component.ChipsRow
 import com.convx.music.ui.component.HideOnScrollFAB
@@ -125,6 +128,9 @@ fun LibrarySongsScreen(
     // Pull-to-refresh only: no hero artwork on this screen, so heroZoom.scale
     // goes unread and the modifier contributes just the rubber-band stretch.
     val heroZoom = rememberHeroZoom()
+    // Progressive top blur so the list dissolves under the status bar instead
+    // of cutting off hard — same technique as the rest of the app's screens.
+    val hazeState = remember { HazeState() }
 
 
     var hasStoragePermission by remember { mutableStateOf(false) }
@@ -181,7 +187,7 @@ fun LibrarySongsScreen(
         LazyColumn(
             state = lazyListState,
             overscrollEffect = heroZoom.listOverscroll(),
-            modifier = Modifier.heroPullZoom(heroZoom),
+            modifier = Modifier.heroPullZoom(heroZoom).hazeSource(hazeState),
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
             item(
@@ -200,7 +206,7 @@ fun LibrarySongsScreen(
                     FilterChip(
                         label = { Text(stringResource(R.string.songs)) },
                         selected = true,
-                        colors = FilterChipDefaults.filterChipColors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = FilterChipDefaults.filterChipColors(containerColor = AppTheme.colorScheme.surface),
                         onClick = onDeselect,
                         shape = RoundedCornerShape(16.dp),
                         leadingIcon = {
@@ -247,8 +253,8 @@ fun LibrarySongsScreen(
                         if (!hasStoragePermission) {
                             Text(
                                 text = stringResource(R.string.local_audio_permission_needed),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = AppTheme.typography.bodyLarge,
+                                color = AppTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                             Spacer(Modifier.height(16.dp))
@@ -267,8 +273,8 @@ fun LibrarySongsScreen(
                         } else {
                             Text(
                                 text = stringResource(R.string.no_local_files),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = AppTheme.typography.bodyLarge,
+                                color = AppTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                             Spacer(Modifier.height(16.dp))
@@ -298,8 +304,8 @@ fun LibrarySongsScreen(
                         Spacer(Modifier.height(16.dp))
                         Text(
                             text = stringResource(R.string.scanning_local_files),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.typography.bodyLarge,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -328,8 +334,8 @@ fun LibrarySongsScreen(
                                     R.string.local_files_found,
                                     result.totalFound
                                 ),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = AppTheme.typography.bodyMedium,
+                                color = AppTheme.colorScheme.primary,
                             )
                         }
                         Spacer(Modifier.weight(1f))
@@ -368,8 +374,8 @@ fun LibrarySongsScreen(
                                 SongSortType.PLAY_TIME -> R.string.sort_by_play_time
                             }
                         ),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        style = AppTheme.typography.titleSmall,
+                        color = AppTheme.colorScheme.onSurface,
                     )
 
                     Spacer(Modifier.weight(1f))
@@ -380,8 +386,8 @@ fun LibrarySongsScreen(
                             filteredSongs.size,
                             filteredSongs.size
                         ),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                        style = AppTheme.typography.titleSmall,
+                        color = AppTheme.colorScheme.secondary,
                     )
 
                     SortPopupButton(
@@ -445,6 +451,12 @@ fun LibrarySongsScreen(
                 )
             }
         }
+
+        TopFadeBlur(
+            hazeState = hazeState,
+            pageColor = AppTheme.colorScheme.background,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
 
         // Fast-scrub rail. Present at every sort: letters when the list is ordered by
         // name, a proportional thumb otherwise. A scrubber that vanishes when you change

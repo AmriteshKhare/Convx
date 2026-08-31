@@ -53,6 +53,17 @@ object Motion {
      * reference. That one number was most of why the morph did not read as iOS: the
      * curve shape was already close, the clock was wrong.
      */
+    /**
+     * Flamingo's lyric easing — a symmetric ease-in-out that leaves the line almost
+     * stationary at both ends and does nearly all its travel in the middle third.
+     *
+     * Standard easings are asymmetric: they leave quickly and arrive slowly, which is right
+     * for something entering the screen and wrong for text that has to look *sung*. A lyric
+     * line is not going anywhere — it swells and settles — so the curve has to hold still at
+     * both ends, and this is the one Flamingo uses for every line transition in its view.
+     */
+    val LyricEasing = CubicBezierEasing(0.75f, 0f, 0.25f, 1f)
+
     const val MorphStiffness = 950f
 
     fun <T> morph(): FiniteAnimationSpec<T> = spring(

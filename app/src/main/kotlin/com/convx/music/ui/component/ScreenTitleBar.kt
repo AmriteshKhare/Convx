@@ -21,8 +21,8 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -59,7 +59,7 @@ fun LargeScreenTitle(
 
     Text(
         text = title,
-        style = MaterialTheme.typography.headlineLarge,
+        style = AppTheme.typography.headlineLarge,
         fontWeight = FontWeight.ExtraBold,
         color = color ?: LocalAccentTextColor.current,
         maxLines = 2,
@@ -130,7 +130,7 @@ fun CollapsedTitleBar(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = color ?: LocalAccentTextColor.current,
             maxLines = 1,

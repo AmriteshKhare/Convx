@@ -23,12 +23,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
 import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.material3.toShape
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -139,13 +139,13 @@ fun AppleMiniPlayer(
     )
     
     // Memoize colors
-    val backgroundColor = if (pureBlack && useDarkTheme) Color.Black else MaterialTheme.colorScheme.surface
+    val backgroundColor = if (pureBlack && useDarkTheme) Color.Black else AppTheme.colorScheme.surface
     val isDynamicBackground = miniPlayerBackground != PlayerBackgroundStyle.DEFAULT
     
-    val primaryColor = if (isDynamicBackground) Color.White else MaterialTheme.colorScheme.primary
-    val outlineColor = if (isDynamicBackground) Color.White.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline
-    val onSurfaceColor = if (isDynamicBackground) Color.White else MaterialTheme.colorScheme.onSurface
-    val errorColor = MaterialTheme.colorScheme.error
+    val primaryColor = if (isDynamicBackground) Color.White else AppTheme.colorScheme.primary
+    val outlineColor = if (isDynamicBackground) Color.White.copy(alpha = 0.5f) else AppTheme.colorScheme.outline
+    val onSurfaceColor = if (isDynamicBackground) Color.White else AppTheme.colorScheme.onSurface
+    val errorColor = AppTheme.colorScheme.error
 
     Box(
         modifier = modifier

@@ -12,11 +12,21 @@ fun String.resize(
     if (width == null && height == null) return this
 
     // i.ytimg.com handling (YouTube video thumbnails)
-    // These URLs use a filename-based quality system:
-    // We use maxresdefault (1280x720) for the large player thumbnail (width >= 1200) for the best quality,
-    // and hqdefault (480x360) for lists and grids to ensure extremely fast loading and absolute reliability.
+    // These URLs are addressed by filename, not by dimensions, so the only choice is which
+    // rung of the ladder to ask for. It used to be binary — maxresdefault above 1200px and
+    // hqdefault for everything else — which fed a 544px grid tile a 480x360 image that a
+    // square crop cuts down to 360px of real detail; anything filling more than ~400px read
+    // soft. Ask for the smallest file that still covers the request, and let
+    // ArtworkQualityInterceptor step back down on the 404s (maxres and sd are missing for a
+    // large share of videos).
     if (this.contains("i.ytimg.com")) {
-        val targetQuality = if (width != null && width >= 1200) "maxresdefault.jpg" else "hqdefault.jpg"
+        val target = maxOf(width ?: 0, height ?: 0)
+        val targetQuality = when {
+            target >= 1000 -> "maxresdefault.jpg" // 1280x720
+            target >= 400 -> "sddefault.jpg"      // 640x480
+            target >= 250 -> "hqdefault.jpg"      // 480x360
+            else -> "mqdefault.jpg"               // 320x180
+        }
         return this.replace(
             Regex("(default|mqdefault|hqdefault|sddefault|maxresdefault)\\.jpg"),
             targetQuality

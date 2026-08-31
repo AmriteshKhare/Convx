@@ -11,7 +11,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,8 +32,11 @@ fun AnimatedPlayPauseIcon(
         AnimatedContent(
             targetState = isPlaying,
             transitionSpec = {
-                ((fadeIn(tween(180, easing = FastOutSlowInEasing)) + scaleIn(tween(180, easing = FastOutSlowInEasing), initialScale = 0.85f)) togetherWith
-                        (fadeOut(tween(140, easing = FastOutSlowInEasing)) + scaleOut(tween(140, easing = FastOutSlowInEasing), targetScale = 0.85f)))
+                // 0.3, not a polite 0.85: Flamingo's pop. At 0.85 the scale is small enough
+                // to be indistinguishable from a plain cut, and the swap reads as a different
+                // button appearing rather than this one changing its mind.
+                ((fadeIn(tween(200, easing = FastOutSlowInEasing)) + scaleIn(tween(200, easing = FastOutSlowInEasing), initialScale = 0.3f)) togetherWith
+                        (fadeOut(tween(160, easing = FastOutSlowInEasing)) + scaleOut(tween(160, easing = FastOutSlowInEasing), targetScale = 0.3f)))
                     .using(SizeTransform(clip = false))
             },
             contentKey = { it },

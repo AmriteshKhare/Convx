@@ -11,12 +11,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Slider
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,14 +77,14 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
             painter = painterResource(R.drawable.fast_forward),
             contentDescription = null,
             modifier = Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.primary
+            tint = AppTheme.colorScheme.primary
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = stringResource(R.string.lyrics_offset),
-            style = MaterialTheme.typography.headlineSmall,
+            style = AppTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
 
@@ -136,7 +136,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                     }
                 },
                 singleLine = true,
-                textStyle = MaterialTheme.typography.displaySmall.copy(
+                textStyle = AppTheme.typography.displaySmall.copy(
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold
                 ),
@@ -144,11 +144,11 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
-                    cursorColor = MaterialTheme.colorScheme.primary,
-                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                    unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    cursorColor = AppTheme.colorScheme.primary,
+                    focusedIndicatorColor = AppTheme.colorScheme.primary,
+                    unfocusedIndicatorColor = AppTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     disabledIndicatorColor = Color.Transparent,
-                    errorIndicatorColor = MaterialTheme.colorScheme.error
+                    errorIndicatorColor = AppTheme.colorScheme.error
                 ),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
@@ -160,8 +160,8 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
 
             Text(
                 text = "ms",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.titleLarge,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Medium
             )
 
@@ -176,7 +176,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.replay),
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = AppTheme.colorScheme.primary,
                         contentDescription = "Reset"
                     )
                 }
@@ -236,13 +236,13 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
         ) {
             Text(
                 text = "-3000ms",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.typography.labelLarge,
+                color = AppTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = "+3000ms",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.typography.labelLarge,
+                color = AppTheme.colorScheme.onSurfaceVariant
             )
         }
     }

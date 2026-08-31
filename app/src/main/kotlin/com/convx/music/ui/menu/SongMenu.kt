@@ -24,14 +24,14 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.ListItem
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -85,8 +85,8 @@ import com.convx.music.playback.ExoDownloadService
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.ListDialog
 import com.convx.music.ui.component.LocalBottomSheetPageState
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.ui.component.SongListItem
@@ -238,7 +238,7 @@ fun SongMenu(
                         Image(
                             painter = painterResource(R.drawable.close),
                             contentDescription = null,
-                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
+                            colorFilter = ColorFilter.tint(AppTheme.colorScheme.onBackground),
                             modifier = Modifier.size(ListThumbnailSize),
                         )
                     },
@@ -318,7 +318,7 @@ fun SongMenu(
             ) {
                 Icon(
                     painter = painterResource(if (song.song.liked) R.drawable.favorite else R.drawable.favorite_border),
-                    tint = if (song.song.liked) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                    tint = if (song.song.liked) AppTheme.colorScheme.error else LocalContentColor.current,
                     contentDescription = null,
                 )
             }
@@ -352,7 +352,7 @@ fun SongMenu(
                                 painter = painterResource(R.drawable.edit),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.edit),
@@ -364,7 +364,7 @@ fun SongMenu(
                                 painter = painterResource(R.drawable.playlist_add),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.add_to_an_playlist),
@@ -376,7 +376,7 @@ fun SongMenu(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share),
@@ -396,7 +396,7 @@ fun SongMenu(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share_smart_link),
@@ -417,10 +417,10 @@ fun SongMenu(
             )
         }
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOfNotNull(
                     if (listenTogetherManager != null && listenTogetherManager.isInRoom && !listenTogetherManager.isHost) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.suggest_to_host)) },
                             icon = {
                                 Icon(
@@ -444,7 +444,7 @@ fun SongMenu(
                         )
                     } else null,
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.start_radio)) },
                             description = { Text(text = stringResource(R.string.start_radio_desc)) },
                             icon = {
@@ -460,7 +460,7 @@ fun SongMenu(
                         )
                     } else null,
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.play_next)) },
                             description = { Text(text = stringResource(R.string.play_next_desc)) },
                             icon = {
@@ -476,7 +476,7 @@ fun SongMenu(
                         )
                     } else null,
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.add_to_queue)) },
                             description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                             icon = {
@@ -498,10 +498,10 @@ fun SongMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { 
                                 Text(
                                     text = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial" 
@@ -535,7 +535,7 @@ fun SongMenu(
                         )
                     )
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = {
                                 Text(
                                     text = stringResource(
@@ -574,7 +574,7 @@ fun SongMenu(
                     )
                     if (event != null) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.remove_from_history)) },
                                 icon = {
                                     Icon(
@@ -593,7 +593,7 @@ fun SongMenu(
                     }
                     if (playlistSong != null) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.remove_from_playlist)) },
                                 icon = {
                                     Icon(
@@ -628,7 +628,7 @@ fun SongMenu(
                     }
                     if (isFromCache) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.remove_from_cache)) },
                                 icon = {
                                     Icon(
@@ -644,7 +644,7 @@ fun SongMenu(
                         )
                     }
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
                                 Icon(
@@ -674,11 +674,11 @@ fun SongMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOf(
                     when (download?.state) {
                         Download.STATE_COMPLETED -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = {
                                     Text(
                                         text = stringResource(R.string.remove_download)
@@ -701,7 +701,7 @@ fun SongMenu(
                             )
                         }
                         Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
                                     CircularProgressIndicator(
@@ -724,13 +724,13 @@ fun SongMenu(
                         // no sign anything had gone wrong. Surfacing it distinctly (and
                         // letting the same tap re-queue it) is the whole fix.
                         Download.STATE_FAILED -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.download_failed)) },
                                 icon = {
                                     Icon(
                                         painter = painterResource(R.drawable.error),
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
+                                        tint = AppTheme.colorScheme.error,
                                     )
                                 },
                                 onClick = {
@@ -750,7 +750,7 @@ fun SongMenu(
                             )
                         }
                         else -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 description = { Text(text = stringResource(R.string.download_desc)) },
                                 icon = {
@@ -783,10 +783,10 @@ fun SongMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.view_artist)) },
                             description = { Text(text = song.artists.joinToString { it.name }) },
                             icon = {
@@ -807,7 +807,7 @@ fun SongMenu(
                     )
                     if (song.song.albumId != null) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_album)) },
                                 description = {
                                     song.song.albumName?.let {
@@ -828,7 +828,7 @@ fun SongMenu(
                         )
                     }
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.refetch)) },
                             description = { Text(text = stringResource(R.string.refetch_desc)) },
                             icon = {
@@ -854,7 +854,7 @@ fun SongMenu(
                         )
                     )
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {
@@ -876,7 +876,7 @@ fun SongMenu(
                     // is nothing on disk to edit for a YouTube track.
                     if (song.song.isLocal) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.edit_tags)) },
                                 description = {
                                     Text(text = stringResource(R.string.edit_tags_desc))

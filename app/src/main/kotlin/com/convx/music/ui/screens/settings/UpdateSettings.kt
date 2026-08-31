@@ -20,15 +20,15 @@ import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
+import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SwitchDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -66,9 +66,9 @@ import com.convx.music.R
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
+import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.vivimusic.component.UpdateInfoDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -100,7 +100,7 @@ import com.convx.music.vivimusic.updater.saveBetaUpdatesSetting
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.vivimusic.updater.autoClearOldApks
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.BuildConfig
 
@@ -143,17 +143,17 @@ fun UpdateSettings(
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp),
     ) {
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.app_updates_title),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.network_update),
                     title = { Text(stringResource(R.string.system_update)) },
                     description = {
                         if (isUpdateAvailable) {
                             Text(
                                 text = stringResource(R.string.update_available),
-                                color = MaterialTheme.colorScheme.error
+                                color = AppTheme.colorScheme.error
                             )
                         } else {
                             Text(stringResource(R.string.app_update_uptodate))
@@ -169,7 +169,7 @@ fun UpdateSettings(
                         }
                     }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.info),
                     title = {
                         Text(stringResource(R.string.version, BuildConfig.VERSION_NAME))
@@ -181,7 +181,7 @@ fun UpdateSettings(
                     }
                 ),
                 
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.update),
                     title = { Text(stringResource(R.string.auto_update_check)) },
                     description = { Text(stringResource(R.string.auto_update_check_subtitle)) },
@@ -194,15 +194,6 @@ fun UpdateSettings(
                                 if (!enabled) {
                                     saveUpdateAvailableState(context, false)
                                 }
-                            },
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (autoUpdateEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
                             }
                         )
                     },
@@ -215,7 +206,7 @@ fun UpdateSettings(
                     }
                 ),
 
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.notification),
                     title = { Text(stringResource(R.string.update_notifications)) },
                     description = { Text(stringResource(R.string.update_notifications_subtitle)) },
@@ -225,15 +216,6 @@ fun UpdateSettings(
                             onCheckedChange = { enabled ->
                                 updateNotificationsEnabled = enabled
                                 saveUpdateNotificationsSetting(context, enabled)
-                            },
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (updateNotificationsEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
                             }
                         )
                     },
@@ -243,7 +225,7 @@ fun UpdateSettings(
                     }
                 ),
 
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.biotech),
                     title = { Text(stringResource(R.string.beta_updates)) },
                     description = { Text(stringResource(R.string.beta_updates_subtitle)) },
@@ -253,15 +235,6 @@ fun UpdateSettings(
                             onCheckedChange = { enabled ->
                                 betaUpdatesEnabled = enabled
                                 saveBetaUpdatesSetting(context, enabled)
-                            },
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (betaUpdatesEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
                             }
                         )
                     },
@@ -271,19 +244,19 @@ fun UpdateSettings(
                     }
                 ),
 
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.delete),
                     title = { Text(stringResource(R.string.clear_downloaded_updates)) },
                     description = {
                         if (apkCount == 0) {
                             Text(
                                 text = stringResource(R.string.clear_downloaded_updates_desc),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
                             Text(
                                 text = pluralStringResource(R.plurals.n_apk_found, apkCount, apkCount),
-                                color = MaterialTheme.colorScheme.error
+                                color = AppTheme.colorScheme.error
                             )
                         }
                     },
@@ -312,7 +285,7 @@ fun UpdateSettings(
                     }
                 )
 
-//                Material3SettingsItem(
+//                IosSettingsItem(
 //                    icon = painterResource(R.drawable.info),
 //                    title = { Text(stringResource(R.string.namespace)) },
 //                    description = { Text(BuildConfig.APPLICATION_ID) }
@@ -322,16 +295,16 @@ fun UpdateSettings(
         )
         
         Spacer(modifier = Modifier.height(16.dp))
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.changelog),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.history),
                     title = { Text(stringResource(R.string.changelog)) },
                     description = { Text(stringResource(R.string.view_version_history)) },
                     onClick = { navController.navigate("settings/changelog") }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.commit),
                     title = { Text(stringResource(R.string.commits)) },
                     description = { Text(stringResource(R.string.view_commit_history)) },

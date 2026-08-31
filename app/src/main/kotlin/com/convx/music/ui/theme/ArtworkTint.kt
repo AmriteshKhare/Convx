@@ -5,7 +5,6 @@
 
 package com.convx.music.ui.theme
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,10 +12,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import android.util.LruCache
-import androidx.palette.graphics.Palette
 import com.convx.music.ui.theme.colorengine.ColorEngine
 import coil3.imageLoader
 import coil3.request.ImageRequest
@@ -33,24 +30,19 @@ import kotlinx.coroutines.withContext
 private val artworkTintCache = LruCache<String, List<Color>>(128)
 
 /**
- * Extracts the same [PlayerColorExtractor] gradient (primary vibrant color,
- * darker variant, black) from an arbitrary artwork URL — the "single color
- * from the image" background tint used by the Artist/Album/Playlist detail
- * screens. Same Coil load + [Palette] pipeline as
- * [com.convx.music.ui.component.AlbumGradient], copied rather than composed
- * since callers need the raw colors for buttons/text too, not just a painted
- * gradient box.
+ * Extracts a three-stop gradient (primary color, darker variant, black) from an
+ * arbitrary artwork URL via [ColorEngine] — the "single color from the image"
+ * background tint used by the Artist/Album/Playlist detail screens, and by
+ * [com.convx.music.ui.component.AlbumGradient], which delegates here rather than
+ * re-extracting the same artwork a second time.
  *
- * Returns an empty list until extraction finishes (or if [thumbnailUrl] is
- * null) — callers should fall back to a theme color for that case, e.g. via
- * `animateColorAsState`.
+ * Returns an empty list until extraction finishes, if [thumbnailUrl] is null, or
+ * if the engine can't produce a result — callers fall back to a theme color for
+ * that case, e.g. via `animateColorAsState`.
  */
 @Composable
 fun rememberArtworkTint(thumbnailUrl: String?): List<Color> {
     val context = LocalContext.current
-    // Neutral dark fallback (NOT the red-derived primaryContainer) so artwork
-    // that yields no palette color reads as a dark card, never red.
-    val fallbackColorInt = PlayerColorExtractor.NeutralFallbackColor.toArgb()
     // Seed from cache so a revisited image paints its tint immediately (no flash,
     // no re-extract).
     var extractedColors by remember(thumbnailUrl) {
@@ -64,33 +56,23 @@ fun rememberArtworkTint(thumbnailUrl: String?): List<Color> {
             try {
                 val request = ImageRequest.Builder(context)
                     .data(thumbnailUrl)
-                    .size(100, 100)
+                    .size(200, 200)
                     .allowHardware(false)
                     .build()
                 val result = context.imageLoader.execute(request)
                 val bitmap = result.image?.toBitmap()
 
                 if (bitmap != null) {
-                    // Colour engine first: it picks a real observed medoid with identity
-                    // weighting, where Palette's vibrancy heuristic will happily return a
-                    // stray highlight from a dozen pixels. Same three-stop contract either
-                    // way (primary, darker variant, black) so no caller changes.
-                    val colors = ColorEngine.analyze(bitmap, cacheKey = thumbnailUrl)
+                    // No Material Palette fallback: when the engine can't produce a
+                    // result (recycled/corrupt bitmap, or clustering found nothing),
+                    // extractedColors just stays empty and callers fall back to their
+                    // own neutral theme color, same as the null-thumbnailUrl case.
+                    ColorEngine.analyze(bitmap, cacheKey = thumbnailUrl)
                         ?.let { result -> gradientStopsFrom(result.palette.dominant) }
-                        ?: run {
-                            val palette = withContext(Dispatchers.Default) {
-                                Palette.from(bitmap)
-                                    .maximumColorCount(8)
-                                    .resizeBitmapArea(100 * 100)
-                                    .generate()
-                            }
-                            PlayerColorExtractor.extractGradientColors(
-                                palette = palette,
-                                fallbackColor = fallbackColorInt
-                            )
+                        ?.let { colors ->
+                            artworkTintCache.put(thumbnailUrl, colors)
+                            extractedColors = colors
                         }
-                    artworkTintCache.put(thumbnailUrl, colors)
-                    extractedColors = colors
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

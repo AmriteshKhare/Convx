@@ -1,8 +1,7 @@
 package com.convx.music.eq.data
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
+import com.tencent.mmkv.MMKV
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,9 +36,8 @@ data class SavedEQProfile(
 class EQProfileRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val prefs: SharedPreferences = context.getSharedPreferences(
-        "nanosonic_eq_profiles",
-        Context.MODE_PRIVATE
+    private val prefs: MMKV? = MMKV.mmkvWithID(
+        "nanosonic_eq_profiles"
     )
 
     private val json = Json {
@@ -67,13 +65,13 @@ class EQProfileRepository @Inject constructor(
      */
     private fun loadProfiles() {
         try {
-            val profilesJson = prefs.getString(KEY_PROFILES, null)
+            val profilesJson = prefs?.decodeString(KEY_PROFILES)
             if (profilesJson != null) {
                 val loadedProfiles = json.decodeFromString<List<SavedEQProfile>>(profilesJson)
                 _profiles.value = loadedProfiles
 
                 // Load active profile
-                val activeId = prefs.getString(KEY_ACTIVE_PROFILE_ID, null)
+                val activeId = prefs?.decodeString(KEY_ACTIVE_PROFILE_ID)
                 _activeProfile.value = loadedProfiles.find { it.id == activeId }
             }
         } catch (e: Exception) {
@@ -100,9 +98,9 @@ class EQProfileRepository @Inject constructor(
             currentProfiles.add(profile)
         }
 
-        // Save to SharedPreferences
+        // Save to MMKV
         val profilesJson = json.encodeToString<List<SavedEQProfile>>(currentProfiles)
-        prefs.edit { putString(KEY_PROFILES, profilesJson) }
+        prefs?.encode(KEY_PROFILES, profilesJson)
 
         _profiles.value = currentProfiles
     }
@@ -115,12 +113,12 @@ class EQProfileRepository @Inject constructor(
         currentProfiles.removeAll { it.id == profileId }
 
         val profilesJson = json.encodeToString<List<SavedEQProfile>>(currentProfiles)
-        prefs.edit { putString(KEY_PROFILES, profilesJson) }
+        prefs?.encode(KEY_PROFILES, profilesJson)
 
         // If deleted profile was active, clear active profile
         if (_activeProfile.value?.id == profileId) {
             _activeProfile.value = null
-            prefs.edit { remove(KEY_ACTIVE_PROFILE_ID) }
+            prefs?.removeValueForKey(KEY_ACTIVE_PROFILE_ID)
         }
 
         _profiles.value = currentProfiles
@@ -136,11 +134,11 @@ class EQProfileRepository @Inject constructor(
         if (profileId == null) {
             // Deactivate all profiles
             _activeProfile.value = null
-            prefs.edit { remove(KEY_ACTIVE_PROFILE_ID) }
+            prefs?.removeValueForKey(KEY_ACTIVE_PROFILE_ID)
         } else {
             val profile = currentProfiles.find { it.id == profileId }
             _activeProfile.value = profile
-            prefs.edit { putString(KEY_ACTIVE_PROFILE_ID, profileId) }
+            prefs?.encode(KEY_ACTIVE_PROFILE_ID, profileId)
         }
     }
 

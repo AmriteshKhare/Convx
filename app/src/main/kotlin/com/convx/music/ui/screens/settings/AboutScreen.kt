@@ -32,13 +32,13 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
 import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -64,8 +64,8 @@ import com.convx.music.constants.DonationUpiId
 import com.convx.music.constants.DonationUpiUri
 import com.convx.music.R
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.component.Material3SettingsGroup
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsGroup
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.ui.utils.safeOpenUri
@@ -111,12 +111,12 @@ fun AboutScreen(
         ) {
             Text(
                 text = stringResource(R.string.vivi_music_title),
-                style = MaterialTheme.typography.displaySmall.copy(
+                style = AppTheme.typography.displaySmall.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 48.sp,
                     letterSpacing = 2.sp
                 ),
-                color = MaterialTheme.colorScheme.onSurface
+                color = AppTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -125,7 +125,7 @@ fun AboutScreen(
                 modifier = Modifier
                     .border(
                         width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        color = AppTheme.colorScheme.primary.copy(alpha = 0.5f),
                         shape = CircleShape
                     )
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -136,25 +136,25 @@ fun AboutScreen(
                     painter = painterResource(R.drawable.convx_logo),
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
+                    colorFilter = ColorFilter.tint(AppTheme.colorScheme.primary)
                 )
 
                 Text(
                     text = "v${BuildConfig.VERSION_NAME} • ${stringResource(if (BuildConfig.IS_NIGHTLY) R.string.build_nightly else R.string.build_stable)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    style = AppTheme.typography.titleMedium,
+                    color = AppTheme.colorScheme.primary
                 )
             }
         }
         
         // Developer Section
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.developer_section),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.dev),
                     title = { Text(stringResource(R.string.developer_name)) },
-                    description = { Text(stringResource(R.string.app_developer), color = MaterialTheme.colorScheme.primary) },
+                    description = { Text(stringResource(R.string.app_developer), color = AppTheme.colorScheme.primary) },
                     tintIcon = false,
                     iconShape = cookieShape,
                     onClick = { uriHandler.safeOpenUri(context, "https://github.com/cosmictaserdev-creator") }
@@ -164,16 +164,16 @@ fun AboutScreen(
         Spacer(modifier = Modifier.height(27.dp))
 
         // Community Section
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.community_section),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.github),
                     title = { Text(stringResource(R.string.github_repository)) },
                     description = { Text(stringResource(R.string.view_source_code)) },
                     onClick = { uriHandler.safeOpenUri(context, "https://github.com/cosmictaserdev-creator/Convx") }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.discord),
                     title = { Text(stringResource(R.string.discord_channel)) },
                     description = { Text(stringResource(R.string.join_discord)) },
@@ -185,16 +185,16 @@ fun AboutScreen(
         Spacer(modifier = Modifier.height(27.dp))
 
         // Support Section
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.support_section),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.favorite),
                     title = { Text(stringResource(R.string.support_upi)) },
                     description = { Text(DonationUpiId) },
                     onClick = { uriHandler.safeOpenUri(context, DonationUpiUri) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.favorite),
                     title = { Text(stringResource(R.string.support_kofi)) },
                     description = { Text(stringResource(R.string.support_kofi_desc)) },
@@ -205,20 +205,20 @@ fun AboutScreen(
         Spacer(modifier = Modifier.height(27.dp))
 
         // App Information Section
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.app_info_section),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.deployed_app_update),
                     title = { Text(stringResource(R.string.installed_date_title)) },
                     description = { Text(installedDate) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.info),
                     title = { Text(stringResource(R.string.version_code)) },
                     description = { Text(BuildConfig.VERSION_CODE.toString()) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.license_vivi),
                     title = { Text(stringResource(R.string.license)) },
                     description = { Text("GPL-3.0 • Free Open Source Software") },

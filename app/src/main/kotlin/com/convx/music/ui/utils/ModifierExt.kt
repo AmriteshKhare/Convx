@@ -13,6 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -21,6 +24,37 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+
+/**
+ * Flamingo's player-chrome compositing: draw the content into its own layer and add that
+ * layer to what is behind it (`BlendMode.Plus`).
+ *
+ * This is how a player takes its chrome colour off the artwork without extracting a palette
+ * at all. The seek bar, the transport glyphs and the time text are drawn plain white at a
+ * low alpha; added onto an artwork-derived background they come out tinted by whatever is
+ * behind them, and they get *brighter* exactly where the background is dark, so they stay
+ * legible on any sleeve. A palette pass answers the same question with a decode, a
+ * quantiser and a frame of lag; this answers it per-pixel, for free, and never disagrees
+ * with the pixels it is sitting on.
+ *
+ * Additive only makes sense over something dark and photographic. Over a flat light surface
+ * every white it touches clips, so [enabled] is false on the plain themed background and the
+ * chrome falls back to ordinary tinting.
+ *
+ * Set alpha *after* this modifier (or inside a `graphicsLayer`), never before: alpha applied
+ * first is folded into the layer this saves, and the add then happens at full strength.
+ */
+fun Modifier.additiveChrome(enabled: Boolean = true): Modifier =
+    if (!enabled) this else drawWithCache {
+        val layerPaint = Paint().apply { blendMode = BlendMode.Plus }
+        val bounds = Rect(0f, 0f, size.width, size.height)
+        onDrawWithContent {
+            val canvas = drawContext.canvas
+            canvas.saveLayer(bounds, layerPaint)
+            drawContent()
+            canvas.restore()
+        }
+    }
 
 /**
  * Springy "wobble" on press for an existing [interactionSource]: the target scales down

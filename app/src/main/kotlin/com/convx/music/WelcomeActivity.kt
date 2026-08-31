@@ -73,17 +73,17 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Forum
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import androidx.compose.material3.LargeFloatingActionButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.ListItem
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Switch
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -161,7 +161,7 @@ class WelcomeActivity : ComponentActivity() {
             vivimusicTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = AppTheme.colorScheme.background
                 ) {
                     WelcomePagerScreen(onFinished = {
                         lifecycleScope.launch {
@@ -298,14 +298,14 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                     Text(
                         text = stringResource(com.convx.music.R.string.welcome_to),
                         style = thinHeaderStyle,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = AppTheme.colorScheme.onBackground
                     )
                     Text(
                         text = stringResource(com.convx.music.R.string.app_name).uppercase(),
                         fontFamily = GoogleSansFlex,
                         fontWeight = FontWeight.Bold,
                         fontSize = 48.sp,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = AppTheme.colorScheme.primary,
                         lineHeight = 56.sp
                     )
 
@@ -317,22 +317,22 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                         Text(
                             text = flavorSuffix,
                             fontFamily = GoogleSansFlex,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.secondary
+                            style = AppTheme.typography.titleMedium,
+                            color = AppTheme.colorScheme.secondary
                         )
 
                         Spacer(modifier = Modifier.width(8.dp))
 
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                            color = AppTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
                         ) {
                             Text(
                                 text = "v${BuildConfig.VERSION_NAME}",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
+                                style = AppTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                                color = AppTheme.colorScheme.onSecondaryContainer
                             )
                         }
                     }
@@ -352,8 +352,8 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                         Text(
                             text = stringResource(com.convx.music.R.string.welcome_preparing_subtitle),
                             fontFamily = GoogleSansFlex,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.typography.bodyLarge,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -372,14 +372,14 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                     Text(
                         text = stringResource(com.convx.music.R.string.perm_required),
                         style = thinHeaderStyle,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = AppTheme.colorScheme.onBackground
                     )
                     Text(
                         text = stringResource(com.convx.music.R.string.perm_permissions),
                         fontFamily = GoogleSansFlex,
                         fontWeight = FontWeight.Bold,
                         fontSize = 48.sp,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = AppTheme.colorScheme.primary,
                         lineHeight = 56.sp
                     )
 
@@ -387,10 +387,10 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
 
                     Text(
                         text = stringResource(com.convx.music.R.string.perm_intro_text),
-                        style = MaterialTheme.typography.bodyLarge.copy(
+                        style = AppTheme.typography.bodyLarge.copy(
                             fontFamily = GoogleSansFlex
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(32.dp))
@@ -425,13 +425,6 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                                                 notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                             }
                                         }
-                                    },
-                                    thumbContent = {
-                                        Icon(
-                                            imageVector = if (hasNotificationPermission) Icons.Rounded.Check else Icons.Rounded.Close,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
                                     }
                                 )
                             },
@@ -467,7 +460,7 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                                     Icon(
                                         imageVector = if (canInstallPackages) Icons.Rounded.Check else Icons.Rounded.ChevronRight,
                                         contentDescription = null,
-                                        tint = if (canInstallPackages) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = if (canInstallPackages) AppTheme.colorScheme.primary else AppTheme.colorScheme.onSurfaceVariant
                                     )
                                 },
                                 onClick = {
@@ -498,14 +491,14 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                     Text(
                         text = "Join our",
                         style = thinHeaderStyle,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = AppTheme.colorScheme.onBackground
                     )
                     Text(
                         text = "Community",
                         fontFamily = GoogleSansFlex,
                         fontWeight = FontWeight.Bold,
                         fontSize = 48.sp,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = AppTheme.colorScheme.primary,
                         lineHeight = 56.sp
                     )
 
@@ -513,10 +506,10 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
 
                     Text(
                         text = "Convx is open-source and depends on community support to grow. Your help makes a difference!",
-                        style = MaterialTheme.typography.bodyLarge.copy(
+                        style = AppTheme.typography.bodyLarge.copy(
                             fontFamily = GoogleSansFlex
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(32.dp))
@@ -537,7 +530,7 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                                 Icon(
                                     imageVector = Icons.Rounded.ChevronRight,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             onClick = {
@@ -558,7 +551,7 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                                 Icon(
                                     imageVector = Icons.Rounded.ChevronRight,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             onClick = {
@@ -583,14 +576,14 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                         Text(
                             text = stringResource(com.convx.music.R.string.feat_discover),
                             style = thinHeaderStyle,
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = AppTheme.colorScheme.onBackground
                         )
                         Text(
                             text = stringResource(com.convx.music.R.string.feat_features),
                             fontFamily = GoogleSansFlex,
                             fontWeight = FontWeight.Bold,
                             fontSize = 48.sp,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = AppTheme.colorScheme.primary,
                             lineHeight = 56.sp
                         )
 
@@ -598,10 +591,10 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
 
                         Text(
                             text = stringResource(com.convx.music.R.string.feat_intro),
-                            style = MaterialTheme.typography.bodyLarge.copy(
+                            style = AppTheme.typography.bodyLarge.copy(
                                 fontFamily = GoogleSansFlex
                             ),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = AppTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -803,8 +796,8 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                             .width(dotWidth)
                             .clip(RoundedCornerShape(50))
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                if (selected) AppTheme.colorScheme.primary
+                                else AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                             )
                     )
                 }
@@ -856,7 +849,7 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                             }
                         },
                         containerColor = Color.Transparent,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        contentColor = AppTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxSize(),
                         isOutlined = true
                     )
@@ -892,8 +885,8 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                                 }
                             }
                         },
-                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = alphaNext),
-                        contentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = alphaNext),
+                        containerColor = AppTheme.colorScheme.primary.copy(alpha = alphaNext),
+                        contentColor = AppTheme.colorScheme.onPrimary.copy(alpha = alphaNext),
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -915,8 +908,8 @@ fun RotatingShapeContainer(modifier: Modifier = Modifier) {
         label = "rotation"
     )
 
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val backgroundColor = MaterialTheme.colorScheme.background
+    val primaryColor = AppTheme.colorScheme.primary
+    val backgroundColor = AppTheme.colorScheme.background
 
     Box(
         modifier = modifier,
@@ -1005,7 +998,7 @@ fun PermissionCard(
                 onClick = onClick
             ),
         shape = animatedShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         ListItem(
@@ -1020,7 +1013,7 @@ fun PermissionCard(
                 Text(
                     text = description,
                     fontFamily = GoogleSansFlex,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = AppTheme.colorScheme.onSurfaceVariant
                 )
             },
             leadingContent = {
@@ -1059,7 +1052,7 @@ fun FeatureCard(
             .fillMaxWidth()
             .clip(shape),
         shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         ListItem(
@@ -1074,7 +1067,7 @@ fun FeatureCard(
                 Text(
                     text = description,
                     fontFamily = GoogleSansFlex,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = AppTheme.colorScheme.onSurfaceVariant
                 )
             },
             leadingContent = {
@@ -1122,7 +1115,7 @@ fun WelcomeExpressiveButton(
             .then(if (isPressed) Modifier.rotate(0f) else Modifier), // placeholder for scale
         color = containerColor,
         contentColor = contentColor,
-        border = if (isOutlined) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)) else null,
+        border = if (isOutlined) androidx.compose.foundation.BorderStroke(1.dp, AppTheme.colorScheme.outline.copy(alpha = 0.3f)) else null,
         shape = CircleShape,
         interactionSource = interactionSource
     ) {

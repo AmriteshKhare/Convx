@@ -39,10 +39,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -229,8 +229,8 @@ private fun getMediaItems(
 @Composable
 private fun getTextColor(playerBackground: PlayerBackgroundStyle): Color {
     return when (playerBackground) {
-        PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.onBackground
-        PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.White
+        PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.onBackground
+        PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.White
     }
 }
 
@@ -581,13 +581,13 @@ private fun ThumbnailHeader(
             if (listenTogetherRoleState?.value != RoomRole.NONE) {
                 Text(
                     text = if (listenTogetherRoleState?.value == RoomRole.HOST) "Hosting Listen Together" else "Listening Together",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     color = textColor
                 )
             } else {
                 Text(
                     text = stringResource(R.string.now_playing),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     color = textColor
                 )
             }
@@ -601,7 +601,7 @@ private fun ThumbnailHeader(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = text,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.typography.titleMedium,
                         color = textColor.copy(alpha = 0.8f),
                         maxLines = 1,
                         modifier = Modifier.basicMarquee()
@@ -954,49 +954,6 @@ private fun ThumbnailItem(
                 }
             }
         }
-
-        // Non-rotating light overlay — stays fixed while the vinyl spins underneath
-        if (artworkStyle == PlayerArtworkStyle.VINYL && !hidePlayerThumbnail) {
-            Canvas(
-                Modifier
-                    .size(dimensions.thumbnailSize)
-                    .clip(CircleShape)
-            ) {
-                val r = size.minDimension / 2f
-                val c = Offset(size.width / 2f, size.height / 2f)
-
-                // Edge rim light
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.18f),
-                    radius = r * 0.98f,
-                    center = c,
-                    style = Stroke(width = 1.2.dp.toPx()),
-                )
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.06f),
-                    radius = r * 0.95f,
-                    center = c,
-                    style = Stroke(width = 0.6.dp.toPx()),
-                )
-
-                // Diagonal gloss shine — stays in place as if lit from above-right
-                drawOval(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.09f),
-                            Color.White.copy(alpha = 0.14f),
-                            Color.White.copy(alpha = 0.09f),
-                            Color.Transparent,
-                        ),
-                        start = Offset(size.width * 0.15f, 0f),
-                        end = Offset(size.width * 0.85f, size.height),
-                    ),
-                    topLeft = Offset(size.width * 0.08f, size.height * 0.22f),
-                    size = androidx.compose.ui.geometry.Size(size.width * 0.84f, size.height * 0.32f),
-                )
-            }
-        }
     }
 }
 
@@ -1011,7 +968,7 @@ private fun HiddenThumbnailPlaceholder(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(AppTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -1035,7 +992,7 @@ private fun ThumbnailImage(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(AppTheme.colorScheme.surfaceVariant)
     ) {
         var currentUrl by remember(artworkUri) {
             mutableStateOf(artworkUri)

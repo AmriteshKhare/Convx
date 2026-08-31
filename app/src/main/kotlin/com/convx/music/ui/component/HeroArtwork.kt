@@ -33,8 +33,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +64,7 @@ import coil3.toBitmap
 import com.convx.music.R
 import com.convx.music.constants.DynamicThemeKey
 import com.convx.music.constants.PureBlackHeroBackgroundKey
+import com.convx.music.constants.ReduceDynamicBlurKey
 import com.convx.music.constants.SelectedThemeColorKey
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.theme.AppleTokens
@@ -78,6 +79,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.convx.music.ui.theme.colorengine.textHierarchyOn
+import dev.chrisbanes.haze.HazeProgressive
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 
 /**
  * Resolved hero image source with priority chain:
@@ -123,12 +130,29 @@ fun HeroMergeBand(
     blurRadius: Dp = 100.dp,
     /** Aspect ratio of the hero artwork this band must line up with. */
     heroRatio: Float = 1f,
-    /** The page colour below the join, for the pre-S plain-gradient fallback. */
+    /** The page colour below the join, for the below-13 plain-gradient fallback. */
     pageColor: Color = Color.Black,
+    /**
+     * When non-null (and on Android 13+), blurs the whole screen behind this band
+     * with Haze instead of re-drawing a blurred copy of the artwork. The screen's
+     * root content must be marked `Modifier.hazeSource(hazeState)` for the band to
+     * have anything to sample. On Android 12 and below — where RenderEffect blur is
+     * a no-op — the band falls back to a plain [pageColor] crossfade, so the hero
+     * still dissolves into the page without a hard edge.
+     */
+    hazeState: HazeState? = null,
 ) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-        // Same footprint as the S+ Box below (fillMaxWidth/bandHeight), so callers'
-        // own .align/.offset on `modifier` line the fallback up on the same join.
+    // Haze (RenderEffect) only reliably blurs on Android 13+; below that the
+    // crossfade is the path that actually renders. Also honour the low-power
+    // preference: giving the screen a live blur when the user asked for none
+    // defeats the point of the setting.
+    val reduceBlur by rememberPreference(ReduceDynamicBlurKey, false)
+    val useHaze = hazeState != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !reduceBlur
+
+    if (!useHaze || hazeState == null) {
+        // A plain vertical crossfade into [pageColor] — the same footprint as the
+        // Haze band below (fillMaxWidth/bandHeight), so callers' own .align/.offset
+        // on `modifier` line the fallback up on the same join.
         Box(
             modifier
                 .fillMaxWidth()
@@ -144,54 +168,106 @@ fun HeroMergeBand(
         return
     }
 
-    val bandHeightPx = LocalDensity.current.run { bandHeight.roundToPx() }
-
+    // One pane of glass across the join: Haze samples the whole screen behind
+    // this band (both the artwork above the join and the tint below it), so the
+    // artwork's colour is carried down past where the picture ends and the page
+    // colour is carried up into it — a merge rather than a cut, and the line
+    // that used to separate the two has no content left to be a line between.
+    // The band's own edges are hidden by a vertical alpha mask so there is no
+    // moment where the blur starts or stops.
+    @OptIn(ExperimentalHazeMaterialsApi::class)
     Box(
         modifier
             .fillMaxWidth()
             .height(bandHeight)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        0.00f to Color.Transparent,
-                        0.50f to Color.Black,
-                        1.00f to Color.Transparent,
-                    ),
-                    blendMode = BlendMode.DstIn,
+            .hazeEffect(
+                state = hazeState,
+                style = HazeMaterials.ultraThin(pageColor),
+            ) {
+                // A blur has nothing to sample past the edge of its own layer, so
+                // the first blur-radius of the mask shows mostly the flat material
+                // colour. Keyed to the page colour behind the join so that band
+                // reads as the tint it covers, not as a hard-edged pane.
+                noiseFactor = 0f
+                mask = Brush.verticalGradient(
+                    0.00f to Color.Transparent,
+                    0.50f to Color.Black,
+                    1.00f to Color.Transparent,
                 )
             },
-    ) {
-        if (!artworkUrl.isNullOrBlank()) {
-            // Baked once per track rather than `Modifier.blur(100.dp)`, which is a
-            // RenderEffect and therefore re-runs on EVERY frame the band is on screen --
-            // for a picture that never changes while the screen is up. This band is on
-            // every hero screen, so that was a static blur being recomputed at scroll
-            // cadence. BlurredBackdropImage decodes small and blurs on the CPU once; at
-            // this magnification the result is indistinguishable.
-            BlurredBackdropImage(
-                model = artworkUrl,
-                screenBlurRadiusDp = blurRadius.value,
-                decodeSize = 160,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(heroRatio)
-                    // Bottom of the copy sits at the band's centre — the join.
-                    .layout { measurable, constraints ->
-                        val placeable = measurable.measure(constraints)
-                        layout(placeable.width, placeable.height) {
-                            placeable.placeRelative(0, bandHeightPx / 2 - placeable.height)
-                        }
-                    },
-            )
-        }
-    }
+    )
 }
 
 /** Where [HeroMergeBand] is centred: half over the artwork, half over the page. */
 val HeroMergeBandHeight: Dp = 320.dp
+
+/**
+ * The progressive blur at the very top of a hero screen (BitChord/Apple-Music
+ * treatment): as the artwork scrolls up under the status bar, a strip of Haze
+ * ramps from nothing to full so the picture dissolves smoothly into the theme
+ * behind the glass instead of sliding under a hard edge.
+ *
+ * Intensity follows [progress] (0..1, e.g. from [rememberHeroTopBlur]) on the
+ * strip's height: zero blur when the hero is fully visible, full when it has
+ * scrolled off. Below Android 13 (RenderEffect no-op) or when dynamic blur is
+ * reduced, this paints a translucent scrim in [pageColor] instead — a plain
+ * fade that still hides where the hero crosses into the status bar.
+ */
+@Composable
+fun HeroTopBlur(
+    hazeState: HazeState?,
+    progress: Float,
+    pageColor: Color = AppTheme.colorScheme.background,
+    modifier: Modifier = Modifier,
+    /** Height of the blur strip + the run below it the fade needs to disappear. */
+    height: Dp = 140.dp,
+) {
+    val reduceBlur by rememberPreference(ReduceDynamicBlurKey, false)
+    val useHaze =
+        hazeState != null &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !reduceBlur &&
+            progress > 0.001f
+
+    if (!useHaze) {
+        // Below 13 / blur reduced: a translucent scrim in the page's colour that
+        // fades in with scroll — the same dissolve, done with a colour the
+        // hardware can always draw. No Haze, no RenderEffect, no cost.
+        Box(
+            modifier
+                .fillMaxWidth()
+                .height(height)
+                .graphicsLayer { alpha = progress.coerceIn(0f, 1f) }
+                .background(pageColor),
+        )
+        return
+    }
+
+    @OptIn(ExperimentalHazeMaterialsApi::class)
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(height)
+            .hazeEffect(
+                state = hazeState,
+                style = HazeMaterials.ultraThin(pageColor),
+            ) {
+                blurRadius = 36.dp
+                noiseFactor = 0f
+                // The whole strip's intensity follows scroll: zero blur when the
+                // hero is fully visible, full when it has scrolled under the bar.
+                alpha = progress.coerceIn(0f, 1f)
+                // Within the strip itself, blur keeps full strength down to the
+                // foot and ramps to nothing at the very bottom edge, so the glass
+                // stops before the strip does and never reads as a hard pane.
+                progressive = HazeProgressive.verticalGradient(
+                    easing = androidx.compose.animation.core.EaseInCubic,
+                    startIntensity = 1f,
+                    endIntensity = 0f,
+                )
+            },
+    )
+}
 
 /**
  * Hero palettes keyed by artwork URL (the image's stable id): the Coil decode +
@@ -203,24 +279,48 @@ private val heroPaletteCache = android.util.LruCache<String, HeroPalette>(128)
 /**
  * 0..1 scroll progress for [HeroBackground]'s `topBlurProgress`: ramps as the first
  * screenful scrolls up, then pins at 1. Pass a hero screen's list state.
+ *
+ * Pixel threshold, not a fraction of the header's own height: these screens also
+ * layer [ChromeScrim] over this same strip, ramped by [rememberChromeScrimProgress]
+ * on the same fixed 300px. A header-height-relative ramp (the old `fraction`
+ * approach) reaches full blur far later than a tall hero header's own 300px, so
+ * for most of the scroll the strip was under near-opaque scrim with barely any
+ * blur yet — reading as "no blur" even though it was there, just buried. Sharing
+ * the threshold keeps the two in lockstep so the glass is visible as the scrim
+ * darkens, not swallowed by it.
  */
 @Composable
 fun rememberHeroTopBlur(
     state: androidx.compose.foundation.lazy.LazyListState,
-    // Blur reaches full strength once the hero header has scrolled this fraction
-    // of its OWN height. Deriving the span from the real header size (instead of a
-    // fixed px threshold) keeps the ramp continuous through the moment the header
-    // scrolls off — a fixed 700px threshold snapped when it didn't match the
-    // header's actual height.
-    fraction: Float = 0.6f,
+    thresholdPx: Float = 300f,
 ): Float {
     val progress by remember(state) {
         androidx.compose.runtime.derivedStateOf {
-            if (state.firstVisibleItemIndex > 0) return@derivedStateOf 1f
-            val header = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == 0 }
-            val span = (header?.size ?: 0) * fraction
-            if (span <= 0f) 0f
-            else (state.firstVisibleItemScrollOffset / span).coerceIn(0f, 1f)
+            val scrolledPx = if (state.firstVisibleItemIndex == 0) {
+                state.firstVisibleItemScrollOffset.toFloat()
+            } else {
+                thresholdPx
+            }
+            (scrolledPx / thresholdPx).coerceIn(0f, 1f)
+        }
+    }
+    return progress
+}
+
+/** [rememberHeroTopBlur], for a header that leads a grid instead of a list. */
+@Composable
+fun rememberHeroTopBlur(
+    state: androidx.compose.foundation.lazy.grid.LazyGridState,
+    thresholdPx: Float = 300f,
+): Float {
+    val progress by remember(state) {
+        androidx.compose.runtime.derivedStateOf {
+            val scrolledPx = if (state.firstVisibleItemIndex == 0) {
+                state.firstVisibleItemScrollOffset.toFloat()
+            } else {
+                thresholdPx
+            }
+            (scrolledPx / thresholdPx).coerceIn(0f, 1f)
         }
     }
     return progress
@@ -282,6 +382,21 @@ fun Color.asVividAccent(): Color {
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
+/** A punchier boost than [asVividAccent] for a thin specular rim stroke, where
+ *  a text-safe accent reads as barely-there: pushes saturation and lightness
+ *  harder so the edge actually pops against the glass instead of disappearing
+ *  into it. */
+fun Color.asRimPop(): Color {
+    val hsl = FloatArray(3)
+    androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
+    // Two rounds of "still too much" feedback in: this is now only a touch past
+    // asVividAccent's own baseline (0.45f / 0.45f..0.68f), not a real boost —
+    // the rim reads as subtle tinted glass, not a coloured glow.
+    hsl[1] = hsl[1].coerceAtLeast(0.50f)
+    hsl[2] = hsl[2].coerceIn(0.45f, 0.65f)
+    return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+}
+
 /** Same clamp family as [asDeepTint], a shade lighter — the wash a real blur
  *  of the artwork would leave behind, not the page's own deep tint. */
 fun Color.asWashTint(): Color {
@@ -304,7 +419,7 @@ suspend fun heroPaletteOf(context: Context, url: String): HeroPalette? {
         try {
             val request = ImageRequest.Builder(context)
                 .data(url)
-                .size(100, 100)
+                .size(200, 200)
                 .allowHardware(false)
                 .build()
             context.imageLoader.execute(request).image?.toBitmap()
@@ -484,6 +599,12 @@ fun AlbumStyleHeroImage(
     // Driven by rememberHeroZoom() for pull-to-zoom. Applied to the drawn image
     // only, so growing it never re-lays-out the list underneath.
     heroScale: Float = 1f,
+    // The screen's own Haze source. Without one the merge band below can only fall
+    // back to a flat crossfade — a fade rather than a merge, which is what the
+    // playlist screens were getting while Album and Artist got the real thing.
+    hazeState: HazeState? = null,
+    // The colour under the join, for the band's pre-13 / reduced-blur fallback.
+    pageColor: Color = Color.Black,
 ) {
     val topInset = androidx.compose.foundation.layout.WindowInsets.systemBars
         .asPaddingValues().calculateTopPadding()
@@ -547,6 +668,8 @@ fun AlbumStyleHeroImage(
         HeroMergeBand(
             artworkUrl = artworkUrl,
             heroRatio = 1f,
+            pageColor = pageColor,
+            hazeState = hazeState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .offset(y = HeroMergeBandHeight / 2),
@@ -588,13 +711,17 @@ fun HeroBackground(
     heroScale: Float = 1f,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryColor = AppTheme.colorScheme.primary
     val (pureBlack) = rememberPreference(PureBlackHeroBackgroundKey, false)
     // Reuses the existing Default branch (flat tint, no image) to suppress the
     // artwork backdrop entirely rather than adding a second code path.
     val effectiveTint = if (pureBlack) Color.Black else tint
     val effectiveHeroSource = if (pureBlack) HeroSource.Default else heroSource
-    Box(modifier = modifier.background(effectiveTint)) {
+    // Per-screen Haze source (Album/Artist pattern): this background becomes the
+    // backdrop the top blur strip samples, so the artwork dissolves as it scrolls
+    // under the status bar instead of sliding under a hard edge.
+    val hazeState = remember { HazeState() }
+    Box(modifier = modifier.background(effectiveTint).hazeSource(hazeState)) {
         when (val heroSource = effectiveHeroSource) {
             is HeroSource.Artwork -> {
                 // Fade-in animation for the hero image (the "smooth transition"
@@ -713,7 +840,7 @@ fun HeroBackground(
         if (meshWash != null) {
             HeroMeshWash(
                 palette = meshWash,
-                screenBackground = MaterialTheme.colorScheme.background,
+                screenBackground = AppTheme.colorScheme.background,
                 modifier = Modifier.fillMaxSize(),
             )
         } else if (bottomGradient) {
@@ -729,6 +856,17 @@ fun HeroBackground(
             )
         }
         content()
+
+        // Progressive top blur: as [topBlurProgress] ramps with scroll, a strip of
+        // Haze blurs the artwork beneath the status bar into the page colour, so the
+        // hero dissolves instead of sliding under a hard edge. Inert (alpha 0) when
+        // [topBlurProgress] stays 0, so screens that don't pass it are unaffected.
+        HeroTopBlur(
+            hazeState = hazeState,
+            progress = topBlurProgress,
+            pageColor = AppTheme.colorScheme.background,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 }
 
@@ -781,7 +919,7 @@ fun HeroCardHeader(
                 .size(cardSize)
                 .shadow(elevation = 12.dp, shape = shape)
                 .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .background(AppTheme.colorScheme.surfaceContainerHigh),
         ) {
             if (!artworkUrl.isNullOrBlank()) {
                 AsyncImage(
@@ -838,8 +976,8 @@ fun HeroCardHeader(
         title = {
             Text(
                 text = titleText,
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = AppTheme.typography.displaySmall,
+                color = AppTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -848,8 +986,8 @@ fun HeroCardHeader(
             {
                 Text(
                     text = it,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.titleMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

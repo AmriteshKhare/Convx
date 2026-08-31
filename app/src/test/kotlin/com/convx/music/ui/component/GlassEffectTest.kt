@@ -23,7 +23,6 @@ class GlassEffectConfigTest {
     @Test
     fun `default config enables all components`() {
         val config = GlassEffectConfig()
-        assertTrue(config.playerEnabled)
         assertTrue(config.miniPlayerEnabled)
         assertTrue(config.navBarEnabled)
     }
@@ -91,7 +90,6 @@ class GlassEffectConfigTest {
     fun `isEnabledFor returns false for every component when global switch is off`() {
         val config = GlassEffectConfig(
             globalEnabled = false,
-            playerEnabled = true,
             miniPlayerEnabled = true,
             navBarEnabled = true,
         )
@@ -104,11 +102,9 @@ class GlassEffectConfigTest {
     fun `isEnabledFor respects per-component switches when global switch is on`() {
         val config = GlassEffectConfig(
             globalEnabled = true,
-            playerEnabled = true,
             miniPlayerEnabled = false,
             navBarEnabled = true,
         )
-        assertTrue(config.isEnabledFor(GlassComponent.PLAYER))
         assertFalse(config.isEnabledFor(GlassComponent.MINI_PLAYER))
         assertTrue(config.isEnabledFor(GlassComponent.NAV_BAR))
     }

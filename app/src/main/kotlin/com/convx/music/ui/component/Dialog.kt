@@ -20,17 +20,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.LocalContentColor
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.ProvideTextStyle
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
+import com.convx.music.ui.ios.compat.ProvideTextStyle
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.ios.foundation.IosTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -69,9 +69,8 @@ fun DefaultDialog(
     ) {
         Surface(
             modifier = Modifier.padding(24.dp),
-            shape = AlertDialogDefaults.shape,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation
+            shape = ContinuousRoundedRectangle(30.dp),
+            color = IosTheme.colors.systemBackground,
         ) {
             Column(
                 horizontalAlignment = horizontalAlignment,
@@ -79,7 +78,7 @@ fun DefaultDialog(
                     .padding(24.dp)
             ) {
                 if (icon != null) {
-                    CompositionLocalProvider(LocalContentColor provides AlertDialogDefaults.iconContentColor) {
+                    CompositionLocalProvider(LocalContentColor provides IosTheme.tint) {
                         Box(
                             Modifier.align(Alignment.CenterHorizontally)
                         ) {
@@ -90,8 +89,8 @@ fun DefaultDialog(
                     Spacer(Modifier.height(16.dp))
                 }
                 if (title != null) {
-                    CompositionLocalProvider(LocalContentColor provides AlertDialogDefaults.titleContentColor) {
-                        ProvideTextStyle(MaterialTheme.typography.headlineSmall) {
+                    CompositionLocalProvider(LocalContentColor provides IosTheme.colors.label) {
+                        ProvideTextStyle(IosTheme.typography.headline) {
                             Box(
                                 // Align the title to the center when an icon is present.
                                 Modifier.align(if (icon == null) Alignment.Start else Alignment.CenterHorizontally)
@@ -112,9 +111,9 @@ fun DefaultDialog(
                     FlowRow(
                         modifier = Modifier.align(Alignment.End)
                     ) {
-                        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+                        CompositionLocalProvider(LocalContentColor provides IosTheme.tint) {
                             ProvideTextStyle(
-                                value = MaterialTheme.typography.labelLarge
+                                value = IosTheme.typography.headline
                             ) {
                                 buttons()
                             }
@@ -149,7 +148,7 @@ fun ActionPromptDialog(
                     text = title,
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 1,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = IosTheme.typography.headline,
                 )
             }
         } else null,
@@ -195,9 +194,8 @@ fun ListDialog(
     ) {
         Surface(
             modifier = Modifier.padding(24.dp),
-            shape = AlertDialogDefaults.shape,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation,
+            shape = ContinuousRoundedRectangle(30.dp),
+            color = IosTheme.colors.systemBackground,
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -221,12 +219,12 @@ fun InfoLabel(
     Icon(
         painter = painterResource(id = R.drawable.info),
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.secondary,
+        tint = IosTheme.colors.secondaryLabel,
         modifier = Modifier.padding(4.dp)
     )
     Text(
         text = text,
-        style = MaterialTheme.typography.bodySmall,
+        style = IosTheme.typography.footnote,
         modifier = Modifier.padding(horizontal = 4.dp)
     )
 }

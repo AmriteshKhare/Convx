@@ -30,17 +30,17 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
+import com.convx.music.ui.ios.compat.AlertDialog
+import com.convx.music.ui.ios.compat.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.ExtendedFloatingActionButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedTextField
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -223,7 +223,7 @@ fun PresetsScreen(
                     }) {
                         Text(
                             stringResource(R.string.preset_delete),
-                            color = MaterialTheme.colorScheme.error,
+                            color = AppTheme.colorScheme.error,
                         )
                     }
                 }
@@ -275,8 +275,8 @@ fun PresetsScreen(
             ) {
                 Text(
                     text = stringResource(R.string.preset_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                 )
             }
             return@Scaffold
@@ -319,7 +319,7 @@ private fun PresetCard(
                 .fillMaxWidth()
                 .aspectRatio(9f / 16f)
                 .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(AppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
             if (thumbnail != null) {
@@ -333,13 +333,13 @@ private fun PresetCard(
                 Icon(
                     painterResource(R.drawable.palette),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = AppTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
         Text(
             text = meta.name,
-            style = MaterialTheme.typography.labelLarge,
+            style = AppTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp, start = 4.dp, end = 4.dp),
@@ -407,8 +407,8 @@ private fun SavePresetDialog(
                 if (captureFailed) {
                     Text(
                         text = stringResource(R.string.preset_thumbnail_failed),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
+                        style = AppTheme.typography.labelSmall,
+                        color = AppTheme.colorScheme.error,
                     )
                 }
                 OutlinedTextField(
@@ -452,7 +452,7 @@ private fun ApplyPresetDialog(
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     stringResource(R.string.preset_apply_desc),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = AppTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(8.dp))
                 CategoryChecklist(
@@ -491,7 +491,7 @@ private fun CategoryChecklist(
                 )
                 Text(
                     text = stringResource(presetCategoryLabel(category)),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.typography.bodyMedium,
                 )
             }
         }

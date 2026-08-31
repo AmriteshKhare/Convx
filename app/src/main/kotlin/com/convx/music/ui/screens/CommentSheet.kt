@@ -15,15 +15,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.CircularWavyProgressIndicator
+import com.convx.music.ui.ios.compat.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.ModalBottomSheet
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -94,7 +94,7 @@ fun CommentSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = MaterialTheme.colorScheme.surfaceContainer
+        containerColor = AppTheme.colorScheme.surfaceContainer
     ) {
         Column(modifier = Modifier.fillMaxHeight()) {
             // Header row
@@ -108,14 +108,14 @@ fun CommentSheet(
                 Column {
                     Text(
                         text = stringResource(R.string.comments),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = AppTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     if (totalComments != null) {
                         Text(
                             text = "$totalComments",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = AppTheme.typography.labelMedium,
+                            color = AppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -156,7 +156,7 @@ fun CommentSheet(
                                 painter = painterResource(R.drawable.error),
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.error
+                                tint = AppTheme.colorScheme.error
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(text = stringResource(R.string.no_comments))
@@ -248,7 +248,7 @@ fun CommentItem(
             contentDescription = null,
             modifier = Modifier
                 .size(if (isReply) 28.dp else 36.dp)
-                .clip(MaterialTheme.shapes.extraLarge),
+                .clip(AppTheme.shapes.extraLarge),
             contentScale = ContentScale.Crop
         )
 
@@ -261,7 +261,7 @@ fun CommentItem(
             ) {
                 Text(
                     text = renderer.authorText?.runs?.firstOrNull()?.text ?: "",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -270,8 +270,8 @@ fun CommentItem(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = renderer.publishedTimeText?.runs?.firstOrNull()?.text ?: "",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.typography.labelSmall,
+                    color = AppTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -279,7 +279,7 @@ fun CommentItem(
 
             Text(
                 text = renderer.contentText?.runs?.joinToString("") { it.text } ?: "",
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.typography.bodyMedium,
                 lineHeight = 20.sp
             )
 
@@ -291,13 +291,13 @@ fun CommentItem(
                         painter = painterResource(R.drawable.thumb_up_like),
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = AppTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = voteCount.runs?.firstOrNull()?.text ?: "0",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = AppTheme.typography.labelSmall,
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 
@@ -315,13 +315,13 @@ fun CommentItem(
                             painter = painterResource(R.drawable.chat_msg),
                             contentDescription = "Replies",
                             modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = AppTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = replyCount.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = AppTheme.typography.labelSmall,
+                            color = AppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -377,7 +377,7 @@ fun CommentDetailPane(
             }
             Text(
                 text = "${mainComment.replyCount ?: 0} Replies",
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
         }

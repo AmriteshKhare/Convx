@@ -27,23 +27,23 @@ import androidx.compose.foundation.rememberScrollState
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.AlertDialog
+import com.convx.music.ui.ios.compat.AlertDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.LinearProgressIndicator
+import com.convx.music.ui.ios.compat.LinearProgressIndicator
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Slider
+import com.convx.music.ui.ios.compat.Slider
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -106,9 +106,9 @@ import com.convx.music.ui.component.ActionPromptDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
+import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -129,6 +129,13 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import okio.ByteString.Companion.encodeUtf8
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
+import com.convx.music.ui.component.FrostedTopBar
+import com.convx.music.ui.component.TopFadeBlur
+import com.convx.music.ui.ios.foundation.IosTheme
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 @OptIn(ExperimentalCoilApi::class, ExperimentalMaterial3Api::class, DelicateCoilApi::class)
 @Composable
@@ -326,7 +333,7 @@ fun StorageSettings(
                 ) {
                     Text(
                         stringResource(R.string.cache_size_warning_confirm),
-                        color = MaterialTheme.colorScheme.error
+                        color = AppTheme.colorScheme.error
                     )
                 }
             },
@@ -338,8 +345,12 @@ fun StorageSettings(
         )
     }
 
+    val hazeState = remember { HazeState() }
+
+    Box(modifier = Modifier) {
     Column(
         Modifier
+            .hazeSource(hazeState)
             .windowInsetsPadding(
                 LocalPlayerAwareWindowInsets.current.only(
                     WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
@@ -355,17 +366,17 @@ fun StorageSettings(
                 )
             )
         )
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.storage),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.storage),
                     title = { Text(stringResource(R.string.downloaded_songs)) },
                     description = {
                         Text(text = formatFileSize(downloadCacheSize))
                     }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.clear_all),
                     title = { Text(stringResource(R.string.clear_all_downloads)) },
                     onClick = {
@@ -375,10 +386,10 @@ fun StorageSettings(
             )
         )
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.song_cache),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.cached),
                     title = { Text(stringResource(R.string.max_song_cache_size)) },
                     description = {
@@ -430,12 +441,12 @@ fun StorageSettings(
                                         )
                                     }"
                                 },
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = AppTheme.typography.bodyMedium,
                             )
                         }
                     }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.clear_all),
                     title = { Text(stringResource(R.string.clear_song_cache)) },
                     onClick = {
@@ -445,10 +456,10 @@ fun StorageSettings(
             )
         )
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.image_cache),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.manage_search),
                     title = { Text(stringResource(R.string.max_image_cache_size)) },
                     description = {
@@ -491,12 +502,12 @@ fun StorageSettings(
                                         maxImageCacheSize * 1024 * 1024L
                                     )
                                 }",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = AppTheme.typography.bodyMedium,
                             )
                         }
                     }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.clear_all),
                     title = { Text(stringResource(R.string.clear_image_cache)) },
                     onClick = {
@@ -508,19 +519,17 @@ fun StorageSettings(
         Spacer(Modifier.padding(bottom = 30.dp))
     }
 
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.storage)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        }
-    )
+        TopFadeBlur(
+            hazeState = hazeState,
+            pageColor = IosTheme.colors.systemGroupedBackground,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+
+        FrostedTopBar(
+            onBack = navController::navigateUp,
+            title = stringResource(R.string.storage),
+            titleAlpha = 1f,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+    }
 }

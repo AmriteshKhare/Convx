@@ -25,15 +25,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import com.convx.music.ui.ios.compat.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Switch
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -191,8 +191,8 @@ fun PlayerIconsScreen(
         ) {
             Text(
                 text = stringResource(R.string.player_icons_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
 
@@ -231,14 +231,14 @@ fun PlayerIconsScreen(
                 Spacer(Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.v2_player_icons),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     modifier = Modifier.padding(vertical = 4.dp),
                 )
                 Text(
                     text = stringResource(R.string.v2_player_icons_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodySmall,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
                 PlayerIconSlot.entries.filter { it.isV2 }.forEach { slot ->
@@ -287,7 +287,7 @@ private fun SlotRow(
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(AppTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
             if (icon.isCustom && !icon.tint) {
@@ -301,7 +301,7 @@ private fun SlotRow(
                 Icon(
                     painter = icon.painter,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = AppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(26.dp),
                 )
             }
@@ -311,20 +311,20 @@ private fun SlotRow(
                 .weight(1f)
                 .padding(horizontal = 12.dp),
         ) {
-            Text(stringResource(slot.labelRes), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(slot.labelRes), style = AppTheme.typography.bodyLarge)
             Text(
                 text = stringResource(
                     if (override == null) R.string.player_icon_default else R.string.player_icon_custom,
                 ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (override != null) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     stringResource(R.string.player_icon_tint),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = AppTheme.typography.labelSmall,
                 )
                 Switch(checked = override.tint, onCheckedChange = onTintChange)
             }
@@ -332,7 +332,7 @@ private fun SlotRow(
                 Icon(
                     painterResource(R.drawable.delete),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = AppTheme.colorScheme.error,
                 )
             }
         }

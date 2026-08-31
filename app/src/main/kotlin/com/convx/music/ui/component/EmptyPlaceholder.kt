@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +38,7 @@ fun EmptyPlaceholder(
         Image(
             painter = painterResource(icon),
             contentDescription = null,
-            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
+            colorFilter = ColorFilter.tint(AppTheme.colorScheme.onBackground),
             modifier = Modifier.size(64.dp),
         )
 
@@ -46,7 +46,7 @@ fun EmptyPlaceholder(
 
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge,
+            style = AppTheme.typography.bodyLarge,
         )
     }
 }

@@ -32,13 +32,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
+import com.convx.music.ui.ios.compat.DropdownMenu
+import com.convx.music.ui.ios.compat.DropdownMenuItem
+import com.convx.music.ui.ios.compat.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -53,7 +53,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.VerticalDivider
+import com.convx.music.ui.ios.compat.VerticalDivider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -67,11 +67,11 @@ fun <E> ChipsRow(
     currentValue: E,
     onValueUpdate: (E) -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    containerColor: Color = AppTheme.colorScheme.surfaceContainer,
     // Callers sitting over their own blurred hero backdrop (search results, over
     // a hero blur) pass transparent/tint-based colors here instead of the
     // Material defaults, so the chips read as part of the glass, not a card.
-    selectedContainerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    selectedContainerColor: Color = AppTheme.colorScheme.secondaryContainer,
     labelColor: Color = Color.Unspecified,
     selectedLabelColor: Color = Color.Unspecified,
 ) {
@@ -144,7 +144,7 @@ fun <Int> ChoiceChipsRow(
     currentValue: Int,
     onValueUpdate: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    containerColor: Color = AppTheme.colorScheme.surfaceContainer,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -201,9 +201,9 @@ fun <Int> ChoiceChipsRow(
                     border = null,
                     colors = FilterChipDefaults.filterChipColors(
                         containerColor = containerColor,
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        labelColor = MaterialTheme.colorScheme.onSurface,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        selectedContainerColor = AppTheme.colorScheme.primaryContainer,
+                        labelColor = AppTheme.colorScheme.onSurface,
+                        selectedLabelColor = AppTheme.colorScheme.onPrimaryContainer
                     )
                 )
 

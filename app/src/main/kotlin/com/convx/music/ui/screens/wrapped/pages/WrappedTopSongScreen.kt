@@ -18,8 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -91,7 +91,7 @@ fun WrappedTopSongScreen(topSong: SongWithStats?, isVisible: Boolean) {
             ) {
                 Text(
                     text = stringResource(id = R.string.wrapped_top_song_title),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = AppTheme.typography.headlineSmall,
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
@@ -123,7 +123,7 @@ fun WrappedTopSongScreen(topSong: SongWithStats?, isVisible: Boolean) {
             ) {
                 Text(
                 text = topSong?.title ?: stringResource(id = R.string.wrapped_no_data),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = AppTheme.typography.headlineMedium,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
@@ -141,7 +141,7 @@ fun WrappedTopSongScreen(topSong: SongWithStats?, isVisible: Boolean) {
             ) {
                 Text(
                 text = stringResource(id = R.string.wrapped_top_song_listening_time, topSong?.timeListened?.div(60000) ?: 0),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     color = Color.White.copy(alpha = 0.8f),
                     textAlign = TextAlign.Center
                 )

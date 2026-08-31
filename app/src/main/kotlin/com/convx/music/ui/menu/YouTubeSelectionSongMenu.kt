@@ -12,11 +12,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,8 +44,8 @@ import com.convx.music.extensions.toMediaItem
 import com.convx.music.models.toMediaMetadata
 import com.convx.music.playback.queues.ListQueue
 import com.convx.music.ui.component.DefaultDialog
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import com.convx.music.playback.DownloadTarget
@@ -170,7 +170,7 @@ fun YouTubeSelectionSongMenu(
             content = {
                 Text(
                     text = stringResource(R.string.remove_download_playlist_confirm, "selection"),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp),
                 )
             },
@@ -204,9 +204,9 @@ fun YouTubeSelectionSongMenu(
         ),
     ) {
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 listOfNotNull(
-                    if (!isGuest) Material3MenuItemData(
+                    if (!isGuest) IosMenuItemData(
                         icon = { Icon(painterResource(R.drawable.play), null) },
                         title = { Text(stringResource(R.string.play)) },
                         onClick = {
@@ -220,7 +220,7 @@ fun YouTubeSelectionSongMenu(
                             onDismiss()
                         },
                     ) else null,
-                    if (!isGuest) Material3MenuItemData(
+                    if (!isGuest) IosMenuItemData(
                         icon = { Icon(painterResource(R.drawable.shuffle), null) },
                         title = { Text(stringResource(R.string.shuffle)) },
                         onClick = {
@@ -234,7 +234,7 @@ fun YouTubeSelectionSongMenu(
                             onDismiss()
                         },
                     ) else null,
-                    if (!isGuest) Material3MenuItemData(
+                    if (!isGuest) IosMenuItemData(
                         icon = { Icon(painterResource(R.drawable.queue_music), null) },
                         title = { Text(stringResource(R.string.add_to_queue)) },
                         onClick = {
@@ -243,14 +243,14 @@ fun YouTubeSelectionSongMenu(
                             onDismiss()
                         },
                     ) else null,
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         icon = { Icon(painterResource(R.drawable.playlist_add), null) },
                         title = { Text(stringResource(R.string.add_to_playlist)) },
                         onClick = {
                             showChoosePlaylistDialog = true
                         },
                     ),
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = {
                             Text(
                                 text = stringResource(
@@ -301,7 +301,7 @@ fun YouTubeSelectionSongMenu(
                     ),
                     when (downloadState) {
                         Download.STATE_COMPLETED -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = {
                                     Text(
                                         text = stringResource(R.string.remove_download)
@@ -319,7 +319,7 @@ fun YouTubeSelectionSongMenu(
                             )
                         }
                         Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
                                     CircularProgressIndicator(
@@ -340,7 +340,7 @@ fun YouTubeSelectionSongMenu(
                             )
                         }
                         else -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 icon = {
                                     Icon(
@@ -360,7 +360,7 @@ fun YouTubeSelectionSongMenu(
                             )
                         }
                     },
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = {
                             Text(
                                 text = stringResource(

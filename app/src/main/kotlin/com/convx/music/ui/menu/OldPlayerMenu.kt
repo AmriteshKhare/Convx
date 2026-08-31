@@ -19,11 +19,11 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -61,8 +61,8 @@ import com.convx.music.models.MediaMetadata
 import com.convx.music.playback.ExoDownloadService
 import com.convx.music.ui.component.BottomSheetState
 import com.convx.music.ui.component.ListDialog
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.ui.component.VolumeSlider
@@ -193,13 +193,13 @@ fun OldPlayerMenu(
                     painter = painterResource(R.drawable.cast),
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = AppTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = stringResource(R.string.casting_to, castDeviceName ?: ""),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.primary
                 )
             }
         }
@@ -246,7 +246,7 @@ fun OldPlayerMenu(
                                     painter = painterResource(R.drawable.radio),
                                     contentDescription = null,
                                     modifier = Modifier.size(32.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.start_an_radio),
@@ -263,7 +263,7 @@ fun OldPlayerMenu(
                                 painter = painterResource(R.drawable.playlist_add),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.add_to_an_playlist),
@@ -275,7 +275,7 @@ fun OldPlayerMenu(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share),
@@ -302,19 +302,19 @@ fun OldPlayerMenu(
 
         // Core Old Player Items
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     // Shuffle
                     if (!isListenTogetherGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(stringResource(R.string.shuffle)) },
                                 icon = {
                                     Icon(
                                         painter = painterResource(R.drawable.shuffle),
                                         contentDescription = null,
                                         modifier = Modifier.size(24.dp),
-                                        tint = if (shuffleModeEnabled) MaterialTheme.colorScheme.primary else androidx.compose.material3.LocalContentColor.current
+                                        tint = if (shuffleModeEnabled) AppTheme.colorScheme.primary else androidx.compose.material3.LocalContentColor.current
                                     )
                                 },
                                 onClick = {
@@ -329,7 +329,7 @@ fun OldPlayerMenu(
                     when (download?.state) {
                         Download.STATE_COMPLETED -> {
                             add(
-                                Material3MenuItemData(
+                                IosMenuItemData(
                                     title = { Text(stringResource(R.string.remove_download)) },
                                     icon = {
                                         Icon(
@@ -347,7 +347,7 @@ fun OldPlayerMenu(
                         }
                         Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
                             add(
-                                Material3MenuItemData(
+                                IosMenuItemData(
                                     title = { Text(stringResource(R.string.downloading)) },
                                     icon = {
                                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
@@ -361,7 +361,7 @@ fun OldPlayerMenu(
                         }
                         else -> {
                             add(
-                                Material3MenuItemData(
+                                IosMenuItemData(
                                     title = { Text(stringResource(R.string.action_download)) },
                                     icon = {
                                         Icon(
@@ -387,14 +387,14 @@ fun OldPlayerMenu(
                     // Like
                     val isLiked = currentSong?.song?.liked == true
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(stringResource(if (isLiked) R.string.liked else R.string.like)) },
                             icon = {
                                 Icon(
                                     painter = painterResource(if (isLiked) R.drawable.favorite else R.drawable.favorite_border),
                                     contentDescription = null,
                                     modifier = Modifier.size(24.dp),
-                                    tint = if (isLiked) MaterialTheme.colorScheme.error else androidx.compose.material3.LocalContentColor.current
+                                    tint = if (isLiked) AppTheme.colorScheme.error else androidx.compose.material3.LocalContentColor.current
                                 )
                             },
                             onClick = {
@@ -407,7 +407,7 @@ fun OldPlayerMenu(
                     // Repeat
                     if (!isListenTogetherGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(stringResource(R.string.repeat)) },
                                 icon = {
                                     Icon(
@@ -420,7 +420,7 @@ fun OldPlayerMenu(
                                         ),
                                         contentDescription = null,
                                         modifier = Modifier.size(24.dp),
-                                        tint = if (repeatMode != Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else androidx.compose.material3.LocalContentColor.current
+                                        tint = if (repeatMode != Player.REPEAT_MODE_OFF) AppTheme.colorScheme.primary else androidx.compose.material3.LocalContentColor.current
                                     )
                                 },
                                 onClick = {
@@ -437,12 +437,12 @@ fun OldPlayerMenu(
 
         // Artist & Add to library
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     // ── Single smart Retry button ────────────────────────────
                     // Always visible. Re-triggers the full resolution chain.
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.retry_stream)) },
                             description = {
                                 Text(
@@ -471,7 +471,7 @@ fun OldPlayerMenu(
 
                     if (artists.isNotEmpty()) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_artist)) },
                                 description = {
                                     Text(
@@ -502,7 +502,7 @@ fun OldPlayerMenu(
 
                     if (mediaMetadata.album != null) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_album)) },
                                 description = {
                                     Text(
@@ -530,7 +530,7 @@ fun OldPlayerMenu(
                     // Add to Library option
                     val isInLibrary = librarySong?.song?.inLibrary != null
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { 
                                 Text(
                                     text = stringResource(
@@ -563,10 +563,10 @@ fun OldPlayerMenu(
 
         // Listen together
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.listen_together)) },
                             icon = {
                                 Icon(
@@ -580,7 +580,7 @@ fun OldPlayerMenu(
                     )
                     if (isListenTogetherGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.resync)) },
                                 icon = {
                                     Icon(
@@ -604,10 +604,10 @@ fun OldPlayerMenu(
 
         // details, eq, adv
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {
@@ -625,7 +625,7 @@ fun OldPlayerMenu(
                     )
 
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.equalizer)) },
                             description = { Text(text = stringResource(R.string.equalizer_desc)) },
                             icon = {
@@ -643,7 +643,7 @@ fun OldPlayerMenu(
                     )
 
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.advanced)) },
                             description = { Text(text = stringResource(R.string.advanced_desc)) },
                             icon = {
@@ -659,7 +659,7 @@ fun OldPlayerMenu(
                         )
                     )
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
                                 Icon(
@@ -684,7 +684,7 @@ fun OldPlayerMenu(
                         )
                     )
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.ambient_mode)) },
                             icon = {
                                 Icon(

@@ -42,14 +42,14 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.AlertDialog
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Slider
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Switch
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -425,7 +425,7 @@ private fun EditorCanvas(
                             modifier = if (sticker.id == selectedId) {
                                 Modifier.border(
                                     2.dp,
-                                    MaterialTheme.colorScheme.primary,
+                                    AppTheme.colorScheme.primary,
                                     RoundedCornerShape(4.dp),
                                 )
                             } else {
@@ -612,7 +612,7 @@ private fun BottomControls(
                     selected = editOpen,
                     onClick = onToggleEdit,
                 )
-                PillIcon(R.drawable.delete, tint = MaterialTheme.colorScheme.error, onClick = onDelete)
+                PillIcon(R.drawable.delete, tint = AppTheme.colorScheme.error, onClick = onDelete)
             }
         }
     }
@@ -623,7 +623,7 @@ private fun BottomControls(
 private fun Pill(content: @Composable () -> Unit) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+        color = AppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
     ) {
@@ -639,7 +639,7 @@ private fun Pill(content: @Composable () -> Unit) {
 private fun PillIcon(
     icon: Int,
     enabled: Boolean = true,
-    tint: Color = MaterialTheme.colorScheme.onSurface,
+    tint: Color = AppTheme.colorScheme.onSurface,
     onClick: () -> Unit,
 ) {
     Box(
@@ -667,16 +667,16 @@ private fun PillText(
 ) {
     Surface(
         shape = CircleShape,
-        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        color = if (selected) AppTheme.colorScheme.primary else Color.Transparent,
         modifier = Modifier.clip(CircleShape).clickable(enabled = enabled, onClick = onClick),
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelLarge,
+            style = AppTheme.typography.labelLarge,
             color = when {
-                selected -> MaterialTheme.colorScheme.onPrimary
-                enabled -> MaterialTheme.colorScheme.onSurface
-                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                selected -> AppTheme.colorScheme.onPrimary
+                enabled -> AppTheme.colorScheme.onSurface
+                else -> AppTheme.colorScheme.onSurfaceVariant
             },
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
         )
@@ -785,7 +785,7 @@ private fun BoxScope.DraggablePanel(
 private fun PopupPanel(content: @Composable () -> Unit) {
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.96f),
+        color = AppTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.96f),
         tonalElevation = 4.dp,
         shadowElevation = 12.dp,
     ) {
@@ -810,7 +810,7 @@ private fun GrabHandle() {
                 .width(36.dp)
                 .height(5.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+                .background(AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
         )
     }
 }
@@ -914,8 +914,8 @@ private fun StickerPanel(
                 text = stringResource(
                     if (sticker.z < 0) R.string.diy_behind_artwork else R.string.diy_above_artwork,
                 ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.labelSmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
@@ -930,7 +930,7 @@ private fun MenuSlider(
     onChange: (Float) -> Unit,
 ) {
     Column {
-        Text(label, style = MaterialTheme.typography.labelMedium)
+        Text(label, style = AppTheme.typography.labelMedium)
         Slider(value = value.coerceIn(range), onValueChange = onChange, valueRange = range)
     }
 }
@@ -938,7 +938,7 @@ private fun MenuSlider(
 @Composable
 private fun MenuSwitch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Text(label, Modifier.weight(1f), style = AppTheme.typography.bodyMedium)
         Switch(checked = checked, onCheckedChange = onChange)
     }
 }
@@ -967,8 +967,8 @@ private fun LowResolutionHint(sticker: DiySticker, transform: DiyTransform) {
 
     Text(
         text = stringResource(R.string.diy_low_resolution),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.error,
+        style = AppTheme.typography.labelSmall,
+        color = AppTheme.colorScheme.error,
         modifier = Modifier.padding(bottom = 4.dp),
     )
 }

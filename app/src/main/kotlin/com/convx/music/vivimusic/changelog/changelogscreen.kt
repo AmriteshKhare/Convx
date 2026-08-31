@@ -31,21 +31,21 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.SegmentedButton
+import com.convx.music.ui.ios.compat.SegmentedButtonDefaults
+import com.convx.music.ui.ios.compat.SingleChoiceSegmentedButtonRow
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.ToggleButton
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
@@ -296,7 +296,7 @@ fun ChangelogScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
+                .background(AppTheme.colorScheme.background)
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom))
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -333,7 +333,7 @@ fun ChangelogScreen(
                                 ) {
                                     Text(
                                         text = release.tagName,
-                                        style = MaterialTheme.typography.labelLarge
+                                        style = AppTheme.typography.labelLarge
                                     )
                                 }
                             }
@@ -344,7 +344,7 @@ fun ChangelogScreen(
                                     .padding(start = 8.dp)
                                     .size(24.dp),
                                 strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
+                                color = AppTheme.colorScheme.primary
                             )
                         }
                     }
@@ -353,9 +353,9 @@ fun ChangelogScreen(
                 if (hasError && !isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp))
+                            Icon(Icons.Default.Error, null, tint = AppTheme.colorScheme.error, modifier = Modifier.size(48.dp))
                             Spacer(Modifier.height(16.dp))
-                            Text(stringResource(R.string.error_loading_changelog), color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.error_loading_changelog), color = AppTheme.colorScheme.error)
                         }
                     }
                 } else {
@@ -375,13 +375,13 @@ fun ChangelogScreen(
                                 ) {
                                     Text(
                                         text = currentVersionTag,
-                                        style = MaterialTheme.typography.titleLarge,
+                                        style = AppTheme.typography.titleLarge,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = AppTheme.colorScheme.primary
                                     )
                                     if (showingCached) {
-                                        Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp)) {
-                                            Text(stringResource(R.string.cached), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                        Surface(color = AppTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp)) {
+                                            Text(stringResource(R.string.cached), style = AppTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                                         }
                                     }
                                 }
@@ -400,7 +400,7 @@ fun ChangelogScreen(
 
                                 updateDescription?.let { desc ->
                                     Spacer(Modifier.height(16.dp))
-                                    Text(desc, style = MaterialTheme.typography.bodyLarge)
+                                    Text(desc, style = AppTheme.typography.bodyLarge)
                                 }
 
                                 if (changelogSections.isNotEmpty()) {
@@ -409,9 +409,9 @@ fun ChangelogScreen(
                                             Spacer(Modifier.height(16.dp))
                                             Text(
                                                 text = section.title,
-                                                style = MaterialTheme.typography.titleMedium,
+                                                style = AppTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary
+                                                color = AppTheme.colorScheme.primary
                                             )
                                             Spacer(Modifier.height(8.dp))
                                         } else {
@@ -424,11 +424,11 @@ fun ChangelogScreen(
                                                 append(item.trim())
                                                 urls.forEach { (range, url) ->
                                                     addStringAnnotation("URL", url, range.first, range.last + 1)
-                                                    addStyle(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline), range.first, range.last + 1)
+                                                    addStyle(SpanStyle(color = AppTheme.colorScheme.primary, textDecoration = TextDecoration.Underline), range.first, range.last + 1)
                                                 }
                                             }
                                             Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                Box(modifier = Modifier.padding(top = 8.dp).size(6.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+                                                Box(modifier = Modifier.padding(top = 8.dp).size(6.dp).background(AppTheme.colorScheme.primary, CircleShape))
                                                 ClickableText(
                                                     text = annotatedText,
                                                     onClick = { offset ->
@@ -436,7 +436,7 @@ fun ChangelogScreen(
                                                             ContextCompat.startActivity(context, Intent(Intent.ACTION_VIEW, Uri.parse(it.item)), null)
                                                         }
                                                     },
-                                                    style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
+                                                    style = AppTheme.typography.bodyLarge.copy(color = AppTheme.colorScheme.onSurface)
                                                 )
                                             }
                                         }
@@ -445,10 +445,10 @@ fun ChangelogScreen(
 
                                 updateWarning?.let { warning ->
                                     Spacer(Modifier.height(24.dp))
-                                    Surface(color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp)) {
+                                    Surface(color = AppTheme.colorScheme.errorContainer.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp)) {
                                         Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
-                                            Text(warning, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                                            Icon(Icons.Default.Error, null, tint = AppTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                                            Text(warning, style = AppTheme.typography.bodyMedium, color = AppTheme.colorScheme.onErrorContainer)
                                         }
                                     }
                                 }

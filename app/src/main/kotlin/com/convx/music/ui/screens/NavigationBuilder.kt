@@ -80,6 +80,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.convx.music.ui.screens.settings.ContentSettings
 import com.convx.music.ui.screens.settings.DiscordLoginScreen
 import com.convx.music.ui.screens.settings.PlayerSettings
+import com.convx.music.ui.screens.settings.PlayerAdvancedSettings
+import com.convx.music.ui.screens.settings.AppearanceAdvancedSettings
+import com.convx.music.ui.screens.settings.ContentAdvancedSettings
 import com.convx.music.ui.screens.settings.JioSettings
 import com.convx.music.ui.screens.settings.LocalFoldersSettingsScreen
 import com.convx.music.ui.screens.settings.ScanMusicScreen
@@ -149,6 +152,10 @@ fun NavGraphBuilder.navigationBuilder(
 
     sharedComposable(Screens.Library.route) {
         LibraryScreen(navController)
+    }
+
+    sharedComposable(Screens.Explore.route) {
+        ExploreScreen(navController = navController)
     }
 
     sharedComposable(Screens.Settings.route) {
@@ -408,6 +415,10 @@ fun NavGraphBuilder.navigationBuilder(
         AppearanceSettings(navController, scrollBehavior, activity, snackbarHostState)
     }
 
+    sharedComposable("settings/appearance/advanced") {
+        AppearanceAdvancedSettings(navController, scrollBehavior, activity)
+    }
+
     sharedComposable("settings/home_feed_order") {
         HomeFeedOrderScreen(navController, scrollBehavior)
     }
@@ -452,6 +463,10 @@ fun NavGraphBuilder.navigationBuilder(
         ContentSettings(navController, scrollBehavior)
     }
 
+    sharedComposable("settings/content/advanced") {
+        ContentAdvancedSettings(navController, scrollBehavior)
+    }
+
     sharedComposable("settings/content/romanization") {
         RomanizationSettings(navController, scrollBehavior)
     }
@@ -462,6 +477,10 @@ fun NavGraphBuilder.navigationBuilder(
     
     sharedComposable("settings/player") {
         PlayerSettings(navController, scrollBehavior)
+    }
+
+    sharedComposable("settings/player/advanced") {
+        PlayerAdvancedSettings(navController, scrollBehavior)
     }
 
     sharedComposable("settings/player/jio") {

@@ -87,6 +87,9 @@ data class CommunityPlaylistItem(
     val songs: List<SongItem>
 )
 
+/** Second shelf list the home feed is padded from — see [HomeViewModel.loadNetworkDataPhase]. */
+private const val NEW_RELEASES_BROWSE_ID = "FEmusic_new_releases"
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -108,6 +111,7 @@ class HomeViewModel @Inject constructor(
     val dailyDiscover = MutableStateFlow<List<DailyDiscoverItem>?>(null)
     val forgottenFavorites = MutableStateFlow<List<Song>?>(null)
     val keepListening = MutableStateFlow<List<LocalItem>?>(null)
+    val topSongs = MutableStateFlow<List<Song>?>(null)
     val similarRecommendations = MutableStateFlow<List<SimilarRecommendation>?>(null)
     val accountPlaylists = MutableStateFlow<List<PlaylistItem>?>(null)
     val homePage = MutableStateFlow<HomePage?>(null)
@@ -506,6 +510,9 @@ class HomeViewModel @Inject constructor(
             .filter { it.artist.isYouTubeArtist && it.artist.thumbnailUrl != null }.shuffled().take(5)
         keepListening.value = (keepListeningSongs + keepListeningAlbums + keepListeningArtists).shuffled()
 
+        topSongs.value = database.mostPlayedSongs(fromTimeStamp, limit = 10, offset = 0).first()
+            .filterVideoSongs(hideVideoSongs).filterNot { it.song.isLocal }
+
         allLocalItems.value = (quickPicks.value.orEmpty() + forgottenFavorites.value.orEmpty() + keepListening.value.orEmpty())
             .filter { it is Song || it is Album }
     }
@@ -612,9 +619,19 @@ class HomeViewModel @Inject constructor(
             launch(Dispatchers.IO) { getCommunityPlaylists() }
             launch(Dispatchers.IO) { loadSimilarRecommendations() }
             launch(Dispatchers.IO) {
+                // BitChord's trick: FEmusic_home alone is thin (three shelves signed out),
+                // so the feed is padded with FEmusic_new_releases, which carries genuinely
+                // different rows. Fetched alongside rather than after, and de-duped by
+                // title in case home already surfaced the same shelf. Only home's own
+                // continuation is kept — new releases is a one-shot list.
+                val newReleases = async(Dispatchers.IO) {
+                    YouTube.home(browseId = NEW_RELEASES_BROWSE_ID).getOrNull()?.sections.orEmpty()
+                }
                 YouTube.home().onSuccess { page ->
+                    val seenTitles = mutableSetOf<String>()
                     homePage.value = page.copy(
-                        sections = page.sections.mapNotNull { section ->
+                        sections = (page.sections + newReleases.await()).mapNotNull { section ->
+                            if (!seenTitles.add(section.title.lowercase())) return@mapNotNull null
                             val filteredItems = section.items
                                 .filterExplicit(hideExplicit)
                                 .filterVideoSongs(hideVideoSongs)
@@ -622,7 +639,10 @@ class HomeViewModel @Inject constructor(
                             if (filteredItems.isEmpty()) null else section.copy(items = filteredItems)
                         }
                     )
-                }.onFailure { reportException(it) }
+                }.onFailure {
+                    newReleases.cancel()
+                    reportException(it)
+                }
             }
             launch(Dispatchers.IO) {
                 YouTube.explore().onSuccess { page ->

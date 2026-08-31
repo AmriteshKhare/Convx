@@ -16,12 +16,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Switch
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -126,8 +126,8 @@ fun HomeFeedOrderScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = stringResource(R.string.home_feed_order_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(
                 start = AppleTokens.Gutter,
                 end = AppleTokens.Gutter,
@@ -151,7 +151,7 @@ fun HomeFeedOrderScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = ContinuousRoundedRectangle(AppleTokens.Control),
-                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        color = AppTheme.colorScheme.surfaceContainer,
                         tonalElevation = elevation,
                         shadowElevation = elevation,
                     ) {
@@ -165,11 +165,11 @@ fun HomeFeedOrderScreen(
                             val isHidden = row.id in hidden
                             Text(
                                 text = stringResource(row.labelRes),
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = AppTheme.typography.bodyLarge,
                                 color = if (isHidden) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                    AppTheme.colorScheme.onSurfaceVariant
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface
+                                    AppTheme.colorScheme.onSurface
                                 },
                                 overflow = TextOverflow.Ellipsis,
                                 maxLines = 1,
@@ -188,7 +188,7 @@ fun HomeFeedOrderScreen(
                             Icon(
                                 painter = painterResource(R.drawable.drag_handle),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = AppTheme.colorScheme.onSurfaceVariant,
                                 // The handle is the drag target, not a button wrapping it:
                                 // an IconButton put its own 48dp ripple between the finger
                                 // and the handle, which is what made the grab feel late.

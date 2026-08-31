@@ -37,17 +37,17 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.SnackbarHost
+import com.convx.music.ui.ios.compat.SnackbarHost
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SnackbarHostState
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -176,8 +176,8 @@ fun ArtistAlbumsScreen(
 
                     Text(
                         text = pluralStringResource(R.plurals.n_album, albums.size, albums.size),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        style = AppTheme.typography.titleSmall,
+                        color = AppTheme.colorScheme.secondary
                     )
                 }
             }

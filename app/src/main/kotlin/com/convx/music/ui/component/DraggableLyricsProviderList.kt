@@ -14,11 +14,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -81,7 +81,7 @@ fun DraggableLyricsProviderList(
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
                     shape = AbsoluteSmoothCornerShape(12.dp, 60),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    color = AppTheme.colorScheme.surfaceContainer,
                 ) {
                     Row(
                         modifier = Modifier
@@ -97,13 +97,13 @@ fun DraggableLyricsProviderList(
                             Icon(
                                 painter = painterResource(R.drawable.drag_handle),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = AppTheme.colorScheme.onSurfaceVariant,
                             )
                         }
 
                         Text(
                             text = item.name,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = AppTheme.typography.bodyLarge,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )

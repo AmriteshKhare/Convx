@@ -35,27 +35,27 @@ import androidx.compose.foundation.text.KeyboardOptions
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.AlertDialog
+import com.convx.music.ui.ios.compat.AlertDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.OutlinedButton
+import com.convx.music.ui.ios.compat.OutlinedButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.OutlinedTextField
+import com.convx.music.ui.ios.compat.OutlinedTextField
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Slider
+import com.convx.music.ui.ios.compat.Slider
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -121,9 +121,9 @@ import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
+import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -237,8 +237,8 @@ fun LastFMSettings(
                     loginError?.let { error ->
                         Text(
                             text = error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
+                            color = AppTheme.colorScheme.error,
+                            style = AppTheme.typography.bodySmall,
                             modifier = Modifier.padding(top = 8.dp)
                         )
                     }
@@ -256,7 +256,7 @@ fun LastFMSettings(
                             Spacer(modifier = Modifier.size(8.dp))
                             Text(
                                 text = stringResource(R.string.logging_in),
-                                style = MaterialTheme.typography.bodySmall
+                                style = AppTheme.typography.bodySmall
                             )
                         }
                     }
@@ -353,10 +353,10 @@ fun LastFMSettings(
             )
         )
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.account),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.music_note),
                     title = {
                         Text(
@@ -386,10 +386,10 @@ fun LastFMSettings(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.options),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.check),
                     title = { Text(stringResource(R.string.enable_scrobbling)) },
                     enabled = isLoggedIn,
@@ -397,21 +397,12 @@ fun LastFMSettings(
                         androidx.compose.material3.Switch(
                             checked = lastfmScrobbling,
                             onCheckedChange = onlastfmScrobblingChange,
-                            enabled = isLoggedIn,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (lastfmScrobbling) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(androidx.compose.material3.SwitchDefaults.IconSize),
-                                )
-                            }
+                            enabled = isLoggedIn
                         )
                     },
                     onClick = { onlastfmScrobblingChange(!lastfmScrobbling) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.play),
                     title = { Text(stringResource(R.string.lastfm_now_playing)) },
                     enabled = isLoggedIn && lastfmScrobbling,
@@ -419,21 +410,12 @@ fun LastFMSettings(
                         androidx.compose.material3.Switch(
                             checked = useNowPlaying,
                             onCheckedChange = onUseNowPlayingChange,
-                            enabled = isLoggedIn && lastfmScrobbling,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (useNowPlaying) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(androidx.compose.material3.SwitchDefaults.IconSize),
-                                )
-                            }
+                            enabled = isLoggedIn && lastfmScrobbling
                         )
                     },
                     onClick = { onUseNowPlayingChange(!useNowPlaying) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.thumb_up_like),
                     title = { Text(stringResource(R.string.last_fm_send_likes)) },
                     description = { Text(stringResource(R.string.last_fm_send_likes_description)) },
@@ -442,16 +424,7 @@ fun LastFMSettings(
                         androidx.compose.material3.Switch(
                             checked = useSendLikes,
                             onCheckedChange = onUseSendLikes,
-                            enabled = isLoggedIn,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (useSendLikes) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(androidx.compose.material3.SwitchDefaults.IconSize),
-                                )
-                            }
+                            enabled = isLoggedIn
                         )
                     },
                     onClick = { onUseSendLikes(!useSendLikes) }
@@ -506,13 +479,13 @@ fun LastFMSettings(
                 ) {
                     Text(
                         text = stringResource(R.string.scrobble_min_track_duration),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
                     Text(
                         text = makeTimeString((tempMinTrackDuration * 1000).toLong()),
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = AppTheme.typography.bodyLarge,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
@@ -571,13 +544,13 @@ fun LastFMSettings(
                 ) {
                     Text(
                         text = stringResource(R.string.scrobble_delay_percent),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
                     Text(
                         text = stringResource(R.string.sensitivity_percentage, (tempScrobbleDelayPercent * 100).roundToInt()),
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = AppTheme.typography.bodyLarge,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
@@ -636,13 +609,13 @@ fun LastFMSettings(
                 ) {
                     Text(
                         text = stringResource(R.string.scrobble_delay_minutes),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
                     Text(
                         text = makeTimeString((tempScrobbleDelaySeconds * 1000).toLong()),
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = AppTheme.typography.bodyLarge,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
 
@@ -656,22 +629,22 @@ fun LastFMSettings(
             }
         }
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.scrobbling_configuration),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.timer),
                     title = { Text(stringResource(R.string.scrobble_min_track_duration)) },
                     description = { Text(makeTimeString((minTrackDuration * 1000).toLong())) },
                     onClick = { showMinTrackDurationDialog = true }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.timer),
                     title = { Text(stringResource(R.string.scrobble_delay_percent)) },
                     description = { Text(stringResource(R.string.sensitivity_percentage, (scrobbleDelayPercent * 100).roundToInt())) },
                     onClick = { showScrobbleDelayPercentDialog = true }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.timer),
                     title = { Text(stringResource(R.string.scrobble_delay_minutes)) },
                     description = { Text(makeTimeString((scrobbleDelaySeconds * 1000).toLong())) },

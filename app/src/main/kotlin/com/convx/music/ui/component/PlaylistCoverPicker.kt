@@ -15,7 +15,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,7 +57,7 @@ fun rememberPlaylistCoverPicker(
     val database = LocalDatabase.current
     val (darkMode) = rememberEnumPreference(DarkModeKey, DarkMode.AUTO)
     val darkTheme = darkMode == DarkMode.ON || (darkMode == DarkMode.AUTO && isSystemInDarkTheme())
-    val cropColor = MaterialTheme.colorScheme
+    val cropColor = AppTheme.colorScheme
 
     val result = remember { mutableStateOf<Uri?>(null) }
     var pendingCropDestUri by remember { mutableStateOf<Uri?>(null) }

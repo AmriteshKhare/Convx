@@ -8,9 +8,9 @@ package com.convx.music.ui.menu
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -21,8 +21,8 @@ import com.convx.music.LocalListenTogetherManager
 import com.convx.music.R
 import com.convx.music.db.entities.Playlist
 import com.convx.music.db.entities.PlaylistSong
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 
 /**
  * Menu for Local Playlist Screen
@@ -45,7 +45,7 @@ fun LocalPlaylistMenu(
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
 
     val downloadMenuItem = when (downloadState) {
-        Download.STATE_COMPLETED -> Material3MenuItemData(
+        Download.STATE_COMPLETED -> IosMenuItemData(
             title = { Text(stringResource(R.string.remove_download)) },
             description = { Text(stringResource(R.string.remove_download_playlist_desc)) },
             icon = {
@@ -59,7 +59,7 @@ fun LocalPlaylistMenu(
                 onDismiss()
             }
         )
-        Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> Material3MenuItemData(
+        Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> IosMenuItemData(
             title = { Text(stringResource(R.string.downloading)) },
             description = { Text(stringResource(R.string.download_in_progress_desc)) },
             icon = {
@@ -73,7 +73,7 @@ fun LocalPlaylistMenu(
                 onDismiss()
             }
         )
-        else -> Material3MenuItemData(
+        else -> IosMenuItemData(
             title = { Text(stringResource(R.string.action_download)) },
             description = { Text(stringResource(R.string.download_playlist_desc)) },
             icon = {
@@ -93,7 +93,7 @@ fun LocalPlaylistMenu(
 
     val menuItems = buildList {
         add(
-            Material3MenuItemData(
+            IosMenuItemData(
                 title = { Text(stringResource(R.string.edit)) },
                 description = { Text(stringResource(R.string.edit_playlist)) },
                 icon = {
@@ -112,7 +112,7 @@ fun LocalPlaylistMenu(
         // Show sync button only for YouTube playlists
         if (isYouTubePlaylist) {
             add(
-                Material3MenuItemData(
+                IosMenuItemData(
                     title = { Text(stringResource(R.string.action_sync)) },
                     description = { Text(stringResource(R.string.sync_playlist_desc)) },
                     icon = {
@@ -131,7 +131,7 @@ fun LocalPlaylistMenu(
 
         if (!isGuest) {
             add(
-                Material3MenuItemData(
+                IosMenuItemData(
                     title = { Text(stringResource(R.string.add_to_queue)) },
                     description = { Text(stringResource(R.string.add_to_queue_desc)) },
                     icon = {
@@ -152,7 +152,7 @@ fun LocalPlaylistMenu(
 
         if (playlist.playlist.isEditable) {
             add(
-                Material3MenuItemData(
+                IosMenuItemData(
                     title = { Text(stringResource(R.string.modify_with_ai)) },
                     description = { Text(stringResource(R.string.modify_with_ai_desc)) },
                     icon = {
@@ -170,7 +170,7 @@ fun LocalPlaylistMenu(
         }
 
         add(
-            Material3MenuItemData(
+            IosMenuItemData(
                 title = { Text(stringResource(R.string.share)) },
                 description = { Text(stringResource(R.string.share_playlist_desc)) },
                 icon = {
@@ -198,7 +198,7 @@ fun LocalPlaylistMenu(
         )
 
         add(
-            Material3MenuItemData(
+            IosMenuItemData(
                 title = { Text(stringResource(R.string.delete)) },
                 description = { Text(stringResource(R.string.delete_playlist_desc)) },
                 icon = {
@@ -215,7 +215,7 @@ fun LocalPlaylistMenu(
         )
     }
 
-    Material3MenuGroup(items = menuItems)
+    IosMenuGroup(items = menuItems)
 }
 
 /**
@@ -232,7 +232,7 @@ fun AutoPlaylistMenu(
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
 
     val downloadMenuItem = when (downloadState) {
-        Download.STATE_COMPLETED -> Material3MenuItemData(
+        Download.STATE_COMPLETED -> IosMenuItemData(
             title = { Text(stringResource(R.string.remove_download)) },
             description = { Text(stringResource(R.string.remove_download_playlist_desc)) },
             icon = {
@@ -246,7 +246,7 @@ fun AutoPlaylistMenu(
                 onDismiss()
             }
         )
-        Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> Material3MenuItemData(
+        Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> IosMenuItemData(
             title = { Text(stringResource(R.string.downloading)) },
             description = { Text(stringResource(R.string.download_in_progress_desc)) },
             icon = {
@@ -260,7 +260,7 @@ fun AutoPlaylistMenu(
                 onDismiss()
             }
         )
-        else -> Material3MenuItemData(
+        else -> IosMenuItemData(
             title = { Text(stringResource(R.string.action_download)) },
             description = { Text(stringResource(R.string.download_playlist_desc)) },
             icon = {
@@ -276,10 +276,10 @@ fun AutoPlaylistMenu(
         )
     }
 
-    Material3MenuGroup(
+    IosMenuGroup(
         items = listOfNotNull(
             if (!isGuest) {
-                Material3MenuItemData(
+                IosMenuItemData(
                     title = { Text(stringResource(R.string.add_to_queue)) },
                     description = { Text(stringResource(R.string.add_to_queue_desc)) },
                     icon = {
@@ -313,7 +313,7 @@ fun TopPlaylistMenu(
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
 
     val downloadMenuItem = when (downloadState) {
-        Download.STATE_COMPLETED -> Material3MenuItemData(
+        Download.STATE_COMPLETED -> IosMenuItemData(
             title = { Text(stringResource(R.string.remove_download)) },
             description = { Text(stringResource(R.string.remove_download_playlist_desc)) },
             icon = {
@@ -327,7 +327,7 @@ fun TopPlaylistMenu(
                 onDismiss()
             }
         )
-        Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> Material3MenuItemData(
+        Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> IosMenuItemData(
             title = { Text(stringResource(R.string.downloading)) },
             description = { Text(stringResource(R.string.download_in_progress_desc)) },
             icon = {
@@ -341,7 +341,7 @@ fun TopPlaylistMenu(
                 onDismiss()
             }
         )
-        else -> Material3MenuItemData(
+        else -> IosMenuItemData(
             title = { Text(stringResource(R.string.action_download)) },
             description = { Text(stringResource(R.string.download_playlist_desc)) },
             icon = {
@@ -357,10 +357,10 @@ fun TopPlaylistMenu(
         )
     }
 
-    Material3MenuGroup(
+    IosMenuGroup(
         items = listOfNotNull(
             if (!isGuest) {
-                Material3MenuItemData(
+                IosMenuItemData(
                     title = { Text(stringResource(R.string.add_to_queue)) },
                     description = { Text(stringResource(R.string.add_to_queue_desc)) },
                     icon = {
@@ -394,7 +394,7 @@ fun CachePlaylistMenu(
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
 
     val downloadMenuItem = when (downloadState) {
-        Download.STATE_COMPLETED -> Material3MenuItemData(
+        Download.STATE_COMPLETED -> IosMenuItemData(
             title = { Text(stringResource(R.string.remove_download)) },
             description = { Text(stringResource(R.string.remove_download_playlist_desc)) },
             icon = {
@@ -408,7 +408,7 @@ fun CachePlaylistMenu(
                 onDismiss()
             }
         )
-        Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> Material3MenuItemData(
+        Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> IosMenuItemData(
             title = { Text(stringResource(R.string.downloading)) },
             description = { Text(stringResource(R.string.download_in_progress_desc)) },
             icon = {
@@ -422,7 +422,7 @@ fun CachePlaylistMenu(
                 onDismiss()
             }
         )
-        else -> Material3MenuItemData(
+        else -> IosMenuItemData(
             title = { Text(stringResource(R.string.action_download)) },
             description = { Text(stringResource(R.string.download_playlist_desc)) },
             icon = {
@@ -438,10 +438,10 @@ fun CachePlaylistMenu(
         )
     }
 
-    Material3MenuGroup(
+    IosMenuGroup(
         items = listOfNotNull(
             if (!isGuest) {
-                Material3MenuItemData(
+                IosMenuItemData(
                     title = { Text(stringResource(R.string.add_to_queue)) },
                     description = { Text(stringResource(R.string.add_to_queue_desc)) },
                     icon = {

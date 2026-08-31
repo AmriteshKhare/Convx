@@ -22,18 +22,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.AlertDialog
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.ListItem
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedButton
+import com.convx.music.ui.ios.compat.RadioButton
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -204,8 +204,8 @@ private fun EqScreenContent(
     onDeleteProfile: (String) -> Unit
 ) {
     Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = AppTheme.shapes.extraLarge,
+        color = AppTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 6.dp,
         modifier = Modifier
             .fillMaxWidth(0.9f)
@@ -224,7 +224,7 @@ private fun EqScreenContent(
                 Column {
                     Text(
                         text = stringResource(R.string.equalizer_header),
-                        style = MaterialTheme.typography.headlineSmall
+                        style = AppTheme.typography.headlineSmall
                     )
                     Text(
                         text = pluralStringResource(
@@ -232,8 +232,8 @@ private fun EqScreenContent(
                             count = profiles.size,
                             profiles.size
                         ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Row {
@@ -301,13 +301,13 @@ private fun EqScreenContent(
                                     painter = painterResource(R.drawable.equalizer),
                                     contentDescription = null,
                                     modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
                                     text = stringResource(R.string.no_profiles),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = AppTheme.typography.titleMedium,
+                                    color = AppTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(onClick = onImportCustomEQ) {
@@ -388,7 +388,7 @@ private fun EQProfileItem(
                 Icon(
                     painter = painterResource(R.drawable.delete),
                     contentDescription = stringResource(R.string.delete_profile_desc),
-                    tint = MaterialTheme.colorScheme.error
+                    tint = AppTheme.colorScheme.error
                 )
             }
         },

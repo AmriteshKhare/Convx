@@ -18,15 +18,22 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ProvideTextStyle
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Slider
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.runtime.CompositionLocalProvider
+import com.convx.music.ui.ios.component.IosChevron
+import com.convx.music.ui.ios.component.IosCheckmark
+import com.convx.music.ui.ios.component.IosSlider
+import com.convx.music.ui.ios.component.IosToggle
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.foundation.IosMetrics
+import com.convx.music.ui.ios.foundation.IosTheme
+import com.convx.music.ui.ios.foundation.iosRowPress
+import com.convx.music.ui.ios.foundation.LocalIosContentColor
+import com.convx.music.ui.ios.foundation.LocalIosTextStyle
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.ProvideTextStyle
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -57,58 +64,64 @@ fun PreferenceEntry(
     onClick: (() -> Unit)? = null,
     isEnabled: Boolean = true,
 ) {
+    val colors = IosTheme.colors
+
     Column(modifier.fillMaxWidth()) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-        Modifier
-            .fillMaxWidth()
-            .clickable(
-                enabled = isEnabled && onClick != null,
-                onClick = onClick ?: {},
-            ).alpha(if (isEnabled) 1f else 0.5f)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-    ) {
-        if (icon != null) {
-            Box(
-                modifier = Modifier.padding(horizontal = 4.dp),
-            ) {
-                icon()
-            }
-
-            Spacer(Modifier.width(12.dp))
-        }
-
-        Column(
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.weight(1f),
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .iosRowPress(enabled = isEnabled, onClick = onClick)
+                .alpha(if (isEnabled) 1f else 0.5f)
+                .defaultMinSize(minHeight = IosMetrics.ListRowHeight)
+                .padding(horizontal = 16.dp, vertical = 11.dp),
         ) {
-            ProvideTextStyle(MaterialTheme.typography.titleMedium) {
-                title()
+            if (icon != null) {
+                Box(Modifier.size(IosMetrics.IconTileSize), contentAlignment = Alignment.Center) {
+                    icon()
+                }
+                Spacer(Modifier.width(12.dp))
             }
 
-            if (description != null) {
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
+            Column(
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.weight(1f),
+            ) {
+                CompositionLocalProvider(
+                    LocalIosContentColor provides colors.label,
+                    LocalIosTextStyle provides IosTheme.typography.body,
+                    LocalContentColor provides colors.label,
+                ) {
+                    ProvideTextStyle(IosTheme.typography.body) { title() }
+                }
+
+                if (description != null) {
+                    Text(
+                        text = description,
+                        style = IosTheme.typography.footnote,
+                        color = colors.secondaryLabel,
+                    )
+                }
+
+                content?.invoke()
             }
 
-            content?.invoke()
+            if (trailingContent != null) {
+                Spacer(Modifier.width(12.dp))
+                trailingContent()
+            } else if (onClick != null) {
+                // A row that navigates gets the disclosure chevron; one that toggles
+                // in place already says so with its own control.
+                Spacer(Modifier.width(8.dp))
+                IosChevron()
+            }
         }
 
-        if (trailingContent != null) {
-            Spacer(Modifier.width(12.dp))
-
-            trailingContent()
-        }
-    }
-        // Flat-list hairline divider, matching the shared list-row style.
         HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            color = MaterialTheme.colorScheme.outlineVariant,
-            thickness = 0.5.dp,
+            // Inset to the text column, clearing the icon gutter — the iOS rule.
+            modifier = Modifier.padding(start = if (icon != null) 57.dp else 16.dp),
+            color = colors.separator,
+            thickness = IosMetrics.SeparatorThickness,
         )
     }
 }
@@ -142,16 +155,14 @@ fun <T> ListPreference(
                             onValueSelected(value)
                         }.padding(horizontal = 16.dp, vertical = 12.dp),
                 ) {
-                    RadioButton(
-                        selected = value == selectedValue,
-                        onClick = null,
-                    )
-
                     Text(
                         text = valueText(value),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(start = 16.dp),
+                        style = IosTheme.typography.body,
+                        color = IosTheme.colors.label,
+                        modifier = Modifier.weight(1f),
                     )
+
+                    if (value == selectedValue) IosCheckmark()
                 }
             }
         }
@@ -205,19 +216,12 @@ fun SwitchPreference(
         description = description,
         icon = icon,
         trailingContent = {
-            Switch(
+            // The iOS switch carries no glyph in its knob — the fill colour is the
+            // whole signal.
+            IosToggle(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 enabled = isEnabled,
-                thumbContent = {
-                    Icon(
-                        painter = painterResource(
-                            id = if (checked) R.drawable.check else R.drawable.close
-                        ),
-                        contentDescription = null,
-                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                    )
-                }
             )
         },
         onClick = { onCheckedChange(!checked) },
@@ -293,7 +297,7 @@ fun SliderPreference(
                         text = stringResource(R.string.history_duration),
                         overflow = TextOverflow.Ellipsis,
                         maxLines = 1,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = IosTheme.typography.headline,
                     )
                 }
             },
@@ -317,12 +321,12 @@ fun SliderPreference(
                             sliderValue.roundToInt(),
                             sliderValue.roundToInt()
                         ),
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = IosTheme.typography.body,
                     )
 
                     Spacer(Modifier.height(16.dp))
 
-                    Slider(
+                    IosSlider(
                         value = sliderValue,
                         onValueChange = { sliderValue = it },
                         valueRange = 15f..60f,
@@ -349,9 +353,9 @@ fun PreferenceGroupTitle(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(16.dp),
+        text = title,
+        style = IosTheme.typography.subheadline,
+        color = IosTheme.colors.secondaryLabel,
+        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
     )
 }

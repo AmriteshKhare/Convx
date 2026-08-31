@@ -26,19 +26,19 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import com.convx.music.constants.ThumbnailRoundedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.DropdownMenu
+import com.convx.music.ui.ios.compat.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedButton
+import com.convx.music.ui.ios.compat.OutlinedTextField
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -173,7 +173,7 @@ fun LocalMusicScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.filter_local),
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = AppTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f),
                     )
@@ -243,8 +243,8 @@ fun LocalMusicScreen(
                 if (totalCount > 0) {
                     Text(
                         text = "${displaySongs.size} songs \u00b7 ${displayAlbums.size} albums \u00b7 ${displayArtists.size} artists",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
@@ -272,8 +272,8 @@ fun LocalMusicScreen(
                 ) {
                     Text(
                         text = "Grant permission to access your music library",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyLarge,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(12.dp))
                     Button(
@@ -300,8 +300,8 @@ fun LocalMusicScreen(
                 ) {
                     Text(
                         text = "No local music found",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyLarge,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(12.dp))
                     Button(
@@ -327,8 +327,8 @@ fun LocalMusicScreen(
                     Spacer(Modifier.width(12.dp))
                     Text(
                         text = "Scanning device...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -347,13 +347,13 @@ fun LocalMusicScreen(
                 ) {
                     Text(
                         text = "Found ${result.newSongs} new songs (${result.totalFound} total)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodySmall,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                     )
                     OutlinedButton(
                         onClick = { viewModel.scanDevice(context) },
                     ) {
-                        Text("Rescan", style = MaterialTheme.typography.labelMedium)
+                        Text("Rescan", style = AppTheme.typography.labelMedium)
                     }
                 }
             }
@@ -453,8 +453,8 @@ fun LocalMusicScreen(
                 item(key = "songs_more") {
                     Text(
                         text = "+ ${displaySongs.size - LocalMusicSongRowCap} more songs",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.primary,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -554,14 +554,14 @@ private fun SectionHeader(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = "($count)",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -592,7 +592,7 @@ private fun SongListItem(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(AppTheme.colorScheme.surfaceVariant),
         )
 
         Spacer(Modifier.width(12.dp))
@@ -601,15 +601,15 @@ private fun SongListItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
             )
             Text(
                 text = song.artists.joinToString { it.name }.ifEmpty { "Unknown Artist" },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -620,8 +620,8 @@ private fun SongListItem(
         if (song.song.duration > 0) {
             Text(
                 text = formatDuration(song.song.duration),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -651,7 +651,7 @@ private fun AlbumListItem(
             modifier = Modifier
                 .size(56.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(AppTheme.colorScheme.surfaceVariant),
         )
 
         Spacer(Modifier.width(12.dp))
@@ -659,7 +659,7 @@ private fun AlbumListItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = album.title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 softWrap = false,
@@ -667,8 +667,8 @@ private fun AlbumListItem(
             )
             Text(
                 text = "${album.album.songCount} songs${if (album.album.year != null) " \u00b7 ${album.album.year}" else ""}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
         }
@@ -699,7 +699,7 @@ private fun ArtistListItem(
             modifier = Modifier
                 .size(48.dp)
                 .clip(ThumbnailRoundedShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(AppTheme.colorScheme.surfaceVariant),
         )
 
         Spacer(Modifier.width(12.dp))
@@ -707,7 +707,7 @@ private fun ArtistListItem(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = artist.artist.name,
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 softWrap = false,
@@ -715,8 +715,8 @@ private fun ArtistListItem(
             )
             Text(
                 text = "${artist.songCount} songs",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

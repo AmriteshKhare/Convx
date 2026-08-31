@@ -16,8 +16,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.convx.music.R
 
-import androidx.compose.material3.LocalContentColor
+import com.convx.music.ui.ios.compat.LocalContentColor
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.LocalAccentTextColor
 import androidx.compose.ui.graphics.Color
@@ -72,7 +72,7 @@ fun NavigationTitle(
                 label?.let { label ->
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = AppTheme.typography.labelLarge,
                         color = contentColor.copy(alpha = 0.6f),
                         overflow = TextOverflow.Ellipsis,
                     )

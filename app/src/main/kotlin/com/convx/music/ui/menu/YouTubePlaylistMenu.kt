@@ -22,17 +22,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.ListItem
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -73,8 +72,8 @@ import com.convx.music.models.toMediaMetadata
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.component.ListDialog
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.ui.component.YouTubeListItem
@@ -189,7 +188,7 @@ fun YouTubePlaylistMenu(
                 ) {
                     Icon(
                         painter = painterResource(if (dbPlaylist?.playlist?.bookmarkedAt != null) R.drawable.favorite else R.drawable.favorite_border),
-                        tint = if (dbPlaylist?.playlist?.bookmarkedAt != null) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                        tint = if (dbPlaylist?.playlist?.bookmarkedAt != null) AppTheme.colorScheme.error else LocalContentColor.current,
                         contentDescription = null
                     )
                 }
@@ -229,7 +228,7 @@ fun YouTubePlaylistMenu(
                         R.string.remove_download_playlist_confirm,
                         playlist.title
                     ),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp)
                 )
             },
@@ -283,7 +282,7 @@ fun YouTubePlaylistMenu(
                         Image(
                             painter = painterResource(R.drawable.close),
                             contentDescription = null,
-                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
+                            colorFilter = ColorFilter.tint(AppTheme.colorScheme.onBackground),
                             modifier = Modifier.size(ListThumbnailSize),
                         )
                     },
@@ -344,7 +343,7 @@ fun YouTubePlaylistMenu(
                                             painter = painterResource(R.drawable.play),
                                             contentDescription = null,
                                             modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            tint = AppTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     text = stringResource(R.string.play),
@@ -363,7 +362,7 @@ fun YouTubePlaylistMenu(
                                             painter = painterResource(R.drawable.shuffle),
                                             contentDescription = null,
                                             modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            tint = AppTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     text = stringResource(R.string.shuffle),
@@ -382,7 +381,7 @@ fun YouTubePlaylistMenu(
                                             painter = painterResource(R.drawable.radio),
                                             contentDescription = null,
                                             modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            tint = AppTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     text = stringResource(R.string.start_radio),
@@ -400,10 +399,10 @@ fun YouTubePlaylistMenu(
         }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOfNotNull(
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.play_next)) },
                             description = { Text(text = stringResource(R.string.play_next_desc)) },
                             icon = {
@@ -436,7 +435,7 @@ fun YouTubePlaylistMenu(
                         )
                     } else null,
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.add_to_queue)) },
                             description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                             icon = {
@@ -465,7 +464,7 @@ fun YouTubePlaylistMenu(
                             }
                         )
                     } else null,
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = { Text(text = stringResource(R.string.add_to_playlist)) },
                         description = { Text(text = stringResource(R.string.add_to_playlist_desc)) },
                         icon = {
@@ -478,7 +477,7 @@ fun YouTubePlaylistMenu(
                             showChoosePlaylistDialog = true
                         }
                     ),
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = { 
                             Text(
                                 text = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial" 
@@ -508,13 +507,13 @@ fun YouTubePlaylistMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     if (songs.isNotEmpty()) {
                         add(
                             when (downloadState) {
                                 Download.STATE_COMPLETED -> {
-                                    Material3MenuItemData(
+                                    IosMenuItemData(
                                         title = {
                                             Text(
                                                 text = stringResource(R.string.remove_download)
@@ -532,7 +531,7 @@ fun YouTubePlaylistMenu(
                                     )
                                 }
                                 Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                                    Material3MenuItemData(
+                                    IosMenuItemData(
                                         title = { Text(text = stringResource(R.string.downloading)) },
                                         icon = {
                                             CircularProgressIndicator(
@@ -553,7 +552,7 @@ fun YouTubePlaylistMenu(
                                     )
                                 }
                                 else -> {
-                                    Material3MenuItemData(
+                                    IosMenuItemData(
                                         title = { Text(text = stringResource(R.string.action_download)) },
                                         description = { Text(text = stringResource(R.string.download_desc)) },
                                         icon = {
@@ -575,7 +574,7 @@ fun YouTubePlaylistMenu(
                         )
                     }
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.share)) },
                             description = { Text(text = stringResource(R.string.share_desc)) },
                             icon = {
@@ -597,7 +596,7 @@ fun YouTubePlaylistMenu(
                     )
                     if (canSelect) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.select)) },
                                 icon = {
                                     Icon(

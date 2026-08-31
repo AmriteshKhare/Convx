@@ -10,19 +10,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -34,15 +34,14 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
-import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
-import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.rememberArtworkTint
-import com.convx.music.ui.utils.bounceClick
+import com.convx.music.ui.utils.combinedBounceClick
 
 /** Square artwork edge. The card is this wide; one page of the spotlight row. */
 val SpotlightCardArtworkSize = 240.dp
@@ -92,33 +91,51 @@ fun SpotlightCard(
     subtitle: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     artworkSize: Dp = SpotlightCardArtworkSize,
     infoHeight: Dp = SpotlightCardInfoHeight,
+    // When 2+ URLs are given, the artwork is a 2x2 collage of them instead of one
+    // image — real chart branding (its top songs) rather than a single arbitrary
+    // thumbnail standing in for the whole chart. No reflection in that case: there
+    // is no single source image left to mirror.
+    collageUrls: List<String> = emptyList(),
 ) {
-    val tints = rememberArtworkTint(thumbnailUrl)
+    val isCollage = collageUrls.size >= 2
+    val tints = rememberArtworkTint(collageUrls.firstOrNull() ?: thumbnailUrl)
     // Well short of black: the card colour still has to read as the artwork colour
     // where the reflection fades out over it.
     val cardColor = remember(tints) {
         lerp(tints.firstOrNull() ?: Color.Black, Color.Black, 0.48f)
     }
-    val reflectionsSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val reflectionsSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !isCollage
 
+    val cardShape = rememberHomeCardShape()
     Box(
         modifier = modifier
             .width(artworkSize)
             .height(artworkSize + infoHeight)
-            .clip(ContinuousRoundedRectangle(AppleTokens.CardCorner))
+            .clip(cardShape)
             .background(cardColor)
-            .bounceClick(onClick = onClick),
+            .combinedBounceClick(onLongClick = onLongClick, onClick = onClick)
+            .homeCardRim(cardShape),
     ) {
-        AsyncImage(
-            model = thumbnailUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .size(artworkSize),
-        )
+        if (isCollage) {
+            ChartCollageArt(
+                urls = collageUrls,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(artworkSize),
+            )
+        } else {
+            AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .size(artworkSize),
+            )
+        }
 
         if (reflectionsSupported) {
             SpotlightReflection(
@@ -136,7 +153,7 @@ fun SpotlightCard(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 maxLines = 1,
@@ -144,11 +161,32 @@ fun SpotlightCard(
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = AppTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.68f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+/**
+ * A 2x2 grid of up to 4 thumbnails filling one square — the "top global" chart's own
+ * branding (a glance at what's actually on it) rather than one song's cover standing
+ * in for the whole chart. Fewer than 4 URLs still tile evenly across the 2x2 cells,
+ * repeating the last one rather than leaving a cell blank.
+ */
+@Composable
+private fun ChartCollageArt(urls: List<String>, modifier: Modifier = Modifier) {
+    val cells = remember(urls) { List(4) { i -> urls.getOrNull(i) ?: urls.last() } }
+    Column(modifier = modifier) {
+        Row(modifier = Modifier.weight(1f)) {
+            AsyncImage(cells[0], null, Modifier.weight(1f).fillMaxSize(), contentScale = ContentScale.Crop)
+            AsyncImage(cells[1], null, Modifier.weight(1f).fillMaxSize(), contentScale = ContentScale.Crop)
+        }
+        Row(modifier = Modifier.weight(1f)) {
+            AsyncImage(cells[2], null, Modifier.weight(1f).fillMaxSize(), contentScale = ContentScale.Crop)
+            AsyncImage(cells[3], null, Modifier.weight(1f).fillMaxSize(), contentScale = ContentScale.Crop)
         }
     }
 }
@@ -166,6 +204,11 @@ private fun BoxScope.SpotlightReflection(
     val saturate = remember {
         ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(ReflectionSaturation) })
     }
+    // BlurredBackdropImage projects its radius assuming the result is stretched to the
+    // full screen width; this one is stretched to the card's width instead, so scale the
+    // radius up by however much narrower that is or the reflection comes out sharp.
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val projectedBlur = ReflectionBlurRadius.value * (screenWidthDp / artworkSize.value)
     Box(
         modifier = Modifier
             .align(Alignment.BottomStart)
@@ -191,15 +234,18 @@ private fun BoxScope.SpotlightReflection(
                 )
             },
     ) {
-        AsyncImage(
+        // Baked once per artwork, not a live RenderEffect: a non-null RenderEffect is
+        // re-evaluated on every composite, so the reflection -- whose pixels are fixed the
+        // moment the thumbnail loads -- was costing a blur pass per visible card per frame
+        // for the whole life of the Home row. Same helper HeroArtwork's backdrop uses.
+        BlurredBackdropImage(
             model = thumbnailUrl,
-            contentDescription = null,
+            screenBlurRadiusDp = projectedBlur,
             contentScale = ContentScale.Crop,
             colorFilter = saturate,
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { scaleY = -1f }
-                .blur(ReflectionBlurRadius),
+                .graphicsLayer { scaleY = -1f },
         )
         Box(
             modifier = Modifier

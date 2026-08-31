@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.ios.compat.AppTheme
+
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +44,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.*
 // Explicit import wins over the star import above, so the two toggles below
 // pick up the glass switch without touching their call sites.
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
+import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.*
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -167,10 +169,10 @@ fun AccountSettingsScreen(
                 .padding(horizontal = 16.dp)
         ) {
             // Account Profile Section
-            Material3SettingsGroup(
+            IosSettingsGroup(
                 title = stringResource(R.string.settings),
                 items = listOf(
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = if (isLoggedIn && !accountImageUrl.isNullOrBlank()) null else painterResource(R.drawable.login),
                         title = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -187,8 +189,8 @@ fun AccountSettingsScreen(
                                 }
                                 Text(
                                     text = if (isLoggedIn) accountName else stringResource(R.string.login),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                                    color = AppTheme.colorScheme.primary,
+                                    style = AppTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
                         },
@@ -202,8 +204,8 @@ fun AccountSettingsScreen(
                                     showLogoutDialog = true
                                 },
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                    containerColor = AppTheme.colorScheme.surfaceContainer,
+                                    contentColor = AppTheme.colorScheme.onSurface
                                 )
                             ) {
                                 Text(stringResource(R.string.action_logout))
@@ -220,10 +222,10 @@ fun AccountSettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (isLoggedIn && savedAccounts.size > 1) {
-                Material3SettingsGroup(
+                IosSettingsGroup(
                     title = stringResource(R.string.saved_accounts_title),
                     items = savedAccounts.map { account ->
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             leadingContent = {
                                 AsyncImage(
                                     model = account.thumbnailUrl,
@@ -248,9 +250,9 @@ fun AccountSettingsScreen(
             }
 
             if (isLoggedIn) {
-                Material3SettingsGroup(
+                IosSettingsGroup(
                     items = listOf(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             icon = painterResource(R.drawable.sync),
                             title = { Text(stringResource(R.string.switch_channel_action)) },
                             description = { Text(stringResource(R.string.switch_channel_action_desc)) },
@@ -263,10 +265,10 @@ fun AccountSettingsScreen(
             }
 
             // Token / Advanced Login Section
-            Material3SettingsGroup(
+            IosSettingsGroup(
                 title = stringResource(R.string.advanced_login),
                 items = listOf(
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = painterResource(R.drawable.token),
                         title = {
                             Text(
@@ -290,10 +292,10 @@ fun AccountSettingsScreen(
 
             // Sync & Content Section
             if (isLoggedIn) {
-                Material3SettingsGroup(
+                IosSettingsGroup(
                     title = stringResource(R.string.settings_section_player_content),
                     items = listOf(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             icon = painterResource(R.drawable.add_circle),
                             title = { Text(stringResource(R.string.more_content)) },
                             trailingContent = {
@@ -302,15 +304,6 @@ fun AccountSettingsScreen(
                                     onCheckedChange = {
                                         YouTube.useLoginForBrowse = it
                                         onUseLoginForBrowseChange(it)
-                                    },
-                                    thumbContent = {
-                                        Icon(
-                                            painter = painterResource(
-                                                id = if (useLoginForBrowse) R.drawable.check else R.drawable.close
-                                            ),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(SwitchDefaults.IconSize),
-                                        )
                                     }
                                 )
                             },
@@ -320,22 +313,13 @@ fun AccountSettingsScreen(
                                 onUseLoginForBrowseChange(newValue)
                             }
                         ),
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             icon = painterResource(R.drawable.cached),
                             title = { Text(stringResource(R.string.yt_sync)) },
                             trailingContent = {
                                 Switch(
                                     checked = ytmSync,
-                                    onCheckedChange = onYtmSyncChange,
-                                    thumbContent = {
-                                        Icon(
-                                            painter = painterResource(
-                                                id = if (ytmSync) R.drawable.check else R.drawable.close
-                                            ),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(SwitchDefaults.IconSize),
-                                        )
-                                    }
+                                    onCheckedChange = onYtmSyncChange
                                 )
                             },
                             onClick = { onYtmSyncChange(!ytmSync) }
@@ -347,31 +331,22 @@ fun AccountSettingsScreen(
             }
 
             // ListenBrainz Section
-            Material3SettingsGroup(
+            IosSettingsGroup(
                 title = stringResource(R.string.listenbrainz_scrobbling),
                 items = listOf(
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = painterResource(R.drawable.edit),
                         title = { Text(stringResource(R.string.listenbrainz_scrobbling)) },
                         description = { Text(stringResource(R.string.listenbrainz_scrobbling_desc)) },
                         trailingContent = {
                             Switch(
                                 checked = listenBrainzEnabled,
-                                onCheckedChange = onListenBrainzEnabledChange,
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (listenBrainzEnabled) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                    )
-                                }
+                                onCheckedChange = onListenBrainzEnabledChange
                             )
                         },
                         onClick = { onListenBrainzEnabledChange(!listenBrainzEnabled) }
                     ),
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = painterResource(R.drawable.edit),
                         title = {
                             Text(
@@ -390,11 +365,11 @@ fun AccountSettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Quick Links Section
-            Material3SettingsGroup(
+            IosSettingsGroup(
                 title = stringResource(R.string.integrations),
                 items = buildList {
                     add(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             icon = painterResource(R.drawable.integration),
                             title = { Text(stringResource(R.string.integrations)) },
                             onClick = { navController.navigate("settings/integrations") }
@@ -507,7 +482,7 @@ fun AccountSettingsScreen(
                             modifier = Modifier.weight(1f),
                             shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
                             colors = ToggleButtonDefaults.toggleButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
+                                contentColor = AppTheme.colorScheme.error
                             )
                         ) {
                             Text(stringResource(R.string.logout_clear_data))
@@ -531,7 +506,7 @@ fun AccountSettingsScreen(
             ) {
                 Text(
                     text = stringResource(R.string.logout_dialog_message),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.typography.bodyMedium,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }

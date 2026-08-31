@@ -32,13 +32,13 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Slider
+import com.convx.music.ui.ios.compat.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,8 +67,8 @@ import com.convx.music.constants.LibraryBackgroundModeKey
 import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.component.HomeVideoBackground
 import com.convx.music.ui.component.rememberHomeBackgroundTargetSize
-import com.convx.music.ui.component.Material3SettingsGroup
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsGroup
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
@@ -241,7 +241,7 @@ fun HomeBackgroundControls() {
         ) {
             Text(
                 text = stringResource(R.string.home_background_video_warning),
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.typography.bodyMedium,
                 modifier = Modifier.padding(16.dp),
             )
         }
@@ -257,7 +257,7 @@ fun HomeBackgroundControls() {
                 .aspectRatio(16f / 10f)
                 .padding(vertical = 12.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                .background(AppTheme.colorScheme.surfaceContainerHighest),
         ) {
             if (path.isNotEmpty() && isVideo) {
                 HomeVideoBackground(path = path, blur = blur, dim = dim)
@@ -285,37 +285,28 @@ fun HomeBackgroundControls() {
             } else {
                 Text(
                     text = stringResource(R.string.home_background_image_none),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
         }
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.home_background),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.home_background_enable)) },
                     trailingContent = {
                         Switch(
                             checked = enabled,
-                            onCheckedChange = onEnabledChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (enabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
+                            onCheckedChange = onEnabledChange
                         )
                     },
                     onClick = { onEnabledChange(!enabled) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.image),
                     title = { Text(stringResource(R.string.home_background_image)) },
                     description = {
@@ -333,44 +324,35 @@ fun HomeBackgroundControls() {
                         )
                     }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.sliders),
                     title = { Text(stringResource(R.string.home_background_blur)) },
                     onClick = { showBlurDialog = true }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.home_background_dim)) },
                     onClick = { showDimDialog = true }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.sliders),
                     title = { Text(stringResource(R.string.home_background_quality)) },
                     description = { Text(stringResource(R.string.home_background_quality_desc)) },
                     onClick = { showQualityDialog = true }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.home_background_animate)) },
                     description = { Text(stringResource(R.string.home_background_animate_desc)) },
                     trailingContent = {
                         Switch(
                             checked = animate,
-                            onCheckedChange = onAnimateChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (animate) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
+                            onCheckedChange = onAnimateChange
                         )
                     },
                     onClick = { onAnimateChange(!animate) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.delete),
                     title = { Text(stringResource(R.string.home_background_remove)) },
                     onClick = {
@@ -393,10 +375,10 @@ fun HomeBackgroundControls() {
             LibraryBackgroundModeKey,
             LibraryBackgroundMode.THUMBNAIL_BLUR,
         )
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.library_background),
             items = LibraryBackgroundMode.entries.map { mode ->
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(
                         when (mode) {
                             LibraryBackgroundMode.PLAIN -> R.drawable.close
@@ -440,8 +422,8 @@ fun HomeBackgroundControls() {
             }
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-                Text(text = stringResource(R.string.home_background_blur), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
-                Text(text = "%.0f".format(tempValue), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
+                Text(text = stringResource(R.string.home_background_blur), style = AppTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+                Text(text = "%.0f".format(tempValue), style = AppTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
                 Slider(value = tempValue, onValueChange = { tempValue = it }, valueRange = 0f..50f, modifier = Modifier.fillMaxWidth())
             }
         }
@@ -459,8 +441,8 @@ fun HomeBackgroundControls() {
             }
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-                Text(text = stringResource(R.string.home_background_dim), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
-                Text(text = "%.0f%%".format(tempValue * 100), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
+                Text(text = stringResource(R.string.home_background_dim), style = AppTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+                Text(text = "%.0f%%".format(tempValue * 100), style = AppTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
                 Slider(value = tempValue, onValueChange = { tempValue = it }, valueRange = 0f..1f, modifier = Modifier.fillMaxWidth())
             }
         }
@@ -478,13 +460,13 @@ fun HomeBackgroundControls() {
             }
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-                Text(text = stringResource(R.string.home_background_quality), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
-                Text(text = "%.0f%%".format(tempValue * 100), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
+                Text(text = stringResource(R.string.home_background_quality), style = AppTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+                Text(text = "%.0f%%".format(tempValue * 100), style = AppTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
                 Slider(value = tempValue, onValueChange = { tempValue = it }, valueRange = 0.3f..1f, modifier = Modifier.fillMaxWidth())
                 Text(
                     text = stringResource(R.string.home_background_quality_reapply_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodySmall,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }

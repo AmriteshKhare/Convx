@@ -43,25 +43,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Card
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.CardDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.RadioButton
+import com.convx.music.ui.ios.compat.RadioButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Scaffold
+import com.convx.music.ui.ios.compat.Scaffold
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
+import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -99,9 +99,9 @@ import com.convx.music.ui.component.ExpressiveIconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
+import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.ModernSwitch
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -147,25 +147,25 @@ fun CanvasSelection(
         // Description text
         Text(
             text = stringResource(R.string.vivimusic_canvas_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 24.dp, top = 16.dp)
         )
 
         // Large capsule banner for main toggle
         val containerColor by animateColorAsState(
             targetValue = if (canvasThumbnailAnimation) {
-                MaterialTheme.colorScheme.primaryContainer
+                AppTheme.colorScheme.primaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             },
             label = "containerColor"
         )
 
         val contentColor = if (canvasThumbnailAnimation) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            AppTheme.colorScheme.onPrimaryContainer
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            AppTheme.colorScheme.onSurfaceVariant
         }
 
         Card(
@@ -183,7 +183,7 @@ fun CanvasSelection(
             ) {
                 Text(
                     text = stringResource(R.string.use_canvas),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     color = contentColor
                 )
                 ModernSwitch(
@@ -196,10 +196,10 @@ fun CanvasSelection(
         Spacer(modifier = Modifier.height(24.dp))
 
         // Options settings group
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.canvas_source),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     leadingContent = {
                         RadioButton(
                             selected = canvasSource == CanvasSource.AUTO,
@@ -212,7 +212,7 @@ fun CanvasSelection(
                     enabled = canvasThumbnailAnimation,
                     onClick = { onCanvasSourceChange(CanvasSource.AUTO) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     leadingContent = {
                         RadioButton(
                             selected = canvasSource == CanvasSource.ECHO_MUSIC,
@@ -225,7 +225,7 @@ fun CanvasSelection(
                     enabled = canvasThumbnailAnimation,
                     onClick = { onCanvasSourceChange(CanvasSource.ECHO_MUSIC) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     leadingContent = {
                         RadioButton(
                             selected = canvasSource == CanvasSource.APPLE_MUSIC,
@@ -238,7 +238,7 @@ fun CanvasSelection(
                     enabled = canvasThumbnailAnimation,
                     onClick = { onCanvasSourceChange(CanvasSource.APPLE_MUSIC) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     leadingContent = {
                         RadioButton(
                             selected = canvasSource == CanvasSource.VIVIMUSIC,
@@ -251,7 +251,7 @@ fun CanvasSelection(
                     enabled = canvasThumbnailAnimation,
                     onClick = { onCanvasSourceChange(CanvasSource.VIVIMUSIC) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     leadingContent = {
                         RadioButton(
                             selected = canvasSource == CanvasSource.TIDAL,

@@ -34,16 +34,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.ModalBottomSheet
+import com.convx.music.ui.ios.compat.Slider
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -304,7 +304,7 @@ fun PlayerThemeScreen(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(Color(staticColorInt))
-                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        .border(1.dp, AppTheme.colorScheme.outline, CircleShape)
                 )
             }
         }
@@ -320,7 +320,7 @@ fun PlayerThemeScreen(
                         .height(28.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .tiltedGradient(gradientStops, gradientAngle)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        .border(1.dp, AppTheme.colorScheme.outline, RoundedCornerShape(8.dp))
                 )
             }
         }
@@ -350,8 +350,8 @@ fun PlayerThemeScreen(
         // SectionTitle(stringResource(R.string.player_theme_layout))
         // Text(
         //     text = stringResource(R.string.player_theme_layout_desc),
-        //     style = MaterialTheme.typography.bodySmall,
-        //     color = MaterialTheme.colorScheme.onSurfaceVariant,
+        //     style = AppTheme.typography.bodySmall,
+        //     color = AppTheme.colorScheme.onSurfaceVariant,
         //     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
         // )
         // PlayerLayoutList(
@@ -433,7 +433,7 @@ private fun GradientSheet(
         ) {
             Text(
                 text = stringResource(R.string.player_theme_custom_gradient),
-                style = MaterialTheme.typography.titleLarge,
+                style = AppTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
 
@@ -447,7 +447,7 @@ private fun GradientSheet(
             )
 
             Spacer(Modifier.height(20.dp))
-            Text(stringResource(R.string.player_theme_stops), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.player_theme_stops), style = AppTheme.typography.titleSmall)
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 working.forEachIndexed { index, color ->
@@ -456,7 +456,7 @@ private fun GradientSheet(
                             .size(40.dp)
                             .clip(CircleShape)
                             .background(color)
-                            .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                            .border(2.dp, AppTheme.colorScheme.outline, CircleShape)
                             .clickable { editingIndex = index }
                     )
                 }
@@ -466,7 +466,7 @@ private fun GradientSheet(
                         Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                            .border(2.dp, AppTheme.colorScheme.outline, CircleShape)
                             .clickable {
                                 working.add(working.lastOrNull() ?: Color.Black)
                                 onStopsChange(working.toList())
@@ -494,7 +494,7 @@ private fun GradientSheet(
             Spacer(Modifier.height(12.dp))
             Text(
                 text = stringResource(R.string.player_theme_tilt, angle.roundToInt()),
-                style = MaterialTheme.typography.titleSmall,
+                style = AppTheme.typography.titleSmall,
             )
             Slider(
                 value = angle,
@@ -542,10 +542,10 @@ private fun GradientSheet(
 private fun GradientPresetChip(label: String, onClick: () -> Unit) {
     Text(
         text = label,
-        style = MaterialTheme.typography.labelLarge,
+        style = AppTheme.typography.labelLarge,
         modifier = Modifier
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(AppTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     )
@@ -559,6 +559,7 @@ private fun backgroundLabel(style: PlayerBackgroundStyle) = when (style) {
     PlayerBackgroundStyle.GLOW_ANIMATED -> stringResource(R.string.glow_animated)
     PlayerBackgroundStyle.APPLE_MUSIC -> stringResource(R.string.apple_music)
     PlayerBackgroundStyle.LIVE_MESH -> stringResource(R.string.live_mesh)
+    PlayerBackgroundStyle.BITCHORD_MESH -> stringResource(R.string.player_theme_colour_mesh)
     PlayerBackgroundStyle.STATIC -> stringResource(R.string.player_theme_static)
     PlayerBackgroundStyle.CUSTOM_GRADIENT -> stringResource(R.string.player_theme_custom_gradient)
 }
@@ -575,7 +576,7 @@ private fun sliderLabel(style: SliderStyle) = when (style) {
 private fun SectionTitle(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
+        style = AppTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
     )
@@ -585,8 +586,8 @@ private fun SectionTitle(text: String) {
 private fun LockedNote(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = AppTheme.typography.bodySmall,
+        color = AppTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
     )
 }
@@ -627,7 +628,7 @@ private fun PlayerLayoutList(
 
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = AppTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier,
     ) {
         LazyColumn(
@@ -643,7 +644,7 @@ private fun PlayerLayoutList(
                             .fillMaxWidth()
                             .alpha(if (isHidden) 0.4f else 1f)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                            .background(AppTheme.colorScheme.surfaceContainerLowest)
                             .draggableHandle()
                             .padding(10.dp),
                     ) {
@@ -655,16 +656,7 @@ private fun PlayerLayoutList(
                                 onCheckedChange = { visible -> onVisibilityChange(slot, !visible) },
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .scale(0.7f),
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (!isHidden) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize)
-                                    )
-                                }
+                                    .scale(0.7f)
                             )
                         }
                     }
@@ -677,7 +669,7 @@ private fun PlayerLayoutList(
 /** One slot's actual visual shape, at reduced scale, standing in for its real Now Playing section. */
 @Composable
 private fun SlotPreviewBlock(slot: PlayerSlot, artworkUrl: String?) {
-    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurface = AppTheme.colorScheme.onSurface
     when (slot) {
         PlayerSlot.ALBUM_ART -> Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -697,7 +689,7 @@ private fun SlotPreviewBlock(slot: PlayerSlot, artworkUrl: String?) {
             Spacer(Modifier.width(10.dp))
             Text(
                 text = stringResource(slot.labelRes),
-                style = MaterialTheme.typography.labelMedium,
+                style = AppTheme.typography.labelMedium,
                 color = onSurface.copy(alpha = 0.6f),
             )
         }
@@ -770,8 +762,8 @@ private fun PresetCard(
                 .clip(shape)
                 .border(
                     width = if (selected) 2.dp else 1.dp,
-                    color = if (selected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.outlineVariant,
+                    color = if (selected) AppTheme.colorScheme.primary
+                    else AppTheme.colorScheme.outlineVariant,
                     shape = shape,
                 )
         ) { preview() }
@@ -779,7 +771,7 @@ private fun PresetCard(
         Spacer(Modifier.height(8.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = AppTheme.typography.labelLarge,
             maxLines = 1,
         )
         Spacer(Modifier.height(6.dp))
@@ -788,16 +780,16 @@ private fun PresetCard(
                 .size(20.dp)
                 .clip(CircleShape)
                 .background(
-                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+                    if (selected) AppTheme.colorScheme.primary else Color.Transparent
                 )
-                .border(1.5.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                .border(1.5.dp, AppTheme.colorScheme.outline, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (selected) {
                 Icon(
                     painterResource(R.drawable.check),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = AppTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(13.dp),
                 )
             }
@@ -816,8 +808,8 @@ private fun PlayerPreview(
     gradientStops: List<Color>,
     gradientAngle: Float,
 ) {
-    val accent = MaterialTheme.colorScheme.primary
-    val surface = MaterialTheme.colorScheme.surface
+    val accent = AppTheme.colorScheme.primary
+    val surface = AppTheme.colorScheme.surface
     val backdrop: Brush? = when (background) {
         PlayerBackgroundStyle.DEFAULT -> Brush.verticalGradient(listOf(surface, surface))
         PlayerBackgroundStyle.STATIC -> Brush.verticalGradient(listOf(staticColor, staticColor))
@@ -825,11 +817,14 @@ private fun PlayerPreview(
         PlayerBackgroundStyle.CUSTOM_GRADIENT -> null
         PlayerBackgroundStyle.LIVE_MESH ->
             Brush.linearGradient(listOf(accent, Color.Black, accent.copy(alpha = 0.4f)))
+        // Blobs of colour over a near-black base, which is what the real thing is.
+        PlayerBackgroundStyle.BITCHORD_MESH ->
+            Brush.radialGradient(listOf(accent.copy(alpha = 0.85f), Color.Black))
         PlayerBackgroundStyle.GLOW_ANIMATED -> Brush.radialGradient(listOf(accent, Color.Black))
         else -> Brush.verticalGradient(listOf(accent.copy(alpha = 0.55f), Color.Black))
     }
     val onBackdrop = if (background == PlayerBackgroundStyle.DEFAULT) {
-        MaterialTheme.colorScheme.onSurface
+        AppTheme.colorScheme.onSurface
     } else {
         Color.White
     }
@@ -999,7 +994,7 @@ private fun SettingRow(title: String, onClick: () -> Unit, trailing: @Composable
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
-        Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(title, style = AppTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         trailing()
     }
 }

@@ -27,21 +27,21 @@ import androidx.compose.foundation.rememberScrollState
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.AlertDialog
+import com.convx.music.ui.ios.compat.AlertDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.IconButton
+import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -91,9 +91,9 @@ import com.convx.music.constants.TranslateModeKey
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.EnumDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
+import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.TextFieldDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -218,7 +218,7 @@ fun AiSettings(
                         if (help.isNotEmpty()) {
                             Text(
                                 text = "$provider: $help",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = AppTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(vertical = 4.dp)
                             )
                         }
@@ -242,22 +242,22 @@ fun AiSettings(
                 Column {
                     Text(
                         text = "${stringResource(R.string.ai_translation_literal)}:",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = AppTheme.typography.titleSmall,
                         modifier = Modifier.padding(top = 8.dp)
                     )
                     Text(
                         text = stringResource(R.string.ai_translation_literal_desc),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = AppTheme.typography.bodyMedium,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     
                     Text(
                         text = "${stringResource(R.string.ai_translation_transcribed)}:",
-                        style = MaterialTheme.typography.titleSmall
+                        style = AppTheme.typography.titleSmall
                     )
                     Text(
                         text = stringResource(R.string.ai_translation_transcribed_desc),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = AppTheme.typography.bodyMedium
                     )
                 }
             }
@@ -436,10 +436,10 @@ fun AiSettings(
             )
         )
         
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.ai_provider),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.explore_outlined),
                     title = { Text(stringResource(R.string.ai_provider)) },
                     description = { Text(aiProvider) },
@@ -455,7 +455,7 @@ fun AiSettings(
                     }
                 ),
                 if (aiProvider == "Custom") {
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = painterResource(R.drawable.link),
                         title = { Text(stringResource(R.string.ai_base_url)) },
                         description = { Text(openRouterBaseUrl.ifBlank { stringResource(R.string.not_set) }) },
@@ -469,12 +469,12 @@ fun AiSettings(
 
         Spacer(modifier = Modifier.height(27.dp))
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.ai_setup_guide),
             items = buildList {
                 if (aiProvider == "DeepL") {
                     add(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             icon = painterResource(R.drawable.key),
                             title = { Text("DeepL ${stringResource(R.string.ai_api_key)}") },
                             description = { 
@@ -489,7 +489,7 @@ fun AiSettings(
                         )
                     )
                     add(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             icon = painterResource(R.drawable.tune),
                             title = { Text(stringResource(R.string.ai_deepl_formality)) },
                             description = { 
@@ -507,7 +507,7 @@ fun AiSettings(
                     )
                 } else {
                     add(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             icon = painterResource(R.drawable.key),
                             title = { Text(stringResource(R.string.ai_api_key)) },
                             description = { 
@@ -523,7 +523,7 @@ fun AiSettings(
                     )
                     if (aiProvider != "Custom") {
                         add(
-                            Material3SettingsItem(
+                            IosSettingsItem(
                                 icon = painterResource(R.drawable.discover_tune),
                                 title = { Text(stringResource(R.string.ai_model)) },
                                 description = { Text(openRouterModel.ifBlank { stringResource(R.string.not_set) }) },
@@ -537,12 +537,12 @@ fun AiSettings(
 
         Spacer(modifier = Modifier.height(27.dp))
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.ai_translation_mode),
             items = buildList {
                 if (aiProvider != "DeepL") {
                     add(
-                        Material3SettingsItem(
+                        IosSettingsItem(
                             icon = painterResource(R.drawable.translate),
                             title = { Text(stringResource(R.string.ai_translation_mode)) },
                             description = {
@@ -568,7 +568,7 @@ fun AiSettings(
                     )
                 }
                 add(
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = painterResource(R.drawable.language),
                         title = { Text(stringResource(R.string.ai_target_language)) },
                         description = { Text(LanguageCodeToName[translateLanguage] ?: translateLanguage) },

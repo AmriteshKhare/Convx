@@ -9,21 +9,15 @@ import com.convx.music.ui.utils.FloatingChromeSpacer
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.datastore.preferences.core.edit
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,25 +45,25 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Surface
+import com.convx.music.ui.ios.compat.Checkbox
+import com.convx.music.ui.ios.compat.Surface
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconToggleButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.SnackbarHost
+import com.convx.music.ui.ios.compat.FilledIconToggleButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedTextField
+import com.convx.music.ui.ios.compat.PlainTooltip
+import com.convx.music.ui.ios.compat.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
+import com.convx.music.ui.ios.compat.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -103,7 +97,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -125,7 +118,6 @@ import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.util.fastForEachReversed
 import androidx.compose.ui.util.fastSumBy
-import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
@@ -142,7 +134,6 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.LocalSyncUtils
 import com.convx.music.R
-import com.convx.music.constants.DarkModeKey
 import com.convx.music.constants.PendingPlaylistDeletesKey
 import com.convx.music.constants.PlaylistEditLockKey
 import com.convx.music.constants.PlaylistSongSortDescendingKey
@@ -173,6 +164,7 @@ import com.convx.music.ui.component.LocalItemPrefs
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.OverlayEditButton
+import com.convx.music.ui.component.rememberPlaylistCoverPicker
 import com.convx.music.ui.component.SongListItem
 import com.convx.music.ui.component.SortHeader
 import com.convx.music.ui.component.isGlassAllowed
@@ -183,8 +175,11 @@ import com.convx.music.ui.component.ExpandableText
 import com.convx.music.ui.menu.LocalPlaylistMenu
 import com.convx.music.ui.menu.SelectionSongMenu
 import com.convx.music.ui.menu.SongMenu
-import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.component.AlbumStyleHeroImage
+import com.convx.music.ui.component.HeroTopBlur
+import com.convx.music.ui.component.rememberHeroTopBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.convx.music.LocalTabView
 import com.convx.music.ui.utils.rememberHeroZoom
 import com.convx.music.ui.utils.heroPullZoom
@@ -202,10 +197,7 @@ import com.convx.music.utils.listItemShape
 import com.convx.music.utils.makeTimeString
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
-import com.convx.music.utils.reportException
 import com.convx.music.viewmodels.LocalPlaylistViewModel
-import com.yalantis.ucrop.UCrop
-import io.ktor.client.plugins.ClientRequestException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -386,7 +378,7 @@ fun LocalPlaylistScreen(
                 Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                     Text(
                         text = stringResource(R.string.edit_playlist),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = AppTheme.typography.headlineSmall,
                         modifier = Modifier.padding(vertical = 16.dp),
                     )
                     OutlinedTextField(
@@ -425,7 +417,7 @@ fun LocalPlaylistScreen(
                         R.string.remove_download_playlist_confirm,
                         playlist?.playlist!!.name
                     ),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp),
                 )
             },
@@ -476,7 +468,7 @@ fun LocalPlaylistScreen(
                         R.string.delete_playlist_confirm,
                         playlist?.playlist!!.name
                     ),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp)
                 )
             },
@@ -588,6 +580,7 @@ fun LocalPlaylistScreen(
 
     val heroPalette = rememberHeroPalette(heroUrl)
     val tint = heroPalette.background
+    com.convx.music.PublishAmbientBackgroundColor(tint)
     // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
     // now the colour engine's own primary text tier for THIS artwork -- derived against
     // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
@@ -632,10 +625,17 @@ fun LocalPlaylistScreen(
         songs = songs.map { it.song.song.thumbnailUrl to false },
     )
 
+    // Per-screen Haze source, the same one Album and Artist already keep: the hero
+    // square and the tint plane under it become the backdrop HeroMergeBand and
+    // HeroTopBlur sample through. Without it both fall back to a flat crossfade, so
+    // this screen had a fade where the others had a merge.
+    val hazeState = remember { HazeState() }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(tint),
+            .background(tint)
+            .hazeSource(hazeState),
     ) {
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeBackgroundModifier = if (useGlass) {
@@ -702,6 +702,7 @@ fun LocalPlaylistScreen(
                                 onStartSearch = { isSearching = true },
                                 snackbarHostState = snackbarHostState,
                                 heroScale = heroZoom.scale,
+                                hazeState = hazeState,
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -960,9 +961,20 @@ fun LocalPlaylistScreen(
         val chromeBackgroundModifier = if (useGlass) {
             Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
         } else {
-            Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
+            Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
         }
         val chromeScrimProgress = rememberChromeScrimProgress(lazyListState)
+        // Drawn BEFORE the chrome row below, not after: this used to sit as a
+        // sibling composed later than the whole button row, which put the
+        // blur ON TOP of the buttons/scrim instead of behind them — visually
+        // near-invisible against the already-dark ChromeScrim, and hid the
+        // hero-dissolve effect this exists for.
+        HeroTopBlur(
+            hazeState = hazeState,
+            progress = rememberHeroTopBlur(lazyListState),
+            pageColor = tint,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -987,7 +999,7 @@ fun LocalPlaylistScreen(
 
                 Text(
                     text = pluralStringResource(R.plurals.n_selected, selection.size, selection.size),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     color = chromeContentColor,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
@@ -1064,12 +1076,12 @@ fun LocalPlaylistScreen(
                         placeholder = {
                             Text(
                                 text = stringResource(R.string.search),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = AppTheme.typography.titleMedium,
                                 color = chromeContentColor.copy(alpha = 0.6f)
                             )
                         },
                         singleLine = true,
-                        textStyle = MaterialTheme.typography.titleMedium.copy(color = chromeContentColor),
+                        textStyle = AppTheme.typography.titleMedium.copy(color = chromeContentColor),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -1098,7 +1110,7 @@ fun LocalPlaylistScreen(
                 if (showTopBarTitle) {
                     Text(
                         text = playlist?.playlist?.name.orEmpty(),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.typography.titleMedium,
                         color = chromeContentColor,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -1145,6 +1157,7 @@ fun LocalPlaylistHeader(
     snackbarHostState: SnackbarHostState,
     modifier: Modifier,
     heroScale: Float = 1f,
+    hazeState: HazeState? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
@@ -1184,100 +1197,18 @@ fun LocalPlaylistHeader(
     val liked = playlist.playlist.bookmarkedAt != null
     val editable: Boolean = playlist.playlist.isEditable
 
-    val overrideThumbnail = remember {mutableStateOf<String?>(null)}
-    var isCustomThumbnail: Boolean = playlist.thumbnails.firstOrNull()?.let {
-        it.contains("studio_square_thumbnail") || it.contains("content://com.vivimusic.music")
-    } ?: false
-
-
-    val result = remember { mutableStateOf<Uri?>(null) }
-    var pendingCropDestUri by remember { mutableStateOf<Uri?>(null) }
     var showEditNoteDialog by remember { mutableStateOf(false) }
 
-    val cropLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { res ->
-        if (res.resultCode == android.app.Activity.RESULT_OK) {
-            val output = res.data?.let { UCrop.getOutput(it) } ?: pendingCropDestUri
-            if (output != null) result.value = output
-        }
-    }
-
-    val (darkMode, _) = rememberEnumPreference(
-        DarkModeKey,
-        defaultValue = DarkMode.AUTO
+    // The header used to carry its own copy of the pick -> crop -> save flow, which stored the
+    // cropped file's cacheDir uri straight into the DB. Cache eviction then took the cover with
+    // it, which is why a changed playlist image kept reverting. rememberPlaylistCoverPicker is
+    // the same flow but persists the crop into filesDir first (and still pushes it to YouTube
+    // for synced playlists), so use that one everywhere.
+    val launchCoverPicker = rememberPlaylistCoverPicker(
+        playlist = playlist,
+        onError = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
     )
 
-    val cropColor = MaterialTheme.colorScheme
-    val darkTheme = darkMode == DarkMode.ON || (darkMode == DarkMode.AUTO && isSystemInDarkTheme())
-
-    val pickLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        uri?.let { sourceUri ->
-            val destFile = java.io.File(context.cacheDir, "playlist_cover_crop_${System.currentTimeMillis()}.jpg")
-            val destUri = FileProvider.getUriForFile(context, "${context.packageName}.FileProvider", destFile)
-            pendingCropDestUri = destUri
-    
-            val options = UCrop.Options().apply {
-                setCompressionFormat(Bitmap.CompressFormat.JPEG)
-                setCompressionQuality(90)
-                setHideBottomControls(true)
-                setToolbarTitle(context.getString(R.string.edit_playlist_cover))
-                
-                setStatusBarLight(!darkTheme)
-
-                setToolbarColor(cropColor.surface.toArgb())
-                setToolbarWidgetColor(cropColor.inverseSurface.toArgb())
-                setRootViewBackgroundColor(cropColor.surface.toArgb())
-                setLogoColor(cropColor.surface.toArgb())
-            }
-
-            val intent = UCrop.of(sourceUri, destUri)
-                .withAspectRatio(1f, 1f)
-                .withOptions(options)
-                .getIntent(context)
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            cropLauncher.launch(intent)
-        }
-    }
-
-    LaunchedEffect(result.value) {
-        val uri = result.value ?: return@LaunchedEffect
-        withContext(Dispatchers.IO) {
-            when {
-                playlist.playlist.browseId == null -> {
-                    overrideThumbnail.value = uri.toString()
-                    isCustomThumbnail = true
-
-                    // Update the database with the new thumbnail
-                    database.query {
-                        update(playlist.playlist.copy(thumbnailUrl = uri.toString()))
-                    }
-                }
-
-                else -> {
-                    val bytes = uriToByteArray(context, uri)
-                    YouTube.uploadCustomThumbnailLink(
-                        playlist.playlist.browseId,
-                        bytes!!
-                    ).onSuccess { newThumbnailUrl ->
-                        overrideThumbnail.value = newThumbnailUrl
-                        isCustomThumbnail = true
-
-                        // Update the database with the new thumbnail URL
-                        database.query {
-                            update(playlist.playlist.copy(thumbnailUrl = newThumbnailUrl))
-                        }
-                    }.onFailure {
-                        if (it is ClientRequestException) {
-                            snackbarHostState.showSnackbar("${it.response.status.value} ${it.response.status.description}")
-                        }
-                        reportException(it)
-                    }
-                }
-            }
-        }
-    }
 
     // See the main LocalPlaylistScreen composable: debounce against the local
     // scan streaming thumbnails in one at a time.
@@ -1294,6 +1225,7 @@ fun LocalPlaylistHeader(
     )
     val heroPalette = rememberHeroPalette(heroUrl)
     val tint = heroPalette.background
+    com.convx.music.PublishAmbientBackgroundColor(tint)
     // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
     // now the colour engine's own primary text tier for THIS artwork -- derived against
     // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
@@ -1316,23 +1248,21 @@ fun LocalPlaylistHeader(
                     onDismiss = { showEditNoteDialog = false },
                     onConfirm = {
                         showEditNoteDialog = false
-                        pickLauncher.launch(
-                            PickVisualMediaRequest(mediaType = ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
+                        launchCoverPicker()
                     },
                     onCancel = { showEditNoteDialog = false }
                 ) {
                     if (playlist.playlist.browseId != null) {
                         Text(
                             text = stringResource(R.string.edit_playlist_cover_note),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = AppTheme.typography.bodyMedium
                         )
                         Spacer(Modifier.height(8.dp))
                     }
                     Text(
                         text = stringResource(R.string.edit_playlist_cover_note_wait),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        style = AppTheme.typography.bodySmall,
+                        color = AppTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -1359,7 +1289,7 @@ fun LocalPlaylistHeader(
                     title = {
                         Text(
                             text = playlist.playlist.name,
-                            style = MaterialTheme.typography.headlineLarge,
+                            style = AppTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
                             color = onTint,
                             maxLines = 2,
@@ -1370,7 +1300,7 @@ fun LocalPlaylistHeader(
                         {
                             Text(
                                 text = desc,
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = AppTheme.typography.bodyMedium,
                                 color = onTint.copy(alpha = 0.7f),
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
@@ -1380,7 +1310,7 @@ fun LocalPlaylistHeader(
                     actions = {
                         Text(
                             text = playlistInfoText,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = AppTheme.typography.bodyMedium,
                             color = onTint.copy(alpha = 0.5f),
                         )
                     },
@@ -1395,7 +1325,12 @@ fun LocalPlaylistHeader(
                     Modifier
                 },
             ) {
-                AlbumStyleHeroImage(artworkUrl = heroUrl, heroScale = heroScale)
+                AlbumStyleHeroImage(
+                    artworkUrl = heroUrl,
+                    heroScale = heroScale,
+                    hazeState = hazeState,
+                    pageColor = tint,
+                )
                 if (editable) {
                     Box(
                         modifier = Modifier
@@ -1421,7 +1356,7 @@ fun LocalPlaylistHeader(
             // Playlist Name
             Text(
                 text = playlist.playlist.name,
-                style = MaterialTheme.typography.headlineMedium,
+                style = AppTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 color = onTint,
@@ -1434,7 +1369,7 @@ fun LocalPlaylistHeader(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = desc,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = onTint.copy(alpha = 0.7f),
                     maxLines = 3,
@@ -1448,7 +1383,7 @@ fun LocalPlaylistHeader(
             // Metadata - Song Count • Duration
             Text(
                 text = playlistInfoText,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.typography.bodyMedium,
                 color = onTint.copy(alpha = 0.7f)
             )
             }
@@ -1573,6 +1508,7 @@ fun LocalPlaylistHeader(
                 ) {
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlayingThisPlaylist,
+                        tint = tint,
                         size = 32.dp,
                         modifier = Modifier.offset(x = 2.dp),
                     )
@@ -1616,7 +1552,7 @@ fun LocalPlaylistHeader(
             ) {
                 Text(
                     text = stringResource(R.string.about_playlist),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = onTint,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -1645,7 +1581,7 @@ private fun MetadataChip(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+        color = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -1656,12 +1592,12 @@ private fun MetadataChip(
                 painter = painterResource(icon),
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = AppTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.labelMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
         }

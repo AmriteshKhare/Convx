@@ -5,7 +5,7 @@
 
 package com.convx.music.ui.screens.wrapped.components
 
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf

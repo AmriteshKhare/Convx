@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import com.tencent.mmkv.MMKV
 import timber.log.Timber
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -30,11 +31,11 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,8 +96,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LargeTopAppBar
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.LargeTopAppBar
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -237,7 +238,7 @@ fun UpdateScreen(navController: NavHostController) {
                             append(stringResource(R.string.new_update) + " ")
                             withStyle(
                                 SpanStyle(
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = AppTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
                                 )
                             ) {
@@ -255,22 +256,22 @@ fun UpdateScreen(navController: NavHostController) {
                             onClick = { navController.navigateUp() },
                             painter = painterResource(R.drawable.arrow_back),
                             contentDescription = stringResource(R.string.cancel),
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurface
+                            containerColor = AppTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = AppTheme.colorScheme.onSurface
                         )
                     }
                 },
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    containerColor = AppTheme.colorScheme.background,
+                    scrolledContainerColor = AppTheme.colorScheme.background,
+                    titleContentColor = AppTheme.colorScheme.onBackground
                 )
             )
         },
         bottomBar = {
             Surface(
-                color = MaterialTheme.colorScheme.background,
+                color = AppTheme.colorScheme.background,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -351,7 +352,7 @@ fun UpdateScreen(navController: NavHostController) {
             }
         },
         snackbarHost = { ErrorSnackbar(hostState = snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = AppTheme.colorScheme.background,
         modifier = Modifier
             .widthIn(max = 700.dp)
             .fillMaxSize()
@@ -393,21 +394,21 @@ fun UpdateScreen(navController: NavHostController) {
                                         painter = painterResource(R.drawable.deployed_app_update),
                                         contentDescription = null,
                                         modifier = Modifier.size(120.dp),
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = AppTheme.colorScheme.primary
                                     )
                                     Spacer(modifier = Modifier.height(24.dp))
                                     Text(
                                         text = stringResource(R.string.on_latest_version),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = MaterialTheme.colorScheme.onSurface,
+                                        style = AppTheme.typography.titleLarge,
+                                        color = AppTheme.colorScheme.onSurface,
                                         textAlign = TextAlign.Center,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = stringResource(R.string.current_version_v, currentStatus.version),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = AppTheme.typography.bodyMedium,
+                                        color = AppTheme.colorScheme.onSurfaceVariant,
                                         textAlign = TextAlign.Center
                                     )
                                 }
@@ -421,13 +422,13 @@ fun UpdateScreen(navController: NavHostController) {
                                         painter = painterResource(R.drawable.error),
                                         contentDescription = null,
                                         modifier = Modifier.size(120.dp),
-                                        tint = MaterialTheme.colorScheme.error
+                                        tint = AppTheme.colorScheme.error
                                     )
                                     Spacer(modifier = Modifier.height(24.dp))
                                     Text(
                                         text = currentStatus.message,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = MaterialTheme.colorScheme.error,
+                                        style = AppTheme.typography.titleLarge,
+                                        color = AppTheme.colorScheme.error,
                                         textAlign = TextAlign.Center,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -442,14 +443,14 @@ fun UpdateScreen(navController: NavHostController) {
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text(
                                         text = stringResource(R.string.release_date_v, currentStatus.releaseDate),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = AppTheme.typography.bodyMedium,
+                                        color = AppTheme.colorScheme.onSurfaceVariant
                                     )
                                     if (currentStatus.size.isNotBlank()) {
                                         Text(
                                             text = stringResource(R.string.update_size_v, currentStatus.size),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            style = AppTheme.typography.bodyMedium,
+                                            color = AppTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(24.dp))
@@ -473,7 +474,7 @@ fun UpdateScreen(navController: NavHostController) {
                                                 addStringAnnotation("URL", url, range.first, range.last + 1)
                                                 addStyle(
                                                     SpanStyle(
-                                                        color = MaterialTheme.colorScheme.primary,
+                                                        color = AppTheme.colorScheme.primary,
                                                         textDecoration = TextDecoration.Underline
                                                     ),
                                                     range.first,
@@ -489,8 +490,8 @@ fun UpdateScreen(navController: NavHostController) {
                                                     ContextCompat.startActivity(context, Intent(Intent.ACTION_VIEW, Uri.parse(it.item)), null)
                                                 }
                                             },
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = AppTheme.typography.bodyMedium.copy(
+                                                color = AppTheme.colorScheme.onSurfaceVariant,
                                                 lineHeight = 20.sp
                                             ),
                                             modifier = Modifier.padding(bottom = 24.dp)
@@ -504,8 +505,8 @@ fun UpdateScreen(navController: NavHostController) {
                                                     .fillMaxWidth()
                                                     .height(8.dp)
                                                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                                color = AppTheme.colorScheme.primary,
+                                                trackColor = AppTheme.colorScheme.surfaceContainerHigh
                                             )
                                         } else {
                                             androidx.compose.material3.LinearProgressIndicator(
@@ -513,8 +514,8 @@ fun UpdateScreen(navController: NavHostController) {
                                                     .fillMaxWidth()
                                                     .height(8.dp)
                                                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)),
-                                                color = MaterialTheme.colorScheme.primary,
-                                                trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                                color = AppTheme.colorScheme.primary,
+                                                trackColor = AppTheme.colorScheme.surfaceContainerHigh
                                             )
                                         }
                                         Spacer(modifier = Modifier.height(24.dp))
@@ -523,7 +524,7 @@ fun UpdateScreen(navController: NavHostController) {
                                         if (section.title.isNotBlank()) {
                                             Text(
                                                 text = section.title,
-                                                style = MaterialTheme.typography.titleMedium,
+                                                style = AppTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp)
                                             )
@@ -555,63 +556,50 @@ fun UpdateScreen(navController: NavHostController) {
 }
 
 
-// Utility functions for SharedPreferences uses now view model
+// Utility functions for MMKV-backed update settings, used by view models.
 const val PREFS_NAME = "settings"
 const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
 const val KEY_LAST_CHECKED_TIME = "last_checked_time"
 const val KEY_BETA_UPDATES = "beta_updates"
 const val KEY_UPDATE_AVAILABLE = "update_available"
 
-fun getUpdateAvailableState(context: Context): Boolean {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return sharedPrefs.getBoolean(KEY_UPDATE_AVAILABLE, false)
-}
+private fun updatePrefs(): MMKV = MMKV.mmkvWithID(PREFS_NAME)!!
+
+fun getUpdateAvailableState(context: Context): Boolean =
+    updatePrefs().decodeBool(KEY_UPDATE_AVAILABLE, false)
 
 fun saveUpdateAvailableState(context: Context, available: Boolean) {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    sharedPrefs.edit().putBoolean(KEY_UPDATE_AVAILABLE, available).apply()
+    updatePrefs().encode(KEY_UPDATE_AVAILABLE, available)
 }
 
-fun getAutoUpdateCheckSetting(context: Context): Boolean {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return sharedPrefs.getBoolean(KEY_AUTO_UPDATE_CHECK, false)
-}
+fun getAutoUpdateCheckSetting(context: Context): Boolean =
+    updatePrefs().decodeBool(KEY_AUTO_UPDATE_CHECK, false)
 
 fun saveAutoUpdateCheckSetting(context: Context, enabled: Boolean) {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    sharedPrefs.edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply()
+    updatePrefs().encode(KEY_AUTO_UPDATE_CHECK, enabled)
 }
 
 const val KEY_UPDATE_NOTIFICATIONS = "update_notifications"
 
-fun getUpdateNotificationsSetting(context: Context): Boolean {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return sharedPrefs.getBoolean(KEY_UPDATE_NOTIFICATIONS, false)
-}
+fun getUpdateNotificationsSetting(context: Context): Boolean =
+    updatePrefs().decodeBool(KEY_UPDATE_NOTIFICATIONS, false)
 
 fun saveUpdateNotificationsSetting(context: Context, enabled: Boolean) {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    sharedPrefs.edit().putBoolean(KEY_UPDATE_NOTIFICATIONS, enabled).apply()
+    updatePrefs().encode(KEY_UPDATE_NOTIFICATIONS, enabled)
 }
 
 fun saveLastCheckedTime(context: Context, timestamp: String) {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    sharedPrefs.edit().putString(KEY_LAST_CHECKED_TIME, timestamp).apply()
+    updatePrefs().encode(KEY_LAST_CHECKED_TIME, timestamp)
 }
 
-fun getLastCheckedTime(context: Context): String {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return sharedPrefs.getString(KEY_LAST_CHECKED_TIME, "") ?: ""
-}
+fun getLastCheckedTime(context: Context): String =
+    updatePrefs().decodeString(KEY_LAST_CHECKED_TIME, "") ?: ""
 
-fun getBetaUpdatesSetting(context: Context): Boolean {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return sharedPrefs.getBoolean(KEY_BETA_UPDATES, false)
-}
+fun getBetaUpdatesSetting(context: Context): Boolean =
+    updatePrefs().decodeBool(KEY_BETA_UPDATES, false)
 
 fun saveBetaUpdatesSetting(context: Context, enabled: Boolean) {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    sharedPrefs.edit().putBoolean(KEY_BETA_UPDATES, enabled).apply()
+    updatePrefs().encode(KEY_BETA_UPDATES, enabled)
 }
 
 private fun formatGitHubDate(githubDate: String): String = try {

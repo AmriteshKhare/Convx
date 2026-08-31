@@ -28,17 +28,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularWavyProgressIndicator
+import com.convx.music.ui.ios.compat.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedTextField
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Switch
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,8 +66,8 @@ import com.convx.music.db.entities.SongEntity
 import com.convx.music.models.MediaMetadata
 import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.component.ListDialog
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.ui.component.TextFieldDialog
@@ -287,15 +287,15 @@ fun LyricsMenu(
                     ) {
                         Text(
                             text = result.lyrics,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = AppTheme.typography.bodyMedium,
                             maxLines = if (index == expandedItemIndex) Int.MAX_VALUE else 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(bottom = 4.dp),
                         )
 
                         Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = RoundedCornerShape(6.dp),
+                            color = AppTheme.colorScheme.secondaryContainer,
+                            shape = ContinuousRoundedRectangle(6.dp),
                             modifier = Modifier.padding(top = 4.dp)
                         ) {
                             Row(
@@ -304,15 +304,15 @@ fun LyricsMenu(
                             ) {
                                 Text(
                                     text = result.providerName,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    style = AppTheme.typography.labelMedium,
+                                    color = AppTheme.colorScheme.onSecondaryContainer,
                                     maxLines = 1,
                                 )
                                 if (result.lyrics.startsWith("[")) {
                                     Icon(
                                         painter = painterResource(R.drawable.sync),
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        tint = AppTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier
                                             .padding(start = 4.dp)
                                             .size(14.dp),
@@ -398,7 +398,7 @@ fun LyricsMenu(
                                 painter = painterResource(R.drawable.edit),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.edit),
@@ -412,7 +412,7 @@ fun LyricsMenu(
                                 painter = painterResource(R.drawable.cached),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.refetch),
@@ -427,7 +427,7 @@ fun LyricsMenu(
                                 painter = painterResource(R.drawable.search),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.search),
@@ -441,12 +441,12 @@ fun LyricsMenu(
         }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     // Add "Translate with AI" option if API key is configured
                     if (hasApiKey) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(stringResource(R.string.ai_lyrics_translation)) },
                                 icon = {
                                     Icon(
@@ -495,7 +495,7 @@ fun LyricsMenu(
                     }
                     
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(stringResource(R.string.lyrics_offset)) },
                             icon = {
                                 Icon(
@@ -510,15 +510,15 @@ fun LyricsMenu(
                             trailingContent = {
                                 Text(
                                     text = "${if (lyricsOffset >= 0) "+" else ""}${lyricsOffset}ms",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = AppTheme.typography.bodyMedium,
+                                    color = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         )
                     )
                     
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.romanize_current_track)) },
                             icon = {
                                 Icon(

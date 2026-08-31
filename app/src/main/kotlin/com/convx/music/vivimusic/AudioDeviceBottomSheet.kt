@@ -79,23 +79,25 @@ import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.outlined.Error
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.BasicAlertDialog
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Slider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.ModalBottomSheet
+import com.convx.music.ui.ios.compat.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.CircularWavyProgressIndicator
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.ToggleButton
+import com.convx.music.ui.ios.compat.SegmentedButton
+import com.convx.music.ui.ios.compat.SingleChoiceSegmentedButtonRow
+import com.convx.music.ui.ios.compat.CircularWavyProgressIndicator
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
@@ -322,7 +324,7 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                         CircularProgressIndicator(
                             modifier = Modifier.size(48.dp),
                             strokeWidth = 3.dp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppTheme.colorScheme.primary
                         )
                     }
                 }
@@ -338,13 +340,13 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                             imageVector = Icons.Outlined.Error,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.error
+                            tint = AppTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = errorMessage!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            style = AppTheme.typography.bodyMedium,
+                            color = AppTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -373,7 +375,7 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                         activeDevice?.let { device ->
                             // Tappable device row — shows chevron hint when Bluetooth is available
                             Surface(
-                                shape = MaterialTheme.shapes.large,
+                                shape = AppTheme.shapes.large,
                                 color = androidx.compose.ui.graphics.Color.Transparent,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -410,7 +412,7 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                                             Surface(
                                                 onClick = { showDevicePopup = !showDevicePopup },
                                                 shape = CircleShape,
-                                                color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                                color = if (isActive) AppTheme.colorScheme.primaryContainer else AppTheme.colorScheme.surfaceVariant,
                                                 tonalElevation = 2.dp,
                                                 modifier = Modifier.size(72.dp)
                                             ) {
@@ -421,7 +423,7 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                                                         modifier = Modifier
                                                             .size(28.dp)
                                                             .graphicsLayer { rotationZ = chevronRotation },
-                                                        tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                                        tint = if (isActive) AppTheme.colorScheme.onPrimaryContainer else AppTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
                                             }
@@ -442,8 +444,8 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                             ) + androidx.compose.animation.fadeOut(tween(150))
                         ) {
                             Surface(
-                                shape = MaterialTheme.shapes.extraLarge,
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                shape = AppTheme.shapes.extraLarge,
+                                color = AppTheme.colorScheme.surfaceContainerLow,
                                 modifier = Modifier.fillMaxWidth()
                             ) {                                 Column(
                                     modifier = Modifier
@@ -452,8 +454,8 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                                 ) {
                                     Text(
                                         text = stringResource(R.string.audio_devices),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        style = AppTheme.typography.labelMedium,
+                                        color = AppTheme.colorScheme.primary,
                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
                                     )
 
@@ -486,9 +488,9 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                                                 },
                                                 shape = itemShape,
                                                 color = if (isSelected)
-                                                    MaterialTheme.colorScheme.secondaryContainer
+                                                    AppTheme.colorScheme.secondaryContainer
                                                 else
-                                                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                                                    AppTheme.colorScheme.surfaceContainerHigh,
                                                 modifier = Modifier.fillMaxWidth()
                                                     .padding(vertical = 1.dp)
                                             ) {
@@ -504,18 +506,18 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                                                         contentDescription = null,
                                                         modifier = Modifier.size(20.dp),
                                                         tint = if (isSelected)
-                                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                                            AppTheme.colorScheme.onSecondaryContainer
                                                         else
-                                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                                            AppTheme.colorScheme.onSurfaceVariant
                                                     )
                                                     Text(
                                                         text = if (dev.type == AudioDeviceType.PHONE_SPEAKER)
                                                             stringResource(R.string.this_phone) else dev.name,
-                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        style = AppTheme.typography.bodyLarge,
                                                         color = if (isSelected)
-                                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                                            AppTheme.colorScheme.onSecondaryContainer
                                                         else
-                                                            MaterialTheme.colorScheme.onSurface,
+                                                            AppTheme.colorScheme.onSurface,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
                                                         modifier = Modifier.weight(1f)
@@ -525,7 +527,7 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                                                             imageVector = Icons.Filled.VolumeUp,
                                                             contentDescription = null,
                                                             modifier = Modifier.size(16.dp),
-                                                            tint = MaterialTheme.colorScheme.secondary
+                                                            tint = AppTheme.colorScheme.secondary
                                                         )
                                                     }
                                                 }
@@ -581,17 +583,17 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
                                 CircularWavyProgressIndicator(
                                     progress = { activeDevice.batteryLevel.toFloat() / 100f },
                                     modifier = Modifier.fillMaxSize(),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.primaryContainer,
+                                    color = AppTheme.colorScheme.primary,
+                                    trackColor = AppTheme.colorScheme.primaryContainer,
                                     stroke = wavyStroke,
                                     trackStroke = wavyStroke,
                                     gapSize = 3.dp
                                 )
                                 Text(
                                     text = "${activeDevice.batteryLevel}%",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = AppTheme.typography.labelMedium,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = AppTheme.colorScheme.onSurface,
                                     textAlign = TextAlign.Center
                                 )
                             }
@@ -629,7 +631,7 @@ fun VolumeControlRow(
         valueRange = 0f..maxVolume.toFloat(),
     )
 
-    val snapAnimationSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val snapAnimationSpec = AppTheme.motionScheme.fastEffectsSpec<Float>()
     var currentValue by rememberSaveable { mutableFloatStateOf(volume) }
     var animateJob: Job? by remember { mutableStateOf(null) }
 
@@ -671,7 +673,7 @@ fun VolumeControlRow(
             .fillMaxWidth()
             .height(72.dp),
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = AppTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp
     ) {
         Box(contentAlignment = Alignment.CenterStart) {
@@ -718,7 +720,7 @@ fun VolumeControlRow(
                     modifier = Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(animatedVolumeFraction)
-                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .background(AppTheme.colorScheme.primaryContainer)
                 )
             }
 
@@ -736,13 +738,13 @@ fun VolumeControlRow(
                     Icon(
                         imageVector = if (currentValue > 0) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
                         contentDescription = null,
-                        tint = if (currentValue / maxVolume > 0.2f) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                        tint = if (currentValue / maxVolume > 0.2f) AppTheme.colorScheme.onPrimaryContainer else AppTheme.colorScheme.onSurface,
                         modifier = Modifier.size(24.dp)
                     )
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (currentValue / maxVolume > 0.4f) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                        style = AppTheme.typography.titleMedium,
+                        color = if (currentValue / maxVolume > 0.4f) AppTheme.colorScheme.onPrimaryContainer else AppTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -753,7 +755,7 @@ fun VolumeControlRow(
                         .padding(end = 16.dp)
                         .size(6.dp)
                         .background(
-                            color = if (currentValue / maxVolume > 0.95f) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            color = if (currentValue / maxVolume > 0.95f) AppTheme.colorScheme.onPrimaryContainer else AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             shape = CircleShape
                         )
                 )
@@ -775,8 +777,8 @@ fun AudioQualitySelector(context: Context) {
     ) {
         Text(
             text = stringResource(R.string.audio_quality_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = AppTheme.typography.titleMedium,
+            color = AppTheme.colorScheme.onSurface,
             modifier = Modifier
                 .padding(bottom = 12.dp)
                 .fillMaxWidth()
@@ -794,18 +796,16 @@ fun AudioQualitySelector(context: Context) {
             else -> 0
         }
 
-        androidx.compose.foundation.layout.FlowRow(
+        SingleChoiceSegmentedButtonRow(
             modifier = Modifier
                 .padding(horizontal = 16.dp)
                 .padding(vertical = 8.dp)
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             options.forEachIndexed { index, label ->
-                ToggleButton(
-                    checked = selectedIndex == index,
-                    onCheckedChange = {
+                SegmentedButton(
+                    selected = selectedIndex == index,
+                    onClick = {
                         val newQuality = when (index) {
                             0 -> AudioQuality.AUTO
                             1 -> AudioQuality.HIGH
@@ -814,21 +814,13 @@ fun AudioQualitySelector(context: Context) {
                         onAudioQualityChange(newQuality)
                         applyAudioQuality(context, newQuality)
                     },
-                    shapes = when (index) {
-                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    label = {
+                        Text(
+                            text = label,
+                            style = AppTheme.typography.bodyMedium
+                        )
                     },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .semantics { role = Role.RadioButton }
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                )
             }
         }
     }
@@ -1027,8 +1019,8 @@ private fun AudioDeviceRow(
 ) {
     val isActiveDevice = device.isActive
     
-    val containerColor = if (isActiveDevice) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    val onContainer = if (isActiveDevice) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val containerColor = if (isActiveDevice) AppTheme.colorScheme.primaryContainer else AppTheme.colorScheme.surfaceVariant
+    val onContainer = if (isActiveDevice) AppTheme.colorScheme.onPrimaryContainer else AppTheme.colorScheme.onSurface
 
     val scallopShape = RoundedStarShape(sides = 8, curve = 0.10, rotation = 0f)
 
@@ -1093,7 +1085,7 @@ private fun AudioDeviceRow(
             ) {
                 Text(
                     text = device.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = onContainer,
                     maxLines = 1,
@@ -1115,7 +1107,7 @@ private fun AudioDeviceRow(
                     Text(
                         text = statusText,
                         maxLines = 1,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = AppTheme.typography.labelMedium,
                         overflow = TextOverflow.Ellipsis,
                         color = onContainer
                     )
@@ -1138,7 +1130,7 @@ private fun AudioDeviceRow(
                     )
                     Text(
                         text = "$value%",
-                        style = MaterialTheme.typography.labelSmall,
+                        style = AppTheme.typography.labelSmall,
                         color = onContainer
                     )
                 }
@@ -1192,7 +1184,7 @@ fun DeviceSelector(
                     )
                     Text(
                         text = if (device.type == AudioDeviceType.PHONE_SPEAKER) stringResource(R.string.this_phone) else device.name,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = AppTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

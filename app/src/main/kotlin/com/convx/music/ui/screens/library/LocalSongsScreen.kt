@@ -14,10 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +43,9 @@ import com.convx.music.extensions.toMediaItem
 import com.convx.music.playback.queues.ListQueue
 import com.convx.music.ui.component.HideOnScrollFAB
 import com.convx.music.ui.component.LargeScreenTitle
+import com.convx.music.ui.component.TopFadeBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.component.ListScrollRail
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.SongListItem
@@ -106,10 +109,14 @@ fun LocalSongsScreen(
     LaunchedEffect(Unit) { viewModel.scanDevice(context, force = false) }
 
     val lazyListState = rememberLazyListState()
+    // Progressive top blur so the list dissolves under the status bar instead
+    // of cutting off hard — same technique as the rest of the app's screens.
+    val hazeState = remember { HazeState() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = lazyListState,
+            modifier = Modifier.hazeSource(hazeState),
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
             item(key = "title", contentType = "header") {
@@ -123,8 +130,8 @@ fun LocalSongsScreen(
                 ) {
                     Text(
                         text = pluralStringResource(R.plurals.n_song, songs.size, songs.size),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                        style = AppTheme.typography.titleSmall,
+                        color = AppTheme.colorScheme.secondary,
                     )
 
                     Spacer(Modifier.weight(1f))
@@ -145,8 +152,8 @@ fun LocalSongsScreen(
                         text = stringResource(
                             if (isScanning) R.string.scanning_local_files else R.string.no_local_files,
                         ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -204,6 +211,12 @@ fun LocalSongsScreen(
                 )
             }
         }
+
+        TopFadeBlur(
+            hazeState = hazeState,
+            pageColor = AppTheme.colorScheme.background,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
 
         ListScrollRail(
             lazyListState = lazyListState,

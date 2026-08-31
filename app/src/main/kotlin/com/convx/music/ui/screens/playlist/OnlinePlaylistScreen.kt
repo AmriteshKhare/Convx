@@ -10,21 +10,21 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.Intent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ContainedLoadingIndicator
+import com.convx.music.ui.ios.compat.Checkbox
+import com.convx.music.ui.ios.compat.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ripple
-import androidx.compose.material3.SnackbarHost
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.ripple
+import com.convx.music.ui.ios.compat.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.TextField
+import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -78,6 +78,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -152,6 +153,10 @@ import com.convx.music.ui.component.HeroBackground
 import com.convx.music.ui.component.HeroCardHeader
 import com.convx.music.ui.component.rememberHeroSource
 import com.convx.music.ui.component.AlbumStyleHeroImage
+import com.convx.music.ui.component.HeroTopBlur
+import com.convx.music.ui.component.rememberHeroTopBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.convx.music.LocalTabView
 import com.convx.music.ui.utils.rememberHeroZoom
 import com.convx.music.ui.utils.heroPullZoom
@@ -175,7 +180,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.OnlineBlur
 import com.convx.music.constants.AppBarHeight
@@ -183,7 +188,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import com.convx.music.playback.DownloadTarget
 import com.convx.music.playback.cancelDownloads
 import com.convx.music.playback.downloadSongs
@@ -297,7 +302,7 @@ fun OnlinePlaylistScreen(
     // real liquid glass sampling this screen's own content behind it — same
     // treatment as Artist/Album.
     val artworkColors = rememberArtworkTint(playlist?.thumbnail)
-    val screenBackground = MaterialTheme.colorScheme.background
+    val screenBackground = AppTheme.colorScheme.background
     val tintColor by animateColorAsState(
         targetValue = artworkColors.getOrNull(0)?.copy(alpha = 0.55f) ?: Color.Transparent,
         animationSpec = tween(durationMillis = 800),
@@ -307,7 +312,7 @@ fun OnlinePlaylistScreen(
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
-    val chromeContentColor = if (useGlass) glassConfig.textColor else MaterialTheme.colorScheme.onSurface
+    val chromeContentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface
 
     // Unattached backdrop (never .layerBackdrop'd): glass chrome sampling it
     // early-returns → translucent frosted surface, no RenderNode self-reference.
@@ -328,6 +333,7 @@ fun OnlinePlaylistScreen(
     )
     val heroPalette = rememberHeroPalette(playlist?.thumbnail)
     val tint = heroPalette.background
+    com.convx.music.PublishAmbientBackgroundColor(tint)
     // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
     // now the colour engine's own primary text tier for THIS artwork -- derived against
     // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
@@ -350,10 +356,17 @@ fun OnlinePlaylistScreen(
     )
     val backdropFreeze = rememberBackdropFreeze()
 
+    // Per-screen Haze source, the same one Album and Artist already keep: the hero
+    // square and the tint plane under it become the backdrop HeroMergeBand and
+    // HeroTopBlur sample through. Without it both fall back to a flat crossfade, so
+    // this screen had a fade where the others had a merge.
+    val hazeState = remember { HazeState() }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(tint),
+            .background(tint)
+            .hazeSource(hazeState),
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
@@ -427,6 +440,8 @@ fun OnlinePlaylistScreen(
                                 continuation = viewModel.continuation,
                                 heroBackdrop = heroBackdrop,
                                 heroScale = heroZoom.scale,
+                                hazeState = hazeState,
+                                pageColor = tint,
                             )
                         }
                     }
@@ -597,6 +612,17 @@ fun OnlinePlaylistScreen(
         // this chrome actually shows blurred list/hero content, not just a
         // flat tinted fallback.
         CompositionLocalProvider(LocalAppBackdrop provides listBackdrop) {
+        // Drawn BEFORE the chrome row below, not after: this used to sit as a
+        // sibling composed later than the whole button row, which put the
+        // blur ON TOP of the buttons/scrim instead of behind them — visually
+        // near-invisible against the already-dark ChromeScrim, and hid the
+        // hero-dissolve effect this exists for.
+        HeroTopBlur(
+            hazeState = hazeState,
+            progress = rememberHeroTopBlur(lazyListState),
+            pageColor = tint,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -621,7 +647,7 @@ fun OnlinePlaylistScreen(
 
                 Text(
                     text = pluralStringResource(R.plurals.n_song, selection.size, selection.size),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     color = chromeContentColor,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
@@ -647,22 +673,24 @@ fun OnlinePlaylistScreen(
                             }
                         }
                     )
-                    IconButton(
-                        enabled = selection.isNotEmpty(),
+                    GlassCircleButton(
                         onClick = {
-                            menuState.show {
-                                YouTubeSelectionSongMenu(
-                                    songSelection = filteredSongs.filter { it.second.id in selection }
-                                        .map { it.second },
-                                    onDismiss = menuState::dismiss,
-                                    clearAction = onExitSelectionMode
-                                )
+                            if (selection.isNotEmpty()) {
+                                menuState.show {
+                                    YouTubeSelectionSongMenu(
+                                        songSelection = filteredSongs.filter { it.second.id in selection }
+                                            .map { it.second },
+                                        onDismiss = menuState::dismiss,
+                                        clearAction = onExitSelectionMode
+                                    )
+                                }
                             }
                         }
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.more_vert),
-                            contentDescription = null
+                            contentDescription = null,
+                            modifier = Modifier.alpha(if (selection.isNotEmpty()) 1f else 0.4f)
                         )
                     }
                 }
@@ -694,12 +722,12 @@ fun OnlinePlaylistScreen(
                         placeholder = {
                             Text(
                                 text = stringResource(R.string.search),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = AppTheme.typography.titleMedium,
                                 color = chromeContentColor.copy(alpha = 0.6f)
                             )
                         },
                         singleLine = true,
-                        textStyle = MaterialTheme.typography.titleMedium.copy(color = chromeContentColor),
+                        textStyle = AppTheme.typography.titleMedium.copy(color = chromeContentColor),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
@@ -736,7 +764,7 @@ fun OnlinePlaylistScreen(
                     if (show) {
                         Text(
                             text = playlist?.title ?: "",
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.typography.titleMedium,
                             color = chromeContentColor,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
@@ -777,6 +805,8 @@ private fun OnlinePlaylistHeader(
     heroBackdrop: LayerBackdrop,
     modifier: Modifier = Modifier,
     heroScale: Float = 1f,
+    hazeState: HazeState? = null,
+    pageColor: Color = Color.Black,
 ) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -796,11 +826,11 @@ private fun OnlinePlaylistHeader(
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
-    val chromeContentColor = if (useGlass) glassConfig.textColor else MaterialTheme.colorScheme.onSurface
+    val chromeContentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface
     val chromeBackgroundModifier = if (useGlass) {
         Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
     } else {
-        Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
+        Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
     }
 
     val heroUrl = playlist.thumbnail
@@ -810,6 +840,7 @@ private fun OnlinePlaylistHeader(
     )
     val heroPalette = rememberHeroPalette(heroUrl)
     val tint = heroPalette.background
+    com.convx.music.PublishAmbientBackgroundColor(tint)
     // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
     // now the colour engine's own primary text tier for THIS artwork -- derived against
     // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
@@ -834,7 +865,7 @@ private fun OnlinePlaylistHeader(
                     title = {
                         Text(
                             text = playlist.title,
-                            style = MaterialTheme.typography.headlineLarge,
+                            style = AppTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
                             color = onTint,
                             maxLines = 2,
@@ -845,7 +876,7 @@ private fun OnlinePlaylistHeader(
                         {
                             Text(
                                 text = author,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = AppTheme.typography.titleMedium,
                                 color = onTint.copy(alpha = 0.7f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -854,14 +885,19 @@ private fun OnlinePlaylistHeader(
                     },
                 )
             } else {
-                AlbumStyleHeroImage(artworkUrl = heroUrl, heroScale = heroScale)
+                AlbumStyleHeroImage(
+                    artworkUrl = heroUrl,
+                    heroScale = heroScale,
+                    hazeState = hazeState,
+                    pageColor = pageColor,
+                )
 
                 Spacer(Modifier.height(16.dp))
 
                 // Title
                 Text(
                     text = playlist.title,
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = AppTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     color = onTint,
@@ -931,6 +967,7 @@ private fun OnlinePlaylistHeader(
                     ) {
                         AnimatedPlayPauseIcon(
                             isPlaying = isPlayingThisPlaylist,
+                            tint = tint,
                             size = 32.dp,
                         )
                     }
@@ -985,7 +1022,7 @@ private fun OnlinePlaylistHeader(
                             ),
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
-                            tint = if (isBookmarked) MaterialTheme.colorScheme.error else LocalContentColor.current
+                            tint = if (isBookmarked) AppTheme.colorScheme.error else LocalContentColor.current
                         )
                     }
                 }
@@ -1010,7 +1047,7 @@ private fun OnlinePlaylistHeader(
                     )
                     Text(
                         text = stringResource(R.string.explicit),
-                        style = MaterialTheme.typography.labelSmall,
+                        style = AppTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = chromeContentColor
                     )
@@ -1034,7 +1071,7 @@ private fun OnlinePlaylistHeader(
                         }
                     }
                 },
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.typography.bodyMedium,
                 color = onTint.copy(alpha = 0.7f),
                 modifier = Modifier
                     .padding(horizontal = 32.dp)
@@ -1047,7 +1084,7 @@ private fun OnlinePlaylistHeader(
             playlist.author?.name?.let { authorName ->
                 Text(
                     text = authorName,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = onTint,
                     textAlign = TextAlign.Center,
@@ -1131,7 +1168,7 @@ private fun OnlinePlaylistHeader(
                             Download.STATE_DOWNLOADING -> stringResource(R.string.saving)
                             else -> stringResource(R.string.save_album)
                         },
-                        style = MaterialTheme.typography.labelMedium,
+                        style = AppTheme.typography.labelMedium,
                         color = chromeContentColor
                     )
                 }

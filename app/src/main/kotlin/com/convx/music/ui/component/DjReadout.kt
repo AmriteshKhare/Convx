@@ -7,12 +7,14 @@ package com.convx.music.ui.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -33,7 +35,13 @@ import kotlin.math.roundToInt
  * transition sounded ordinary.
  */
 @Composable
-fun DjReadout(modifier: Modifier = Modifier) {
+fun DjReadout(
+    modifier: Modifier = Modifier,
+    // Unspecified keeps the classic player's own theme-driven colour; Player V17
+    // passes its adaptive secondary tint so this reads correctly against its
+    // artwork-derived/static/gradient backgrounds too, not just the app theme.
+    color: Color = Color.Unspecified,
+) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val state by playerConnection.djState.collectAsStateWithLifecycle()
 
@@ -50,8 +58,8 @@ fun DjReadout(modifier: Modifier = Modifier) {
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.labelSmall,
+            color = color.takeOrElse { AppTheme.colorScheme.onSurfaceVariant },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

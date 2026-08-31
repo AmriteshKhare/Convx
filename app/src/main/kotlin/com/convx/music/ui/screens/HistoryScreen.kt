@@ -26,12 +26,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Checkbox
+import com.convx.music.ui.ios.compat.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -83,7 +83,7 @@ import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.ChipsRow
 import com.convx.music.ui.component.HideOnScrollFAB
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.component.CollapsedTitleBar
+import com.convx.music.ui.component.FrostedTopBar
 import com.convx.music.ui.component.LargeScreenTitle
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.NavigationTitle
@@ -230,8 +230,9 @@ fun HistoryScreen(
         blurArtwork = true,
         fullBlur = true,
         bottomGradient = true,
-        // Scroll-linked sharp-top/blurred-bottom split, replaced by fullBlur above.
-        // topBlurProgress = rememberHeroTopBlur(lazyListState),
+        // Progressive top blur: the artwork dissolves under the status bar as it
+        // scrolls up (Haze on 13+, plain scrim below).
+        topBlurProgress = rememberHeroTopBlur(lazyListState),
         heroScale = heroZoom.scale,
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -490,10 +491,10 @@ fun HistoryScreen(
             // it sits between the chrome row's edge buttons rather than under
             // them — but the search field takes the centre in those modes.
             if (!inSelectMode && !isSearching) {
-                CollapsedTitleBar(
+                FrostedTopBar(
                     title = stringResource(R.string.history),
-                    progress = rememberTitleCollapseProgress(lazyListState),
-                    color = onTint,
+                    titleAlpha = rememberTitleCollapseProgress(lazyListState),
+                    titleColor = onTint,
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
             }
@@ -518,7 +519,7 @@ fun HistoryScreen(
                     
                     Text(
                         text = pluralStringResource(R.plurals.n_selected, selection.size, selection.size),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = AppTheme.typography.titleMedium,
                         color = onTint,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f)
@@ -593,12 +594,12 @@ fun HistoryScreen(
                             placeholder = {
                                 Text(
                                     text = stringResource(R.string.search),
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = AppTheme.typography.titleMedium,
                                     color = onTint.copy(alpha = 0.6f)
                                 )
                             },
                             singleLine = true,
-                            textStyle = MaterialTheme.typography.titleMedium.copy(color = onTint),
+                            textStyle = AppTheme.typography.titleMedium.copy(color = onTint),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,

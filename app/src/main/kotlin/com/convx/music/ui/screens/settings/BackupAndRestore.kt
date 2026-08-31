@@ -29,11 +29,11 @@ import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -79,9 +79,9 @@ import com.convx.music.db.entities.Song
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
+import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.menu.AddToPlaylistDialogOnline
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -186,9 +186,9 @@ fun BackupAndRestore(
             )
         )
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.action_backup)) },
                     icon = painterResource(R.drawable.backup),
                     onClick = {
@@ -200,28 +200,28 @@ fun BackupAndRestore(
                         )
                     },
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.action_restore)) },
                     icon = painterResource(R.drawable.restore),
                     onClick = {
                         restoreLauncher.launch(arrayOf("application/octet-stream"))
                     },
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.import_online)) },
                     icon = painterResource(R.drawable.playlist_add),
                     onClick = {
                         importM3uLauncherOnline.launch(arrayOf("audio/*"))
                     }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.import_csv)) },
                     icon = painterResource(R.drawable.playlist_add),
                     onClick = {
                         importPlaylistFromCsv.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "text/plain"))
                     }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.import_from_spotify)) },
                     icon = painterResource(R.drawable.spotify),
                     onClick = {

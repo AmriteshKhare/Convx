@@ -78,6 +78,7 @@ enum class DensityScale(val value: Float, val label: String) {
 
 val DefaultOpenTabKey = stringPreferencesKey("defaultOpenTab")
 val SlimNavBarKey = booleanPreferencesKey("slimNavBar")
+val NavBarMeltTransitionKey = booleanPreferencesKey("navBarMeltTransition")
 val GridItemsSizeKey = stringPreferencesKey("gridItemSize")
 /** 0 = auto (GridColumnMinWidth-driven), else a fixed column count for every adaptive grid. */
 val GridColumnsOverrideKey = intPreferencesKey("gridColumnsOverride")
@@ -89,6 +90,8 @@ val GridCardHeightOverrideKey = intPreferencesKey("gridCardHeightOverrideDp")
 val SpeedDialColumnsOverrideKey = intPreferencesKey("speedDialColumnsOverride")
 /** Forces a flat black background (no blurred artwork) on Artist/Album/Playlist/Search hero screens. */
 val PureBlackHeroBackgroundKey = booleanPreferencesKey("pureBlackHeroBackground")
+/** Replace live blur (Haze progressive/merge bands) with flat colour for low-power devices. */
+val ReduceDynamicBlurKey = booleanPreferencesKey("reduceDynamicBlur")
 val SliderStyleKey = stringPreferencesKey("sliderStyle")
 val SquigglySliderKey = booleanPreferencesKey("squigglySlider")
 val SwipeToSongKey = booleanPreferencesKey("SwipeToSong")
@@ -174,6 +177,11 @@ enum class AudioQuality {
 
 val AudioOffload = booleanPreferencesKey("enableOffload")
 
+/** Bit Perfect: forces EQ/silence-skip/speed-pitch processing and crossfade off so
+ *  decoded samples reach the sink unmodified, and forces audio offload on. Master
+ *  switch — wins over those other settings' own toggles while it's active. */
+val BitPerfectKey = booleanPreferencesKey("bitPerfect")
+
 // JioSaavn streaming
 val EnableSaavnStreamingKey = booleanPreferencesKey("enableSaavnStreaming")
 val SaavnAudioQualityKey    = stringPreferencesKey("saavnAudioQuality")
@@ -239,6 +247,7 @@ val AutoSkipNextOnErrorKey = booleanPreferencesKey("autoSkipNextOnError")
 val StopMusicOnTaskClearKey = booleanPreferencesKey("stopMusicOnTaskClear")
 val ShufflePlaylistFirstKey = booleanPreferencesKey("shufflePlaylistFirst")
 val PreventDuplicateTracksInQueueKey = booleanPreferencesKey("preventDuplicateTracksInQueue")
+val AskBeforeReplacingQueueKey = booleanPreferencesKey("askBeforeReplacingQueue")
 val CrossfadeEnabledKey = booleanPreferencesKey("crossfadeEnabled")
 val CrossfadeDurationKey = floatPreferencesKey("crossfadeDuration")
 val CrossfadeGaplessKey = booleanPreferencesKey("crossfadeGapless")
@@ -535,6 +544,12 @@ enum class PlayerBackgroundStyle {
     GLOW_ANIMATED,
     APPLE_MUSIC,
     LIVE_MESH,
+    /**
+     * BitChord's Now Playing backdrop: four colour blobs sampled off the sleeve, blurred
+     * into a mesh, drifting only when the track changes. LIVE_MESH rotates the artwork
+     * itself and so keeps its shapes; this keeps only its colours.
+     */
+    BITCHORD_MESH,
     STATIC,
     CUSTOM_GRADIENT,
 }
@@ -618,7 +633,6 @@ val LiquidGlassLensHeightKey = floatPreferencesKey("liquidGlassLensHeight")
 val LiquidGlassLensAmountKey = floatPreferencesKey("liquidGlassLensAmount")
 val LiquidGlassChromaticAberrationKey = booleanPreferencesKey("liquidGlassChromaticAberration")
 val LiquidGlassDepthEffectKey = booleanPreferencesKey("liquidGlassDepthEffect")
-val LiquidGlassPlayerEnabledKey = booleanPreferencesKey("liquidGlassPlayerEnabled")
 val LiquidGlassMiniPlayerEnabledKey = booleanPreferencesKey("liquidGlassMiniPlayerEnabled")
 val LiquidGlassNavBarEnabledKey = booleanPreferencesKey("liquidGlassNavBarEnabled")
 val LiquidGlassSidePanelEnabledKey = booleanPreferencesKey("liquidGlassSidePanelEnabled")
@@ -633,6 +647,9 @@ val SideBarCollapsedKey = booleanPreferencesKey("sideBarCollapsed")
 val PlayerLayoutOrderKey = stringPreferencesKey("playerLayoutOrder")
 val PlayerLayoutHiddenSlotsKey = stringPreferencesKey("playerLayoutHiddenSlots")
 val AutoDjMixingEnabledKey = booleanPreferencesKey("autoDjMixingEnabled")
+
+/** Corner radius (dp) for the app's floating bottom sheets (menus, dialogs). */
+val SheetCornerRadiusKey = floatPreferencesKey("sheetCornerRadius")
 
 /** Off by default: Auto-DJ on its own means beatmatching and a transparent mix,
  *  which is what most listeners want. This adds loop rolls, echo tails and
@@ -744,6 +761,14 @@ enum class LyricsAnimationStyle {
     VIVIMUSIC_1,
     LYRICS_V2,
     METRO_LYRICS,
+
+    /**
+     * ArchiveTune's treatment: Apple Music's karaoke view, rendered by
+     * `com.mocharealm.accompanist:lyrics-ui`. The only style that animates the whole
+     * column rather than one line at a time, which is what the smooth catch-up scroll,
+     * the depth-of-field falloff and duet (left/right) alignment all need.
+     */
+    ARCHIVE_TUNE,
 }
 
 val LyricsTextSizeKey = floatPreferencesKey("lyricsTextSize")

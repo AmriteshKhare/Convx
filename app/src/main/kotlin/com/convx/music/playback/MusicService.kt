@@ -141,6 +141,7 @@ import com.convx.music.constants.ShufflePlaylistFirstKey
 import com.convx.music.constants.PreventDuplicateTracksInQueueKey
 import com.convx.music.constants.SimilarContent
 import com.convx.music.constants.SkipSilenceInstantKey
+import com.convx.music.constants.BitPerfectKey
 import com.convx.music.constants.SkipSilenceKey
 import com.convx.music.constants.IpVersionKey
 import com.music.innertube.models.IpVersion
@@ -157,6 +158,8 @@ import com.convx.music.db.entities.Song
 import com.convx.music.di.DownloadCache
 import com.convx.music.di.PlayerCache
 import com.convx.music.eq.EqualizerService
+import com.convx.music.playback.audio.BitPerfectAudio
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.NextRenderersFactory
 import com.convx.music.eq.audio.CustomEqualizerAudioProcessor
 import com.convx.music.eq.data.EQProfileRepository
 import com.convx.music.extensions.SilentHandler
@@ -247,6 +250,9 @@ private const val INSTANT_SILENCE_SKIP_SETTLE_MS = 350L
 // onPlaybackStatsReady reports.
 private const val STATS_WRITE_INTERVAL_MS = 20_000L
 
+/** How far ahead in play order the queue must run dry before the next page is fetched. */
+private const val LOAD_MORE_LOOKAHEAD = 5
+
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @androidx.annotation.OptIn(UnstableApi::class)
 @AndroidEntryPoint
@@ -279,6 +285,7 @@ class MusicService :
     lateinit var listenTogetherManager: com.convx.music.listentogether.ListenTogetherManager
 
     private lateinit var audioManager: AudioManager
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var lastAudioFocusState = AudioManager.AUDIOFOCUS_NONE
     private var wasPlayingBeforeAudioFocusLoss = false
@@ -291,6 +298,7 @@ class MusicService :
 
     private var cachedSkipSilence = false
     private var cachedSkipSilenceInstant = false
+    private var cachedBitPerfect = false
     private var cachedOffloadEnabled = false
 
     private var crossfade: CrossfadeController? = null
@@ -864,6 +872,23 @@ class MusicService :
                 }
             }
 
+        dataStore.data
+            .map { it[BitPerfectKey] ?: false }
+            .distinctUntilChanged()
+            .collectLatest(scope) { bitPerfect ->
+                cachedBitPerfect = bitPerfect
+                equalizerService.setBitPerfectBypass(bitPerfect)
+
+                if (bitPerfect) {
+                    player.skipSilenceEnabled = false
+                    sparePlayer?.skipSilenceEnabled = false
+                } else {
+                    player.skipSilenceEnabled = cachedSkipSilence
+                    sparePlayer?.skipSilenceEnabled = cachedSkipSilence
+                    BitPerfectAudio.clearBitPerfectMixer(this@MusicService)
+                }
+            }
+
         combine(
             currentFormat,
             dataStore.data
@@ -1179,7 +1204,7 @@ class MusicService :
 
         player.apply {
                 setOffloadEnabled(cachedOffloadEnabled)
-                skipSilenceEnabled = cachedSkipSilence
+                skipSilenceEnabled = if (cachedBitPerfect) false else cachedSkipSilence
                 addAnalyticsListener(PlaybackStatsListener(false, this@MusicService))
 
                 // Cleanup handled manually in onDestroy/release
@@ -1297,6 +1322,31 @@ class MusicService :
                 audioManager.abandonAudioFocusRequest(request)
                 hasAudioFocus = false
             }
+        }
+    }
+
+    /**
+     * Modern Wi-Fi 6/7 routers put the chip to sleep between beacons (Target Wake
+     * Time) once the screen is off, which delays or drops packets for a background
+     * stream — heard as buffering or playback just stopping. WIFI_MODE_FULL_HIGH_PERF
+     * keeps the radio awake for as long as this is held.
+     */
+    private fun acquireWifiLock() {
+        if (wifiLock == null) {
+            val wifiManager = applicationContext.getSystemService(android.net.wifi.WifiManager::class.java)
+            wifiLock = wifiManager?.createWifiLock(
+                android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                "convx_music:wifi_lock"
+            )
+        }
+        if (wifiLock?.isHeld == false) {
+            wifiLock?.acquire()
+        }
+    }
+
+    private fun releaseWifiLock() {
+        if (wifiLock?.isHeld == true) {
+            wifiLock?.release()
         }
     }
 
@@ -1582,6 +1632,26 @@ class MusicService :
                 val shufflePlaylistFirst = dataStore.get(ShufflePlaylistFirstKey, false)
                 applyShuffleOrder(player.currentMediaItemIndex, player.mediaItemCount, shufflePlaylistFirst)
             }
+        }
+    }
+
+    /**
+     * Resolves [queue] and appends it to what is already playing, leaving the current queue
+     * and playhead untouched. This is the "keep queue" half of the keep-or-clear prompt; the
+     * "clear" half is just [playQueue].
+     */
+    fun enqueueQueue(queue: Queue) {
+        scope.launch(SilentHandler) {
+            val status = withContext(Dispatchers.IO) {
+                queue.getInitialStatus()
+                    .filterExplicit(dataStore.get(HideExplicitKey, false))
+                    .filterVideoSongs(dataStore.get(HideVideoSongsKey, false) || dataStore.get(DataSaverEnabledKey, false))
+            }
+            if (status.items.isEmpty()) return@launch
+            // Start the appended run at the song the user actually tapped, then wrap round to
+            // the ones before it, so "keep the queue" still plays what was asked for first.
+            val start = status.mediaItemIndex.coerceIn(0, status.items.lastIndex)
+            addToQueue(status.items.drop(start) + status.items.take(start))
         }
     }
 
@@ -2126,7 +2196,7 @@ class MusicService :
         // Auto load more songs from queue
         if (cachedAutoLoadMore &&
             reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT &&
-            player.mediaItemCount - player.currentMediaItemIndex <= 5 &&
+            remainingInPlayOrder(LOAD_MORE_LOOKAHEAD) <= LOAD_MORE_LOOKAHEAD &&
             currentQueue.hasNextPage() &&
             !(cachedDisableLoadMoreWhenRepeatAll && player.repeatMode == REPEAT_MODE_ALL)
         ) {
@@ -2137,11 +2207,12 @@ class MusicService :
                         .filterVideoSongs(dataStore.get(HideVideoSongsKey, false) || dataStore.get(DataSaverEnabledKey, false))
                 }
                 if (player.playbackState != STATE_IDLE && mediaItems.isNotEmpty()) {
+                    // No applyShuffleOrder() here on purpose: the appended items are unheard,
+                    // and ExoPlayer's ShuffleOrder.cloneAndInsert already folds them into the
+                    // existing order. Re-shuffling instead re-randomised the queue the user
+                    // was already listening to and moved the current item to position 0,
+                    // which drops everything played so far out of the queue view.
                     player.addMediaItems(mediaItems)
-                    if (player.shuffleModeEnabled) {
-                        val shufflePlaylistFirst = dataStore.get(ShufflePlaylistFirstKey, false)
-                        applyShuffleOrder(player.currentMediaItemIndex, player.mediaItemCount, shufflePlaylistFirst)
-                    }
                 }
             }
         }
@@ -2190,6 +2261,14 @@ class MusicService :
             player.currentMediaItem?.mediaId?.let { mediaId ->
                 resetRetryCount(mediaId)
                 Timber.tag(TAG).d("Playback successful for $mediaId, reset retry count")
+            }
+
+            // Bit Perfect: re-request the hardware mixer for every track, since a
+            // sample-rate change needs a fresh negotiation with AudioFlinger.
+            if (cachedBitPerfect) {
+                player.audioFormat?.let { format ->
+                    BitPerfectAudio.requestBitPerfectMixer(this, format.sampleRate, format.pcmEncoding)
+                }
             }
         }
 
@@ -2250,8 +2329,10 @@ class MusicService :
             updateWidgetUI(player.isPlaying)
             if (player.isPlaying) {
                 startWidgetUpdates()
+                acquireWifiLock()
             } else {
                 stopWidgetUpdates()
+                releaseWifiLock()
             }
             if (!player.isPlaying && !events.containsAny(Player.EVENT_POSITION_DISCONTINUITY, Player.EVENT_MEDIA_ITEM_TRANSITION)) {
                 scope.launch {
@@ -2331,6 +2412,32 @@ class MusicService :
         if (dataStore.get(PersistentQueueKey, true)) {
             saveQueueToDisk()
         }
+    }
+
+    /**
+     * How many items are still queued *after* the current one in playback order, capped at
+     * [limit] so a 500-track queue is not walked on every transition.
+     *
+     * The auto-load-more gate used to ask `mediaItemCount - currentMediaItemIndex`, which is
+     * timeline-index space. That is the same question as "how much is left" only while
+     * shuffle is off. With shuffle on, playback follows the shuffle order, so the current
+     * item's index is effectively random and the gate fired by luck — usually never, because
+     * reaching the last few *indices* is not what ends a shuffled queue. The continuation was
+     * therefore never fetched and the queue just ran out early. This walks the same order the
+     * player actually plays.
+     */
+    private fun remainingInPlayOrder(limit: Int): Int {
+        val timeline = player.currentTimeline
+        if (timeline.isEmpty) return 0
+        val shuffled = player.shuffleModeEnabled
+        var index = player.currentMediaItemIndex
+        var remaining = 0
+        while (remaining <= limit) {
+            index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, shuffled)
+            if (index == C.INDEX_UNSET) break
+            remaining++
+        }
+        return remaining
     }
 
     /**
@@ -3364,7 +3471,7 @@ class MusicService :
         djTail: DjTailAudioProcessor,
         djDelay: DelayAudioProcessor,
     ) =
-        object : DefaultRenderersFactory(this) {
+        object : NextRenderersFactory(this) {
             override fun buildAudioSink(
                 context: Context,
                 enableFloatOutput: Boolean,
@@ -3389,6 +3496,12 @@ class MusicService :
                         SonicAudioProcessor(),
                     ),
                 ).build()
+        }.apply {
+            // Platform MediaCodec has no ALAC decoder on most Android devices (no AOSP
+            // one exists at all). ON tries the platform decoder first per format and
+            // only falls back to NextRenderersFactory's bundled FfmpegAudioRenderer —
+            // this doesn't change decode for any format a device already handles.
+            setExtensionRendererMode(EXTENSION_RENDERER_MODE_ON)
         }
 
     override fun onPlaybackStatsReady(
@@ -3572,6 +3685,7 @@ class MusicService :
         }
         discordRpc = null
         connectivityObserver.unregister()
+        releaseWifiLock()
         abandonAudioFocus()
         releaseLoudnessEnhancer()
         djEngine.release()

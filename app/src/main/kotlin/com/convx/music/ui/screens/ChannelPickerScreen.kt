@@ -15,10 +15,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,8 +32,8 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.component.Material3SettingsGroup
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsGroup
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.AccountSettingsViewModel
 
@@ -69,12 +69,12 @@ fun ChannelPickerScreen(navController: NavController) {
         ) {
             Text(
                 text = stringResource(R.string.choose_channel_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
 
-            Material3SettingsGroup(
+            IosSettingsGroup(
                 items = channels.map { channel ->
                     val handle = channel.channelHandle
                     val descriptionContent: (@Composable () -> Unit)? =
@@ -83,7 +83,7 @@ fun ChannelPickerScreen(navController: NavController) {
                         } else {
                             null
                         }
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         leadingContent = {
                             AsyncImage(
                                 model = channel.thumbnailUrl,

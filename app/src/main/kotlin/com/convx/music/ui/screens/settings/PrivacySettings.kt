@@ -6,86 +6,50 @@
 package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.only
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Switch
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalDatabase
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DisableScreenshotKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.PauseListenHistoryKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.PauseSearchHistoryKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.DefaultDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.ui.component.FrostedTopBar
+import com.convx.music.ui.component.IosSettingsGroup
+import com.convx.music.ui.component.IosSettingsItem
+import com.convx.music.ui.component.TopFadeBlur
+import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.utils.rememberPreference
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,7 +81,7 @@ fun PrivacySettings(
             content = {
                 Text(
                     text = stringResource(R.string.clear_listen_history_confirm),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp),
                 )
             },
@@ -152,7 +116,7 @@ fun PrivacySettings(
             content = {
                 Text(
                     text = stringResource(R.string.clear_search_history_confirm),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp),
                 )
             },
@@ -177,8 +141,12 @@ fun PrivacySettings(
         )
     }
 
+    val hazeState = remember { HazeState() }
+
+    Box(modifier = Modifier) {
     Column(
         Modifier
+            .hazeSource(hazeState)
             .windowInsetsPadding(
                 LocalPlayerAwareWindowInsets.current.only(
                     WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
@@ -195,30 +163,21 @@ fun PrivacySettings(
             )
         )
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.listen_history),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.history),
                     title = { Text(stringResource(R.string.pause_listen_history)) },
                     trailingContent = {
                         Switch(
                             checked = pauseListenHistory,
-                            onCheckedChange = onPauseListenHistoryChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (pauseListenHistory) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(androidx.compose.material3.SwitchDefaults.IconSize)
-                                )
-                            }
+                            onCheckedChange = onPauseListenHistoryChange
                         )
                     },
                     onClick = { onPauseListenHistoryChange(!pauseListenHistory) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.delete_history),
                     title = { Text(stringResource(R.string.clear_listen_history)) },
                     onClick = { showClearListenHistoryDialog = true }
@@ -228,30 +187,21 @@ fun PrivacySettings(
 
         Spacer(modifier = Modifier.height(27.dp))
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.search_history),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.search_off),
                     title = { Text(stringResource(R.string.pause_search_history)) },
                     trailingContent = {
                         Switch(
                             checked = pauseSearchHistory,
-                            onCheckedChange = onPauseSearchHistoryChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (pauseSearchHistory) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(androidx.compose.material3.SwitchDefaults.IconSize)
-                                )
-                            }
+                            onCheckedChange = onPauseSearchHistoryChange
                         )
                     },
                     onClick = { onPauseSearchHistoryChange(!pauseSearchHistory) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.clear_all),
                     title = { Text(stringResource(R.string.clear_search_history)) },
                     onClick = { showClearSearchHistoryDialog = true }
@@ -261,26 +211,17 @@ fun PrivacySettings(
 
         Spacer(modifier = Modifier.height(27.dp))
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.misc),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     icon = painterResource(R.drawable.screenshot),
                     title = { Text(stringResource(R.string.disable_screenshot)) },
                     description = { Text(stringResource(R.string.disable_screenshot_desc)) },
                     trailingContent = {
                         Switch(
                             checked = disableScreenshot,
-                            onCheckedChange = onDisableScreenshotChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (disableScreenshot) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(androidx.compose.material3.SwitchDefaults.IconSize)
-                                )
-                            }
+                            onCheckedChange = onDisableScreenshotChange
                         )
                     },
                     onClick = { onDisableScreenshotChange(!disableScreenshot) }
@@ -290,19 +231,17 @@ fun PrivacySettings(
         Spacer(modifier = Modifier.height(16.dp))
     }
 
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.privacy)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        }
-    )
+        TopFadeBlur(
+            hazeState = hazeState,
+            pageColor = IosTheme.colors.systemGroupedBackground,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+
+        FrostedTopBar(
+            onBack = navController::navigateUp,
+            title = stringResource(R.string.privacy),
+            titleAlpha = 1f,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+    }
 }

@@ -19,14 +19,14 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.RadioButton
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,8 +44,8 @@ import com.convx.music.constants.SaavnAudioQuality
 import com.convx.music.constants.SaavnAudioQualityKey
 import com.convx.music.constants.SaavnFallbackToYouTubeKey
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.component.Material3SettingsGroup
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsGroup
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.component.ModernSwitch
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
@@ -95,25 +95,25 @@ fun JioSettings(
         // Description text
         Text(
             text = stringResource(R.string.enable_saavn_streaming_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 24.dp, top = 16.dp)
         )
 
         // Large capsule banner for main toggle
         val containerColor by animateColorAsState(
             targetValue = if (saavnEnabled) {
-                MaterialTheme.colorScheme.primaryContainer
+                AppTheme.colorScheme.primaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             },
             label = "containerColor"
         )
 
         val contentColor = if (saavnEnabled) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+            AppTheme.colorScheme.onPrimaryContainer
         } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            AppTheme.colorScheme.onSurfaceVariant
         }
 
         Card(
@@ -131,7 +131,7 @@ fun JioSettings(
             ) {
                 Text(
                     text = stringResource(R.string.enable_saavn_streaming),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     color = contentColor
                 )
                 ModernSwitch(
@@ -144,10 +144,10 @@ fun JioSettings(
         Spacer(modifier = Modifier.height(24.dp))
 
         // Options settings group
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.saavn_audio_quality),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     leadingContent = {
                         RadioButton(
                             selected = saavnQuality == SaavnAudioQuality.QUALITY_320,
@@ -159,7 +159,7 @@ fun JioSettings(
                     enabled = saavnEnabled,
                     onClick = { onSaavnQualityChange(SaavnAudioQuality.QUALITY_320) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     leadingContent = {
                         RadioButton(
                             selected = saavnQuality == SaavnAudioQuality.QUALITY_160,
@@ -171,7 +171,7 @@ fun JioSettings(
                     enabled = saavnEnabled,
                     onClick = { onSaavnQualityChange(SaavnAudioQuality.QUALITY_160) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     leadingContent = {
                         RadioButton(
                             selected = saavnQuality == SaavnAudioQuality.QUALITY_96,
@@ -188,9 +188,9 @@ fun JioSettings(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Material3SettingsGroup(
+        IosSettingsGroup(
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.saavn_fallback_to_youtube)) },
                     description = { Text(stringResource(R.string.saavn_fallback_to_youtube_desc)) },
                     enabled = saavnEnabled,
@@ -203,7 +203,7 @@ fun JioSettings(
                     },
                     onClick = { onFallbackToYouTubeChange(!fallbackToYouTube) }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.force_selected_quality)) },
                     description = { Text(stringResource(R.string.force_selected_quality_desc)) },
                     enabled = saavnEnabled,
@@ -226,13 +226,13 @@ fun JioSettings(
             Icon(
                 painter = painterResource(R.drawable.info),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = AppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 8.dp)
             )
             Text(
                 text = stringResource(R.string.jiosaavn_beta_info),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant
             )
         }
 

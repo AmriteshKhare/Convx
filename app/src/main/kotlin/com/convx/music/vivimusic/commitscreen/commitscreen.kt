@@ -28,14 +28,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
@@ -170,7 +170,7 @@ fun CommitScreen(
                     Column {
                         Text(
                             text = stringResource(R.string.commits_title),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = AppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -188,7 +188,7 @@ fun CommitScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
+                .background(AppTheme.colorScheme.background)
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom))
         ) {
             when {
@@ -198,13 +198,13 @@ fun CommitScreen(
                             Icon(
                                 Icons.Default.Error,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
+                                tint = AppTheme.colorScheme.error,
                                 modifier = Modifier.size(48.dp)
                             )
                             Spacer(Modifier.height(16.dp))
                             Text(
                                 text = stringResource(R.string.error_loading_commits),
-                                color = MaterialTheme.colorScheme.error
+                                color = AppTheme.colorScheme.error
                             )
                         }
                     }
@@ -230,7 +230,7 @@ fun CommitScreen(
                             if (index < commits.lastIndex) {
                                 HorizontalDivider(
                                     modifier = Modifier.padding(start = 72.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                    color = AppTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                                 )
                             }
                         }

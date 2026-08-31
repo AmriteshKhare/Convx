@@ -11,10 +11,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Switch
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,12 +62,19 @@ fun CreatePlaylistDialog(
         onDismiss = onDismiss,
         onDone = { playlistName ->
             coroutineScope.launch(Dispatchers.IO) {
-                val browseId = if (syncedPlaylist && isSignedIn) {
-                    YouTube.createPlaylist(playlistName)
-                } else if (syncedPlaylist) {
-                    Logger.getLogger("CreatePlaylistDialog").warning("Not signed in")
-                    return@launch
-                } else null
+                // YouTube.createPlaylist is the one innertube call that is NOT wrapped in
+                // runCatching, so a failed sync (no cookie, network, changed response shape)
+                // threw straight out of this coroutine and the local insert below never ran:
+                // the playlist did not appear at all, with nothing said about why.
+                val wantsSync = syncedPlaylist
+                val browseId = if (wantsSync && isSignedIn) {
+                    runCatching { YouTube.createPlaylist(playlistName) }
+                        .onFailure { Logger.getLogger("CreatePlaylistDialog").warning("Playlist sync failed: $it") }
+                        .getOrNull()
+                } else {
+                    if (wantsSync) Logger.getLogger("CreatePlaylistDialog").warning("Not signed in")
+                    null
+                }
 
                 val playlistEntity = PlaylistEntity(
                     name = playlistName,
@@ -75,13 +82,20 @@ fun CreatePlaylistDialog(
                     bookmarkedAt = LocalDateTime.now(),
                     isEditable = true,
                 )
-                
+
                 database.query {
                     insert(playlistEntity)
                 }
 
-//                onPlaylistCreated?.invoke(playlistEntity.id)
                 withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        context.getString(
+                            if (wantsSync && browseId == null) R.string.playlist_created_sync_failed
+                            else R.string.playlist_created
+                        ),
+                        Toast.LENGTH_SHORT
+                    ).show()
                     onPlaylistCreated?.invoke(playlistEntity.id)
                 }
             }
@@ -94,11 +108,11 @@ fun CreatePlaylistDialog(
                     Column {
                         Text(
                             text = stringResource(R.string.sync_playlist),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = AppTheme.typography.titleLarge,
                         )
                         Text(
                             text = stringResource(R.string.allows_for_sync_witch_youtube),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = AppTheme.typography.bodySmall,
                             modifier = Modifier.fillMaxWidth(0.7f)
                         )
                     }

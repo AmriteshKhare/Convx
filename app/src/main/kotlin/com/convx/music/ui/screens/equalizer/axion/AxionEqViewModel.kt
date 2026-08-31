@@ -8,6 +8,7 @@ import com.convx.music.eq.data.EQProfileRepository
 import com.convx.music.eq.data.FilterType
 import com.convx.music.eq.data.ParametricEQBand
 import com.convx.music.eq.data.SavedEQProfile
+import com.tencent.mmkv.MMKV
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,19 +26,19 @@ class AxionEqViewModel @Inject constructor(
     private val eqProfileRepository: EQProfileRepository
 ) : ViewModel() {
 
-    private val prefs = context.getSharedPreferences("vivi_eq_prefs", Context.MODE_PRIVATE)
+    private val prefs = MMKV.mmkvWithID("vivi_eq_prefs")
 
-    private val _enabled = MutableStateFlow(prefs.getBoolean("enabled", false))
+    private val _enabled = MutableStateFlow(prefs?.decodeBool("enabled", false) ?: false)
     val enabled = _enabled.asStateFlow()
 
     private val bandFrequencies = doubleArrayOf(31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0)
     
     private val _bandGains = MutableStateFlow(
-        FloatArray(10) { prefs.getFloat("band_$it", 0f) }
+        FloatArray(10) { prefs?.decodeFloat("band_$it", 0f) ?: 0f }
     )
     val bandGains = _bandGains.asStateFlow()
 
-    private val _mode = MutableStateFlow(prefs.getInt("mode", 0)) // 0: Simple, 1: Advanced
+    private val _mode = MutableStateFlow(prefs?.decodeInt("mode", 0) ?: 0) // 0: Simple, 1: Advanced
     val mode = _mode.asStateFlow()
 
     private val _isDirty = MutableStateFlow(false)
@@ -55,7 +56,7 @@ class AxionEqViewModel @Inject constructor(
 
     fun setEnabled(enabled: Boolean) {
         _enabled.value = enabled
-        prefs.edit().putBoolean("enabled", enabled).apply()
+        prefs?.encode("enabled", enabled)
         if (enabled) {
             applyToService()
         } else {
@@ -68,7 +69,7 @@ class AxionEqViewModel @Inject constructor(
 
     fun setMode(mode: Int) {
         _mode.value = mode
-        prefs.edit().putInt("mode", mode).apply()
+        prefs?.encode("mode", mode)
         _isDirty.value = false // Reset dirty when switching modes
     }
 
@@ -76,7 +77,7 @@ class AxionEqViewModel @Inject constructor(
         val newGains = _bandGains.value.copyOf()
         newGains[index] = gain
         _bandGains.value = newGains
-        prefs.edit().putFloat("band_$index", gain).apply()
+        prefs?.encode("band_$index", gain)
         _isDirty.value = true
         if (_enabled.value) {
             applyToService()
@@ -85,9 +86,7 @@ class AxionEqViewModel @Inject constructor(
 
     fun setBandsGains(gains: FloatArray, fromUser: Boolean = false) {
         _bandGains.value = gains
-        val editor = prefs.edit()
-        gains.forEachIndexed { index, f -> editor.putFloat("band_$index", f) }
-        editor.apply()
+        gains.forEachIndexed { index, f -> prefs?.encode("band_$index", f) }
         _isDirty.value = fromUser // Only dirty if coming from manual tuner moves
         if (_enabled.value) {
             applyToService()

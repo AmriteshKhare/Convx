@@ -104,6 +104,13 @@
     <string name="shuffle_content_desc">Shuffle</string>
     <string name="shuffle_label">Shuffle</string>
     <string name="reset">Reset</string>
+    <string name="custom">Custom</string>
+    <string name="value">Value</string>
+    <string name="sheet_corner_radius">Sheet Corner Radius</string>
+    <string name="pin_to_library">Pin to Library</string>
+    <string name="unpin_from_library">Unpin from Library</string>
+    <string name="pinned">Pinned</string>
+    <string name="recommended_for_you">Recommended for You</string>
 
     <!-- Menu -->
     <string name="details">Details</string>
@@ -140,6 +147,7 @@
     <string name="search_online">Search online</string>
     <string name="action_sync">Sync</string>
     <string name="advanced">Advanced</string>
+    <string name="advanced_settings_desc">Power-user tuning most people never need to touch</string>
     <string name="tempo_and_pitch">Tempo and Pitch</string>
 
     <!-- Sort menu -->
@@ -242,6 +250,19 @@
     <string name="playlist_imported">Playlist imported</string>
     <string name="removed_song_from_playlist">Removed \"%s\" from playlist</string>
     <string name="playlist_synced">Playlist synced</string>
+    <string name="playlist_created">Playlist created</string>
+    <string name="player_theme_colour_mesh">Colour mesh</string>
+    <string name="lyrics_animation_karaoke_apple">Karaoke (Apple)</string>
+    <string name="playlist_created_sync_failed">Playlist created, but syncing to YouTube Music failed</string>
+
+    <!-- Queue conflict -->
+    <string name="queue_conflict_title">Something is already playing</string>
+    <string name="queue_conflict_message">Keep the current queue and add this to the end, or clear it and play now?</string>
+    <string name="queue_conflict_keep">Keep queue</string>
+    <string name="queue_conflict_replace">Clear and play</string>
+    <string name="ask_before_replacing_queue">Ask before replacing the queue</string>
+    <string name="ask_before_replacing_queue_desc">When something is already playing, choose whether to keep or clear the queue</string>
+    <string name="queue_replaced_message">Queue replaced</string>
     <string name="undo">Undo</string>
 
     <!-- Player -->
@@ -329,6 +350,8 @@
     <string name="auto">Auto</string>
     <string name="pure_black_hero_background">Pure black backgrounds</string>
     <string name="pure_black_hero_background_desc">Flat black instead of blurred artwork on Artist, Album, Playlist and Search</string>
+    <string name="reduce_dynamic_blur">Reduce live blur</string>
+    <string name="reduce_dynamic_blur_desc">Replace live blur (Haze blend and top blur) with flat colour on hero screens for low-power devices</string>
     <string name="theme_packs">Theme packs</string>
     <string name="theme_pack_save_current">Save current as new theme</string>
     <string name="theme_pack_import">Import theme from file</string>
@@ -367,6 +390,8 @@
     <string name="mini_player_waveform">Mini player waveform seek bar</string>
     <string name="mini_bar_tab_style">Multi-icon mini bar</string>
     <string name="mini_bar_tab_style_desc">Show the full transport row (shuffle, prev, play, next, repeat, lyrics, queue) instead of the simple thumbnail/seek bar/play/forward look</string>
+    <string name="nav_bar_melt_transition">Melt nav bar transition</string>
+    <string name="nav_bar_melt_transition_desc">Morph the bar between collapsed and expanded with a liquid blend. Off uses a plain fade — lighter on GPU</string>
     <string name="not_logged_in">Not logged in</string>
     <string name="login_failed">Login failed</string>
 

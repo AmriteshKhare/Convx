@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -195,7 +195,7 @@ fun MetroLyricsLine(
         )
         .background(
             if (isSelected && isSelectionModeActive)
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                AppTheme.colorScheme.primary.copy(alpha = 0.2f)
             else Color.Transparent
         )
         .padding(horizontal = 24.dp, vertical = (8 * lyricsLineSpacing).dp)

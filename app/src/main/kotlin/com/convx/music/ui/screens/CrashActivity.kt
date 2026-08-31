@@ -24,13 +24,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.ExtendedFloatingActionButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -130,7 +130,7 @@ fun CrashScreen(
                 title = { 
                     Text(
                         text = stringResource(R.string.crash_title),
-                        style = MaterialTheme.typography.headlineSmall
+                        style = AppTheme.typography.headlineSmall
                     ) 
                 },
                 actions = {
@@ -148,7 +148,7 @@ fun CrashScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = AppTheme.colorScheme.surface
                 )
             )
         },
@@ -162,11 +162,11 @@ fun CrashScreen(
                     )
                 },
                 text = { Text(stringResource(R.string.crash_share_logs)) },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                containerColor = AppTheme.colorScheme.primaryContainer,
+                contentColor = AppTheme.colorScheme.onPrimaryContainer
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = AppTheme.colorScheme.surface
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -177,8 +177,8 @@ fun CrashScreen(
         ) {
             Text(
                 text = stringResource(R.string.crash_description),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.typography.bodyLarge,
+                color = AppTheme.colorScheme.onSurfaceVariant
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -188,17 +188,17 @@ fun CrashScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .background(AppTheme.colorScheme.surfaceContainerHighest)
                     .padding(16.dp)
             ) {
                 Text(
                     text = crashLog,
-                    style = MaterialTheme.typography.bodySmall.copy(
+                    style = AppTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
                         lineHeight = 16.sp
                     ),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = AppTheme.colorScheme.onSurface,
                     modifier = Modifier.horizontalScroll(rememberScrollState())
                 )
             }

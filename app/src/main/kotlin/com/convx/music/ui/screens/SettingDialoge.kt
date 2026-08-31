@@ -1,5 +1,7 @@
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.ios.compat.AppTheme
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -10,7 +12,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.OutlinedButton
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,10 +89,10 @@ fun SettingDialoge(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        val primaryColor = MaterialTheme.colorScheme.surface
-        val onPrimaryColor = MaterialTheme.colorScheme.onSurface
-        val secondaryColor = MaterialTheme.colorScheme.secondaryContainer
-        val onSecondaryColor = MaterialTheme.colorScheme.onSecondaryContainer
+        val primaryColor = AppTheme.colorScheme.surface
+        val onPrimaryColor = AppTheme.colorScheme.onSurface
+        val secondaryColor = AppTheme.colorScheme.secondaryContainer
+        val onSecondaryColor = AppTheme.colorScheme.onSecondaryContainer
 
         Surface(
             modifier = Modifier
@@ -91,7 +100,11 @@ fun SettingDialoge(
                 .fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
             color = primaryColor,
-            tonalElevation = 8.dp
+            // No elevation tint ladder in this app's design language (flat iOS
+            // surfaces, see AppColorRoles.surfaceColorAtElevation) — a non-zero
+            // tonalElevation blends in Material's own surfaceTint here, which
+            // reads as a lighter, off-theme surface instead of the flat colour.
+            tonalElevation = 0.dp
         ) {
             Column(
                 modifier = Modifier
@@ -119,7 +132,7 @@ fun SettingDialoge(
                     Text(
                         modifier = Modifier.wrapContentWidth(),
                         text = "CONVX",
-                        style = MaterialTheme.typography.titleMedium.copy(
+                        style = AppTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
                         ),

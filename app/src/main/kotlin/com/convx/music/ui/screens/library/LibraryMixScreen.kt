@@ -10,15 +10,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -26,14 +28,14 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.SegmentedButton
+import com.convx.music.ui.ios.compat.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -53,9 +55,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -160,6 +159,16 @@ fun LibraryMixScreen(
     val artists by viewModel.artists.collectAsState()
     val playlists by viewModel.playlists.collectAsState()
 
+    // Pinned playlists get their own row up top -- same pattern as
+    // LibraryPlaylistsScreen's. Without this, pinning a playlist from the mixed
+    // (default) Library tab changed the database but nothing visible here, since
+    // this screen's merged album+playlist list has no idea pinnedAt exists.
+    val pinnedPlaylists = remember(playlists) {
+        playlists.distinctBy { it.id }
+            .filter { it.playlist.pinnedAt != null }
+            .sortedByDescending { it.playlist.pinnedAt }
+    }
+
     val libraryBackgroundMode by rememberEnumPreference(LibraryBackgroundModeKey, LibraryBackgroundMode.THUMBNAIL_BLUR)
 
     // LibraryBackgroundMode only applies when no custom image is set. Without this
@@ -185,7 +194,7 @@ fun LibraryMixScreen(
     // resolving the same preference by hand — its own fallback was colorScheme.primary,
     // a saturated accent, where every other screen falls back to a neutral surface.
     val tint = if (libraryBackgroundMode == LibraryBackgroundMode.THEME) {
-        rememberAppBackgroundColor(MaterialTheme.colorScheme.primary)
+        rememberAppBackgroundColor(AppTheme.colorScheme.primary)
     } else {
         rememberHeroTint(heroUrl)
     }
@@ -336,32 +345,25 @@ fun LibraryMixScreen(
 
             Spacer(Modifier.weight(1f))
 
-            FlowRow(
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier.padding(start = 12.dp, end = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                LibraryViewType.entries.forEachIndexed { index, type ->
-                    ToggleButton(
-                        checked = viewType == type,
-                        onCheckedChange = { viewType = type },
-                        shapes = when (index) {
-                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                            LibraryViewType.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                LibraryViewType.entries.forEach { type ->
+                    SegmentedButton(
+                        selected = viewType == type,
+                        onClick = { viewType = type },
+                        icon = {
+                            Icon(
+                                painter = painterResource(
+                                    when (type) {
+                                        LibraryViewType.LIST -> R.drawable.list
+                                        LibraryViewType.GRID -> R.drawable.grid_view
+                                    }
+                                ),
+                                contentDescription = null,
+                            )
                         },
-                        modifier = Modifier.semantics { role = Role.RadioButton },
-                    ) {
-                        Icon(
-                            painter = painterResource(
-                                when (type) {
-                                    LibraryViewType.LIST -> R.drawable.list
-                                    LibraryViewType.GRID -> R.drawable.grid_view
-                                }
-                            ),
-                            contentDescription = null,
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -428,6 +430,49 @@ fun LibraryMixScreen(
                             contentType = CONTENT_TYPE_HEADER,
                         ) {
                             headerContent()
+                        }
+
+                        if (pinnedPlaylists.isNotEmpty()) {
+                            item(key = "pinned_header", contentType = CONTENT_TYPE_HEADER) {
+                                Text(
+                                    text = stringResource(R.string.pinned),
+                                    style = AppTheme.typography.titleMedium,
+                                    modifier = Modifier
+                                        .padding(horizontal = AppleTokens.Gutter, vertical = 8.dp)
+                                        .animateItem(),
+                                )
+                            }
+                            item(key = "pinned_row", contentType = "pinned_row") {
+                                LazyRow(
+                                    contentPadding = PaddingValues(horizontal = AppleTokens.Gutter),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .animateItem(),
+                                ) {
+                                    items(pinnedPlaylists, key = { "pinned_${it.id}" }) { playlist ->
+                                        PlaylistGridItem(
+                                            playlist = playlist,
+                                            fillMaxWidth = false,
+                                            modifier = Modifier
+                                                .width(150.dp)
+                                                .animateItem()
+                                                .combinedBounceClick(
+                                                    onClick = { navController.navigate("local_playlist/${playlist.id}") },
+                                                    onLongClick = {
+                                                        menuState.show {
+                                                            PlaylistMenu(
+                                                                playlist = playlist,
+                                                                coroutineScope = coroutineScope,
+                                                                onDismiss = menuState::dismiss,
+                                                            )
+                                                        }
+                                                    },
+                                                ),
+                                        )
+                                    }
+                                }
+                            }
                         }
 
                         if (showLiked) {
@@ -809,6 +854,56 @@ fun LibraryMixScreen(
                         contentType = CONTENT_TYPE_HEADER,
                     ) {
                         headerContent()
+                    }
+                    if (pinnedPlaylists.isNotEmpty()) {
+                        item(
+                            key = "pinned_header",
+                            span = { GridItemSpan(maxLineSpan) },
+                            contentType = CONTENT_TYPE_HEADER,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.pinned),
+                                style = AppTheme.typography.titleMedium,
+                                modifier = Modifier
+                                    .padding(horizontal = AppleTokens.Gutter, vertical = 8.dp)
+                                    .animateItem(),
+                            )
+                        }
+                        item(
+                            key = "pinned_row",
+                            span = { GridItemSpan(maxLineSpan) },
+                            contentType = "pinned_row",
+                        ) {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = AppleTokens.Gutter),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .animateItem(),
+                            ) {
+                                items(pinnedPlaylists, key = { "pinned_${it.id}" }) { playlist ->
+                                    PlaylistGridItem(
+                                        playlist = playlist,
+                                        fillMaxWidth = false,
+                                        modifier = Modifier
+                                            .width(150.dp)
+                                            .animateItem()
+                                            .combinedBounceClick(
+                                                onClick = { navController.navigate("local_playlist/${playlist.id}") },
+                                                onLongClick = {
+                                                    menuState.show {
+                                                        PlaylistMenu(
+                                                            playlist = playlist,
+                                                            coroutineScope = coroutineScope,
+                                                            onDismiss = menuState::dismiss,
+                                                        )
+                                                    }
+                                                },
+                                            ),
+                                    )
+                                }
+                            }
+                        }
                     }
                     if (showLiked) {
                         item(

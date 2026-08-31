@@ -7,7 +7,16 @@ package com.convx.music.ui.screens.settings
 
 import com.convx.music.R
 import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,19 +35,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
+import com.convx.music.ui.component.FrostedTopBar
+import com.convx.music.ui.component.TopFadeBlur
+import com.convx.music.ui.component.rememberTitleCollapseProgress
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,12 +67,14 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.convx.music.BuildConfig
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.component.Material3SettingsGroup
-import com.convx.music.ui.component.Material3SettingsItem
-import com.convx.music.ui.theme.AppleTokens
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.backToMain
+import com.convx.music.ui.component.IosSettingsGroup
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.component.shapes.ContinuousCapsule
+import com.convx.music.ui.ios.foundation.IosMetrics
+import com.convx.music.ui.ios.foundation.IosTheme
+import com.convx.music.ui.ios.foundation.iosRowPress
+import com.convx.music.ui.component.IosSettingsItem
+import com.convx.music.ui.utils.isScrollingUp
 import com.convx.music.vivimusic.updater.getUpdateAvailableState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,9 +89,22 @@ fun SettingsScreen(
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val searchLower = searchQuery.trim().lowercase()
+    val listState = rememberLazyListState()
+    // Progressive top blur so the list dissolves under the status bar instead
+    // of cutting off hard — same technique as the rest of the app's screens.
+    val hazeState = remember { HazeState() }
 
+    Box(
+        modifier = Modifier
+            // Explicit rather than relying on whatever's painted behind the NavHost:
+            // this is an iOS grouped-list page, so it owns the grouped background
+            // token directly instead of inheriting MainActivity's flat systemBackground.
+            .background(IosTheme.colors.systemGroupedBackground),
+    ) {
     androidx.compose.foundation.lazy.LazyColumn(
-        Modifier
+        state = listState,
+        modifier = Modifier
+            .hazeSource(hazeState)
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal))
     ) {
         item(key = "top_spacer") {
@@ -90,52 +119,39 @@ fun SettingsScreen(
         item(key = "title") {
             Text(
                 text = stringResource(R.string.settings),
-                style = MaterialTheme.typography.displaySmall.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 8.dp)
+                style = IosTheme.typography.largeTitle,
+                color = IosTheme.colors.label,
+                modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 14.dp)
             )
         }
 
         // Search field — filters the settings catalog and jumps to the matching screen.
+        // It collapses as you scroll down and comes back on the way up, the way iOS
+        // hides the search bar in Settings and Mail. A query in progress pins it open:
+        // hiding the field you are typing into would be a bug, not a flourish.
         item(key = "search_field") {
-            OutlinedTextField(
+            AnimatedVisibility(
+                visible = listState.isScrollingUp() || searchQuery.isNotEmpty(),
+                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+            ) {
+            SettingsSearchField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text(stringResource(R.string.search)) },
-                leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.search),
-                        contentDescription = stringResource(R.string.search)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                painter = painterResource(R.drawable.close),
-                                contentDescription = null
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
+                placeholder = stringResource(R.string.search),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
             )
+            }
         }
 
         if (searchLower.isEmpty()) {
         // Section: General
-        item(key = "general_header") { SettingsSectionHeader("GENERAL") }
+        item(key = "general_header") { SettingsSectionHeader("General") }
         item(key = "general_section") {
             SettingsSection {
                 SettingsNavItem(
                     icon = painterResource(if (isUpdateAvailable) R.drawable.convx_logo else R.drawable.network_update),
-                    iconTint = if (isUpdateAvailable) MaterialTheme.colorScheme.error else Color(0xFF007AFF),
+                    iconTint = if (isUpdateAvailable) IosTheme.colors.systemRed else IosTheme.colors.systemBlue,
                     title = stringResource(R.string.system_update),
                     badge = if (isUpdateAvailable) stringResource(R.string.update_available) else null,
                     onClick = { navController.navigate("settings/update") },
@@ -143,14 +159,14 @@ fun SettingsScreen(
                 SettingsDivider()
                 SettingsNavItem(
                     icon = painterResource(R.drawable.palette),
-                    iconTint = Color(0xFFAF52DE),
+                    iconTint = IosTheme.colors.systemPurple,
                     title = stringResource(R.string.appearance),
                     onClick = { navController.navigate("settings/appearance") },
                 )
                 SettingsDivider()
                 SettingsNavItem(
                     icon = painterResource(R.drawable.play),
-                    iconTint = Color(0xFFFF375F),
+                    iconTint = IosTheme.colors.systemPink,
                     title = stringResource(R.string.player_and_audio),
                     onClick = { navController.navigate("settings/player") },
                 )
@@ -160,19 +176,19 @@ fun SettingsScreen(
         item(key = "spacer_1") { Spacer(Modifier.height(24.dp)) }
 
         // Section: Account
-        item(key = "account_header") { SettingsSectionHeader("ACCOUNT") }
+        item(key = "account_header") { SettingsSectionHeader("Account") }
         item(key = "account_section") {
             SettingsSection {
                 SettingsNavItem(
                     icon = painterResource(R.drawable.account),
-                    iconTint = Color(0xFF34C759),
+                    iconTint = IosTheme.colors.systemGreen,
                     title = stringResource(R.string.account),
                     onClick = { navController.navigate("settings/account") },
                 )
                 SettingsDivider()
                 SettingsNavItem(
                     icon = painterResource(R.drawable.group),
-                    iconTint = Color(0xFF5856D6),
+                    iconTint = IosTheme.colors.systemIndigo,
                     title = stringResource(R.string.listen_together),
                     // Screens.ListenTogether.route ("listen_together") is a
                     // MainTabsPager page now, not its own NavHost destination, and
@@ -189,19 +205,19 @@ fun SettingsScreen(
 
         // Section: Activity — history/stats moved here from the top bar, which now
         // only shows the logo and this settings/profile pill.
-        item(key = "activity_header") { SettingsSectionHeader("ACTIVITY") }
+        item(key = "activity_header") { SettingsSectionHeader("Activity") }
         item(key = "activity_section") {
             SettingsSection {
                 SettingsNavItem(
                     icon = painterResource(R.drawable.music_history),
-                    iconTint = Color(0xFF32ADE6),
+                    iconTint = IosTheme.colors.systemCyan,
                     title = stringResource(R.string.history),
                     onClick = { navController.navigate("history") },
                 )
                 SettingsDivider()
                 SettingsNavItem(
                     icon = painterResource(R.drawable.stats),
-                    iconTint = Color(0xFFFFCC00),
+                    iconTint = IosTheme.colors.systemYellow,
                     title = stringResource(R.string.stats),
                     onClick = { navController.navigate("stats") },
                 )
@@ -211,26 +227,26 @@ fun SettingsScreen(
         item(key = "spacer_2") { Spacer(Modifier.height(24.dp)) }
 
         // Section: Content
-        item(key = "content_header") { SettingsSectionHeader("CONTENT") }
+        item(key = "content_header") { SettingsSectionHeader("Content") }
         item(key = "content_section") {
             SettingsSection {
                 SettingsNavItem(
                     icon = painterResource(R.drawable.language),
-                    iconTint = Color(0xFF007AFF),
+                    iconTint = IosTheme.colors.systemBlue,
                     title = stringResource(R.string.content),
                     onClick = { navController.navigate("settings/content") },
                 )
                 SettingsDivider()
                 SettingsNavItem(
                     icon = painterResource(R.drawable.link),
-                    iconTint = Color(0xFF5856D6),
+                    iconTint = IosTheme.colors.systemIndigo,
                     title = stringResource(R.string.modules),
                     onClick = { navController.navigate("settings/modules") },
                 )
                 SettingsDivider()
                 SettingsNavItem(
                     icon = painterResource(R.drawable.translate),
-                    iconTint = Color(0xFFFF9500),
+                    iconTint = IosTheme.colors.systemOrange,
                     title = stringResource(R.string.ai_lyrics_translation),
                     onClick = { navController.navigate("settings/ai") },
                 )
@@ -240,26 +256,26 @@ fun SettingsScreen(
         item(key = "spacer_3") { Spacer(Modifier.height(24.dp)) }
 
         // Section: Data & Privacy
-        item(key = "privacy_header") { SettingsSectionHeader("DATA & PRIVACY") }
+        item(key = "privacy_header") { SettingsSectionHeader("Data & Privacy") }
         item(key = "privacy_section") {
             SettingsSection {
                 SettingsNavItem(
                     icon = painterResource(R.drawable.security),
-                    iconTint = Color(0xFF007AFF),
+                    iconTint = IosTheme.colors.systemBlue,
                     title = stringResource(R.string.privacy),
                     onClick = { navController.navigate("settings/privacy") },
                 )
                 SettingsDivider()
                 SettingsNavItem(
                     icon = painterResource(R.drawable.storage),
-                    iconTint = Color(0xFF8E8E93),
+                    iconTint = IosTheme.colors.systemGray,
                     title = stringResource(R.string.storage),
                     onClick = { navController.navigate("settings/storage") },
                 )
                 SettingsDivider()
                 SettingsNavItem(
                     icon = painterResource(R.drawable.restore),
-                    iconTint = Color(0xFF34C759),
+                    iconTint = IosTheme.colors.systemGreen,
                     title = stringResource(R.string.backup_restore),
                     onClick = { navController.navigate("settings/backup_restore") },
                 )
@@ -273,7 +289,7 @@ fun SettingsScreen(
             SettingsSection {
                 SettingsNavItem(
                     icon = painterResource(R.drawable.info),
-                    iconTint = Color(0xFF007AFF),
+                    iconTint = IosTheme.colors.systemBlue,
                     title = stringResource(R.string.about),
                     onClick = { navController.navigate("settings/about") },
                 )
@@ -297,17 +313,17 @@ fun SettingsScreen(
                 if (results.isEmpty()) {
                     Text(
                         text = "No settings found for \"$searchQuery\"",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = IosTheme.typography.body,
+                        color = IosTheme.colors.secondaryLabel,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp, vertical = 32.dp)
                     )
                 } else {
-                    Material3SettingsGroup(
+                    IosSettingsGroup(
                         items = results.map { setting ->
-                            Material3SettingsItem(
+                            IosSettingsItem(
                                 icon = painterResource(R.drawable.search),
                                 title = { Text(setting.title) },
                                 description = { Text(setting.category) },
@@ -320,36 +336,28 @@ fun SettingsScreen(
         }
     }
 
-    TopAppBar(
-        title = {},
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null
-                )
-            }
-        },
-        windowInsets = appTopBarWindowInsets(),
-    )
+        TopFadeBlur(
+            hazeState = hazeState,
+            pageColor = IosTheme.colors.systemGroupedBackground,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+
+        FrostedTopBar(
+            onBack = navController::navigateUp,
+            title = stringResource(R.string.settings),
+            titleAlpha = rememberTitleCollapseProgress(listState),
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+    }
 }
 
 @Composable
 private fun SettingsSectionHeader(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.labelLarge.copy(
-            fontWeight = FontWeight.SemiBold,
-        ),
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(
-            start = 20.dp,
-            top = 8.dp,
-            bottom = 8.dp,
-        ),
+        style = IosTheme.typography.subheadline,
+        color = IosTheme.colors.secondaryLabel,
+        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 20.dp, bottom = 8.dp),
     )
 }
 
@@ -362,11 +370,8 @@ private fun SettingsSection(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(AppleTokens.CardCorner))
-            // Row content (title/icon) already reads MaterialTheme.colorScheme —
-            // a fixed-dark AppleTokens.Card background went black-on-black in
-            // light theme (same root cause as Material3SettingsGroup).
-            .background(MaterialTheme.colorScheme.surfaceContainer),
+            .clip(ContinuousRoundedRectangle(IosMetrics.GroupedCornerRadius))
+            .background(IosTheme.colors.secondarySystemGroupedBackground),
         content = content,
     )
 }
@@ -382,33 +387,34 @@ private fun SettingsNavItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 13.dp),
+            .iosRowPress(onClick = onClick)
+            .defaultMinSize(minHeight = IosMetrics.ListRowHeight)
+            .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Icon in rounded square
+        // iOS puts the glyph ON the colour, not in a 15%-alpha wash of it.
         Box(
             modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(iconTint.copy(alpha = 0.15f)),
+                .size(IosMetrics.IconTileSize)
+                .clip(ContinuousRoundedRectangle(IosMetrics.IconTileRadius))
+                .background(iconTint),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 painter = icon,
                 contentDescription = null,
-                tint = iconTint,
+                tint = Color.White,
                 modifier = Modifier.size(18.dp),
             )
         }
 
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(12.dp))
 
         // Title
         Text(
             text = title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = IosTheme.typography.body,
+            color = IosTheme.colors.label,
             modifier = Modifier.weight(1f),
         )
 
@@ -416,8 +422,8 @@ private fun SettingsNavItem(
         if (badge != null) {
             Text(
                 text = badge,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
+                style = IosTheme.typography.footnote,
+                color = IosTheme.colors.systemRed,
             )
             Spacer(Modifier.width(8.dp))
         }
@@ -425,7 +431,7 @@ private fun SettingsNavItem(
         Icon(
             painter = painterResource(R.drawable.chevron_right_px),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            tint = IosTheme.colors.tertiaryLabel,
             modifier = Modifier.size(14.dp),
         )
     }
@@ -434,8 +440,93 @@ private fun SettingsNavItem(
 @Composable
 private fun SettingsDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(start = 64.dp),
-        color = MaterialTheme.colorScheme.outlineVariant,
-        thickness = 0.5.dp,
+        // Inset to the text column, clearing the glyph tile — the iOS separator rule.
+        modifier = Modifier.padding(start = 57.dp),
+        color = IosTheme.colors.separator,
+        thickness = IosMetrics.SeparatorThickness,
     )
+}
+
+/**
+ * Settings' own search field: wider and taller than the shared [com.convx.music.ui.ios.compat.IosSearchField]
+ * pill, with a Cancel affordance that fades in as a frosted capsule (Apple's blurred-glass
+ * chip look) instead of plain text once there's something to cancel.
+ */
+@Composable
+private fun SettingsSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+) {
+    val colors = IosTheme.colors
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(44.dp)
+                .clip(ContinuousCapsule())
+                .background(colors.secondarySystemFill)
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painter = painterResource(R.drawable.search),
+                    contentDescription = null,
+                    tint = colors.secondaryLabel,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f)) {
+                    if (value.isEmpty()) {
+                        Text(
+                            text = placeholder,
+                            style = IosTheme.typography.body,
+                            color = colors.secondaryLabel,
+                        )
+                    }
+                    BasicTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        interactionSource = interactionSource,
+                        textStyle = IosTheme.typography.body.copy(color = colors.label),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(IosTheme.tint),
+                        singleLine = true,
+                    )
+                }
+            }
+        }
+
+        // Cupertino's own search-field motion: Cancel slides in from the trailing edge
+        // as the field shrinks to make room, rather than popping in place — the axis
+        // that was wrong before (expand/shrinkVertically animates height, not the
+        // horizontal reveal this actually is). Plain text, no chip: Cupertino's real
+        // Cancel button has no background either.
+        AnimatedVisibility(
+            visible = isFocused || value.isNotEmpty(),
+            enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
+            exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(),
+        ) {
+            Text(
+                text = stringResource(android.R.string.cancel),
+                style = IosTheme.typography.body,
+                color = IosTheme.tint,
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .clickable {
+                        onValueChange("")
+                        focusManager.clearFocus()
+                    },
+            )
+        }
+    }
 }

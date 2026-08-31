@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.LoadingIndicator
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -49,12 +49,12 @@ fun RandomizeGridItem(
         modifier = modifier
             .aspectRatio(1f)
             .clip(ThumbnailRoundedShape)
-            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .background(AppTheme.colorScheme.secondaryContainer)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         // Die Dots (5-pattern)
-        val dotColor = MaterialTheme.colorScheme.onSecondaryContainer
+        val dotColor = AppTheme.colorScheme.onSecondaryContainer
         val dotSize = 14.dp
         val padding = 24.dp
 
@@ -117,7 +117,7 @@ fun RandomizeGridItem(
             Box(modifier = Modifier.graphicsLayer { alpha = loadingAlpha }) {
                 LoadingIndicator(
                     modifier = Modifier.size(48.dp),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    color = AppTheme.colorScheme.onSecondaryContainer,
                 )
             }
         }

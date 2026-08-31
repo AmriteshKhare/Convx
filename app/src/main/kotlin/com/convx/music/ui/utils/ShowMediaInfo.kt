@@ -27,10 +27,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.LoadingIndicator
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -130,7 +130,7 @@ fun ShowMediaInfo(videoId: String) {
         state = rememberLazyListState(),
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(AppTheme.colorScheme.background)
             .padding(bottom = windowInsets.asPaddingValues().calculateBottomPadding())
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -144,9 +144,9 @@ fun ShowMediaInfo(videoId: String) {
             ) {
                 Text(
                     text = stringResource(R.string.song_info),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = AppTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+                    color = AppTheme.colorScheme.onBackground
                 )
                 TextButton(onClick = { sheetState.dismiss() }) {
                     Text(stringResource(R.string.done))
@@ -161,7 +161,7 @@ fun ShowMediaInfo(videoId: String) {
                     .fillMaxWidth()
                     .height(200.dp)
                     .clip(albumArtShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(AppTheme.colorScheme.surfaceVariant)
             ) {
                 val imageUrl = song?.thumbnailUrl
                     ?: "https://i.ytimg.com/vi/$videoId/maxresdefault.jpg"
@@ -354,11 +354,11 @@ fun ShowMediaInfo(videoId: String) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = stringResource(R.string.description),
-                        style = MaterialTheme.typography.labelMedium.copy(
+                        style = AppTheme.typography.labelMedium.copy(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                     if (info == null) {
                         Box(
@@ -372,8 +372,8 @@ fun ShowMediaInfo(videoId: String) {
                     } else {
                         Text(
                             text = info?.description ?: stringResource(R.string.song_info_no_description),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground
+                            style = AppTheme.typography.bodyMedium,
+                            color = AppTheme.colorScheme.onBackground
                         )
                     }
                 }
@@ -424,19 +424,19 @@ fun InfoItem(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium.copy(
+            style = AppTheme.typography.labelMedium.copy(
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.5.sp
             ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = AppTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium.copy(
+            style = AppTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.SemiBold
             ),
-            color = MaterialTheme.colorScheme.onBackground
+            color = AppTheme.colorScheme.onBackground
         )
     }
 }

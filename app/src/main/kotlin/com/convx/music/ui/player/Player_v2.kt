@@ -6,6 +6,8 @@
 
 package com.convx.music.ui.player
 
+import com.convx.music.ui.ios.compat.AppTheme
+
 import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.IntentFilter
@@ -24,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
@@ -48,22 +49,38 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import androidx.media3.common.C
 import com.convx.music.LocalPlayerConnection
+import com.convx.music.playback.PlayerConnection
 import com.convx.music.constants.PlayerBackgroundStyle
 import com.convx.music.constants.PlayerBackgroundStyleKey
+import com.convx.music.constants.PlayerStaticColorKey
+import com.convx.music.constants.PlayerGradientStopsKey
+import com.convx.music.ui.theme.decodeGradientStops
+import androidx.compose.ui.graphics.luminance
 import com.convx.music.constants.ShowPlayerThumbnailShadowKey
 import com.convx.music.constants.PlayerThumbnailShadowElevationKey
 import com.convx.music.constants.EnableGoogleCastKey
 import com.convx.music.models.MediaMetadata
 import com.convx.music.ui.component.BottomSheetState
+import com.convx.music.ui.component.DjReadout
 import com.convx.music.ui.component.PlayerSliderTrack
 import com.convx.music.ui.theme.PlayerSliderColors
 import com.convx.music.utils.makeTimeString
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.extensions.togglePlayPause
+import com.convx.music.extensions.metadata
 import com.convx.music.ui.component.Lyrics
 import com.convx.music.ui.component.rememberBottomSheetState
 import com.convx.music.ui.component.expandedAnchor
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
+import com.convx.music.constants.SwipeSensitivityKey
+import com.convx.music.constants.SwipeThumbnailKey
+import kotlin.math.roundToInt
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
@@ -81,23 +98,25 @@ import androidx.compose.ui.unit.sp
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Size as CoilSize
-import com.convx.music.extensions.SwipeGesture
 import com.convx.music.vivimusic.AudioDeviceBottomSheet
 import com.convx.music.vivimusic.getConnectedBluetoothDeviceName
 import com.convx.music.ui.component.CastButton
 import com.convx.music.BuildConfig
 import com.convx.music.R
 import com.convx.music.utils.rememberPreference
-import com.convx.music.constants.AppTextColorKey
 import com.convx.music.constants.CompactPlayerInTabViewKey
 import com.convx.music.LocalTabView
 import com.convx.music.constants.ShowUpNextKey
-import com.convx.music.ui.player.customize.DiyStickerLayer
+import com.convx.music.constants.HideVolumeBarKey
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.convx.music.ui.player.customize.AbsoluteFrameDiyStickers
 import com.convx.music.ui.player.customize.PlayerGlyph
+import androidx.compose.ui.graphics.graphicsLayer
+import com.convx.music.ui.utils.additiveChrome
+import com.convx.music.ui.player.customize.AnimatedPlayerGlyph
 import com.convx.music.ui.player.customize.PlayerIconSlot
 import com.convx.music.ui.player.customize.rememberDiyLayout
 import com.convx.music.ui.player.customize.DiyOrientation
-import com.convx.music.ui.player.customize.DiyDesignCanvas
 import com.convx.music.LocalPlayerConnection
 import kotlinx.coroutines.launch
 import com.convx.music.ui.utils.Motion
@@ -119,6 +138,14 @@ fun PlayerV2(
     showDiyStickers: Boolean = true,
     forcedOrientation: DiyOrientation? = null,
     isPreviewOnly: Boolean = false,
+    /** See AbsoluteFrameDiyStickers' doc -- shared with classic Player.kt's own z < 0
+     *  sticker band so both skins resolve stickers against the same frame. */
+    diyRootCoordinates: androidx.compose.ui.layout.LayoutCoordinates? = null,
+    /** Reports whether [playerState] is COVER, so Player.kt's z >= 0 sticker band
+     *  (rendered from its own overlayContent, outside this composable entirely) knows
+     *  to hide while V17 is showing Lyrics or Queue -- it used to get that for free by
+     *  living inside the same AnimatedContent branch as the cover. */
+    onCoverShowingChange: ((Boolean) -> Unit)? = null,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -147,11 +174,26 @@ fun PlayerV2(
     val playerConnection = LocalPlayerConnection.current ?: return
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
+    // For the hero artwork's live swipe peek below: the neighbour thumbnail slides in from
+    // whichever side the finger is dragging toward, tracking the drag itself rather than
+    // only appearing once the gesture commits.
+    val queueWindows by playerConnection.queueWindows.collectAsState()
+    val currentQueueIndex by playerConnection.currentMediaItemIndex.collectAsState()
+    val nextMediaMetadata = queueWindows.getOrNull(currentQueueIndex + 1)?.mediaItem?.metadata
+    val previousMediaMetadata = queueWindows.getOrNull(currentQueueIndex - 1)?.mediaItem?.metadata
     val currentSong by playerConnection.currentSong.collectAsState(initial = null)
     val currentLyrics by playerConnection.currentLyrics.collectAsState(initial = null)
     val menuState = LocalMenuState.current
     val bottomSheetPageState = LocalBottomSheetPageState.current
     var playerState by remember { mutableStateOf(PlayerInternalState.COVER) }
+
+    LaunchedEffect(playerState) {
+        onCoverShowingChange?.invoke(playerState == PlayerInternalState.COVER)
+    }
+
+    // Hoisted out of rememberSwipeCardModifier so the live value is readable here too, for
+    // the neighbour-thumbnail peek.
+    val heroDragOffset = remember { Animatable(0f) }
 
     // The floating mini bar's lyrics/queue icons live outside this composable
     // (FloatingSideBar/FloatingNavBar), so they signal here through
@@ -271,8 +313,8 @@ fun PlayerV2(
     val showPlayerThumbnailShadow by rememberPreference(ShowPlayerThumbnailShadowKey, defaultValue = false)
     val playerThumbnailShadowElevation by rememberPreference(PlayerThumbnailShadowElevationKey, defaultValue = 8f)
     val enableGoogleCast by rememberPreference(EnableGoogleCastKey, defaultValue = true)
-    val (appTextColorInt) = rememberPreference(AppTextColorKey, defaultValue = 0)
     val (showUpNext) = rememberPreference(ShowUpNextKey, defaultValue = false)
+    val (hideVolumeBar) = rememberPreference(HideVolumeBarKey, defaultValue = false)
     val diyLayout = rememberDiyLayout()
     // Was hardcoded to PORTRAIT below, so rotating into landscape kept using the
     // portrait sticker placement -- same real-orientation read the classic player
@@ -341,42 +383,69 @@ fun PlayerV2(
         }
     }
 
+    val staticColorInt by rememberPreference(PlayerStaticColorKey, defaultValue = 0xFF1A1A1A.toInt())
+    val gradientStopsRaw by rememberPreference(PlayerGradientStopsKey, defaultValue = "")
+    val gradientStops = remember(gradientStopsRaw) { decodeGradientStops(gradientStopsRaw) }
+    val flatOnColor = remember(playerBackground, staticColorInt, gradientStops) {
+        val luminance = when (playerBackground) {
+            PlayerBackgroundStyle.CUSTOM_GRADIENT ->
+                gradientStops.map { it.luminance() }.average().toFloat()
+            else -> Color(staticColorInt).luminance()
+        }
+        if (luminance > 0.5f) Color.Black else Color.White
+    }
+
+    // Back to the original per-background pick -- no mesh blend, no global custom colour
+    // override, just what it looked like before either of those existed.
     val adaptivePrimary by animateColorAsState(
-        targetValue = if (appTextColorInt != 0) Color(appTextColorInt) else when (playerBackground) {
-            PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.onSurface
+        targetValue = when (playerBackground) {
+            PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.onSurface
             PlayerBackgroundStyle.BLUR,
             PlayerBackgroundStyle.GRADIENT,
             PlayerBackgroundStyle.GLOW_ANIMATED,
             PlayerBackgroundStyle.APPLE_MUSIC,
             PlayerBackgroundStyle.LIVE_MESH,
+            PlayerBackgroundStyle.BITCHORD_MESH -> Color.White
             PlayerBackgroundStyle.STATIC,
-            PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.White
+            PlayerBackgroundStyle.CUSTOM_GRADIENT -> flatOnColor
         },
         label = "adaptivePrimary"
     )
+    // Back on, per user request: player chrome is composited additively onto the
+    // background/mesh again.
+    val additiveChrome = true
     val adaptiveSecondary by animateColorAsState(
-        targetValue = if (appTextColorInt != 0) Color(appTextColorInt).copy(alpha = 0.7f) else when (playerBackground) {
-            PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.onSurfaceVariant
+        targetValue = when (playerBackground) {
+            PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.onSurfaceVariant
             PlayerBackgroundStyle.BLUR,
             PlayerBackgroundStyle.GRADIENT,
             PlayerBackgroundStyle.GLOW_ANIMATED,
             PlayerBackgroundStyle.APPLE_MUSIC,
             PlayerBackgroundStyle.LIVE_MESH,
+            PlayerBackgroundStyle.BITCHORD_MESH -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
             PlayerBackgroundStyle.STATIC,
-            PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.White.copy(alpha = 0.7f)
+            PlayerBackgroundStyle.CUSTOM_GRADIENT -> flatOnColor.copy(alpha = FlamingoSecondaryAlpha)
         },
         label = "adaptiveSecondary"
     )
+    // Flamingo runs a third step below the artist line for the two time labels, which are
+    // reference text rather than content — reading them should never cost a glance.
+    val adaptiveTime = if (additiveChrome) {
+        Color.White.copy(alpha = FlamingoTimeAlpha)
+    } else {
+        adaptiveSecondary
+    }
     val adaptiveSurface by animateColorAsState(
         targetValue = when (playerBackground) {
-            PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.surfaceVariant
+            PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.surfaceVariant
             PlayerBackgroundStyle.BLUR,
             PlayerBackgroundStyle.GRADIENT,
             PlayerBackgroundStyle.GLOW_ANIMATED,
             PlayerBackgroundStyle.APPLE_MUSIC,
             PlayerBackgroundStyle.LIVE_MESH,
+            PlayerBackgroundStyle.BITCHORD_MESH -> Color.White.copy(alpha = 0.2f)
             PlayerBackgroundStyle.STATIC,
-            PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.White.copy(alpha = 0.2f)
+            PlayerBackgroundStyle.CUSTOM_GRADIENT -> flatOnColor.copy(alpha = 0.2f)
         },
         label = "adaptiveSurface"
     )
@@ -393,7 +462,7 @@ fun PlayerV2(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Transparent) 
+            .background(Color.Transparent)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -456,6 +525,24 @@ fun PlayerV2(
                         label = "InternalWindow"
                     ) { targetState ->
                         if (targetState == PlayerInternalState.COVER) {
+                            // DIY stickers with a negative z sit here, below the artwork. Anchored
+                            // to diyRootCoordinates (captured in Player.kt's overlayContent, since
+                            // that is a sibling of BOTH player skins) rather than this Box's own
+                            // fillMaxSize() -- this Box only gets `pane`'s space, which
+                            // PlayerV2Frame shrinks by its own handle and controls rows, a
+                            // different amount than classic Player.kt's chrome does. A sticker
+                            // placed correctly in the editor (which always previews via classic)
+                            // was landing at the wrong size and place here for exactly that
+                            // reason. See AbsoluteFrameDiyStickers' doc for the full story.
+                            Box(modifier = Modifier.fillMaxSize()) {
+                            if (showDiyStickers) {
+                                AbsoluteFrameDiyStickers(
+                                    rootCoordinates = diyRootCoordinates,
+                                    orientation = diyOrientation,
+                                    layout = diyLayout,
+                                    zFilter = { it < 0 },
+                                )
+                            }
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -466,71 +553,135 @@ fun PlayerV2(
                                 // Massive Apple Music Style Artwork
                                 Box(
                                     modifier = Modifier
-                                        .sharedElement(
-                                            rememberSharedContentState(key = "coverArt"),
-                                            animatedVisibilityScope = this@AnimatedContent
-                                        )
                                         .fillMaxWidth()
                                         .aspectRatio(1f)
-                                        // Target end of the mini-to-full artwork morph.
-                                        // Without this the overlay has no full rect to
-                                        // grow into and the morph silently does nothing
-                                        // on this player -- the classic player registers
-                                        // its own artwork the same way.
-                                        .registerFullArtworkRect(
-                                            with(androidx.compose.ui.platform.LocalDensity.current) { 12.dp.toPx() }
-                                        )
-                                        // The overlay owns the cover for the whole
-                                        // flight; without this both are on screen from
-                                        // the handoff onward.
-                                        .hideWhileMorphing()
-                                        .customSoftShadow(
-                                            elevation = playerThumbnailShadowElevation.dp, 
-                                            cornerRadius = 12.dp, 
-                                            enabled = showPlayerThumbnailShadow
-                                        )
-                                        .background(adaptiveSurface, RoundedCornerShape(12.dp))
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .SwipeGesture(
-                                            enabled = (playerState == PlayerInternalState.COVER && !isListenTogetherGuest),
-                                            onSwipeLeft = { if (canSkipNext) playerConnection.player.seekToNext() },
-                                            onSwipeRight = { if (canSkipPrevious) playerConnection.player.seekToPrevious() }
-                                        )
                                 ) {
-                                    // Behind the artwork -- matches the classic player's z < 0
-                                    // band. Previously there was only one DiyStickerLayer call
-                                    // after the artwork, so a sticker placed at negative z (meant
-                                    // to sit behind the cover) rendered on top of it instead.
-                                    // Gated on showDiyStickers so the DIY editor's own draft
-                                    // overlay (DiyEditorScreen's DiyDesignCanvas) isn't drawn
-                                    // twice on top of this live, saved-layout copy.
-                                    if (showDiyStickers) DiyStickerLayer(
-                                        layout = diyLayout,
-                                        orientation = diyOrientation,
-                                        zFilter = { it < 0 },
+                                    // Live swipe peek: the neighbour song's own card, revealed from
+                                    // whichever side the finger is dragging toward, tracking the drag
+                                    // itself rather than only appearing once the gesture commits.
+                                    val peekMetadata = if (heroDragOffset.value > 0f) previousMediaMetadata else nextMediaMetadata
+                                    if (peekMetadata != null && heroDragOffset.value != 0f) {
+                                        val peekDirection = if (heroDragOffset.value > 0f) 1f else -1f
+                                        val screenWidthPx = LocalConfiguration.current.screenWidthDp *
+                                            androidx.compose.ui.platform.LocalDensity.current.density
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .offset {
+                                                    IntOffset(
+                                                        (heroDragOffset.value - screenWidthPx * peekDirection).roundToInt(),
+                                                        0,
+                                                    )
+                                                }
+                                                .customSoftShadow(
+                                                    elevation = playerThumbnailShadowElevation.dp,
+                                                    cornerRadius = 12.dp,
+                                                    enabled = showPlayerThumbnailShadow
+                                                )
+                                                .background(adaptiveSurface, RoundedCornerShape(12.dp))
+                                                .clip(RoundedCornerShape(12.dp))
+                                        ) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(context)
+                                                    .data(peekMetadata.thumbnailUrl?.resize(1200, 1200))
+                                                    .size(CoilSize.ORIGINAL)
+                                                    .build(),
+                                                contentDescription = "Cover Art",
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .sharedElement(
+                                                rememberSharedContentState(key = "coverArt"),
+                                                animatedVisibilityScope = this@AnimatedContent
+                                            )
+                                            // Target end of the mini-to-full artwork morph.
+                                            // Without this the overlay has no full rect to
+                                            // grow into and the morph silently does nothing
+                                            // on this player -- the classic player registers
+                                            // its own artwork the same way.
+                                            .registerFullArtworkRect(
+                                                with(androidx.compose.ui.platform.LocalDensity.current) { 12.dp.toPx() }
+                                            )
+                                            // The overlay owns the cover for the whole
+                                            // flight; without this both are on screen from
+                                            // the handoff onward.
+                                            .hideWhileMorphing()
+                                            // Deliberately no background/clip/shadow here any more, and no
+                                            // scale either -- this Box is only the morph's stable measurement
+                                            // anchor now. Everything that actually paints (shadow, rounded
+                                            // background, the image itself) lives one level in, inside the
+                                            // AnimatedContent below, so the whole styled card -- not just the
+                                            // image inside a fixed frame -- scales on pause and slides fully
+                                            // off/on during a skip, with nothing here clipping it partway.
+                                            .then(
+                                                rememberSwipeCardModifier(
+                                                    enabled = (playerState == PlayerInternalState.COVER && !isListenTogetherGuest),
+                                                    playerConnection = playerConnection,
+                                                    offsetXAnimatable = heroDragOffset,
+                                                )
+                                            )
+                                    ) {
+                                    val heroScale by animateFloatAsState(
+                                        targetValue = if (isPlaying) 1f else 0.94f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioLowBouncy,
+                                            stiffness = Spring.StiffnessLow,
+                                        ),
+                                        label = "heroScale",
                                     )
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(context)
-                                            .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
-                                            .size(CoilSize.ORIGINAL)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = "Cover Art",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    PlayerV2Canvas(
-                                        mediaMetadata = mediaMetadata,
-                                        isPlaying = isPlaying,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                    if (showDiyStickers) DiyStickerLayer(
-                                        layout = diyLayout,
-                                        orientation = diyOrientation,
-                                        zFilter = { it >= 0 },
-                                    )
+                                    AnimatedContent(
+                                        targetState = mediaMetadata,
+                                        contentKey = { it?.id },
+                                        // Fade only, no slide: the live peek above already carries the
+                                        // whole card across during a swipe (drag-linked, then springs
+                                        // the rest of the way on release). This only needs to swap the
+                                        // content identity in underneath without moving it a second time
+                                        // -- a slide here too would double up on top of the peek's own.
+                                        transitionSpec = {
+                                            fadeIn(Motion.appear()).togetherWith(fadeOut(Motion.appearExit()))
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .graphicsLayer { scaleX = heroScale; scaleY = heroScale },
+                                        label = "heroArtwork",
+                                    ) { targetMetadata ->
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .customSoftShadow(
+                                                    elevation = playerThumbnailShadowElevation.dp,
+                                                    cornerRadius = 12.dp,
+                                                    enabled = showPlayerThumbnailShadow
+                                                )
+                                                .background(adaptiveSurface, RoundedCornerShape(12.dp))
+                                                .clip(RoundedCornerShape(12.dp))
+                                        ) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(context)
+                                                    .data(targetMetadata?.thumbnailUrl?.resize(1200, 1200))
+                                                    .size(CoilSize.ORIGINAL)
+                                                    .crossfade(true)
+                                                    .build(),
+                                                contentDescription = "Cover Art",
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                            PlayerV2Canvas(
+                                                mediaMetadata = targetMetadata,
+                                                isPlaying = isPlaying,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
+                                    }
+                                    }
                                 }
-                                
+
                                 Spacer(modifier = Modifier.weight(1f)) // Allows the content to lock down
 
                                 // Track Meta Info (Left Aligned)
@@ -542,7 +693,7 @@ fun PlayerV2(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             mediaMetadata?.title ?: "Unknown",
-                                            style = MaterialTheme.typography.headlineSmall, 
+                                            style = AppTheme.typography.headlineSmall, 
                                             color = adaptivePrimary,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1,
@@ -558,8 +709,11 @@ fun PlayerV2(
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             mediaMetadata?.artists?.firstOrNull()?.name ?: "Unknown",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = adaptiveSecondary,
+                                            style = AppTheme.typography.titleMedium,
+                                            // Same extra dimming UpNextSong applies to its own
+                                            // artist line (subtitleColor.copy(alpha = 0.7f)),
+                                            // so both artist-name reads land at the same weight.
+                                            color = adaptiveSecondary.copy(alpha = 0.7f),
                                             fontWeight = FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -570,6 +724,14 @@ fun PlayerV2(
                                                 state.collapseSoft()
                                                 mediaMetadata?.artists?.firstOrNull()?.id?.let { navController.navigate("artist/$it") }
                                             }
+                                                .additiveChrome(additiveChrome)
+                                                .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
+                                        )
+                                        DjReadout(
+                                            modifier = Modifier.padding(top = 2.dp)
+                                                .additiveChrome(additiveChrome)
+                                                .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
+                                            color = adaptiveSecondary,
                                         )
                                     }
 
@@ -579,36 +741,34 @@ fun PlayerV2(
                                             rememberSharedContentState(key = "actionButtons"),
                                             animatedVisibilityScope = this@AnimatedContent
                                         )
+                                            .additiveChrome(additiveChrome)
+                                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                     ) {
                                         val isLiked = currentSong?.song?.liked == true
         
-                                        Box(
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .background(adaptivePrimary.copy(alpha = 0.1f), CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
+                                        // Flamingo's favourite/more glyphs draw their own
+                                        // 0.1-alpha disc; the Box that used to sit here drew a
+                                        // second one behind it.
                                         IconButton(
-                                            onClick = playerConnection::toggleLike
+                                            onClick = playerConnection::toggleLike,
+                                            modifier = Modifier.size(40.dp),
                                         ) {
                                             PlayerGlyph(
                                                 slot = if (isLiked) PlayerIconSlot.V2_LIKED else PlayerIconSlot.V2_LIKE,
-                                                fallback = if (isLiked) R.drawable.favorite else R.drawable.favorite_border,
+                                                fallback = if (isLiked) R.drawable.flamingo_favorited else R.drawable.flamingo_favorite,
+                                                // Like sits in the primary row already at full-strength
+                                                // adaptivePrimary either way -- filled vs outline glyph is
+                                                // what signals liked, not a colour swap.
                                                 tint = adaptivePrimary,
+                                                modifier = Modifier.size(28.dp),
                                                 contentDescription = "Like",
                                             )
-                                        }
                                         }
                                         
                                         Spacer(modifier = Modifier.width(8.dp))
                                         
-                                        Box(
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .background(adaptivePrimary.copy(alpha = 0.1f), CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
                                         IconButton(
+                                            modifier = Modifier.size(40.dp),
                                             onClick = {
                                                 menuState.show {
                                                     PlayerMenu(
@@ -629,15 +789,19 @@ fun PlayerV2(
                                         ) {
                                             PlayerGlyph(
                                                 slot = PlayerIconSlot.V2_MORE,
-                                                fallback = R.drawable.more_horiz,
+                                                fallback = R.drawable.flamingo_more,
                                                 tint = adaptivePrimary,
+                                                modifier = Modifier.size(28.dp),
                                                 contentDescription = "Options",
                                             )
-                                        }
                                         }
                                     }
                                     }
                                 }
+                            // The z >= 0 sticker band renders from Player.kt's overlayContent
+                            // slot instead, a sibling of both player skins -- see that call
+                            // site's comment.
+                            }
                         } else if (targetState == PlayerInternalState.LYRICS || targetState == PlayerInternalState.QUEUE) {
                             Column(modifier = Modifier.fillMaxSize()) {
                                 // Apple Music Morphing Mini Header
@@ -678,7 +842,7 @@ fun PlayerV2(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             mediaMetadata?.title ?: "Unknown",
-                                            style = MaterialTheme.typography.titleMedium, 
+                                            style = AppTheme.typography.titleMedium, 
                                             color = adaptivePrimary,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1,
@@ -690,14 +854,17 @@ fun PlayerV2(
                                         )
                                         Text(
                                             mediaMetadata?.artists?.firstOrNull()?.name ?: "Unknown",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = adaptiveSecondary,
+                                            style = AppTheme.typography.titleSmall,
+                                            // Same extra dimming as the portrait artist line above.
+                                            color = adaptiveSecondary.copy(alpha = 0.7f),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.sharedBounds(
                                                 rememberSharedContentState(key = "artist"),
                                                 animatedVisibilityScope = this@AnimatedContent
                                             )
+                                                .additiveChrome(additiveChrome)
+                                                .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                         )
                                     }
 
@@ -707,14 +874,16 @@ fun PlayerV2(
                                             rememberSharedContentState(key = "actionButtons"),
                                             animatedVisibilityScope = this@AnimatedContent
                                         )
+                                            .additiveChrome(additiveChrome)
+                                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                     ) {
                                         val isLiked = currentSong?.song?.liked == true
-                                        
+
                                         IconButton(
                                             onClick = playerConnection::toggleLike
                                         ) {
                                             Icon(
-                                                painter = painterResource(if (isLiked) R.drawable.favorite else R.drawable.favorite_border),
+                                                painter = painterResource(if (isLiked) R.drawable.flamingo_favorited else R.drawable.flamingo_favorite),
                                                 contentDescription = "Like",
                                                 tint = adaptivePrimary,
                                                 modifier = Modifier.size(24.dp)
@@ -833,6 +1002,13 @@ fun PlayerV2(
                                             pureBlack = false,
                                             showInlineLyrics = false,
                                             playerBackground = playerBackground,
+                                            // V17's own controls behind this sheet already show
+                                            // the thumbnail/title/like — the shared header row
+                                            // would just repeat them.
+                                            showHeaderRow = false,
+                                            // Drag-to-dismiss on this sheet was getting stuck —
+                                            // the queue toggle icon and back gesture still close it.
+                                            sheetDraggable = false,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     }
@@ -902,21 +1078,32 @@ fun PlayerV2(
                                 sliderState = sliderState,
                                 trackHeight = trackHeight,
                                 colors = PlayerSliderColors.getSliderColors(
-                                    activeColor = adaptivePrimary.copy(alpha = 0.8f)
+                                    activeColor = if (additiveChrome) adaptivePrimary else adaptivePrimary.copy(alpha = 0.8f),
+                                    // Flamingo's bar: the unplayed half is a hairline, not a
+                                    // grey rail. It reads at 0.05 only because the whole thing
+                                    // is added onto the artwork rather than laid over it.
+                                    inactiveAlpha = if (additiveChrome) 0.05f else 0.3f,
                                 )
                             )
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .additiveChrome(additiveChrome)
+                            // After additiveChrome, never before: alpha applied first is
+                            // folded into the saved layer and the add then runs at full strength.
+                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                     )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp), // Align with internal slider padding
+                            .padding(horizontal = 4.dp) // Align with internal slider padding
+                            .additiveChrome(additiveChrome)
+                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(makeTimeString(currentPos), color = adaptiveSecondary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(makeTimeString(currentPos), color = adaptiveTime, style = AppTheme.typography.labelSmall, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
                         AudioQualityBadge(playerConnection, adaptivePrimary, isPlaying)
-                        Text("-" + makeTimeString(maxOf(0L, duration - currentPos)), color = adaptiveSecondary, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text("-" + makeTimeString(maxOf(0L, duration - currentPos)), color = adaptiveTime, style = AppTheme.typography.labelSmall, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
                     }
 
                     if (showUpNext) {
@@ -924,34 +1111,44 @@ fun PlayerV2(
                             playerConnection = playerConnection,
                             titleColor = adaptivePrimary,
                             subtitleColor = adaptiveSecondary,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            additiveChrome = additiveChrome,
                         )
                     }
-                
+
                     Spacer(modifier = Modifier.height(16.dp))
-                
+
                     // Naked Transparent Playback Controls
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .additiveChrome(additiveChrome)
+                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
+                        horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val previousInteraction = remember { MutableInteractionSource() }
                         IconButton(
                             onClick = { if (!isListenTogetherGuest && canSkipPrevious) playerConnection.player.seekToPrevious() },
                             enabled = !isListenTogetherGuest && canSkipPrevious,
+                            interactionSource = previousInteraction,
                             modifier = Modifier
-                                .size(64.dp)
+                                .size(61.dp)
+                                .flamingoPressScale(previousInteraction)
                                 .alpha(if (isListenTogetherGuest || !canSkipPrevious) 0.4f else 1f)
                         ) {
                             PlayerGlyph(
                                 slot = PlayerIconSlot.V2_PREVIOUS,
-                                fallback = R.drawable.apple_skip_previous,
-                                tint = adaptivePrimary,
-                                modifier = Modifier.size(48.dp),
+                                fallback = R.drawable.flamingo_rewind,
+                                tint = if (additiveChrome) adaptivePrimary else adaptivePrimary.copy(alpha = 0.8f),
+                                modifier = Modifier.size(41.dp),
                                 contentDescription = "Previous",
                             )
                         }
-                
+
+                        Spacer(modifier = Modifier.width(43.dp))
+
+                        val playInteraction = remember { MutableInteractionSource() }
                         IconButton(
                             onClick = {
                                 if (isListenTogetherGuest) {
@@ -960,38 +1157,51 @@ fun PlayerV2(
                                     playerConnection.player.togglePlayPause()
                                 }
                             },
-                            modifier = Modifier.size(88.dp)
+                            interactionSource = playInteraction,
+                            modifier = Modifier
+                                .size(58.5.dp)
+                                .flamingoPressScale(playInteraction)
                         ) {
                             if (isListenTogetherGuest) {
                                 Icon(
                                     imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
                                     contentDescription = if (isMuted) "Unmute" else "Mute",
-                                    modifier = Modifier.size(64.dp),
-                                    tint = adaptivePrimary
+                                    modifier = Modifier.size(38.5.dp),
+                                    tint = if (additiveChrome) adaptivePrimary else adaptivePrimary.copy(alpha = 0.8f)
                                 )
                             } else {
-                                PlayerGlyph(
-                                    slot = if (isPlaying) PlayerIconSlot.V2_PAUSE else PlayerIconSlot.V2_PLAY,
-                                    fallback = if (isPlaying) R.drawable.pause_applemusic else R.drawable.play_applemusic,
-                                    tint = adaptivePrimary,
-                                    modifier = Modifier.size(80.dp),
-                                    contentDescription = if (isPlaying) "Pause" else "Play",
+                                AnimatedPlayerGlyph(
+                                    isPlaying = isPlaying,
+                                    playSlot = PlayerIconSlot.V2_PLAY,
+                                    pauseSlot = PlayerIconSlot.V2_PAUSE,
+                                    playFallback = R.drawable.flamingo_play,
+                                    pauseFallback = R.drawable.flamingo_pause,
+                                    tint = if (additiveChrome) adaptivePrimary else adaptivePrimary.copy(alpha = 0.8f),
+                                    playSize = 40.5.dp,
+                                    pauseSize = 38.5.dp,
+                                    playDescription = "Play",
+                                    pauseDescription = "Pause",
                                 )
                             }
                         }
-                
+
+                        Spacer(modifier = Modifier.width(43.dp))
+
+                        val nextInteraction = remember { MutableInteractionSource() }
                         IconButton(
                             onClick = { if (!isListenTogetherGuest && canSkipNext) playerConnection.player.seekToNext() },
                             enabled = !isListenTogetherGuest && canSkipNext,
+                            interactionSource = nextInteraction,
                             modifier = Modifier
-                                .size(64.dp)
+                                .size(61.dp)
+                                .flamingoPressScale(nextInteraction)
                                 .alpha(if (isListenTogetherGuest || !canSkipNext) 0.4f else 1f)
                         ) {
                             PlayerGlyph(
                                 slot = PlayerIconSlot.V2_NEXT,
-                                fallback = R.drawable.apple_skip_next,
-                                tint = adaptivePrimary,
-                                modifier = Modifier.size(48.dp),
+                                fallback = R.drawable.flamingo_fforward,
+                                tint = if (additiveChrome) adaptivePrimary else adaptivePrimary.copy(alpha = 0.8f),
+                                modifier = Modifier.size(41.dp),
                                 contentDescription = "Next",
                             )
                         }
@@ -999,25 +1209,39 @@ fun PlayerV2(
                     
                     Spacer(modifier = Modifier.height(24.dp))
                     
-                    // Audio Volume Component
+                    // Audio Volume Component — hidden while the player menu or a
+                    // settings-style bottom sheet page is covering the controls, so
+                    // it isn't sitting there fighting for attention behind the sheet.
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = !menuState.isVisible && !bottomSheetPageState.isVisible,
+                        enter = androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.fadeOut(),
+                    ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .additiveChrome(additiveChrome)
+                            // Alpha + cleared semantics, not removed from the tree: same as the
+                            // classic player's HideVolumeBarKey handling -- the row still reserves
+                            // its layout space so a DIY sticker placed relative to it doesn't jump.
+                            .alpha(if (hideVolumeBar) 0f else 1f)
+                            .then(if (hideVolumeBar) Modifier.clearAndSetSemantics {} else Modifier),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Default.VolumeMute, contentDescription = "Volume Down", tint = adaptiveSecondary, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(16.dp))
-                        
+
                         val volumeInteractionSource = remember { MutableInteractionSource() }
                         val isVolDragged by volumeInteractionSource.collectIsDraggedAsState()
                         val isVolPressed by volumeInteractionSource.collectIsPressedAsState()
                         val isVolActive = isVolDragged || isVolPressed
-                        
+
                         val volHeight by animateDpAsState(
                             targetValue = if (isVolActive) 12.dp else 6.dp,
                             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
                             label = "volHeight"
                         )
-                        
+
                         Slider(
                             value = if (isVolActive) systemVolume else animatedVolume,
                             onValueChange = { newValue ->
@@ -1025,22 +1249,26 @@ fun PlayerV2(
                                 val targetVolume = (newValue * maxSystemVolume).toInt()
                                 audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVolume, 0)
                             },
+                            enabled = !hideVolumeBar,
                             interactionSource = volumeInteractionSource,
                             thumb = { Spacer(modifier = Modifier.size(0.dp)) },
                             track = { sliderState ->
                                 PlayerSliderTrack(
                                     sliderState = sliderState,
-                                    trackHeight = volHeight, 
+                                    trackHeight = volHeight,
                                     colors = PlayerSliderColors.getSliderColors(
                                         activeColor = adaptivePrimary.copy(alpha = 0.8f)
-                                    )
+                                    ),
+                                    // Volume, not position: the mix window means nothing here.
+                                    showAutomix = false
                                 )
                             },
                             modifier = Modifier.weight(1f).height(24.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
-                            Icon(Icons.Default.VolumeUp, contentDescription = "Volume Up", tint = adaptiveSecondary, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.VolumeUp, contentDescription = "Volume Up", tint = adaptiveSecondary, modifier = Modifier.size(20.dp))
                         }
+                    }
                     }
                 }
             // (Controls AnimatedVisibility closed above)
@@ -1063,6 +1291,8 @@ fun PlayerV2(
                             indication = null,
                             onClick = {}
                         )
+                        .additiveChrome(additiveChrome)
+                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                         .padding(horizontal = 16.dp, vertical = 24.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
@@ -1073,9 +1303,13 @@ fun PlayerV2(
                 ) {
                     PlayerGlyph(
                         slot = PlayerIconSlot.V2_LYRICS,
-                        fallback = R.drawable.apple_lyrics,
+                        fallback = if (isLyricsActive) R.drawable.flamingo_lyricson else R.drawable.flamingo_lyrics,
+                        // Active = full-strength adaptivePrimary instead of the dim
+                        // adaptiveSecondary every other bottom-bar icon sits at -- same
+                        // white tint, just boosted to full brightness/opacity so it reads
+                        // as lit up, no separate hue involved.
                         tint = if (isLyricsActive) adaptivePrimary else adaptiveSecondary,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(32.dp),
                         contentDescription = "Lyrics",
                     )
                 }
@@ -1087,15 +1321,15 @@ fun PlayerV2(
                             modifier = Modifier.background(Color.Transparent, RoundedCornerShape(12.dp))
                         ) {
                             Icon(
-                                Icons.Default.Bluetooth, 
-                                contentDescription = "Audio Device", 
-                                tint = adaptiveSecondary, 
-                                modifier = Modifier.size(28.dp)
+                                Icons.Default.Bluetooth,
+                                contentDescription = "Audio Device",
+                                tint = adaptiveSecondary,
+                                modifier = Modifier.size(32.dp)
                             )
                         }
                         Text(
                             text = bluetoothDeviceName!!,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            style = AppTheme.typography.labelSmall.copy(fontSize = 10.sp),
                             color = adaptiveSecondary.copy(alpha = 0.8f),
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -1116,9 +1350,9 @@ fun PlayerV2(
                         ) {
                             PlayerGlyph(
                                 slot = PlayerIconSlot.V2_VOLUME_DOWN,
-                                fallback = R.drawable.speaker_apple,
+                                fallback = R.drawable.flamingo_volume,
                                 tint = adaptiveSecondary,
-                                modifier = Modifier.size(28.dp),
+                                modifier = Modifier.size(32.dp),
                                 contentDescription = "Speaker",
                             )
                         }
@@ -1131,9 +1365,9 @@ fun PlayerV2(
                 ) {
                     PlayerGlyph(
                         slot = PlayerIconSlot.V2_QUEUE,
-                        fallback = R.drawable.apple_queue,
+                        fallback = if (isQueueActive) R.drawable.flamingo_queueon else R.drawable.flamingo_queue,
                         tint = if (isQueueActive) adaptivePrimary else adaptiveSecondary,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(32.dp),
                         contentDescription = "Queue",
                     )
                 }
@@ -1193,5 +1427,132 @@ private fun PlayerV2Frame(
             pane(Modifier.weight(1f))
             controls()
         }
+    }
+}
+
+/**
+ * The classic mini player's swipe-to-skip card drag, ported onto V17's own cover
+ * artwork: the whole artwork follows the finger and springs back (or commits a skip
+ * past the sensitivity-scaled threshold, or on a fast flick) instead of the plain
+ * gesture-only swipe detector this replaces having no visual feedback at all.
+ */
+@Composable
+private fun rememberSwipeCardModifier(
+    enabled: Boolean,
+    playerConnection: PlayerConnection,
+    // Hoisted so the caller can read the live drag position too, to slide the next/previous
+    // song's own thumbnail in as a preview while the finger is still moving -- not just after
+    // the gesture commits.
+    offsetXAnimatable: Animatable<Float, AnimationVector1D>,
+): Modifier {
+    val (swipeThumbnail) = rememberPreference(SwipeThumbnailKey, true)
+    val (swipeSensitivity) = rememberPreference(SwipeSensitivityKey, 0.73f)
+    val coroutineScope = rememberCoroutineScope()
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val configuration = LocalConfiguration.current
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+
+    var dragStartTime by remember { mutableLongStateOf(0L) }
+    var totalDragDistance by remember { mutableFloatStateOf(0f) }
+    val animationSpec = remember {
+        spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)
+    }
+    val autoSwipeThreshold = remember(swipeSensitivity, configuration.screenWidthDp, density) {
+        val screenWidthPx = configuration.screenWidthDp * density
+        (screenWidthPx * (0.45f - 0.33f * swipeSensitivity.coerceIn(0f, 1f))).roundToInt()
+    }
+
+    return Modifier
+        .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
+        .then(
+            if (enabled && swipeThumbnail) {
+                Modifier.pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            dragStartTime = System.currentTimeMillis()
+                            totalDragDistance = 0f
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch { offsetXAnimatable.animateTo(0f, animationSpec) }
+                        },
+                        onHorizontalDrag = { _, dragAmount ->
+                            val adjustedDragAmount =
+                                if (layoutDirection == LayoutDirection.Rtl) -dragAmount else dragAmount
+                            val canSkipPrevious = playerConnection.player.previousMediaItemIndex != -1
+                            val canSkipNext = playerConnection.player.nextMediaItemIndex != -1
+                            val tryingToSwipeRight = adjustedDragAmount > 0
+                            val tryingToSwipeLeft = adjustedDragAmount < 0
+                            val allowLeft = tryingToSwipeLeft && canSkipNext
+                            val allowRight = tryingToSwipeRight && canSkipPrevious
+                            val canReturnToCenter =
+                                (tryingToSwipeRight && !canSkipPrevious && offsetXAnimatable.value < 0) ||
+                                    (tryingToSwipeLeft && !canSkipNext && offsetXAnimatable.value > 0)
+                            if (allowLeft || allowRight || canReturnToCenter) {
+                                totalDragDistance += kotlin.math.abs(adjustedDragAmount)
+                                coroutineScope.launch {
+                                    offsetXAnimatable.snapTo(offsetXAnimatable.value + adjustedDragAmount)
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            val dragDuration = System.currentTimeMillis() - dragStartTime
+                            val velocity = if (dragDuration > 0) totalDragDistance / dragDuration else 0f
+                            val currentOffset = offsetXAnimatable.value
+                            val dragged = kotlin.math.abs(currentOffset)
+                            val canSkipPrevious = playerConnection.player.previousMediaItemIndex != -1
+                            val canSkipNext = playerConnection.player.nextMediaItemIndex != -1
+                            val shouldChangeSong = dragged > autoSwipeThreshold ||
+                                (velocity > 0.55f && dragged > autoSwipeThreshold * 0.25f)
+                            if (shouldChangeSong) {
+                                if (currentOffset > 0 && canSkipPrevious) {
+                                    playerConnection.seekToPrevious()
+                                } else if (currentOffset <= 0 && canSkipNext) {
+                                    playerConnection.seekToNext()
+                                }
+                            }
+                            // Either way, spring the same offset back to 0 -- committed or
+                            // cancelled, this is what carries the live peek the rest of the way
+                            // in (or back out). AnimatedContent below only fades the content
+                            // identity in underneath once mediaMetadata changes; it doesn't also
+                            // slide, so there's only ever one thing moving the card horizontally.
+                            coroutineScope.launch { offsetXAnimatable.animateTo(0f, animationSpec) }
+                        },
+                    )
+                }
+            } else {
+                Modifier
+            }
+        )
+}
+
+/** Title stays white; the artist line sits well back. Flamingo's own value. */
+private const val FlamingoSecondaryAlpha = 0.35f
+
+/** Elapsed/remaining under the seek bar — quieter again than the artist line. */
+private const val FlamingoTimeAlpha = 0.3f
+
+/**
+ * Strength of white content added onto the background under [additiveChrome]. Below full so
+ * the blend doesn't clip to plain white -- the background's own colour and saturation stay
+ * visible through the tint instead of getting washed out.
+ */
+private const val AdditiveChromeContentAlpha = 0.45f
+
+/**
+ * Flamingo's transport press: the button dips under the finger and springs back rather than
+ * flashing a ripple. Needs the same [interactionSource] the button is given, so the scale
+ * tracks the real press rather than a second gesture detector layered over it.
+ */
+@Composable
+private fun Modifier.flamingoPressScale(interactionSource: MutableInteractionSource): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
+        label = "flamingoPressScale",
+    )
+    return graphicsLayer {
+        scaleX = scale
+        scaleY = scale
     }
 }

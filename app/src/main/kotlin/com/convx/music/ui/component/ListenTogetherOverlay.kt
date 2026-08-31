@@ -27,9 +27,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -167,7 +167,7 @@ private fun JoinRequestCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(SheetShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(AppTheme.colorScheme.surfaceContainerHigh)
             .padding(20.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -175,29 +175,29 @@ private fun JoinRequestCard(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(AppTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = username.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = AppTheme.colorScheme.onPrimaryContainer,
                 )
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
                     text = username,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = stringResource(R.string.listen_together_wants_to_join),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodySmall,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -207,15 +207,15 @@ private fun JoinRequestCard(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OverlayButton(
                 label = stringResource(R.string.reject),
-                container = MaterialTheme.colorScheme.surfaceContainerHighest,
-                content = MaterialTheme.colorScheme.onSurface,
+                container = AppTheme.colorScheme.surfaceContainerHighest,
+                content = AppTheme.colorScheme.onSurface,
                 onClick = onReject,
                 modifier = Modifier.weight(1f),
             )
             OverlayButton(
                 label = stringResource(R.string.approve),
-                container = MaterialTheme.colorScheme.primary,
-                content = MaterialTheme.colorScheme.onPrimary,
+                container = AppTheme.colorScheme.primary,
+                content = AppTheme.colorScheme.onPrimary,
                 onClick = onApprove,
                 modifier = Modifier.weight(1f),
             )
@@ -229,7 +229,7 @@ private fun QueueNotice(title: String, addedBy: String?) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(SheetShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(AppTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -237,7 +237,7 @@ private fun QueueNotice(title: String, addedBy: String?) {
             painter = painterResource(R.drawable.playlist_add),
             contentDescription = null,
             modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.primary,
+            tint = AppTheme.colorScheme.primary,
         )
         Spacer(Modifier.width(12.dp))
         Text(
@@ -246,7 +246,7 @@ private fun QueueNotice(title: String, addedBy: String?) {
             } else {
                 stringResource(R.string.listen_together_added_to_queue_by, addedBy, title)
             },
-            style = MaterialTheme.typography.bodyMedium,
+            style = AppTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -271,7 +271,7 @@ private fun OverlayButton(
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = AppTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = content,
         )

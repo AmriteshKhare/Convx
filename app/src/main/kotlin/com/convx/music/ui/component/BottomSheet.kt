@@ -479,8 +479,14 @@ class BottomSheetState(
         }
     }
 
-    val preUpPostDownNestedScrollConnection
-        get() = object : NestedScrollConnection {
+    // A `val`, not `get() =`: this used to allocate a fresh NestedScrollConnection (with a
+    // fresh isTopReached = false) on every access. Read inline and un-remembered at the call
+    // site, that meant any recomposition mid-drag silently reset isTopReached -- if that landed
+    // right as the finger lifted, onPreFling's isTopReached check failed, performFling never
+    // ran, and the sheet was left parked mid-drag with no anchor to settle to. Computed once
+    // here (BottomSheetState itself is only constructed once, inside `remember`), isTopReached
+    // now actually survives recomposition.
+    val preUpPostDownNestedScrollConnection = object : NestedScrollConnection {
             var isTopReached = false
 
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {

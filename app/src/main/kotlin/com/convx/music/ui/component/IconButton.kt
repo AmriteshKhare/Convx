@@ -16,12 +16,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.IconButtonColors
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
-import androidx.compose.material3.ripple
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.foundation.IosTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -45,7 +41,7 @@ import com.convx.music.ui.player.customize.rememberPlayerIcon
 fun ResizableIconButton(
     @DrawableRes icon: Int,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurface,
+    color: Color = IosTheme.colors.label,
     enabled: Boolean = true,
     indication: Indication? = null,
     slot: PlayerIconSlot? = null,
@@ -58,7 +54,7 @@ fun ResizableIconButton(
         colorFilter = if (custom == null) ColorFilter.tint(color) else custom.colorFilterFor(color),
         modifier = modifier
             .clickable(
-                indication = indication ?: ripple(bounded = false),
+                indication = indication,
                 interactionSource = remember { MutableInteractionSource() },
                 enabled = enabled,
                 onClick = onClick,
@@ -74,30 +70,26 @@ fun IconButton(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
+    containerColor: Color = Color.Transparent,
+    contentColor: Color = IosTheme.tint,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable () -> Unit,
 ) {
     Box(
         modifier = modifier
-            .minimumInteractiveComponentSize()
-            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
             .clip(CircleShape)
-            .background(color = colors.containerColor)
+            .background(color = containerColor)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
                 enabled = enabled,
                 role = Role.Button,
                 interactionSource = interactionSource,
-                indication = ripple(
-                    bounded = false,
-                    radius = 24.dp
-                ),
+                indication = null,
             ),
         contentAlignment = Alignment.Center,
     ) {
-        val contentColor = colors.contentColor
         CompositionLocalProvider(LocalContentColor provides contentColor, content = content)
     }
 }

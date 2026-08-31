@@ -38,18 +38,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Button
+import com.convx.music.ui.ios.compat.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.FilledTonalButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedButton
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -274,8 +274,8 @@ private fun ReadyState(
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            AppTheme.colorScheme.primary.copy(alpha = 0.3f),
+                            AppTheme.colorScheme.primary.copy(alpha = 0.1f),
                             Color.Transparent
                         )
                     )
@@ -287,22 +287,22 @@ private fun ReadyState(
                 modifier = Modifier
                     .size(160.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
+                    .background(AppTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     painter = painterResource(R.drawable.mic),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onPrimary
+                    tint = AppTheme.colorScheme.onPrimary
                 )
             }
         }
         
         Text(
             text = stringResource(R.string.tap_to_recognize),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            style = AppTheme.typography.titleMedium,
+            color = AppTheme.colorScheme.onSurface
         )
     }
 }
@@ -337,7 +337,7 @@ private fun ListeningState(
                     .size(200.dp)
                     .graphicsLayer { scaleX = scale; scaleY = scale }
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                    .background(AppTheme.colorScheme.primary.copy(alpha = 0.2f))
             )
 
             // Inner pulsing ring
@@ -346,7 +346,7 @@ private fun ListeningState(
                     .size(180.dp)
                     .graphicsLayer { scaleX = scale * 0.9f; scaleY = scale * 0.9f }
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                    .background(AppTheme.colorScheme.primary.copy(alpha = 0.3f))
             )
             
             // Main button
@@ -354,7 +354,7 @@ private fun ListeningState(
                 modifier = Modifier
                     .size(160.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(AppTheme.colorScheme.primary)
                     .bounceClick { onCancel() },
                 contentAlignment = Alignment.Center
             ) {
@@ -362,15 +362,15 @@ private fun ListeningState(
                     painter = painterResource(R.drawable.mic),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onPrimary
+                    tint = AppTheme.colorScheme.onPrimary
                 )
             }
         }
         
         Text(
             text = stringResource(R.string.listening),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
+            style = AppTheme.typography.titleMedium,
+            color = AppTheme.colorScheme.primary
         )
         
         OutlinedButton(onClick = onCancel) {
@@ -407,11 +407,11 @@ private fun ProcessingState() {
                         width = 4.dp,
                         brush = Brush.sweepGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                AppTheme.colorScheme.primary,
+                                AppTheme.colorScheme.primary.copy(alpha = 0.5f),
                                 Color.Transparent,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                                MaterialTheme.colorScheme.primary
+                                AppTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                AppTheme.colorScheme.primary
                             )
                         ),
                         shape = CircleShape
@@ -422,14 +422,14 @@ private fun ProcessingState() {
                 painter = painterResource(R.drawable.music_note),
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = AppTheme.colorScheme.primary
             )
         }
         
         Text(
             text = stringResource(R.string.processing),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            style = AppTheme.typography.titleMedium,
+            color = AppTheme.colorScheme.onSurface
         )
     }
 }
@@ -473,7 +473,7 @@ private fun SuccessState(
         // Track info
         Text(
             text = result.title,
-            style = MaterialTheme.typography.headlineSmall,
+            style = AppTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             maxLines = 2,
@@ -482,8 +482,8 @@ private fun SuccessState(
         
         Text(
             text = result.artist,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.titleMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -492,8 +492,8 @@ private fun SuccessState(
         result.album?.let { album ->
             Text(
                 text = album,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -563,27 +563,27 @@ private fun NoMatchState(
             modifier = Modifier
                 .size(120.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.errorContainer),
+                .background(AppTheme.colorScheme.errorContainer),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painter = painterResource(R.drawable.close),
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onErrorContainer
+                tint = AppTheme.colorScheme.onErrorContainer
             )
         }
         
         Text(
             text = stringResource(R.string.no_match_found),
-            style = MaterialTheme.typography.titleLarge,
+            style = AppTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
         
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 32.dp)
         )
@@ -613,27 +613,27 @@ private fun ErrorState(
             modifier = Modifier
                 .size(120.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.errorContainer),
+                .background(AppTheme.colorScheme.errorContainer),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 painter = painterResource(R.drawable.error),
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onErrorContainer
+                tint = AppTheme.colorScheme.onErrorContainer
             )
         }
         
         Text(
             text = stringResource(R.string.recognition_error),
-            style = MaterialTheme.typography.titleLarge,
+            style = AppTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
         
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 32.dp)
         )

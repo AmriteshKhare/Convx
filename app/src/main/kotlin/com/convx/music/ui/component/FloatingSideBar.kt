@@ -27,9 +27,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,7 +43,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -66,6 +65,7 @@ import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.player.FloatingMiniPlayer
 import com.convx.music.ui.screens.Screens
 import com.convx.music.ui.theme.BrandName
+import com.convx.music.ui.theme.LocalAccentColor
 import com.convx.music.ui.theme.rememberBrandFontFamily
 import com.convx.music.ui.utils.fadingEdge
 
@@ -203,7 +203,7 @@ fun AppFloatingSideBar(
     val backgroundColor = when {
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> AppTheme.colorScheme.surfaceContainerHigh
     }
     // Collapsed rail is narrow and tall — a full capsule (same shape as the
     // tab rows/puck) reads as a pill, where the expanded panel's fixed 28dp
@@ -299,7 +299,7 @@ fun AppFloatingSideBar(
                     section.title?.let { title ->
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = AppTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = glassConfig.textColor.copy(alpha = 0.6f),
                             modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 4.dp),
@@ -346,14 +346,13 @@ private fun SideNavTabs(
     val selectedContentColor = glassConfig.textColor
     val unselectedContentColor = glassConfig.textColor.copy(alpha = 0.75f)
 
-    // Same wash the phone puck uses: the configured colour, or one that follows
-    // the theme rather than assuming a dark bar.
+    // Same wash the phone puck uses: the configured colour, or the app's current
+    // accent (the same colour the hero/nav chrome derives from the background) so
+    // an unset puck still tracks whatever is playing instead of a flat grey.
     val puckWash = if (glassConfig.puckColor.isSpecified) {
         glassConfig.puckColor
-    } else if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color(0xFFF2F2F2)
     } else {
-        Color(28, 27, 28)
+        LocalAccentColor.current
     }
     val puckRestAlpha = glassConfig.puckOpacity.coerceIn(0f, 1f)
 
@@ -378,9 +377,12 @@ private fun SideNavTabs(
     val selectedIndex = tabs.indexOfFirst { it.selected }.coerceAtLeast(0)
 
     // The puck's position, in tab indices. Nothing drives it but the selection.
+    // Underdamped on purpose — the bottom tab bar's own puck (DampedDragAnimation,
+    // ported from Kyant's LiquidBottomTabs) settles with visible overshoot, and a
+    // near-critical 0.9 read as flat/mechanical next to it.
     val puckPosition = remember { Animatable(selectedIndex.toFloat()) }
     LaunchedEffect(selectedIndex) {
-        puckPosition.animateTo(selectedIndex.toFloat(), spring(0.9f, 400f, 0.001f))
+        puckPosition.animateTo(selectedIndex.toFloat(), spring(0.6f, 380f, 0.001f))
     }
 
     Box(
@@ -481,7 +483,7 @@ fun BoxWithConstraintsScope.AppFloatingNowPlayingPill(
     val background = when {
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> AppTheme.colorScheme.surfaceContainerHigh
     }
     val surface = if (useGlass) {
         // This is the mini player pill, not the side panel — it uses the
@@ -496,7 +498,7 @@ fun BoxWithConstraintsScope.AppFloatingNowPlayingPill(
     FloatingMiniPlayer(
         isInline = false,
         // See AppNavigation: hardcoded white disappeared on light themes.
-        contentColor = if (useGlass) glassConfig.textColor else MaterialTheme.colorScheme.onSurface,
+        contentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface,
         onClick = onClick,
         onLyricsClick = onLyricsClick,
         onQueueClick = onQueueClick,
@@ -560,7 +562,7 @@ fun SideBarAccountRow(
                     if (accountImageUrl != null) R.string.account else R.string.settings
                 ),
                 color = contentColor,
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -602,7 +604,7 @@ private fun SideTabRow(
             Text(
                 text = stringResource(tab.screen.titleId),
                 color = contentColor,
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -647,7 +649,7 @@ private fun SideBarLinkRow(link: SideBarLink, contentColor: Color) {
         Text(
             text = link.label,
             color = contentColor,
-            style = MaterialTheme.typography.bodyLarge,
+            style = AppTheme.typography.bodyLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

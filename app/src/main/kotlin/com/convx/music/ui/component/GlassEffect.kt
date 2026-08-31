@@ -9,7 +9,7 @@ import android.app.ActivityManager
 import android.os.Build
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.foundation.background
@@ -36,6 +36,8 @@ import com.convx.music.ui.component.backdrop.effects.lens
 import com.convx.music.ui.component.backdrop.highlight.Highlight
 import com.convx.music.ui.component.backdrop.highlight.HighlightStyle
 import com.convx.music.ui.component.backdrop.shadow.Shadow
+import com.convx.music.ui.component.backdrop.highlight.HighlightElement
+import com.convx.music.ui.component.backdrop.internal.ShapeProvider
 
 /**
  * User-configurable parameters of the liquid glass effect, sourced from DataStore
@@ -69,7 +71,6 @@ data class GlassEffectConfig(
     val puckOpacity: Float = 0.8f,
     val surfaceOpacity: Float = 0.5f,
     val textColor: Color = Color.White,
-    val playerEnabled: Boolean = true,
     val miniPlayerEnabled: Boolean = true,
     val navBarEnabled: Boolean = true,
     /** Tablet side panel — split from [navBarEnabled] so it can differ from the
@@ -106,7 +107,6 @@ data class GlassEffectConfig(
      */
     fun isEnabledFor(component: GlassComponent): Boolean =
         globalEnabled && when (component) {
-            GlassComponent.PLAYER -> playerEnabled
             GlassComponent.MINI_PLAYER -> miniPlayerEnabled
             GlassComponent.NAV_BAR -> navBarEnabled
             GlassComponent.SIDE_PANEL -> sidePanelEnabled
@@ -116,10 +116,14 @@ data class GlassEffectConfig(
      * True when at least one surface would render glass. Used to decide whether
      * capturing the app backdrop is worth anything at all — with every component
      * off, nothing samples it and recording it is pure cost.
+     *
+     * The full player has no per-component switch of its own (see the removed
+     * "Glass Player" toggle) — it is always a potential consumer whenever glass
+     * is on at all, so [globalEnabled] alone already covers it and the
+     * per-component flags below only matter for narrowing further.
      */
     val anyComponentEnabled: Boolean
-        get() = globalEnabled &&
-            (playerEnabled || miniPlayerEnabled || navBarEnabled || sidePanelEnabled)
+        get() = globalEnabled
 }
 
 /** UI surfaces that can individually opt in or out of the liquid glass effect. */
@@ -158,7 +162,6 @@ fun shouldUseTranslucentGlassFallback(style: GlassStyle, renderEffectSupported: 
     style == GlassStyle.TRANSPARENT || !renderEffectSupported
 
 enum class GlassComponent {
-    PLAYER,
     MINI_PLAYER,
     NAV_BAR,
     SIDE_PANEL,
@@ -309,6 +312,20 @@ val LocalGlassEffectConfig = staticCompositionLocalOf { GlassEffectConfig() }
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop> { error("No AppBackdrop provided") }
 
 /**
+ * Whether app-level motion (scroll, fling, nav transition) is currently in flight.
+ *
+ * Chrome that owns a SECOND [layerBackdrop] of its own -- the floating tab bar captures
+ * its own icon row so the selection puck can lens it -- has to sit that motion out for
+ * the same reason the app backdrop does: `layer.record { drawContent() }` cannot reuse
+ * unchanged child RenderNodes, so an unfrozen backdrop re-issues its whole subtree every
+ * frame. The app-level one is frozen via `backdropFrozenProvider`; anything nested had no
+ * way to see that signal, so it re-recorded through every scroll on every screen.
+ *
+ * Defaults to never-frozen so a caller that provides no value keeps the old behaviour.
+ */
+val LocalAppBackdropFrozen = staticCompositionLocalOf<() -> Boolean> { { false } }
+
+/**
  * When set, glass surfaces in scope pool one recorded+effect-processed layer
  * per bucket this returns instead of a single reused layer — see
  * `drawBackdrop`'s `loopBucket` parameter. Meant for surfaces sampling a
@@ -369,6 +386,18 @@ fun Modifier.liquidGlass(
     // whatever's provided in composition, so player control pills over a
     // looping video pick this up without every call site naming it explicitly.
     loopBucket: (() -> Int)? = LocalBackdropLoopBucket.current,
+    /**
+     * Tints the specular rim from the current background/artwork colour, already
+     * boosted for legibility (e.g. via [asVividAccent]) —
+     * the nav bar and mini player's own edge light, distinct from the flat
+     * [GlassEffectConfig.surfaceTintColor] base fill, which stays a fixed
+     * light/dark default regardless of artwork. [Color.Unspecified] (the
+     * default) keeps the existing behaviour: [GlassEffectConfig.highlightColor]
+     * if the user set one, otherwise plain white. Callers animate this
+     * themselves (e.g. `animateColorAsState`) so a track change fades the rim
+     * rather than cutting it.
+     */
+    rimTintColor: Color = Color.Unspecified,
 ): Modifier {
     if (!isGlassAllowed()) return this
     val backdrop = LocalAppBackdrop.current
@@ -388,7 +417,7 @@ fun Modifier.liquidGlass(
     // surface color 1:1 (which made the bar invisible over pure-black content).
     val surfaceTintColor = if (config.surfaceTintColor.isSpecified) {
         config.surfaceTintColor
-    } else if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
+    } else if (AppTheme.colorScheme.surface.luminance() > 0.5f) {
         Color(0xFFFAFAFA)
     } else {
         Color(0xFF4A4A4E)
@@ -487,14 +516,20 @@ fun Modifier.liquidGlass(
 
     // The rim's own colour, independent of the surface tint: on a tinted pill a
     // white rim is what reads as "lit glass", but a coloured one is the difference
-    // between chrome and neon, so it is worth exposing rather than assuming.
-    val rimColor = if (config.highlightColor.isSpecified) config.highlightColor else Color.White
+    // between chrome and neon, so it is worth exposing rather than assuming. An
+    // explicit user highlight color still wins over the automatic artwork tint —
+    // the same override precedence surfaceTintColor already follows.
+    val rimColor = when {
+        config.highlightColor.isSpecified -> config.highlightColor
+        rimTintColor.isSpecified -> rimTintColor
+        else -> Color.White
+    }
     // Call sites pass a per-component alpha (the nav bar wants a dimmer rim than a
     // button). Scale the user's setting by it rather than replacing it, so both the
     // per-component tuning and the preference still mean something.
     val rimAlpha = (highlightAlpha * (config.highlightOpacity / EdgeHighlightAlpha)).coerceIn(0f, 1f)
 
-    val highlightBlock: (() -> Highlight?)? = remember(applyEdgeEffects, plainBlur, rimColor, rimAlpha, animatedHighlightAngle) {
+    val highlightBlock: (() -> Highlight?)? = remember(applyEdgeEffects, plainBlur, rimColor, rimAlpha, rimTintColor, animatedHighlightAngle) {
         if (applyEdgeEffects && !plainBlur) {
             {
                 Highlight(
@@ -513,6 +548,30 @@ fun Modifier.liquidGlass(
     val shadowBlock: (() -> Shadow?)? = remember(applyEdgeEffects) {
         if (applyEdgeEffects) ({ Shadow.Default }) else null
     }
+
+    // The light rim reads as lit glass on a dark background but disappears on a light
+    // one. A second rim stroke on the exact opposite edge — same width, fade and
+    // alpha as the light rim, just angled 180° around and colour-locked to black
+    // instead of adaptive — is what keeps the glass edge visible either way, the
+    // way a real glass sliver's underside catches a dark line regardless of what's
+    // behind it. Same Highlight mechanism as the light rim (not a blurred inner
+    // shadow), so the two fades match exactly and only mirror in direction.
+    val darkRimBlock: (() -> Highlight?)? = remember(applyEdgeEffects, plainBlur, rimAlpha, animatedHighlightAngle) {
+        if (applyEdgeEffects && !plainBlur) {
+            {
+                Highlight(
+                    width = EdgeHighlightWidth,
+                    style = HighlightStyle.Default(
+                        color = Color.Black.copy(alpha = rimAlpha),
+                        angle = animatedHighlightAngle + 180f,
+                    ),
+                )
+            }
+        } else {
+            null
+        }
+    }
+    val darkRimShapeProvider = remember(shapeBlock) { ShapeProvider(shapeBlock) }
 
     // RenderEffect is guaranteed supported past this point — the unsupported
     // case already returned the translucent-tint fallback above.
@@ -537,5 +596,11 @@ fun Modifier.liquidGlass(
         backdropScale = resolutionScale,
         frozen = frozen,
         loopBucket = loopBucket,
+    ).then(
+        if (darkRimBlock != null) {
+            HighlightElement(shapeProvider = darkRimShapeProvider, highlight = darkRimBlock)
+        } else {
+            Modifier
+        }
     )
 }

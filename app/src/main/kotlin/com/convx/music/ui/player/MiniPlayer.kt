@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import com.convx.music.ui.component.BlurredBackdropImage
 import com.convx.music.ui.component.ScrollingWaveformSeekBar
+import com.convx.music.ui.component.rememberNoArtworkPainter
 import com.convx.music.ui.component.rememberPlaybackFraction
 import com.convx.music.ui.component.thumbnailPx
 import com.convx.music.constants.MiniPlayerWaveformKey
@@ -57,10 +58,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableLongState
@@ -146,6 +147,7 @@ import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.theme.PlayerColorExtractor
+import com.convx.music.ui.theme.colorengine.ColorEngine
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
 import com.convx.music.vivimusic.AudioDeviceBottomSheet
@@ -320,7 +322,7 @@ private fun NewMiniPlayer(
     val backgroundColor = when {
         usesGlassSurface -> Color.Transparent
         pureBlack && useDarkTheme -> Color.Black.copy(alpha = 0.82f)
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f)
+        else -> AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f)
     }
     val isDynamicBackground = miniPlayerBackground != PlayerBackgroundStyle.DEFAULT
 
@@ -333,10 +335,10 @@ private fun NewMiniPlayer(
     } else {
         Color.White
     }
-    val primaryColor = if (isDynamicBackground) dynamicContentColor else MaterialTheme.colorScheme.primary
-    val outlineColor = if (isDynamicBackground) dynamicContentColor.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline
-    val onSurfaceColor = if (isDynamicBackground) dynamicContentColor else MaterialTheme.colorScheme.onSurface
-    val errorColor = MaterialTheme.colorScheme.error
+    val primaryColor = if (isDynamicBackground) dynamicContentColor else AppTheme.colorScheme.primary
+    val outlineColor = if (isDynamicBackground) dynamicContentColor.copy(alpha = 0.5f) else AppTheme.colorScheme.outline
+    val onSurfaceColor = if (isDynamicBackground) dynamicContentColor else AppTheme.colorScheme.onSurface
+    val errorColor = AppTheme.colorScheme.error
 
     // Same finger-tracking glow as the nav bar's drag puck (ported from Kyant0's
     // catalog). Its gesture tracking never consumes pointer events, so it's safe
@@ -459,8 +461,8 @@ private fun NewMiniPlayer(
                                 .build(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            placeholder = painterResource(R.drawable.thumbnail_fallback),
-                            error = painterResource(R.drawable.thumbnail_fallback),
+                            placeholder = rememberNoArtworkPainter(),
+                            error = rememberNoArtworkPainter(),
                             modifier = Modifier.fillMaxSize().clip(CircleShape)
                         )
                     }
@@ -696,8 +698,8 @@ private fun NewMiniPlayerPlayButton(
                             .build(),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        placeholder = painterResource(R.drawable.thumbnail_fallback),
-                        error = painterResource(R.drawable.thumbnail_fallback),
+                        placeholder = rememberNoArtworkPainter(),
+                        error = rememberNoArtworkPainter(),
                         modifier = Modifier.fillMaxSize().clip(CircleShape)
                     )
                 }
@@ -850,8 +852,8 @@ private fun LegacyMiniPlayer(
         (screenWidthPx * (0.45f - 0.33f * swipeSensitivity.coerceIn(0f, 1f))).roundToInt()
     }
 
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    val primaryColor = AppTheme.colorScheme.primary
+    val trackColor = AppTheme.colorScheme.surfaceVariant
 
     Box(
         modifier = modifier
@@ -861,7 +863,7 @@ private fun LegacyMiniPlayer(
             .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .background(
                 if (pureBlack && isSystemInDarkTheme()) Color.Black
-                else MaterialTheme.colorScheme.surfaceContainer
+                else AppTheme.colorScheme.surfaceContainer
             )
             .let { baseModifier ->
                 if (swipeThumbnail) {
@@ -1062,7 +1064,7 @@ private fun LegacyMiniMediaInfo(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(AppTheme.colorScheme.surfaceVariant)
             )
 
             AsyncImage(
@@ -1073,8 +1075,8 @@ private fun LegacyMiniMediaInfo(
                     .build(),
                 contentDescription = null,
                 contentScale = if (cropAlbumArt) ContentScale.Crop else ContentScale.Fit,
-                placeholder = painterResource(R.drawable.thumbnail_fallback),
-                error = painterResource(R.drawable.thumbnail_fallback),
+                placeholder = rememberNoArtworkPainter(),
+                error = rememberNoArtworkPainter(),
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(ContinuousRoundedRectangle(ThumbnailCornerRadius)),
@@ -1092,7 +1094,7 @@ private fun LegacyMiniMediaInfo(
                     Icon(
                         painter = painterResource(R.drawable.info),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = AppTheme.colorScheme.error,
                         modifier = Modifier.align(Alignment.Center),
                     )
                 }
@@ -1106,7 +1108,7 @@ private fun LegacyMiniMediaInfo(
         ) {
             Text(
                 text = mediaMetadata.title,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = AppTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -1117,7 +1119,7 @@ private fun LegacyMiniMediaInfo(
             if (mediaMetadata.artists.any { it.name.isNotBlank() }) {
                 Text(
                     text = mediaMetadata.artists.joinToString { it.name },
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = AppTheme.colorScheme.secondary,
                     fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1176,7 +1178,7 @@ internal fun MiniPlayerColorExtractor(
     onGradientColorsChange: (List<Color>) -> Unit
 ) {
     val context = LocalContext.current
-    val fallbackColor = MaterialTheme.colorScheme.surfaceContainer.toArgb()
+    val fallbackColor = AppTheme.colorScheme.surfaceContainer.toArgb()
 
     LaunchedEffect(mediaMetadata?.id, miniPlayerBackground) {
         if (miniPlayerBackground == PlayerBackgroundStyle.GRADIENT || miniPlayerBackground == PlayerBackgroundStyle.GLOW_ANIMATED) {
@@ -1192,7 +1194,7 @@ internal fun MiniPlayerColorExtractor(
                 withContext(Dispatchers.IO) {
                     val request = ImageRequest.Builder(context)
                         .data(currentMetadata.thumbnailUrl)
-                        .size(100, 100)
+                        .size(200, 200)
                         .allowHardware(false)
                         .build()
 
@@ -1216,10 +1218,23 @@ internal fun MiniPlayerColorExtractor(
                                     palette.getDarkMutedColor(fallbackColor).let { Color(it) }
                                 ).distinct()
                             } else {
-                                PlayerColorExtractor.extractGradientColors(
-                                    palette = palette,
-                                    fallbackColor = fallbackColor
-                                )
+                                ColorEngine.analyze(bitmap, cacheKey = currentMetadata.thumbnailUrl)
+                                    ?.let { result ->
+                                        val dominant = result.palette.dominant
+                                        listOf(
+                                            dominant,
+                                            dominant.copy(
+                                                red = (dominant.red * 0.6f).coerceAtLeast(0f),
+                                                green = (dominant.green * 0.6f).coerceAtLeast(0f),
+                                                blue = (dominant.blue * 0.6f).coerceAtLeast(0f),
+                                            ),
+                                            Color.Black,
+                                        )
+                                    }
+                                    ?: PlayerColorExtractor.extractGradientColors(
+                                        palette = palette,
+                                        fallbackColor = fallbackColor
+                                    )
                             }
                             miniPlayerGradientCache.put(cacheKey, extractedColors)
                             withContext(Dispatchers.Main) { onGradientColorsChange(extractedColors) }
@@ -1380,6 +1395,14 @@ internal fun MiniPlayerBackgroundLayer(
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
             }
         }
+        PlayerBackgroundStyle.BITCHORD_MESH -> {
+            MeshGradientBackground(
+                palette = rememberArtworkMeshPalette(mediaMetadata?.thumbnailUrl),
+                trackKey = mediaMetadata?.id,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
         PlayerBackgroundStyle.STATIC -> {
             val staticColor by rememberPreference(PlayerStaticColorKey, defaultValue = 0xFF1A1A1A.toInt())
             Box(modifier = Modifier.fillMaxSize().background(Color(staticColor)))

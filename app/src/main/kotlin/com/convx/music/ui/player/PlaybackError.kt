@@ -15,12 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -116,7 +116,7 @@ fun PlaybackError(
         Icon(
             painter = painterResource(R.drawable.error),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
+            tint = AppTheme.colorScheme.error,
             modifier = Modifier.size(48.dp)
         )
         
@@ -125,8 +125,8 @@ fun PlaybackError(
         // Main error message
         Text(
             text = stringResource(R.string.error_playback_failed),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.error,
+            style = AppTheme.typography.titleMedium,
+            color = AppTheme.colorScheme.error,
             textAlign = TextAlign.Center
         )
         
@@ -135,8 +135,8 @@ fun PlaybackError(
         // Error details
         Text(
             text = errorMessage,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis
@@ -147,11 +147,11 @@ fun PlaybackError(
         // Error code
         Text(
             text = "Code: ${getErrorCodeName(error.errorCode)} (${error.errorCode})",
-            style = MaterialTheme.typography.bodySmall.copy(
+            style = AppTheme.typography.bodySmall.copy(
                 fontFamily = FontFamily.Monospace,
                 fontSize = 11.sp
             ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            color = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             textAlign = TextAlign.Center
         )
         
@@ -166,7 +166,7 @@ fun PlaybackError(
                 onClick = retry,
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = AppTheme.colorScheme.primary
                 )
             ) {
                 Icon(

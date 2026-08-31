@@ -9,8 +9,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,7 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.media3.exoplayer.ExoPlayer
 import com.convx.music.R
@@ -131,7 +131,7 @@ fun AudioQualityBadge(
                     if (sampleRateLabel != null) append(" • $sampleRateLabel")
                 }
             },
-            style = MaterialTheme.typography.labelSmall.copy(
+            style = AppTheme.typography.labelSmall.copy(
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.0.sp

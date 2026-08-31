@@ -40,12 +40,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -75,7 +75,7 @@ import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.NavigationTitle
 import com.convx.music.ui.component.YouTubeGridItem
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.component.YouTubeListItem
 import com.convx.music.ui.component.HeroBackground
 import com.convx.music.ui.utils.rememberHeroZoom
@@ -83,6 +83,7 @@ import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import androidx.compose.foundation.layout.windowInsetsPadding
 import com.convx.music.ui.component.rememberHeroSource
+import com.convx.music.ui.component.rememberHeroTopBlur
 import com.convx.music.ui.component.rememberHeroTint
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
@@ -150,6 +151,9 @@ fun ChartsScreen(
         tint = tint,
         heroSource = heroSource,
         heroScale = heroZoom.scale,
+        // Progressive top blur: the artwork dissolves under the status bar as
+        // the list scrolls up — same treatment as the other hero screens.
+        topBlurProgress = rememberHeroTopBlur(lazyListState),
         modifier = Modifier.fillMaxSize(),
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -192,7 +196,7 @@ fun ChartsScreen(
                                             modifier = Modifier
                                                 .size(ListItemHeight - 16.dp)
                                                 .clip(RoundedCornerShape(4.dp))
-                                                .background(MaterialTheme.colorScheme.onSurface),
+                                                .background(AppTheme.colorScheme.onSurface),
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column(
@@ -203,14 +207,14 @@ fun ChartsScreen(
                                                 modifier = Modifier
                                                     .height(16.dp)
                                                     .width(120.dp)
-                                                    .background(MaterialTheme.colorScheme.onSurface),
+                                                    .background(AppTheme.colorScheme.onSurface),
                                             )
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Box(
                                                 modifier = Modifier
                                                     .height(12.dp)
                                                     .width(80.dp)
-                                                    .background(MaterialTheme.colorScheme.onSurface),
+                                                    .background(AppTheme.colorScheme.onSurface),
                                             )
                                         }
                                     }

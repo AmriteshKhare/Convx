@@ -26,14 +26,14 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import com.convx.music.ui.ios.compat.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -154,7 +154,7 @@ private fun AppIconTile(
 ) {
     val borderWidth by animateDpAsState(if (selected) 3.dp else 0.dp, label = "appIconBorder")
     val borderColor by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        if (selected) AppTheme.colorScheme.primary else Color.Transparent,
         label = "appIconBorderColor",
     )
     Column(
@@ -182,7 +182,7 @@ private fun AppIconTile(
         }
         Text(
             text = stringResource(icon.labelRes),
-            style = MaterialTheme.typography.labelMedium,
+            style = AppTheme.typography.labelMedium,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

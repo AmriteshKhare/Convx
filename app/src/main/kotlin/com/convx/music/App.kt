@@ -11,6 +11,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -41,7 +42,10 @@ import com.convx.music.utils.DebugLogs
 import com.convx.music.utils.cipher.CipherDeobfuscator
 import com.convx.music.utils.dataStore
 import com.convx.music.utils.get
+import com.convx.music.utils.migrateSharedPreferencesToMMKV
+import com.convx.music.utils.warmPreferenceMirror
 import com.convx.music.utils.reportException
+import com.tencent.mmkv.MMKV
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,6 +73,18 @@ class App : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
 
+        // MMKV before anything that reads a migrated store. The legacy files are
+        // copied once, in place; the readers (widget config, EQ prefs, updater,
+        // player-state persistence) then only ever talk to MMKV. Moved above the
+        // session restore below, which now reads through it.
+        MMKV.initialize(this)
+        com.convx.music.ui.theme.colorengine.ColorEngine.init(this)
+        com.convx.music.ui.theme.colorengine.ColorEngine.setDebugEnabled(true)
+        migrateSharedPreferencesToMMKV(this, "widget_config")
+        migrateSharedPreferencesToMMKV(this, "nanosonic_eq_profiles")
+        migrateSharedPreferencesToMMKV(this, "vivi_eq_prefs")
+        migrateSharedPreferencesToMMKV(this, "settings")
+
         // Restored synchronously, before anything else can start: the async
         // DataStore collector further down (applicationScope.launch { ... }
         // .collect { YouTube.cookie = ... }) doesn't land its first value until
@@ -78,9 +94,19 @@ class App : Application(), SingletonImageLoader.Factory {
         // BotDetectionMitigator, and PERSISTS a freshly-fetched guest
         // visitorData over the real logged-in session's value in DataStore.
         // Every cold start was a fresh chance to re-corrupt it.
-        YouTube.cookie = dataStore.get(InnerTubeCookieKey, "").takeIf { it.isNotBlank() && it != "null" }
-        YouTube.visitorData = dataStore.get(VisitorDataKey, "").takeIf { it.isNotBlank() && it != "null" }
-        YouTube.dataSyncId = dataStore.get(DataSyncIdKey, "").takeIf { it.isNotBlank() && it != "null" }
+        //
+        // Synchronous is still the requirement; DataStore is no longer how it is
+        // met. See authSeed().
+        YouTube.cookie = authSeed(InnerTubeCookieKey)
+        YouTube.visitorData = authSeed(VisitorDataKey)
+        YouTube.dataSyncId = authSeed(DataSyncIdKey)
+
+        // Nothing else needs a preference this instant, so the rest of the store
+        // is warmed off Main. The mirror in DataStore.kt only starts on its first
+        // read; starting it here means the first composition finds a populated
+        // snapshot instead of paying that read's runBlocking on the frame it
+        // happens to compose in.
+        applicationScope.launch(Dispatchers.IO) { dataStore.warmPreferenceMirror() }
 
         // Install crash handler first
         CrashHandler.install(this)
@@ -111,6 +137,45 @@ class App : Application(), SingletonImageLoader.Factory {
 
             observeSettingsChanges()
         }
+    }
+
+    /**
+     * The three session keys, mirrored out of DataStore so they can be restored on the
+     * main thread without touching it.
+     *
+     * DataStore's synchronous accessor bottoms out in
+     * `runBlocking(Dispatchers.IO) { data.first() }`: a dispatcher hop, a file open, and
+     * a protobuf parse of ALL ~340 preferences, to read three strings. onCreate() is the
+     * first caller in the process, so the whole cost lands on Main before the first frame
+     * can start. MMKV is an mmap'd read of three keys.
+     *
+     * DataStore stays the source of truth — every writer still writes there, and
+     * [observeSettingsChanges] mirrors each value across as it lands, so this cache can
+     * never drift for longer than one collector hop. It is only ever read here.
+     */
+    private val authCache: MMKV by lazy { MMKV.mmkvWithID(AUTH_CACHE_ID)!! }
+
+    /**
+     * Falls back to DataStore when the key has never been mirrored — the first launch
+     * after updating into this change, where the session exists but the cache does not.
+     * Skipping the fallback would start that one launch logged out, and a null cookie is
+     * exactly what sends BotDetectionMitigator down the guest branch to overwrite a real
+     * visitorData. Costs the old blocking read once, then never again.
+     */
+    private fun authSeed(key: Preferences.Key<String>): String? {
+        val raw = if (authCache.containsKey(key.name)) {
+            authCache.decodeString(key.name, "").orEmpty()
+        } else {
+            dataStore.get(key, "").also { authCache.encode(key.name, it) }
+        }
+        // A blank or literal "null" is a broken value, not a session — same test the
+        // collectors apply, kept identical so a restore and a live update agree.
+        return raw.takeIf { it.isNotBlank() && it != "null" }
+    }
+
+    /** Mirrors one session key into [authCache]. Called from the collectors. */
+    private fun cacheAuthValue(key: Preferences.Key<String>, value: String?) {
+        authCache.encode(key.name, value.orEmpty())
     }
 
     private suspend fun initializeSettings() {
@@ -166,7 +231,7 @@ class App : Application(), SingletonImageLoader.Factory {
         }
 
         YouTube.useLoginForBrowse = settings[UseLoginForBrowse] ?: true
-        YouTube.ipVersion = settings[IpVersionKey]?.toEnum(defaultValue = IpVersion.AUTO) ?: IpVersion.AUTO
+        YouTube.ipVersion = settings[IpVersionKey]?.toEnum(defaultValue = IpVersion.IPV4) ?: IpVersion.IPV4
 
         val channel = NotificationChannel(
             "updates",
@@ -194,6 +259,7 @@ class App : Application(), SingletonImageLoader.Factory {
                                 settings[VisitorDataKey] = newVisitorData
                             }
                         }
+                    cacheAuthValue(VisitorDataKey, YouTube.visitorData)
                 }
         }
 
@@ -209,6 +275,7 @@ class App : Application(), SingletonImageLoader.Factory {
                     // half of "||" — is what silently reverted channel switches back
                     // to primary, since this collector re-fires on every write.
                     YouTube.dataSyncId = dataSyncId
+                    cacheAuthValue(DataSyncIdKey, dataSyncId)
                 }
         }
 
@@ -219,6 +286,7 @@ class App : Application(), SingletonImageLoader.Factory {
                 .collect { cookie ->
                     try {
                         YouTube.cookie = cookie?.takeIf { it.isNotBlank() && it != "null" }
+                        cacheAuthValue(InnerTubeCookieKey, cookie)
                     } catch (e: Exception) {
                         Timber.e(e, "Could not parse cookie. Clearing existing cookie.")
                         forgetAccount(this@App)
@@ -330,6 +398,9 @@ class App : Application(), SingletonImageLoader.Factory {
     }
 
     companion object {
+        /** MMKV file backing [authSeed]. Cache only — DataStore owns these values. */
+        private const val AUTH_CACHE_ID = "auth_seed"
+
         suspend fun forgetAccount(context: Context) {
             Timber.d("forgetAccount: Starting logout process")
 

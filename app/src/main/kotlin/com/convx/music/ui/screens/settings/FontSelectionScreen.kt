@@ -19,17 +19,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.RadioButton
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,8 +52,8 @@ import com.convx.music.constants.CustomFontNameKey
 import com.convx.music.constants.CustomFontPathKey
 import com.convx.music.constants.SelectedFontKey
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.component.Material3SettingsGroup
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsGroup
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.theme.GoogleSansFontFamily
 import com.convx.music.ui.theme.OutfitFontFamily
 import com.convx.music.ui.theme.PlusJakartaSansFontFamily
@@ -156,10 +156,10 @@ fun FontSelectionScreen(
         ) {
             // Typography Preview Card
             Card(
-                shape = MaterialTheme.shapes.large,
+                shape = AppTheme.shapes.large,
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = AppTheme.colorScheme.primaryContainer,
+                    contentColor = AppTheme.colorScheme.onPrimaryContainer
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -172,8 +172,8 @@ fun FontSelectionScreen(
                 ) {
                     Text(
                         text = stringResource(R.string.typography_preview).uppercase(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        style = AppTheme.typography.labelMedium,
+                        color = AppTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
@@ -181,15 +181,15 @@ fun FontSelectionScreen(
                     Text(
                         text = stringResource(R.string.preview_text_quote),
                         fontFamily = activeFontFamily,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        style = AppTheme.typography.headlineMedium,
+                        color = AppTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
                     Text(
                         text = "Expressive typeface is applied to display, headlines, and titles. Body copy and labels remain in the system font for maximum readability.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
                 }
             }
@@ -197,10 +197,10 @@ fun FontSelectionScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Options settings group
-            Material3SettingsGroup(
+            IosSettingsGroup(
                 title = stringResource(R.string.font_selection),
                 items = listOf(
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         leadingContent = {
                             RadioButton(
                                 selected = selectedFont == AppFont.SYSTEM.value,
@@ -221,7 +221,7 @@ fun FontSelectionScreen(
                         },
                         onClick = { onSelectedFontChange(AppFont.SYSTEM.value) }
                     ),
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         leadingContent = {
                             RadioButton(
                                 selected = selectedFont == AppFont.GOOGLE_SANS.value,
@@ -242,7 +242,7 @@ fun FontSelectionScreen(
                         },
                         onClick = { onSelectedFontChange(AppFont.GOOGLE_SANS.value) }
                     ),
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         leadingContent = {
                             RadioButton(
                                 selected = selectedFont == AppFont.SANS_FLEX.value,
@@ -263,7 +263,7 @@ fun FontSelectionScreen(
                         },
                         onClick = { onSelectedFontChange(AppFont.SANS_FLEX.value) }
                     ),
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         leadingContent = {
                             RadioButton(
                                 selected = selectedFont == AppFont.OUTFIT.value,
@@ -284,7 +284,7 @@ fun FontSelectionScreen(
                         },
                         onClick = { onSelectedFontChange(AppFont.OUTFIT.value) }
                     ),
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         leadingContent = {
                             RadioButton(
                                 selected = selectedFont == AppFont.PLUS_JAKARTA_SANS.value,
@@ -309,31 +309,22 @@ fun FontSelectionScreen(
             )
             Spacer(modifier = Modifier.height(27.dp))
 
-            Material3SettingsGroup(
+            IosSettingsGroup(
                 title = stringResource(R.string.font_additional),
                 items = listOf(
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = painterResource(R.drawable.palette),
                         title = { Text(stringResource(R.string.brand_font)) },
                         description = { Text(stringResource(R.string.brand_font_desc)) },
                         trailingContent = {
                             Switch(
                                 checked = brandFont,
-                                onCheckedChange = onBrandFontChange,
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (brandFont) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize)
-                                    )
-                                }
+                                onCheckedChange = onBrandFontChange
                             )
                         },
                         onClick = { onBrandFontChange(!brandFont) }
                     ),
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = painterResource(R.drawable.palette),
                         title = { Text(stringResource(R.string.custom_font)) },
                         description = {
@@ -346,16 +337,7 @@ fun FontSelectionScreen(
                             if (customFontPath.isNotEmpty()) {
                                 Switch(
                                     checked = customFontEnabled,
-                                    onCheckedChange = onCustomFontEnabledChange,
-                                    thumbContent = {
-                                        Icon(
-                                            painter = painterResource(
-                                                id = if (customFontEnabled) R.drawable.check else R.drawable.close
-                                            ),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(SwitchDefaults.IconSize)
-                                        )
-                                    }
+                                    onCheckedChange = onCustomFontEnabledChange
                                 )
                             }
                         },

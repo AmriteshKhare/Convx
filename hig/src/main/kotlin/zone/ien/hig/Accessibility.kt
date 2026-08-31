@@ -1,0 +1,68 @@
+/*
+ * Copyright (c) 2023-2024. Compose Cupertino project and open source contributors.
+ * Copyright (c) 2025. Scott Lanoue.
+ * Copyright (c) 2026. IENGROUND of IENLAB.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@file:Suppress("unused")
+
+package zone.ien.hig
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import zone.ien.hig.theme.CupertinoColors
+import zone.ien.hig.theme.White
+import zone.ien.hig.theme.isDark
+
+/**
+ * This object provides access to native accessibility preferences
+ *
+ * It allows for checking system accessibility settings such as high contrast mode and
+ * reduced transparency.
+ */
+object Accessibility
+
+/**
+ * Checks if high contrast mode is enabled in the system.
+ */
+val Accessibility.isHighContrastEnabled: Boolean get() = false
+
+/**
+ * Checks if reduced transparency is enabled in the system.
+ */
+val Accessibility.isReduceTransparencyEnabled: Boolean get() = false
+
+/**
+ * Adjust color contrast if corresponding OS accessibility system preference is enabled
+ *
+ * @return the accessible color version based on system settings
+ */
+val Color.accessible: Color
+    @Composable
+    get() = accessible(isDark())
+
+/**
+ * Adjust color contrast if corresponding accessibility system preference is enabled
+ *
+ * @param isDark whether the theme is dark or light
+ * @return the accessible color version based on system settings
+ */
+fun Color.accessible(isDark: Boolean): Color =
+    if (Accessibility.isHighContrastEnabled) {
+        lerp(this, if (isDark) CupertinoColors.White else Color.Black, .2f)
+    } else {
+        this
+    }

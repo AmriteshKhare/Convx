@@ -69,6 +69,16 @@ sealed class Screens(
         icon = R.drawable.accord_library,
     )
 
+    /**
+     * Charts, new releases and moods/genres — the discovery tab. Replaces
+     * [Settings] in the floating bar; settings stays behind the top-bar pill.
+     */
+    object Explore : Screens(
+        titleId = R.string.tab_explore,
+        route = "explore",
+        icon = R.drawable.explore_outlined,
+    )
+
     object Settings : Screens(
         titleId = R.string.settings,
         route = "settings",

@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import coil3.ImageLoader
+import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.toBitmap
@@ -75,14 +75,15 @@ fun BlurredBackdropImage(
     val density = LocalDensity.current
 
     // Screen-space blur radius projected onto the tiny source: the image is
-    // stretched from decodeSize px to the screen width, so blur radii shrink
-    // by the same factor.
-    val sourceRadius = remember(screenBlurRadiusDp, decodeSize, configuration, density) {
-        val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
-        val upscale = (screenWidthPx / decodeSize).coerceAtLeast(1f)
-        with(density) { (screenBlurRadiusDp.dp.toPx() / upscale).roundToInt() }
-    }
-    val cacheKey = "$model|$decodeSize|$sourceRadius"
+    // stretched from its decoded width to the screen width, so blur radii shrink
+    // by the same factor. The projection has to use the width the decode actually
+    // came back at, not [decodeSize] -- Coil fits within a decodeSize box, so a
+    // non-square source lands narrower than that and would come out over-blurred
+    // by the ratio it was short by. Square artwork decodes to exactly decodeSize,
+    // so nothing changes for the callers that pass one.
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenRadiusPx = with(density) { screenBlurRadiusDp.dp.toPx() }
+    val cacheKey = "$model|$decodeSize|$screenBlurRadiusDp"
     var baked by remember(cacheKey) { mutableStateOf(blurredBackdropCache.get(cacheKey)) }
 
     LaunchedEffect(cacheKey) {
@@ -93,7 +94,9 @@ fun BlurredBackdropImage(
             .size(decodeSize)
             .allowHardware(false) // pixel readback for the bake
             .build()
-        val bmp = ImageLoader(context).execute(request).image?.toBitmap() ?: return@LaunchedEffect
+        val bmp = context.imageLoader.execute(request).image?.toBitmap() ?: return@LaunchedEffect
+        val upscale = (screenWidthPx / bmp.width.coerceAtLeast(1)).coerceAtLeast(1f)
+        val sourceRadius = (screenRadiusPx / upscale).roundToInt()
         // LaunchedEffect runs on AndroidUiDispatcher, i.e. the MAIN thread inside a frame
         // callback -- a pixel copy plus three blur passes there is a dropped frame every
         // time a new backdrop is baked. The bake is pure CPU over a private bitmap, so it

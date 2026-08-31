@@ -43,11 +43,13 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.convx.music.ui.component.rememberHeroTopBlur
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -105,12 +107,16 @@ fun MoodAndGenresScreen(
     )
     val backdropFreeze = rememberBackdropFreeze()
     val heroZoom = rememberHeroZoom()
+    val lazyListState = rememberLazyListState()
 
     HeroBackground(
         tint = tint,
         heroSource = HeroSource.Default,
         bottomGradient = true,
         heroScale = heroZoom.scale,
+        // Progressive top blur: the artwork dissolves under the status bar as
+        // the list scrolls up — same treatment as the other hero screens.
+        topBlurProgress = rememberHeroTopBlur(lazyListState),
         modifier = Modifier.fillMaxSize(),
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -136,6 +142,7 @@ fun MoodAndGenresScreen(
             // instead of re-issuing every op in the list.
             .graphicsLayer()) {
             LazyColumn(
+                state = lazyListState,
                 // No bounce here: the top pull drives the hero zoom instead.
                 overscrollEffect = heroZoom.listOverscroll(),
                 modifier = Modifier.heroPullZoom(heroZoom),
@@ -243,7 +250,7 @@ fun MoodAndGenresButton(
     val backgroundColor = if (stripeColor != null) {
         Color(stripeColor).copy(alpha = 0.25f)
     } else {
-        MaterialTheme.colorScheme.surfaceContainer
+        AppTheme.colorScheme.surfaceContainer
     }
     
     Box(
@@ -258,7 +265,7 @@ fun MoodAndGenresButton(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

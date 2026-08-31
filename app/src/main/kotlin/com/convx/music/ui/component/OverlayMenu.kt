@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -50,7 +50,7 @@ import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 fun OverlayMenu(
     state: MenuState,
     modifier: Modifier = Modifier,
-    background: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    background: Color = AppTheme.colorScheme.surfaceContainerHigh,
 ) {
     val focusManager = LocalFocusManager.current
 

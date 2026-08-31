@@ -23,13 +23,13 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,8 +72,8 @@ import com.convx.music.playback.ExoDownloadService
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.BottomSheetState
 import com.convx.music.ui.component.ListDialog
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.MediaMetadataListItem
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
@@ -209,7 +209,7 @@ fun QueueMenu(
                         if (librarySong?.song?.liked == true) R.drawable.favorite
                         else R.drawable.favorite_border
                     ),
-                    tint = if (librarySong?.song?.liked == true) MaterialTheme.colorScheme.error
+                    tint = if (librarySong?.song?.liked == true) AppTheme.colorScheme.error
                     else LocalContentColor.current,
                     contentDescription = null,
                 )
@@ -242,7 +242,7 @@ fun QueueMenu(
                                 painter = painterResource(R.drawable.radio),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.start_an_radio),
@@ -259,7 +259,7 @@ fun QueueMenu(
                                 painter = painterResource(R.drawable.playlist_add),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.add_to_an_playlist),
@@ -271,7 +271,7 @@ fun QueueMenu(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share),
@@ -295,9 +295,9 @@ fun QueueMenu(
 
         // Play next / Add to queue
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOf(
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = { Text(text = stringResource(R.string.play_next)) },
                         description = { Text(text = stringResource(R.string.play_next_desc)) },
                         icon = {
@@ -315,7 +315,7 @@ fun QueueMenu(
                             }
                         }
                     ),
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = { Text(text = stringResource(R.string.add_to_queue)) },
                         description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                         icon = {
@@ -341,11 +341,11 @@ fun QueueMenu(
 
         // Download section
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOf(
                     when (download?.state) {
                         Download.STATE_COMPLETED -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = {
                                     Text(text = stringResource(R.string.remove_download))
                                 },
@@ -368,7 +368,7 @@ fun QueueMenu(
                         }
 
                         Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
                                     CircularProgressIndicator(
@@ -388,7 +388,7 @@ fun QueueMenu(
                         }
 
                         else -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 description = { Text(text = stringResource(R.string.download_desc)) },
                                 icon = {
@@ -426,11 +426,11 @@ fun QueueMenu(
 
         // Navigation section (Artist, Album)
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     if (artists.isNotEmpty()) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_artist)) },
                                 description = {
                                     Text(
@@ -460,7 +460,7 @@ fun QueueMenu(
                     }
                     if (mediaMetadata.album != null) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_album)) },
                                 description = {
                                     Text(
@@ -492,10 +492,10 @@ fun QueueMenu(
 
         // Details and refetch section
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.refetch)) },
                             description = { Text(text = stringResource(R.string.refetch_desc)) },
                             icon = {
@@ -521,7 +521,7 @@ fun QueueMenu(
                         )
                     )
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {

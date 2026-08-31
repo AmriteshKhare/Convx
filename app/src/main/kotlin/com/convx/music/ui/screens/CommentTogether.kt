@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.ios.compat.AppTheme
+
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 
@@ -78,14 +80,14 @@ fun CommentTogetherScreen(navController: NavController) {
                     Column {
                         Text(
                             text = stringResource(R.string.comments),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = AppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         roomState?.roomCode?.let { code ->
                             Text(
                                 text = "Room: $code",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = AppTheme.typography.labelMedium,
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -96,8 +98,8 @@ fun CommentTogetherScreen(navController: NavController) {
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = AppTheme.colorScheme.surface,
+                    titleContentColor = AppTheme.colorScheme.onSurface
                 )
             )
         },
@@ -119,7 +121,7 @@ fun CommentTogetherScreen(navController: NavController) {
                             modifier = Modifier
                                 .padding(bottom = 8.dp)
                                 .fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            color = AppTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Row(
@@ -133,7 +135,7 @@ fun CommentTogetherScreen(navController: NavController) {
                                         .fillMaxHeight()
                                         .width(4.dp)
                                         .clip(RoundedCornerShape(2.dp))
-                                        .background(MaterialTheme.colorScheme.primary)
+                                        .background(AppTheme.colorScheme.primary)
                                 )
                                 Column(
                                     modifier = Modifier
@@ -142,15 +144,15 @@ fun CommentTogetherScreen(navController: NavController) {
                                 ) {
                                     Text(
                                         text = replyMsg.username,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        style = AppTheme.typography.labelMedium,
+                                        color = AppTheme.colorScheme.primary,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
                                         text = replyMsg.message,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = AppTheme.typography.bodySmall,
                                         maxLines = 1,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = AppTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 IconButton(onClick = { replyingTo = null }) {
@@ -188,7 +190,7 @@ fun CommentTogetherScreen(navController: NavController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(MaterialTheme.colorScheme.surface)
+                .background(AppTheme.colorScheme.surface)
         ) {
             if (messages.isEmpty()) {
                 EmptyChatPlaceholder()
@@ -223,9 +225,9 @@ private fun MessageItem(
     onReply: (ChatMessagePayload) -> Unit
 ) {
     val alignment = if (isMe) Alignment.End else Alignment.Start
-    val bubbleColor = if (isMe) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-    val replyBgColor = if (isMe) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+    val bubbleColor = if (isMe) AppTheme.colorScheme.primaryContainer else AppTheme.colorScheme.surfaceVariant
+    val textColor = if (isMe) AppTheme.colorScheme.onPrimaryContainer else AppTheme.colorScheme.onSurfaceVariant
+    val replyBgColor = if (isMe) AppTheme.colorScheme.primary.copy(alpha = 0.1f) else AppTheme.colorScheme.onSurface.copy(alpha = 0.05f)
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -234,8 +236,8 @@ private fun MessageItem(
         if (!isMe) {
             Text(
                 text = message.username,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
+                style = AppTheme.typography.labelSmall,
+                color = AppTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
             )
         }
@@ -276,19 +278,19 @@ private fun MessageItem(
                                     .fillMaxHeight()
                                     .width(3.dp)
                                     .clip(RoundedCornerShape(1.5.dp))
-                                    .background(MaterialTheme.colorScheme.primary)
+                                    .background(AppTheme.colorScheme.primary)
                             )
                             Column(modifier = Modifier.padding(start = 10.dp)) {
                                 Text(
                                     text = reply.username,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    style = AppTheme.typography.labelSmall,
+                                    color = AppTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1
                                 )
                                 Text(
                                     text = formatMessageWithLinks(reply.message),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = AppTheme.typography.bodySmall,
                                     maxLines = 2,
                                     color = textColor.copy(alpha = 0.8f),
                                     fontSize = 12.sp
@@ -302,13 +304,13 @@ private fun MessageItem(
 
                 Text(
                     text = formatMessageWithLinks(message.message),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = AppTheme.typography.bodyMedium,
                     color = textColor
                 )
                 
                 Text(
                     text = formatTime(message.timestamp),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = AppTheme.typography.labelSmall,
                     color = textColor.copy(alpha = 0.6f),
                     textAlign = TextAlign.End,
                     modifier = Modifier.align(Alignment.End).padding(top = 2.dp)
@@ -326,7 +328,7 @@ private fun ChatInputArea(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         shape = RoundedCornerShape(28.dp),
         modifier = modifier.fillMaxWidth()
     ) {
@@ -358,8 +360,8 @@ private fun ChatInputArea(
             FloatingActionButton(
                 onClick = onSend,
                 shape = CircleShape,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = AppTheme.colorScheme.primary,
+                contentColor = AppTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(48.dp),
                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
             ) {
@@ -387,8 +389,8 @@ private fun EmptyChatPlaceholder() {
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            MaterialTheme.colorScheme.primaryContainer,
-                            MaterialTheme.colorScheme.secondaryContainer
+                            AppTheme.colorScheme.primaryContainer,
+                            AppTheme.colorScheme.secondaryContainer
                         )
                     )
                 ),
@@ -397,21 +399,21 @@ private fun EmptyChatPlaceholder() {
             Icon(
                 painter = painterResource(R.drawable.chat_msg),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = AppTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(56.dp)
             )
         }
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "No messages yet",
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = AppTheme.colorScheme.onSurface
         )
         Text(
             text = "Start the conversation!",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -436,7 +438,7 @@ private fun formatMessageWithLinks(text: String): AnnotatedString {
                 url = url,
                 styles = TextLinkStyles(
                     style = SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
+                        color = AppTheme.colorScheme.primary,
                         textDecoration = TextDecoration.Underline,
                         fontWeight = FontWeight.Bold
                     )

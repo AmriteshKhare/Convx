@@ -13,13 +13,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.BasicAlertDialog
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +54,7 @@ fun UpdateInfoDialog(
                 .padding(horizontal = 24.dp)
                 .widthIn(max = 320.dp),
             shape = cardShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = AppTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 8.dp,
         ) {
             Column(
@@ -65,7 +65,7 @@ fun UpdateInfoDialog(
                 Surface(
                     modifier = Modifier.padding(horizontal = 0.dp),
                     shape = blockShape,
-                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    color = AppTheme.colorScheme.surfaceContainer,
                 ) {
                     Column(
                         modifier = Modifier
@@ -78,7 +78,7 @@ fun UpdateInfoDialog(
                         ) {
                             Surface(
                                 shape = AbsoluteSmoothCornerShape(12.dp, 60),
-                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                color = AppTheme.colorScheme.secondaryContainer,
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -88,14 +88,14 @@ fun UpdateInfoDialog(
                                     Icon(
                                         painter = painterResource(R.drawable.info),
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        tint = AppTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(16.dp),
                                     )
                                     Text(
                                         text = stringResource(R.string.update_info_badge),
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = AppTheme.typography.labelMedium,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        color = AppTheme.colorScheme.onSecondaryContainer,
                                     )
                                 }
                             }
@@ -103,13 +103,13 @@ fun UpdateInfoDialog(
 
                         Text(
                             text = stringResource(R.string.update_info_title),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = AppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
                             text = stringResource(R.string.clear_downloaded_updates_auto_info),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.typography.bodyMedium,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -117,7 +117,7 @@ fun UpdateInfoDialog(
                 Surface(
                     modifier = Modifier,
                     shape = blockShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = AppTheme.colorScheme.surfaceContainerLow,
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -127,7 +127,7 @@ fun UpdateInfoDialog(
                         Icon(
                             painter = painterResource(R.drawable.manage_search),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = AppTheme.colorScheme.primary,
                             modifier = Modifier
                                 .padding(top = 2.dp)
                                 .size(18.dp),
@@ -138,13 +138,13 @@ fun UpdateInfoDialog(
                         ) {
                             Text(
                                 text = stringResource(R.string.manual_delete_hint_title),
-                                style = MaterialTheme.typography.titleSmall,
+                                style = AppTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
                                 text = stringResource(R.string.manual_delete_hint_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = AppTheme.typography.bodySmall,
+                                color = AppTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }

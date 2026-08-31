@@ -8,6 +8,7 @@ package com.convx.music.ui.component
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.text.Layout
 import android.view.WindowManager
 import android.widget.Toast
@@ -56,15 +57,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.BasicAlertDialog
+import com.convx.music.ui.ios.compat.Button
+import com.convx.music.ui.ios.compat.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.FilledTonalButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -183,6 +184,7 @@ import com.convx.music.ui.component.shimmer.ShimmerHost
 import com.convx.music.ui.component.shimmer.TextPlaceholder
 import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.screens.settings.LyricsPosition
+import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.utils.fadingEdge
 import com.convx.music.utils.ComposeToImage
 import com.convx.music.utils.rememberEnumPreference
@@ -508,8 +510,8 @@ fun Lyrics(
 
     // Use Material 3 expressive accents and keep glow/text colors unified
     val expressiveAccent = when (playerBackground) {
-        PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.primary
-        PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> {
+        PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.primary
+        PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> {
             // For animated or processed backgrounds, always use light colors regardless of theme
             Color.White
         }
@@ -737,7 +739,7 @@ fun Lyrics(
                 is LyricsTranslationHelper.TranslationStatus.Translating -> {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                            containerColor = AppTheme.colorScheme.primaryContainer
                         ),
                         shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -750,12 +752,12 @@ fun Lyrics(
                             androidx.compose.material3.CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                color = AppTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
                                 text = stringResource(R.string.ai_translating_lyrics),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                style = AppTheme.typography.labelMedium,
+                                color = AppTheme.colorScheme.onPrimaryContainer
                             )
                         }
                     }
@@ -763,7 +765,7 @@ fun Lyrics(
                 is LyricsTranslationHelper.TranslationStatus.Error -> {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
+                            containerColor = AppTheme.colorScheme.errorContainer
                         ),
                         shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -776,13 +778,13 @@ fun Lyrics(
                             Icon(
                                 painter = painterResource(R.drawable.error),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                tint = AppTheme.colorScheme.onErrorContainer,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = status.message,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                                style = AppTheme.typography.labelMedium,
+                                color = AppTheme.colorScheme.onErrorContainer
                             )
                         }
                     }
@@ -790,7 +792,7 @@ fun Lyrics(
                 is LyricsTranslationHelper.TranslationStatus.Success -> {
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                            containerColor = AppTheme.colorScheme.tertiaryContainer
                         ),
                         shape = RoundedCornerShape(16.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -803,13 +805,13 @@ fun Lyrics(
                             Icon(
                                 painter = painterResource(R.drawable.check),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                tint = AppTheme.colorScheme.onTertiaryContainer,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = stringResource(R.string.ai_lyrics_translated),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                                style = AppTheme.typography.labelMedium,
+                                color = AppTheme.colorScheme.onTertiaryContainer
                             )
                         }
                     }
@@ -828,12 +830,39 @@ fun Lyrics(
                 Text(
                     text = stringResource(R.string.lyrics_not_found),
                     fontSize = 20.sp,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = AppTheme.colorScheme.secondary,
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.alpha(0.5f)
                 )
             }
+        } else if (
+            // The renderer is built against minSdk 29 and is force-merged into a
+            // minSdk-26 app (see AndroidManifest.xml), so it must not be reached
+            // below 29 -- the plain list below draws these lines there instead.
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            lyricsAnimationStyle == LyricsAnimationStyle.ARCHIVE_TUNE &&
+            lines.hasKaraokeTimings()
+        ) {
+            // The one style that owns the whole column instead of animating a row at a
+            // time, so it replaces the LazyColumn below rather than living inside it —
+            // the catch-up scroll, the depth-of-field falloff and duet alignment all need
+            // to see every line at once. Falls through to the ordinary list when the
+            // provider gave no word timings, where it would be a heavier way to draw
+            // exactly what the plain styles already draw.
+            val lyricsOffset = currentSong?.song?.lyricsOffset?.toLong() ?: 0L
+            KaraokeLyrics(
+                lines = lines,
+                positionMs = { currentPlaybackPosition + lyricsOffset },
+                textColor = textColor,
+                listState = lazyListState,
+                fontSize = lyricsTextSize,
+                lineSpacing = lyricsLineSpacing,
+                onLineClick = { startMs ->
+                    if (changeLyrics) playerConnection.player.seekTo(startMs.toLong())
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
         } else {
             LazyColumn(
             state = lazyListState,
@@ -884,7 +913,7 @@ fun Lyrics(
                     Text(
                         text = "Lyrics from ${lyricsEntity?.provider}",
                         fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        color = AppTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1147,7 +1176,7 @@ fun Lyrics(
                             }
                         )
                         .background(
-                            if (isSelected && isSelectionModeActive) MaterialTheme.colorScheme.primary.copy(
+                            if (isSelected && isSelectionModeActive) AppTheme.colorScheme.primary.copy(
                                 alpha = 0.3f
                             )
                             else Color.Transparent
@@ -1181,19 +1210,20 @@ fun Lyrics(
                     val targetBlur = if (!lyricsStandardBlur || !isAutoScrollEnabled || (isSelectionModeActive && isSelected) || isActiveByIndex || isActiveByTime) {
                         0f
                     } else {
+                        // Flamingo's ladder: a continuous 2.5dp per line away, capped at 8.
+                        // The old one was flat at 0 for the two lines either side and only
+                        // started at three away, so the lines the eye is actually next to were
+                        // as sharp as the one being sung and nothing pulled focus to it.
                         val distance = kotlin.math.abs(index - (if (displayedCurrentLineIndex >= 0) displayedCurrentLineIndex else currentLineIndex))
-                        when (distance) {
-                            1 -> 0f
-                            2 -> 0f
-                            3 -> 2f
-                            4 -> 4f
-                            else -> 6f
-                        }
+                        (distance * 2.5f).coerceAtMost(8f)
                     }
 
                     val blurRadius by animateFloatAsState(
                         targetValue = targetBlur,
-                        animationSpec = tween(durationMillis = 1000),
+                        // 300ms on the lyric curve, not a second: a focus rack that takes a
+                        // full second is still racking when the next line arrives, so the
+                        // depth-of-field never matched the line being sung.
+                        animationSpec = tween(durationMillis = 300, easing = Motion.LyricEasing),
                         label = "standard_blur"
                     )
 
@@ -1943,14 +1973,14 @@ fun Lyrics(
     if (showProgressDialog) {
         BasicAlertDialog(onDismissRequest = { /* Don't dismiss */ }) {
             Card( // Use Card for better styling
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = AppTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = AppTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
                 Box(modifier = Modifier.padding(32.dp)) {
                     Text(
                         text = stringResource(R.string.generating_image) + "\n" + stringResource(R.string.please_wait),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = AppTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -1961,10 +1991,10 @@ fun Lyrics(
         val (lyricsText, songTitle, artists) = shareDialogData!! // Renamed 'lyrics' to 'lyricsText' for clarity
         BasicAlertDialog(onDismissRequest = { showShareDialog = false }) {
             Card(
-                shape = MaterialTheme.shapes.medium,
+                shape = AppTheme.shapes.medium,
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
+                    containerColor = AppTheme.colorScheme.surface,
                 ),
                 modifier = Modifier
                     .padding(16.dp)
@@ -1975,7 +2005,7 @@ fun Lyrics(
                         text = stringResource(R.string.share_lyrics),
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = AppTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     // Share as Text Row
@@ -2008,13 +2038,13 @@ fun Lyrics(
                         Icon(
                             painter = painterResource(id = R.drawable.share), // Use new share icon
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = AppTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = stringResource(R.string.share_as_text),
                             fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = AppTheme.colorScheme.onSurface
                         )
                     }
                     // Share as Image Row
@@ -2033,13 +2063,13 @@ fun Lyrics(
                         Icon(
                             painter = painterResource(id = R.drawable.share), // Use new share icon
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = AppTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = stringResource(R.string.share_as_image),
                             fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = AppTheme.colorScheme.onSurface
                         )
                     }
                     // Cancel Button Row
@@ -2052,7 +2082,7 @@ fun Lyrics(
                         Text(
                             text = stringResource(R.string.cancel),
                             fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.error,
+                            color = AppTheme.colorScheme.error,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier
                                 .clickable { showShareDialog = false }
@@ -2143,14 +2173,14 @@ fun Lyrics(
                 ) {
                     Text(
                         text = stringResource(id = R.string.customize_colors),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = AppTheme.typography.headlineSmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Text(text = stringResource(id = R.string.player_background_style), style = MaterialTheme.typography.titleMedium)
+                    Text(text = stringResource(id = R.string.player_background_style), style = AppTheme.typography.titleMedium)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(vertical = 8.dp)
@@ -2191,7 +2221,7 @@ fun Lyrics(
 
                     Spacer(modifier = Modifier.height(18.dp))
 
-                    Text(text = stringResource(id = R.string.background_color), style = MaterialTheme.typography.titleMedium)
+                    Text(text = stringResource(id = R.string.background_color), style = AppTheme.typography.titleMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                         (paletteColors + listOf(Color(0xFF242424), Color(0xFF121212), Color.White, Color.Black, Color(0xFFF5F5F5))).distinct().take(8).forEach { color ->
                             Box(
@@ -2201,14 +2231,14 @@ fun Lyrics(
                                     .clickable { previewBackgroundColor = color }
                                     .border(
                                         2.dp,
-                                        if (previewBackgroundColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        if (previewBackgroundColor == color) AppTheme.colorScheme.primary else Color.Transparent,
                                         RoundedCornerShape(8.dp)
                                     )
                             )
                         }
                     }
 
-                    Text(text = stringResource(id = R.string.text_color), style = MaterialTheme.typography.titleMedium)
+                    Text(text = stringResource(id = R.string.text_color), style = AppTheme.typography.titleMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                         (paletteColors + listOf(Color.White, Color.Black, Color(0xFF1DB954))).distinct().take(8).forEach { color ->
                             Box(
@@ -2218,14 +2248,14 @@ fun Lyrics(
                                     .clickable { previewTextColor = color }
                                     .border(
                                         2.dp,
-                                        if (previewTextColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        if (previewTextColor == color) AppTheme.colorScheme.primary else Color.Transparent,
                                         RoundedCornerShape(8.dp)
                                     )
                             )
                         }
                     }
 
-                    Text(text = stringResource(id = R.string.secondary_text_color), style = MaterialTheme.typography.titleMedium)
+                    Text(text = stringResource(id = R.string.secondary_text_color), style = AppTheme.typography.titleMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                         (paletteColors.map { it.copy(alpha = 0.7f) } + listOf(Color.White.copy(alpha = 0.7f), Color.Black.copy(alpha = 0.7f), Color(0xFF1DB954))).distinct().take(8).forEach { color ->
                             Box(
@@ -2235,7 +2265,7 @@ fun Lyrics(
                                     .clickable { previewSecondaryTextColor = color }
                                     .border(
                                         2.dp,
-                                        if (previewSecondaryTextColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        if (previewSecondaryTextColor == color) AppTheme.colorScheme.primary else Color.Transparent,
                                         RoundedCornerShape(8.dp)
                                     )
                             )

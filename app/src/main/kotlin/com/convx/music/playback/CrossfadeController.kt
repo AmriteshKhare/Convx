@@ -575,7 +575,8 @@ class CrossfadeController(
         AppSettings.smartTransitionWindow.value = if (markable) {
             TransitionWindow(
                 plan = plan,
-                positionMs = (plan.transitionStart * 1000.0 / duration).toLong(),
+                startMs = (plan.transitionStart * 1000).roundToLong(),
+                endMs = (plan.transitionEnd * 1000).roundToLong(),
                 totalMs = duration,
             )
         } else {

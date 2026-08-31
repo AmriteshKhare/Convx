@@ -1,0 +1,9 @@
+Convx bundles source vendored from third-party open-source projects.
+
+## hig module
+
+Portions of the `hig/` module are vendored from compose-hig
+(https://github.com/ienground/compose-hig), Copyright (c) IENGROUND of IENLAB
+and prior contributors (Compose Cupertino project, Scott Lanoue), licensed
+under the Apache License, Version 2.0. See hig/LICENSE for the full license
+text and individual file headers for per-file copyright notices.

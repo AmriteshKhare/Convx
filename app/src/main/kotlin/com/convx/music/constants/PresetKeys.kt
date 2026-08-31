@@ -131,7 +131,6 @@ object PresetKeys {
         LiquidGlassLensAmountKey,
         LiquidGlassChromaticAberrationKey,
         LiquidGlassDepthEffectKey,
-        LiquidGlassPlayerEnabledKey,
         LiquidGlassMiniPlayerEnabledKey,
         LiquidGlassNavBarEnabledKey,
         LiquidGlassSidePanelEnabledKey,

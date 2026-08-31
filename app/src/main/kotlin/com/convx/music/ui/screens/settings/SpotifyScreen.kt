@@ -1,5 +1,7 @@
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.ios.compat.AppTheme
+
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.webkit.CookieManager
@@ -10,9 +12,7 @@ import android.webkit.WebView
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.webkit.WebViewClient
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.animation.AnimatedVisibility
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.animation.animateColorAsState
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.LinearEasing
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.*
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.lazy.LazyColumn
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.lazy.items
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -45,10 +44,10 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.*
+import com.convx.music.ui.ios.compat.ModalBottomSheet
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.*
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.runtime.saveable.rememberSaveable
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -68,13 +67,11 @@ import androidx.compose.ui.res.stringResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.font.FontWeight
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.text.style.TextOverflow
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.viewinterop.AndroidView
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.window.Dialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -86,9 +83,7 @@ import coil3.compose.AsyncImage
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.music.spotify.SpotifyAuth
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.music.spotify.SpotifyMapper
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.music.spotify.models.SpotifyPlaylist
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -98,19 +93,16 @@ import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsGroup
+import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.menu.LoadingScreen
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.SpotifyImportViewModel
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,19 +151,19 @@ fun SpotifyScreen(
 
         Text(
             text = stringResource(R.string.spotify),
-            style = MaterialTheme.typography.displaySmall.copy(
+            style = AppTheme.typography.displaySmall.copy(
                 fontWeight = FontWeight.SemiBold
             ),
-            color = MaterialTheme.colorScheme.onBackground,
+            color = AppTheme.colorScheme.onBackground,
             modifier = Modifier.padding(start = 8.dp, top = 24.dp, bottom = 16.dp)
         )
 
         // Connection Card/Group
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.spotify_account),
             items = listOf(
                 if (state.isAuthenticated) {
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         leadingContent = if (!state.accountAvatarUrl.isNullOrBlank()) {
                             {
                                 AsyncImage(
@@ -189,16 +181,16 @@ fun SpotifyScreen(
                             Text(
                                 text = if (state.accountName.isNotBlank()) state.accountName
                                 else stringResource(R.string.spotify_account),
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                                color = AppTheme.colorScheme.primary,
+                                style = AppTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                             )
                         },
                         trailingContent = {
                             OutlinedButton(
                                 onClick = { viewModel.logout() },
                                 colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                    containerColor = AppTheme.colorScheme.surfaceContainer,
+                                    contentColor = AppTheme.colorScheme.onSurface
                                 )
                             ) {
                                 Text(stringResource(R.string.action_logout))
@@ -207,7 +199,7 @@ fun SpotifyScreen(
                         onClick = {}
                     )
                 } else {
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         title = { Text(stringResource(R.string.spotify_connect)) },
                         description = { Text(stringResource(R.string.spotify_not_connected)) },
                         icon = painterResource(R.drawable.spotify),
@@ -220,10 +212,10 @@ fun SpotifyScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         val totalPlaylists = state.playlists.size + if (state.likedSongsCount > 0) 1 else 0
-        Material3SettingsGroup(
+        IosSettingsGroup(
             title = stringResource(R.string.playlists),
             items = listOf(
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.spotify_select_sources)) },
                     description = {
                         Text(
@@ -239,7 +231,7 @@ fun SpotifyScreen(
                     enabled = state.isAuthenticated && totalPlaylists > 0 && !state.isLoading,
                     onClick = { showPlaylistsSheet = true }
                 ),
-                Material3SettingsItem(
+                IosSettingsItem(
                     title = { Text(stringResource(R.string.spotify_refresh)) },
                     leadingContent = {
                         Box(
@@ -247,7 +239,7 @@ fun SpotifyScreen(
                                 .size(40.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                    AppTheme.colorScheme.primary.copy(alpha = 0.1f)
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -255,9 +247,9 @@ fun SpotifyScreen(
                                 painter = painterResource(R.drawable.sync),
                                 contentDescription = null,
                                 tint = if (!refreshEnabled) {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                    AppTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                 } else {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                                    AppTheme.colorScheme.primary.copy(alpha = 0.9f)
                                 },
                                 modifier = Modifier
                                     .size(24.dp)
@@ -281,13 +273,13 @@ fun SpotifyScreen(
             Icon(
                 painter = painterResource(R.drawable.info),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = AppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 8.dp)
             )
             Text(
                 text = stringResource(R.string.spotify_import_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -365,9 +357,9 @@ fun SpotifyScreen(
             ) {
                 Text(
                     text = stringResource(R.string.playlists) + ": " + progress.playlistName,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = AppTheme.colorScheme.onSurface
                 )
                 Text(
                     text = if (isFinished) {
@@ -375,8 +367,8 @@ fun SpotifyScreen(
                     } else {
                         stringResource(R.string.spotify_importing_songs_count, progress.currentSongIndex, progress.totalSongs)
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant
                 )
                 LinearProgressIndicator(
                     progress = { progress.percent },
@@ -384,8 +376,8 @@ fun SpotifyScreen(
                         .fillMaxWidth()
                         .height(12.dp)
                         .clip(RoundedCornerShape(6.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    color = AppTheme.colorScheme.primary,
+                    trackColor = AppTheme.colorScheme.surfaceVariant
                 )
             }
         }
@@ -402,8 +394,8 @@ fun SpotifyScreen(
         ) {
             Text(
                 text = error,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -440,7 +432,7 @@ private fun SpotifyLoginSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = AppTheme.colorScheme.surface,
     ) {
         Column(
             modifier = Modifier
@@ -452,19 +444,19 @@ private fun SpotifyLoginSheet(
         ) {
             Text(
                 text = stringResource(R.string.spotify_login_title),
-                style = MaterialTheme.typography.titleLarge,
+                style = AppTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = stringResource(R.string.spotify_waiting_for_login),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
             AndroidView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .clip(MaterialTheme.shapes.large),
+                    .clip(AppTheme.shapes.large),
                 factory = { context ->
                     WebView(context).apply {
                         val cookieManager = CookieManager.getInstance()

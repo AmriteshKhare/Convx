@@ -25,13 +25,13 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -81,8 +81,8 @@ import com.convx.music.playback.queues.ListQueue
 import com.convx.music.ui.component.AlbumListItem
 import com.convx.music.ui.component.ListDialog
 import com.convx.music.ui.component.ListItem
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.ui.component.SongListItem
@@ -192,7 +192,7 @@ fun AlbumMenu(
                         Image(
                             painter = painterResource(R.drawable.close),
                             contentDescription = null,
-                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
+                            colorFilter = ColorFilter.tint(AppTheme.colorScheme.onBackground),
                             modifier = Modifier.size(ListThumbnailSize),
                         )
                     },
@@ -271,7 +271,7 @@ fun AlbumMenu(
             ) {
                 Icon(
                     painter = painterResource(if (album.album.bookmarkedAt != null) R.drawable.favorite else R.drawable.favorite_border),
-                    tint = if (album.album.bookmarkedAt != null) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                    tint = if (album.album.bookmarkedAt != null) AppTheme.colorScheme.error else LocalContentColor.current,
                     contentDescription = null,
                 )
             }
@@ -303,7 +303,7 @@ fun AlbumMenu(
                                     painter = painterResource(R.drawable.play),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.play),
@@ -326,7 +326,7 @@ fun AlbumMenu(
                                     painter = painterResource(R.drawable.shuffle),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.shuffle),
@@ -352,7 +352,7 @@ fun AlbumMenu(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share),
@@ -372,10 +372,10 @@ fun AlbumMenu(
             )
         }
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOfNotNull(
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.play_next)) },
                             description = { Text(text = stringResource(R.string.play_next_desc)) },
                             icon = {
@@ -391,7 +391,7 @@ fun AlbumMenu(
                         )
                     } else null,
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.add_to_queue)) },
                             description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                             icon = {
@@ -406,7 +406,7 @@ fun AlbumMenu(
                             }
                         )
                     } else null,
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = { Text(text = stringResource(R.string.add_to_playlist)) },
                         description = { Text(text = stringResource(R.string.add_to_playlist_desc)) },
                         icon = {
@@ -419,7 +419,7 @@ fun AlbumMenu(
                             showChoosePlaylistDialog = true
                         }
                     ),
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = { 
                             Text(
                                 text = if (isPinned) "Unpin from Speed dial" else "Pin to Speed dial" 
@@ -459,11 +459,11 @@ fun AlbumMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOf(
                     when (downloadState) {
                         STATE_COMPLETED -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = {
                                     Text(
                                         text = stringResource(R.string.remove_download)
@@ -481,7 +481,7 @@ fun AlbumMenu(
                             )
                         }
                         STATE_QUEUED, STATE_DOWNLOADING -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
                                     CircularProgressIndicator(
@@ -497,7 +497,7 @@ fun AlbumMenu(
                             )
                         }
                         else -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 description = { Text(text = stringResource(R.string.download_desc)) },
                                 icon = {
@@ -523,9 +523,9 @@ fun AlbumMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOf(
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = { Text(text = stringResource(R.string.view_artist)) },
                         description = { Text(text = album.artists.joinToString { it.name }) },
                         icon = {
@@ -543,7 +543,7 @@ fun AlbumMenu(
                             }
                         }
                     ),
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = { Text(text = stringResource(R.string.refetch)) },
                         description = { Text(text = stringResource(R.string.refetch_desc)) },
                         icon = {

@@ -12,16 +12,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import com.convx.music.ui.ios.compat.DropdownMenu
+import com.convx.music.ui.ios.compat.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.PlainTooltip
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -74,9 +74,15 @@ inline fun <reified T : Enum<T>> SortHeader(
             ) {
                 Text(
                     text = stringResource(sortTypeText(sortType)),
+                    // Explicit: this Text is the ios-compat one, which falls back to the
+                    // ambient IosTheme.contentColor (a different CompositionLocal than
+                    // Material3's), not this button's own onAccentColor -- unset, it drew
+                    // in whatever the screen's default label color was, which read as
+                    // near-invisible against the button's own bright accent fill.
+                    color = onAccentColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTheme.typography.labelLarge,
                 )
             }
         },
@@ -106,6 +112,9 @@ inline fun <reified T : Enum<T>> SortHeader(
                         )
                         Icon(
                             imageVector = Icons.Filled.KeyboardArrowDown,
+                            // See the leading button's Text above: same cross-CompositionLocal
+                            // gap, needs the explicit color.
+                            tint = onAccentColor,
                             modifier = Modifier
                                 .size(SplitButtonDefaults.TrailingIconSize)
                                 .graphicsLayer {
@@ -134,6 +143,7 @@ inline fun <reified T : Enum<T>> SortHeader(
                     )
                     Icon(
                         imageVector = Icons.Filled.KeyboardArrowDown,
+                        tint = onAccentColor,
                         modifier = Modifier
                             .size(SplitButtonDefaults.TrailingIconSize)
                             .graphicsLayer {

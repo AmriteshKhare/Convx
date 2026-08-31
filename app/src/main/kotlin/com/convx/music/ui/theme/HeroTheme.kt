@@ -1,7 +1,9 @@
 package com.convx.music.ui.theme
 
-import androidx.compose.material3.LocalContentColor
+import com.convx.music.ui.ios.compat.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.foundation.IosTheme
+import com.convx.music.ui.ios.foundation.LocalIosColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -62,6 +64,20 @@ fun HeroTintedContent(
     val contentColor = if (appTextColorInt != 0) Color(appTextColorInt) else AppleTokens.onColor(tint)
     val headingColor = if (appTextColorInt != 0) Color(appTextColorInt) else AppleTokens.onColorHeading(tint)
 
+    // The screens under this read colour through AppTheme/IosTheme, not through the
+    // nested MaterialTheme below, so the iOS palette has to be re-tinted here too or a
+    // hero screen would paint iOS labels over its own artwork-tinted background.
+    val baseIos = IosTheme.colors
+    val heroIosColors = remember(baseIos, contentColor, headingColor, tint) {
+        baseIos.copy(
+            label = headingColor,
+            secondaryLabel = contentColor.copy(alpha = 0.72f),
+            tertiaryLabel = contentColor.copy(alpha = 0.44f),
+            separator = contentColor.copy(alpha = 0.18f),
+            opaqueSeparator = contentColor.copy(alpha = 0.24f),
+        )
+    }
+
     if (tint.isHueless()) {
         androidx.compose.runtime.CompositionLocalProvider(
             LocalAppBackdrop provides backdrop,
@@ -80,6 +96,7 @@ fun HeroTintedContent(
                 LocalAppBackdrop provides backdrop,
                 LocalContentColor provides contentColor,
                 LocalAccentTextColor provides headingColor,
+                LocalIosColors provides heroIosColors,
             ) {
                 content()
             }

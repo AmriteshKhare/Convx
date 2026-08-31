@@ -39,18 +39,18 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Checkbox
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -119,6 +119,7 @@ import com.convx.music.ui.component.SortHeader
 import com.convx.music.ui.component.rememberHeroSource
 import com.convx.music.ui.component.rememberHeroTint
 import com.convx.music.ui.component.rememberHeroPalette
+import com.convx.music.ui.component.rememberHeroTopBlur
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalGlassEffectConfig
@@ -266,6 +267,7 @@ fun AutoPlaylistScreen(
     )
     val heroPalette = rememberHeroPalette(heroUrl)
     val tint = heroPalette.background
+    com.convx.music.PublishAmbientBackgroundColor(tint)
     // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
     // now the colour engine's own primary text tier for THIS artwork -- derived against
     // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
@@ -290,14 +292,8 @@ fun AutoPlaylistScreen(
     )
     val backdropFreeze = rememberBackdropFreeze()
 
-    // Scroll-linked sharp-top/blurred-bottom split, replaced by a constant full
-    // blur (fullBlur = true below) — kept commented instead of deleted.
-    // val heroTopBlur by remember {
-    //     derivedStateOf {
-    //         if (lazyListState.firstVisibleItemIndex > 0) 1f
-    //         else (lazyListState.firstVisibleItemScrollOffset / 700f).coerceIn(0f, 1f)
-    //     }
-    // }
+    // Progressive top blur: the artwork dissolves under the status bar as it
+    // scrolls up (Haze on 13+, plain scrim below).
 
     val heroZoom = rememberHeroZoom()
 
@@ -307,7 +303,7 @@ fun AutoPlaylistScreen(
         blurArtwork = true,
         fullBlur = true,
         meshWash = heroPalette,
-        // topBlurProgress = heroTopBlur,
+        topBlurProgress = rememberHeroTopBlur(lazyListState),
         heroScale = heroZoom.scale,
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -563,7 +559,7 @@ fun AutoPlaylistScreen(
 
                         Text(
                             text = pluralStringResource(R.plurals.n_selected, selection.size, selection.size),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.typography.titleMedium,
                             color = onTint,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.weight(1f),
@@ -636,12 +632,12 @@ fun AutoPlaylistScreen(
                                 placeholder = {
                                     Text(
                                         text = stringResource(R.string.search),
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = AppTheme.typography.titleMedium,
                                         color = onTint.copy(alpha = 0.6f),
                                     )
                                 },
                                 singleLine = true,
-                                textStyle = MaterialTheme.typography.titleMedium.copy(color = onTint),
+                                textStyle = AppTheme.typography.titleMedium.copy(color = onTint),
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = Color.Transparent,
@@ -722,6 +718,7 @@ private fun AutoPlaylistHeader(
     val heroUrl = songs.firstOrNull()?.thumbnailUrl
     val heroPalette = rememberHeroPalette(heroUrl)
     val tint = heroPalette.background
+    com.convx.music.PublishAmbientBackgroundColor(tint)
     // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
     // now the colour engine's own primary text tier for THIS artwork -- derived against
     // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
@@ -750,7 +747,7 @@ private fun AutoPlaylistHeader(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = stringResource(titleRes),
-                style = MaterialTheme.typography.headlineMedium,
+                style = AppTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 color = onTint,
@@ -767,7 +764,7 @@ private fun AutoPlaylistHeader(
                     append(makeTimeString(totalLength * 1000L))
                 }
             },
-            style = MaterialTheme.typography.bodyMedium,
+            style = AppTheme.typography.bodyMedium,
             color = onTint.copy(alpha = 0.7f),
         )
 
@@ -819,7 +816,7 @@ private fun AutoPlaylistHeader(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = stringResource(R.string.play),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = AppTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = tint,
                     )
@@ -858,7 +855,7 @@ private fun AutoPlaylistHeader(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = stringResource(R.string.shuffle),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = AppTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = LocalContentColor.current,
                     )
@@ -913,7 +910,7 @@ private fun AutoPlaylistHeader(
         ) {
             Text(
                 text = stringResource(R.string.about_album),
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = onTint,
                 modifier = Modifier.padding(bottom = 8.dp),

@@ -47,7 +47,7 @@ val AlbumThumbnailSize = 144.dp
 
 // Kept in sync with AppleTokens.Artwork — this is the same token, reachable
 // from :constants which cannot depend on the theme package.
-val ThumbnailCornerRadius = 12.dp
+val ThumbnailCornerRadius = 8.dp
 
 // Plain circular corners. This was a continuous (squircle) curve, which reads
 // closer to iOS artwork but costs a generated Path clip on every thumbnail in

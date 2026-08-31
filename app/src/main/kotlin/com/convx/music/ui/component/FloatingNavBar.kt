@@ -8,9 +8,11 @@
 package com.convx.music.ui.component
 
 import androidx.activity.compose.BackHandler
+import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.constants.AppBackgroundColorKey
 import com.convx.music.constants.AppTextColorKey
 import com.convx.music.utils.rememberPreference
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -38,9 +40,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.animation.animateColorAsState
@@ -239,7 +241,7 @@ private fun AppFloatingNavBarChrome(
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
         appBackgroundColorInt != 0 -> Color(appBackgroundColorInt)
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> AppTheme.colorScheme.surfaceContainerHigh
     }
     // Both derive from the glass content colour, which adapts to what the pill
     // composites to. Unselected used to be hardcoded white, which vanished on a
@@ -264,15 +266,36 @@ private fun AppFloatingNavBarChrome(
     val selectedContentColor = tabTextColor
     val unselectedContentColor = tabTextColor.copy(alpha = 0.6f)
 
+    // The rim's own tint: whatever the current screen published as its background/hero
+    // colour, boosted the same way a hero mesh-wash blob is; the same plain default
+    // liquidGlass would otherwise pick (an explicit highlight colour if the user set
+    // one, else white) when the screen on top has no hero of its own -- Home,
+    // Settings, and so on. Both are real colours, never Color.Unspecified, so the
+    // fade between them is a genuine animateColorAsState interpolation rather than a
+    // cut through an undefined sentinel. Animated on its own -- separately from
+    // tabTextColor above -- since a screen with no hero colour crossing to one that
+    // has one is exactly the kind of change that should fade, not cut.
+    val ambientColor = LocalAmbientBackgroundColor.current.value
+    val defaultRimColor = if (glassConfig.highlightColor.isSpecified) glassConfig.highlightColor else Color.White
+    val rimTintColor by animateColorAsState(
+        targetValue = if (ambientColor.isSpecified) ambientColor.asRimPop() else defaultRimColor,
+        animationSpec = Motion.appear(),
+        label = "navBarRimTint",
+    )
+
     val tabBarContentModifier = if (useGlass) {
         Modifier.liquidGlass(
             config = glassConfig,
             shape = NavBarShape,
-            highlightAlpha = 0.3f,
+            // Dialed back after "way too much" feedback on the 0.65f pass — a
+            // tinted rim still wants a bit more than the plain-glass default
+            // (0.3f) to read at all, but not by much.
+            highlightAlpha = 0.4f,
             // The bar's own surface is the largest of its glass layers, and its
             // bounds animate across the whole inline/expanded/search transition —
             // freezing its capture for those frames is most of the win.
             frozen = LocalTabBarBackdropFrozen.current,
+            rimTintColor = rimTintColor,
         )
     } else {
         Modifier
@@ -293,7 +316,7 @@ private fun AppFloatingNavBarChrome(
         appTextColorInt != 0 -> Color(appTextColorInt)
         useGlass -> glassConfig.textColor
         pureBlack -> Color.White
-        else -> MaterialTheme.colorScheme.onSurface
+        else -> AppTheme.colorScheme.onSurface
     }
     val inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? =
         if (showPlayerAccessory) {
@@ -402,7 +425,7 @@ private fun AppFloatingNavBarChrome(
                             color = if (isSelected) selectedContentColor else unselectedContentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                         )
                     },
                     icon = {
@@ -412,7 +435,7 @@ private fun AppFloatingNavBarChrome(
                             ),
                             contentDescription = stringResource(screen.titleId),
                             tint = if (isSelected) selectedContentColor else unselectedContentColor,
-                            modifier = Modifier.size(30.dp),
+                            modifier = Modifier.size(34.dp),
                         )
                     },
                     onClick = {
@@ -439,7 +462,7 @@ private fun AppFloatingNavBarChrome(
                             color = if (isSelected) selectedContentColor else unselectedContentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                         )
                     },
                     icon = {
@@ -449,7 +472,7 @@ private fun AppFloatingNavBarChrome(
                             ),
                             contentDescription = stringResource(screen.titleId),
                             tint = if (isSelected) selectedContentColor else unselectedContentColor,
-                            modifier = Modifier.size(30.dp),
+                            modifier = Modifier.size(34.dp),
                         )
                     },
                     onClick = {
@@ -555,7 +578,7 @@ fun NavBarSearchInputBar(
     val onTint = when {
         useGlass -> glassConfig.textColor
         pureBlack -> Color.White
-        else -> MaterialTheme.colorScheme.onSurface
+        else -> AppTheme.colorScheme.onSurface
     }
     val pillShape = ContinuousRoundedRectangle(percent = 50)
     val coroutineScope = rememberCoroutineScope()

@@ -47,17 +47,17 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ripple
-import androidx.compose.material3.SnackbarHost
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedButton
+import com.convx.music.ui.ios.compat.ripple
+import com.convx.music.ui.ios.compat.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -104,6 +104,10 @@ import com.convx.music.LocalTabView
 import com.convx.music.ui.component.HeroCardHeader
 import com.convx.music.ui.component.HeroMergeBand
 import com.convx.music.ui.component.HeroMergeBandHeight
+import com.convx.music.ui.component.HeroTopBlur
+import com.convx.music.ui.component.rememberHeroTopBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -190,6 +194,25 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.convx.music.canvas.AppleMusicArtistBackgroundProvider
 import com.convx.music.ui.component.floatingtabbar.gooey
+import com.convx.music.ui.player.MeshGradientBackground
+import com.convx.music.ui.player.MeshPalette
+import com.convx.music.ui.player.dimmed
+import com.convx.music.ui.player.rememberArtworkMeshPalette
+import androidx.core.graphics.ColorUtils
+import androidx.compose.ui.graphics.toArgb
+
+/**
+ * Trial (Artist screen only): a stronger push than [com.convx.music.ui.player.tuned] —
+ * that one keeps the BitChord player mesh from looking muddy, this pushes further so
+ * the blobs read as rich color against the forced-white chrome above them.
+ */
+private fun Color.artistScreenSaturated(): Color {
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(this.toArgb(), hsl)
+    hsl[1] = (hsl[1] * 1.6f).coerceAtMost(1f)
+    hsl[2] = hsl[2].coerceIn(0.30f, 0.62f)
+    return Color(ColorUtils.HSLToColor(hsl))
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -225,6 +248,10 @@ fun ArtistScreen(
     val showArtistBackgroundVideo = if (dataSaverEnabled) false else showArtistBackgroundVideoPref
 
     val lazyListState = rememberLazyListState()
+
+    // Per-screen Haze source (see AlbumScreen): the artwork head + tint plane become
+    // the backdrop that HeroMergeBand/HeroTopBlur blur through.
+    val hazeState = remember { HazeState() }
     val snackbarHostState = remember { SnackbarHostState() }
     var showLocal by rememberSaveable { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -267,7 +294,12 @@ fun ArtistScreen(
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
-    val chromeContentColor = if (useGlass) glassConfig.textColor else MaterialTheme.colorScheme.onSurface
+    // Trial (Artist screen only): Player_v2's own BITCHORD_MESH graded scheme
+    // (Player_v2.kt's adaptivePrimary/adaptiveSecondary) instead of a flat
+    // white or a per-artwork contrast colour — icons stay full white, text
+    // sits at the same 0.35 alpha Player_v2 uses for its secondary tier.
+    val chromeIconColor = Color.White
+    val chromeTextColor = Color.White.copy(alpha = 0.35f)
 
     // Glass chrome (back/share buttons, chips) samples LocalAppBackdrop. The app
     // root's backdrop (MainActivity's Modifier.layerBackdrop(appBackdrop)) captures
@@ -292,12 +324,18 @@ fun ArtistScreen(
     val heroZoom = rememberHeroZoom()
 
     val heroPalette = com.convx.music.ui.component.rememberHeroPalette(artistThumbnail)
-    val tint = heroPalette.background
-    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
-    // now the colour engine's own primary text tier for THIS artwork -- derived against
-    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
-    // a fixed shift of the background.
-    val onTint = heroPalette.primaryText
+
+    // Trial (Artist screen only): the BitChord player's mesh extraction
+    // (Palette-based, four blobs) instead of the colour engine's hero
+    // palette, boosted further so it reads rich even off a dull sleeve. If
+    // this lands well it replaces heroPalette on the other hero screens too.
+    val meshPalette = rememberArtworkMeshPalette(artistThumbnail)
+    val meshColors = remember(meshPalette) { meshPalette.colors.map { it.artistScreenSaturated() } }
+    val tint = remember(meshColors) { meshColors.first().dimmed() }
+    com.convx.music.PublishAmbientBackgroundColor(tint)
+    // Same flat white every icon/text reads in the player on an artwork
+    // background, rather than a per-artwork computed contrast colour.
+    val onTint = Color.White
 
     // Fills the screen tint into the capture BEFORE the content, exactly like
     // MainActivity's appBackdrop does with its own background. Without it the
@@ -320,18 +358,23 @@ fun ArtistScreen(
     // begins. Easing into the screen's real background color over the lower
     // half turns that seam into a deliberate wash instead — same fix as
     // AlbumScreen.kt.
-    val screenBackground = MaterialTheme.colorScheme.background
+    val screenBackground = AppTheme.colorScheme.background
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(tint)
+            .hazeSource(hazeState)
     ) {
-    com.convx.music.ui.component.HeroMeshWash(
-        palette = heroPalette,
-        screenBackground = screenBackground,
+    MeshGradientBackground(
+        palette = MeshPalette(meshColors),
+        trackKey = artistThumbnail,
         modifier = Modifier.matchParentSize(),
     )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
+      // Trial (Artist screen only): forces the tint-derived heading/list colour
+      // HeroTintedContent would otherwise compute back to Player_v2's
+      // BITCHORD_MESH secondary tier (White @ 0.35), matching chromeTextColor.
+      CompositionLocalProvider(LocalAccentTextColor provides chromeTextColor) {
         // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
         // root appBackdrop — sampling appBackdrop here is the RenderNode cycle.
         val chromeBackgroundModifier = if (useGlass) {
@@ -391,7 +434,7 @@ fun ArtistScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .shimmer()
-                                    .background(MaterialTheme.colorScheme.onSurface)
+                                    .background(AppTheme.colorScheme.onSurface)
                                     .fadingEdge(
                                         top = systemBarsTopPadding + AppBarHeight,
                                         bottom = 200.dp,
@@ -445,7 +488,7 @@ fun ArtistScreen(
                                             .size(52.dp)
                                             .shimmer()
                                             .background(
-                                                MaterialTheme.colorScheme.onSurface,
+                                                AppTheme.colorScheme.onSurface,
                                                 RoundedCornerShape(26.dp)
                                             )
                                     )
@@ -539,6 +582,11 @@ fun ArtistScreen(
                                 HeroMergeBand(
                                     artworkUrl = thumbnail,
                                     heroRatio = 0.95f,
+                                    // Without this the pre-13 / reduced-blur fallback
+                                    // crossfades into black rather than into the colour
+                                    // this page is actually painted in.
+                                    pageColor = tint,
+                                    hazeState = hazeState,
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .offset(y = HeroMergeBandHeight / 2),
@@ -555,7 +603,7 @@ fun ArtistScreen(
                                 title = {
                                     Text(
                                         text = artistName?.titlecaseWords() ?: "Unknown",
-                                        style = MaterialTheme.typography.headlineLarge,
+                                        style = AppTheme.typography.headlineLarge,
                                         fontFamily = rememberCustomArtistFontFamily() ?: rememberBrandFontFamily(),
                                         fontWeight = FontWeight.SemiBold,
                                         color = LocalAccentTextColor.current,
@@ -570,8 +618,8 @@ fun ArtistScreen(
                                     {
                                         Text(
                                             text = subscribers,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = AppTheme.typography.titleMedium,
+                                            color = AppTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                         )
                                     }
@@ -649,7 +697,7 @@ fun ArtistScreen(
                                                 append(displayArtistName)
                                             }
                                         },
-                                        style = MaterialTheme.typography.headlineLarge,
+                                        style = AppTheme.typography.headlineLarge,
                                         fontFamily = rememberCustomArtistFontFamily() ?: rememberBrandFontFamily(),
                                         fontWeight = FontWeight.SemiBold,
                                         // The page's biggest heading: carries the artwork
@@ -694,18 +742,20 @@ fun ArtistScreen(
 
                                     // Primary Play Button (Center - Large)
                                     val artistId = artistPage?.artist?.id
-                                    Surface(
+                                    val isPlayingThisArtist = isPlaying && artistId != null &&
+                                        mediaMetadata?.artists?.any { it.id == artistId } == true
+                                    ContrastCircleButton(
+                                        onTint = onTint,
                                         onClick = {
-                                            val isCurrentArtist = artistId != null &&
-                                                mediaMetadata?.artists?.any { it.id == artistId } == true
-                                            if (isPlaying && isCurrentArtist) {
+                                            if (isPlayingThisArtist) {
                                                 playerConnection.player.pause()
-                                            } else if (isCurrentArtist) {
+                                            } else if (artistId != null &&
+                                                mediaMetadata?.artists?.any { it.id == artistId } == true
+                                            ) {
                                                 playerConnection.player.play()
                                             } else {
-                                                // Play artist top songs or radio
                                                 val songSection = artistPage?.sections?.find { section ->
-                                                    (section.items.firstOrNull() as? SongItem)?.album != null
+                                                    section.items.firstOrNull() is SongItem
                                                 }
                                                 val items = songSection?.items?.filterIsInstance<SongItem>()
                                                 if (!items.isNullOrEmpty()) {
@@ -722,19 +772,14 @@ fun ArtistScreen(
                                                 }
                                             }
                                         },
-                                        shape = CircleShape,
-                                        color = onTint,
-                                        modifier = Modifier.size(72.dp)
+                                        size = 72.dp,
                                     ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            AnimatedPlayPauseIcon(
-                                                isPlaying = isPlaying && artistId != null &&
-                                                    mediaMetadata?.artists?.any { it.id == artistId } == true,
-                                                tint = tint,
-                                                size = 32.dp,
-                                                modifier = Modifier.offset(x = 2.dp)
-                                            )
-                                        }
+                                        AnimatedPlayPauseIcon(
+                                            isPlaying = isPlayingThisArtist,
+                                            tint = tint,
+                                            size = 32.dp,
+                                            modifier = Modifier.offset(x = 2.dp)
+                                        )
                                     }
 
                                     // Favorite/Subscribe Button (Right)
@@ -769,7 +814,7 @@ fun ArtistScreen(
                                             ),
                                             contentDescription = null,
                                             modifier = Modifier.size(20.dp),
-                                            tint = if (isSubscribed) MaterialTheme.colorScheme.error else LocalContentColor.current
+                                            tint = if (isSubscribed) AppTheme.colorScheme.error else LocalContentColor.current
                                         )
                                     }
                                 }
@@ -797,13 +842,13 @@ fun ArtistScreen(
                                                     painter = painterResource(R.drawable.artist_screen),
                                                     contentDescription = null,
                                                     modifier = Modifier.size(16.dp),
-                                                    tint = chromeContentColor
+                                                    tint = chromeIconColor
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
                                                     text = "${subscribers.split(' ').firstOrNull() ?: ""} ${stringResource(R.string.subscribers)}",
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    color = chromeContentColor,
+                                                    style = AppTheme.typography.labelLarge,
+                                                    color = chromeTextColor,
                                                     fontWeight = FontWeight.Medium
                                                 )
                                             }
@@ -823,13 +868,13 @@ fun ArtistScreen(
                                                     painter = painterResource(R.drawable.graphic_eq),
                                                     contentDescription = null,
                                                     modifier = Modifier.size(16.dp),
-                                                    tint = chromeContentColor
+                                                    tint = chromeIconColor
                                                 )
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
                                                     text = "${monthlyListeners.split(' ').firstOrNull() ?: ""} ${stringResource(R.string.monthly_listeners)}",
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    color = chromeContentColor,
+                                                    style = AppTheme.typography.labelLarge,
+                                                    color = chromeTextColor,
                                                     fontWeight = FontWeight.Medium
                                                 )
                                             }
@@ -849,9 +894,9 @@ fun ArtistScreen(
                                         ) {
                                             Text(
                                                 text = stringResource(R.string.about_artist),
-                                                style = MaterialTheme.typography.titleMedium,
+                                                style = AppTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = onTint,
+                                                color = chromeTextColor,
                                                 modifier = Modifier.padding(bottom = 8.dp)
                                             )
                                             
@@ -1219,6 +1264,17 @@ fun ArtistScreen(
         // GlassCircleButton below reads LocalAppBackdrop at its own composition
         // point, so wrapping it here (not redeclaring a val above) is enough.
         CompositionLocalProvider(LocalAppBackdrop provides listBackdrop) {
+        // Drawn BEFORE the chrome row below, not after: this used to sit as a
+        // sibling composed later than the whole button row (right at the end
+        // of the composable), which put the blur ON TOP of the buttons/scrim
+        // instead of behind them — visually near-invisible against the
+        // already-dark scrim, and hid the hero-dissolve effect this exists for.
+        HeroTopBlur(
+            hazeState = hazeState,
+            progress = rememberHeroTopBlur(lazyListState),
+            pageColor = screenBackground,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1249,10 +1305,12 @@ fun ArtistScreen(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
+                CompositionLocalProvider(LocalContentColor provides Color.White) {
+                    Icon(
+                        painter = painterResource(R.drawable.arrow_back),
+                        contentDescription = null,
+                    )
+                }
             }
 
             GlassCircleButton(
@@ -1265,14 +1323,17 @@ fun ArtistScreen(
                     }
                 },
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.link),
-                    contentDescription = null,
-                )
+                CompositionLocalProvider(LocalContentColor provides Color.White) {
+                    Icon(
+                        painter = painterResource(R.drawable.link),
+                        contentDescription = null,
+                    )
+                }
             }
             }
         }
         }
+      }
       }
     }
 }
@@ -1308,13 +1369,13 @@ fun FeaturedReleaseCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = album.year?.toString() ?: "Latest Release",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = AppTheme.typography.labelMedium,
                     color = onTint.copy(alpha = 0.6f),
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = album.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     color = onTint,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -1322,7 +1383,7 @@ fun FeaturedReleaseCard(
                 )
                 Text(
                     text = "Album",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = AppTheme.typography.bodySmall,
                     color = onTint.copy(alpha = 0.5f),
                     maxLines = 1
                 )

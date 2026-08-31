@@ -38,21 +38,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.ContainedLoadingIndicator
-import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.Checkbox
+import com.convx.music.ui.ios.compat.ContainedLoadingIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ripple
-import androidx.compose.material3.Surface
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.ripple
+import com.convx.music.ui.ios.compat.Surface
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.ui.semantics.Role
@@ -105,6 +104,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.graphics.Color
 import com.convx.music.constants.AppBarHeight
+import com.convx.music.constants.GridThumbnailHeight
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEachIndexed
@@ -130,6 +130,7 @@ import com.convx.music.db.entities.Album
 import com.convx.music.playback.ExoDownloadService
 import com.convx.music.playback.queues.LocalAlbumRadio
 import com.convx.music.ui.component.AlbumGradient
+import com.convx.music.ui.component.thumbnailPx
 import com.convx.music.ui.component.ExpandableText
 import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
@@ -162,12 +163,16 @@ import com.convx.music.ui.utils.fadingEdge
 import com.convx.music.ui.player.CanvasArtworkPlayer
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.rememberHeroTint
+import com.convx.music.ui.component.rememberHeroTopBlur
 import com.convx.music.utils.listItemShape
 import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.viewmodels.AlbumViewModel
 import com.convx.music.ui.component.HeroMergeBand
 import com.convx.music.ui.component.HeroMergeBandHeight
+import com.convx.music.ui.component.HeroTopBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -273,6 +278,12 @@ fun AlbumScreen(
 
     val lazyListState = rememberLazyListState()
 
+    // Per-screen Haze source: the artwork head + its tint plane together become the
+    // backdrop that HeroMergeBand/HeroTopBlur sample through, so the hero visibly
+    // dissolves into the page and under the status bar. Self-contained per screen —
+    // no global threading through the composition tree.
+    val hazeState = remember { HazeState() }
+
     val transparentAppBar by remember {
         derivedStateOf {
             lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset < 100
@@ -294,6 +305,7 @@ fun AlbumScreen(
 
     val heroPalette = com.convx.music.ui.component.rememberHeroPalette(albumWithSongs?.album?.thumbnailUrl)
     val tint = heroPalette.background
+    com.convx.music.PublishAmbientBackgroundColor(tint)
     // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
     // now the colour engine's own primary text tier for THIS artwork -- derived against
     // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
@@ -303,7 +315,7 @@ fun AlbumScreen(
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
-    val chromeContentColor = if (useGlass) glassConfig.textColor else MaterialTheme.colorScheme.onSurface
+    val chromeContentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface
 
     // Unattached backdrop (never .layerBackdrop'd): glass chrome sampling it
     // early-returns, so it draws a translucent frosted surface with no live
@@ -339,11 +351,12 @@ fun AlbumScreen(
     // begins — the vivid artwork gives way to a uniformly dark tint with no
     // visual continuation. Easing into the screen's real background color
     // over the lower half turns that seam into a deliberate wash instead.
-    val screenBackground = MaterialTheme.colorScheme.background
+    val screenBackground = AppTheme.colorScheme.background
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(tint)
+            .hazeSource(hazeState)
     ) {
     com.convx.music.ui.component.HeroMeshWash(
         palette = heroPalette,
@@ -356,7 +369,7 @@ fun AlbumScreen(
     val chromeBackgroundModifier = if (useGlass) {
         Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
     } else {
-        Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
+        Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
     }
     // Capture from a plain Box wrapping the LazyColumn, not the LazyColumn's own
     // modifier: LazyColumn promotes its items to their own RenderNodes for
@@ -460,15 +473,18 @@ fun AlbumScreen(
                             // Same request the grid tile that opened this screen made:
                             // same data URL, same decode size, same disk key, so the morph
                             // lands on the bitmap Coil already has in memory instead of
-                            // decoding a second copy of it mid-animation. Nothing is lost
-                            // by matching -- the tile's diskCacheKey already pins these
-                            // bytes under the raw URL, so a larger request here was being
-                            // served the same pixels anyway.
-                            val heroRequest = remember(albumWithSongs.album.thumbnailUrl) {
+                            // decoding a second copy of it mid-animation. Must track
+                            // ItemThumbnail's own default (thumbnailPx(GridThumbnailHeight)),
+                            // not a separate constant, and the same resolved-URL keying it
+                            // uses, or the two requests fall out of sync and this stops
+                            // being a cache hit.
+                            val heroTargetPx = thumbnailPx(GridThumbnailHeight)
+                            val heroRequest = remember(albumWithSongs.album.thumbnailUrl, heroTargetPx) {
+                                val resolvedUrl = albumWithSongs.album.thumbnailUrl?.resize(heroTargetPx, heroTargetPx)
                                 ImageRequest.Builder(context)
-                                    .data(albumWithSongs.album.thumbnailUrl?.resize(544, 544))
-                                    .diskCacheKey(albumWithSongs.album.thumbnailUrl)
-                                    .size(544, 544)
+                                    .data(resolvedUrl)
+                                    .diskCacheKey(resolvedUrl)
+                                    .size(heroTargetPx, heroTargetPx)
                                     // Only override for the morph's own hero art: this is
                                     // the one image in the app that has to fade in rather
                                     // than pop, since it sits inside a card that is itself
@@ -502,15 +518,17 @@ fun AlbumScreen(
                         }
                     }
 
-                    // BitChord-style join, same as ArtistScreen: a heavily blurred copy of
-                    // the artwork smeared across the seam, so the artwork's own colour is
-                    // carried down into the page instead of the picture simply stopping.
+                    // BitChord-style join: on Android 13+ a Haze pane blurs the whole
+                    // screen across the seam, carrying the artwork's colour down into the
+                    // page and the page's colour up into it. Below 13 it falls back to a
+                    // plain crossfade gradient so the hero still dissolves into the tint.
                     // Rides `headerOffset` with the artwork so the two never separate
                     // while the header parallaxes.
                     HeroMergeBand(
                         artworkUrl = albumWithSongs.album.thumbnailUrl,
                         heroRatio = 1f,
                         pageColor = tint,
+                        hazeState = hazeState,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .offset { IntOffset(x = 0, y = headerOffset) }
@@ -541,7 +559,7 @@ fun AlbumScreen(
                             title = {
                                 Text(
                                     text = albumWithSongs.album.title,
-                                    style = MaterialTheme.typography.headlineLarge,
+                                    style = AppTheme.typography.headlineLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = onTint,
                                     maxLines = 2,
@@ -551,7 +569,7 @@ fun AlbumScreen(
                             subtitle = {
                                 Text(
                                     text = albumWithSongs.artists.joinToString { it.name },
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = AppTheme.typography.titleMedium,
                                     color = onTint.copy(alpha = 0.7f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -560,7 +578,7 @@ fun AlbumScreen(
                             actions = {
                                 Text(
                                     text = albumInfoText,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = AppTheme.typography.bodyMedium,
                                     color = onTint.copy(alpha = 0.5f),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -585,7 +603,7 @@ fun AlbumScreen(
                             ) {
                                 Text(
                                     text = albumWithSongs.album.title,
-                                    style = MaterialTheme.typography.headlineMedium,
+                                    style = AppTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 30.sp,
                                     color = onTint,
@@ -616,7 +634,7 @@ fun AlbumScreen(
                                     Spacer(Modifier.width(8.dp))
                                     Text(
                                         text = artist.name,
-                                        style = MaterialTheme.typography.titleMedium,
+                                        style = AppTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Medium,
                                         color = onTint
                                     )
@@ -629,14 +647,14 @@ fun AlbumScreen(
                                 ) {
                                     Text(
                                         text = albumInfoText,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = AppTheme.typography.bodyMedium,
                                         color = onTint.copy(alpha = 0.7f),
                                         textAlign = TextAlign.Center
                                     )
                                     if (hasExplicitContent) {
                                         Text(
                                             text = " • ",
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            style = AppTheme.typography.bodyMedium,
                                             color = onTint.copy(alpha = 0.7f)
                                         )
                                         Icon(
@@ -648,7 +666,7 @@ fun AlbumScreen(
                                         Spacer(Modifier.width(4.dp))
                                         Text(
                                             text = stringResource(R.string.explicit),
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            style = AppTheme.typography.bodyMedium,
                                             color = onTint.copy(alpha = 0.7f)
                                         )
                                     }
@@ -674,7 +692,7 @@ fun AlbumScreen(
                                     Spacer(Modifier.width(8.dp))
                                     Text(
                                         text = albumWithSongs.album.title,
-                                        style = MaterialTheme.typography.headlineMedium,
+                                        style = AppTheme.typography.headlineMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = onTint,
                                         maxLines = 2,
@@ -690,14 +708,14 @@ fun AlbumScreen(
                                 ) {
                                     Text(
                                         text = albumInfoText,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = AppTheme.typography.bodyMedium,
                                         color = onTint.copy(alpha = 0.7f),
                                         textAlign = TextAlign.Center
                                     )
                                     if (hasExplicitContent) {
                                         Text(
                                             text = " • ",
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            style = AppTheme.typography.bodyMedium,
                                             color = onTint.copy(alpha = 0.7f)
                                         )
                                         Icon(
@@ -709,7 +727,7 @@ fun AlbumScreen(
                                         Spacer(Modifier.width(4.dp))
                                         Text(
                                             text = stringResource(R.string.explicit),
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            style = AppTheme.typography.bodyMedium,
                                             color = onTint.copy(alpha = 0.7f)
                                         )
                                     }
@@ -795,7 +813,7 @@ fun AlbumScreen(
                                 contentDescription = if (albumWithSongs.album.bookmarkedAt != null) stringResource(R.string.saved) else stringResource(R.string.save),
                                 modifier = Modifier.size(22.dp),
                                 tint = if (albumWithSongs.album.bookmarkedAt != null) {
-                                    MaterialTheme.colorScheme.error
+                                    AppTheme.colorScheme.error
                                 } else {
                                     LocalContentColor.current
                                 }
@@ -821,7 +839,7 @@ fun AlbumScreen(
                     ) {
                         Text(
                             text = stringResource(R.string.about_album),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = onTint,
                             modifier = Modifier.padding(bottom = 8.dp)
@@ -863,8 +881,8 @@ fun AlbumScreen(
                                     }
                                 }
                             },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            style = AppTheme.typography.bodyMedium,
+                            color = AppTheme.colorScheme.onSurface,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 20.dp),
@@ -1067,10 +1085,21 @@ fun AlbumScreen(
         // scrim that ramps from transparent to a dark shade as the list scrolls
         // past the hero art, same treatment as the Artist screen.
         CompositionLocalProvider(LocalAppBackdrop provides listBackdrop) {
+        // Drawn BEFORE the chrome row below, not after: this used to sit as a
+        // sibling composed later than the whole button row (right at the end
+        // of the composable), which put the blur ON TOP of the buttons/scrim
+        // instead of behind them — visually near-invisible against the
+        // already-dark scrim, and hid the hero-dissolve effect this exists for.
+        HeroTopBlur(
+            hazeState = hazeState,
+            progress = rememberHeroTopBlur(lazyListState),
+            pageColor = screenBackground,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
         val chromeBackgroundModifier = if (useGlass) {
             Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
         } else {
-            Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
+            Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
         }
         Box(
             modifier = Modifier
@@ -1109,7 +1138,7 @@ fun AlbumScreen(
 
                 Text(
                     text = pluralStringResource(R.plurals.n_selected, selection.size, selection.size),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     color = chromeContentColor,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)

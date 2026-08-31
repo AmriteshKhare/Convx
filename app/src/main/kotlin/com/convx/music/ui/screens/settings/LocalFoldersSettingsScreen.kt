@@ -29,15 +29,15 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Button
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedButton
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Switch
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -153,8 +153,8 @@ fun LocalFoldersSettingsScreen(
 
         Text(
             text = stringResource(R.string.excluded_folders_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp, top = 16.dp)
         )
 
@@ -164,14 +164,14 @@ fun LocalFoldersSettingsScreen(
             // never granted, and nothing here offered to ask for it.
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
+                color = AppTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(20.dp)) {
                     Text(
                         text = stringResource(R.string.excluded_folders_permission),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = { permissionLauncher.launch(audioPermission) }) {
@@ -223,13 +223,13 @@ fun LocalFoldersSettingsScreen(
         if (folders.isEmpty() && !isScanning) {
             Text(
                 text = stringResource(R.string.excluded_folders_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
         } else {
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                color = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column {
@@ -252,12 +252,12 @@ fun LocalFoldersSettingsScreen(
             Spacer(Modifier.height(24.dp))
             Text(
                 text = stringResource(R.string.excluded_folders_custom),
-                style = MaterialTheme.typography.titleSmall,
+                style = AppTheme.typography.titleSmall,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                color = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column {
@@ -302,15 +302,15 @@ private fun FolderRow(
         ) {
             Text(
                 text = name,
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
             )
             Text(
                 text = detail,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier.horizontalScroll(rememberScrollState()),

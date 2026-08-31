@@ -15,6 +15,7 @@ import androidx.compose.animation.expandIn
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkOut
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,13 +43,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
@@ -468,11 +469,11 @@ fun SongListItem(
             badges = badges,
             thumbnailContent = {
                 if (showIconOnly) {
-                    Box(
-                        modifier = Modifier
-                            .size(ListThumbnailSize)
-                            .clip(ThumbnailRoundedShape)
-                            .background(LocalContentColor.current.copy(alpha = 0.1f)),
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(LocalContentColor.current.copy(alpha = 0.1f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -545,7 +546,7 @@ fun SongGridItem(
     title = {
         Text(
             text = song.song.title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = AppTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -558,7 +559,7 @@ fun SongGridItem(
                 song.artists.joinToString { it.name },
                 makeTimeString(song.song.duration * 1000L)
             ),
-            style = MaterialTheme.typography.bodySmall,
+            style = AppTheme.typography.bodySmall,
             color = AppleTokens.Metadata,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -610,7 +611,7 @@ fun ArtistListItem(
             Icon(
                 painter = painterResource(R.drawable.favorite),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = AppTheme.colorScheme.error,
                 modifier = Modifier
                     .size(18.dp)
                     .padding(end = 2.dp),
@@ -628,7 +629,7 @@ fun ArtistListItem(
             Box(
                 modifier = Modifier
                     .size(ListThumbnailSize)
-                    .clip(ThumbnailRoundedShape)
+                    .clip(CircleShape)
                     .background(LocalContentColor.current.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -654,7 +655,7 @@ fun ArtistListItem(
                 contentDescription = null,
                 modifier = Modifier
                     .size(ListThumbnailSize)
-                    .clip(ThumbnailRoundedShape),
+                    .clip(CircleShape),
             )
         }
     },
@@ -697,9 +698,10 @@ fun ArtistGridItem(
             }
         } else {
             val context = LocalContext.current
-            val imageRequest = remember(artist.artist.thumbnailUrl) {
+            val targetPx = thumbnailPx(GridThumbnailHeight)
+            val imageRequest = remember(artist.artist.thumbnailUrl, targetPx) {
                 ImageRequest.Builder(context)
-                    .data(artist.artist.thumbnailUrl?.resize(544, 544))
+                    .data(artist.artist.thumbnailUrl?.resize(targetPx, targetPx))
                     .memoryCachePolicy(coil3.request.CachePolicy.ENABLED)
                     .diskCachePolicy(coil3.request.CachePolicy.ENABLED)
                     .networkCachePolicy(coil3.request.CachePolicy.ENABLED)
@@ -711,7 +713,7 @@ fun ArtistGridItem(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(ThumbnailRoundedShape)
+                    .clip(CircleShape)
             )
         }
     },
@@ -858,7 +860,7 @@ fun AlbumGridItem(
     title = {
         Text(
             text = album.album.title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = AppTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -868,7 +870,7 @@ fun AlbumGridItem(
     subtitle = {
         Text(
             text = album.artists.joinToString { it.name },
-            style = MaterialTheme.typography.bodySmall,
+            style = AppTheme.typography.bodySmall,
             color = AppleTokens.Metadata,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1078,7 +1080,7 @@ fun PlaylistGridItem(
     title = {
         Text(
             text = playlist.playlist.name,
-            style = MaterialTheme.typography.bodyMedium,
+            style = AppTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1105,7 +1107,7 @@ fun PlaylistGridItem(
         }
         Text(
             text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
+            style = AppTheme.typography.bodySmall,
             color = AppleTokens.Metadata,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1377,7 +1379,7 @@ fun YouTubeGridItem(
     title = {
         Text(
             text = item.title,
-            style = MaterialTheme.typography.bodyMedium,
+            style = AppTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1395,7 +1397,7 @@ fun YouTubeGridItem(
         if (subtitle != null) {
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
+                style = AppTheme.typography.bodySmall,
                 color = AppleTokens.Metadata,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1509,6 +1511,43 @@ fun LocalAlbumsGrid(
 @Composable
 fun thumbnailPx(dp: Dp): Int = with(LocalDensity.current) { dp.roundToPx() }
 
+/**
+ * The no-artwork look wherever a thumbnail is missing: a flat dark tile (no shadow —
+ * there is nothing for one to sit behind) with the app's own logo centred at low
+ * alpha, same shape BitChord uses for its music-note glyph. Swapped in as an
+ * `AsyncImage`'s `placeholder`/`error` painter rather than restructuring those call
+ * sites into `SubcomposeAsyncImage`, which would pay a subcomposition cost on every
+ * successful load too, not just the rare missing-artwork case.
+ */
+@Composable
+fun rememberNoArtworkPainter(
+    tintAlpha: Float = 0.35f,
+    fillAlpha: Float = 0.18f,
+): androidx.compose.ui.graphics.painter.Painter {
+    val logoPainter = painterResource(R.drawable.convx_logo)
+    return remember(logoPainter, tintAlpha, fillAlpha) {
+        object : androidx.compose.ui.graphics.painter.Painter() {
+            override val intrinsicSize = androidx.compose.ui.geometry.Size.Unspecified
+            override fun androidx.compose.ui.graphics.drawscope.DrawScope.onDraw() {
+                drawRect(Color.Black.copy(alpha = fillAlpha))
+                val logoSize = minOf(size.width, size.height) * 0.4f
+                translate(
+                    left = (size.width - logoSize) / 2f,
+                    top = (size.height - logoSize) / 2f,
+                ) {
+                    with(logoPainter) {
+                        draw(
+                            size = androidx.compose.ui.geometry.Size(logoSize, logoSize),
+                            alpha = tintAlpha,
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun ItemThumbnail(
     thumbnailUrl: String?,
@@ -1519,11 +1558,14 @@ fun ItemThumbnail(
     albumIndex: Int? = null,
     isSelected: Boolean = false,
     thumbnailRatio: Float = 1f,
-    /** Decode size. Grid tiles keep the large default; list rows pass their real
-     *  on-screen size via [thumbnailPx], because decoding a 544px bitmap for a
-     *  48dp row is ~10x the pixels the row can show. Do NOT lower this default:
-     *  the same composable draws the big tiles, and they need every pixel. */
-    targetSizePx: Int = 544,
+    /** Decode size. Grid tiles keep this density-scaled default; list rows pass their
+     *  real on-screen size via [thumbnailPx], because decoding a 544px bitmap for a
+     *  48dp row is ~10x the pixels the row can show. Do NOT lower this default below
+     *  the grid tile's own real size: the same composable draws the big tiles, and
+     *  they need every pixel. A flat 544 (rather than this device-relative value) was
+     *  under the tile's actual pixel size on anything above ~3.3x density, which is
+     *  what read as soft/upscaled artwork on higher-density phones. */
+    targetSizePx: Int = thumbnailPx(GridThumbnailHeight),
     /** Overrides the global CropAlbumArtKey preference when set — for tiles that
      *  should always fill edge-to-edge (Apple Music style) regardless of the
      *  user's general album-art setting, e.g. Home's Speed Dial. */
@@ -1540,14 +1582,25 @@ fun ItemThumbnail(
     val context = LocalContext.current
     val actualTargetSizePx = targetSizePx
     val imageRequest = remember(thumbnailUrl, actualTargetSizePx) {
+        val resolvedUrl = thumbnailUrl?.resize(actualTargetSizePx, actualTargetSizePx)
         ImageRequest.Builder(context)
-            .data(thumbnailUrl?.resize(actualTargetSizePx, actualTargetSizePx))
-            // Keyed on the raw URL, not the resized one Coil would otherwise
-            // default to: DownloadUtil pre-caches a downloaded song's thumbnail
-            // under this same raw-URL key, so this is what lets that entry
-            // actually be found offline instead of missing under a different
-            // key for every distinct decode size requested across the app.
-            .diskCacheKey(thumbnailUrl)
+            .data(resolvedUrl)
+            // Keyed on the resolved (quality-tier) URL actually being fetched, not
+            // the raw one: that used to pin every decode size of a song's artwork
+            // to ONE disk-cache slot, so a 64dp list row's mqdefault fetch could
+            // win the slot and a later 544px Speed Dial tile's maxresdefault
+            // request would hit that cache and get served the small image back
+            // instead of ever fetching the bigger one -- whichever size rendered
+            // first "won" that song's artwork everywhere, at that quality, until
+            // eviction. Each quality tier now caches under its own key.
+            //
+            // ponytail: a downloaded song's grid/list tile can still miss its own
+            // disk-cache slot while offline if that exact decode size was never
+            // fetched online first (the full-screen player is unaffected -- it
+            // requests the same maxresdefault URL DownloadUtil precaches, so it
+            // still hits). Add a raw-key fallback read on offline cache miss if
+            // that turns out to matter in practice.
+            .diskCacheKey(resolvedUrl)
             .size(CoilSize(actualTargetSizePx, actualTargetSizePx))
             .allowHardware(true)
             .bitmapConfig(android.graphics.Bitmap.Config.HARDWARE)
@@ -1587,7 +1640,7 @@ fun ItemThumbnail(
             ) {
                 Text(
                     text = albumIndex.toString(),
-                    style = MaterialTheme.typography.labelLarge
+                    style = AppTheme.typography.labelLarge
                 )
             }
         }
@@ -1611,7 +1664,7 @@ fun ItemThumbnail(
         PlayingIndicatorBox(
             isActive = isActive,
             playWhenReady = isPlaying,
-            color = if (albumIndex != null) MaterialTheme.colorScheme.onBackground else Color.White,
+            color = if (albumIndex != null) AppTheme.colorScheme.onBackground else Color.White,
             showPausedIcon = showPausedPlayIcon,
             modifier = Modifier
                 .fillMaxSize()
@@ -1639,13 +1692,19 @@ fun LocalThumbnail(
 ) {
     val cropAlbumArt = LocalItemPrefs.current.cropAlbumArt
     val context = LocalContext.current
-    val imageRequest = remember(thumbnailUrl) {
+    // resize() is a no-op for local file/content URIs (only the YouTube/Google host
+    // branches transform anything) — the decode size below is what actually bounds a
+    // local thumbnail's resolution, so it's what needs to be density-scaled, not 544.
+    val targetPx = thumbnailPx(GridThumbnailHeight)
+    val imageRequest = remember(thumbnailUrl, targetPx) {
+        val resolvedUrl = thumbnailUrl?.resize(targetPx, targetPx)
         ImageRequest.Builder(context)
-            .data(thumbnailUrl?.resize(544, 544))
-            // See ItemThumbnail above: keyed on the raw URL so a thumbnail
-            // pre-cached at download time (also keyed on the raw URL) is found.
-            .diskCacheKey(thumbnailUrl)
-            .size(CoilSize(544, 544))
+            .data(resolvedUrl)
+            // See ItemThumbnail above: keyed on the resolved URL so this decode
+            // size can't collide on disk with a different one requested elsewhere
+            // for the same song.
+            .diskCacheKey(resolvedUrl)
+            .size(CoilSize(targetPx, targetPx))
             .memoryCachePolicy(coil3.request.CachePolicy.ENABLED)
             .diskCachePolicy(coil3.request.CachePolicy.ENABLED)
             .networkCachePolicy(coil3.request.CachePolicy.ENABLED)
@@ -1753,6 +1812,9 @@ fun PlaylistThumbnail(
 ) {
     val cropAlbumArt = LocalItemPrefs.current.cropAlbumArt
     val context = LocalContext.current
+    // The real on-screen size, not a flat constant -- [size] is however big this
+    // particular caller actually draws the tile, quartered tiles included.
+    val targetPx = thumbnailPx(size)
 
     when (thumbnails.size) {
         0 -> Box(
@@ -1760,19 +1822,19 @@ fun PlaylistThumbnail(
             modifier = Modifier
                 .size(size)
                 .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(AppTheme.colorScheme.surfaceContainer)
         ) {
             placeHolder()
         }
         1 -> AsyncImage(
-            model = remember(thumbnails) {
+            model = remember(thumbnails, targetPx) {
+                val resolvedUrl = thumbnails[0].resize(targetPx, targetPx)
                 ImageRequest.Builder(context)
-                    .data(thumbnails[0].resize(544, 544))
-                    // Same raw-URL keying as ItemThumbnail/LocalThumbnail above:
-                    // DownloadUtil pre-caches a downloaded song's art under its
-                    // raw (unresized) URL, so this needs the same key to find it
-                    // offline instead of missing under the resized URL's default.
-                    .diskCacheKey(thumbnails[0])
+                    .data(resolvedUrl)
+                    // See ItemThumbnail: keyed on the resolved URL so this decode
+                    // size can't collide on disk with a different one requested
+                    // elsewhere for the same song.
+                    .diskCacheKey(resolvedUrl)
                     .memoryCachePolicy(coil3.request.CachePolicy.ENABLED)
                     .diskCachePolicy(coil3.request.CachePolicy.ENABLED)
                     .networkCachePolicy(coil3.request.CachePolicy.ENABLED)
@@ -1798,10 +1860,11 @@ fun PlaylistThumbnail(
                 Alignment.BottomEnd
             ).fastForEachIndexed { index, alignment ->
                 AsyncImage(
-                    model = remember(thumbnails, index) {
+                    model = remember(thumbnails, index, targetPx) {
+                        val resolvedUrl = thumbnails.getOrNull(index)?.resize(targetPx, targetPx)
                         ImageRequest.Builder(context)
-                            .data(thumbnails.getOrNull(index)?.resize(544, 544))
-                            .diskCacheKey(thumbnails.getOrNull(index))
+                            .data(resolvedUrl)
+                            .diskCacheKey(resolvedUrl)
                             .memoryCachePolicy(coil3.request.CachePolicy.ENABLED)
                             .diskCachePolicy(coil3.request.CachePolicy.ENABLED)
                             .networkCachePolicy(coil3.request.CachePolicy.ENABLED)
@@ -1899,14 +1962,14 @@ fun SwipeToSongBox(
             val (iconRes, bg, tint, align) = if (offset.floatValue > 0)
                 Quadruple(
                     R.drawable.playlist_play,
-                    MaterialTheme.colorScheme.secondary,
-                    MaterialTheme.colorScheme.onSecondary,
+                    AppTheme.colorScheme.secondary,
+                    AppTheme.colorScheme.onSecondary,
                     Alignment.CenterStart
                 ) else
                 Quadruple(
                     R.drawable.queue_music,
-                    MaterialTheme.colorScheme.primary,
-                    MaterialTheme.colorScheme.onPrimary,
+                    AppTheme.colorScheme.primary,
+                    AppTheme.colorScheme.onPrimary,
                     Alignment.CenterEnd
                 )
 
@@ -1934,7 +1997,7 @@ fun SwipeToSongBox(
             modifier = Modifier
                 .offset { IntOffset(offset.floatValue.roundToInt(), 0) }
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface),
+                .background(AppTheme.colorScheme.surface),
             content = content
         )
     }
@@ -1965,7 +2028,7 @@ object Icon {
         Icon(
             painter = painterResource(R.drawable.favorite),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
+            tint = AppTheme.colorScheme.error,
             modifier = Modifier
                 .size(18.dp)
                 .padding(end = 2.dp)
@@ -2006,7 +2069,7 @@ object Icon {
             Download.STATE_FAILED -> Icon(
                 painter = painterResource(R.drawable.error),
                 contentDescription = stringResource(R.string.download_failed),
-                tint = MaterialTheme.colorScheme.error,
+                tint = AppTheme.colorScheme.error,
                 modifier = Modifier
                     .size(18.dp)
                     .padding(end = 2.dp)

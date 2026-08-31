@@ -31,8 +31,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -205,7 +205,7 @@ fun AlphabetScrollBar(
                     // only appears while a scrub is in progress so a resting list stays
                     // clean.
                     .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                        color = AppTheme.colorScheme.surfaceVariant.copy(
                             alpha = trackAlpha,
                         ),
                         shape = ContinuousRoundedRectangle(RailWidth / 2),
@@ -439,15 +439,15 @@ private fun AlphabetIndicator(section: String?, visible: Boolean) {
             modifier = Modifier
                 .size(64.dp)
                 .background(
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
+                    color = AppTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
                     shape = ContinuousRoundedRectangle(32.dp),
                 ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = section.orEmpty(),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
+                style = AppTheme.typography.headlineSmall,
+                color = AppTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -476,11 +476,11 @@ private fun AlphabetCell(section: String, selected: Boolean, size: Dp) {
     ) {
         Text(
             text = section,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = fontSize),
+            style = AppTheme.typography.labelSmall.copy(fontSize = fontSize),
             color = if (selected) {
-                MaterialTheme.colorScheme.onSurface
+                AppTheme.colorScheme.onSurface
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+                AppTheme.colorScheme.onSurfaceVariant
             },
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.Center,

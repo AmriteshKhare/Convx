@@ -9,6 +9,7 @@ import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.pow
+import kotlin.math.tanh
 
 /**
  * Custom audio processor for ExoPlayer that applies parametric EQ using biquad filters
@@ -23,6 +24,12 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     private var encoding = C.ENCODING_INVALID
     private var isActive = false
     private var equalizerEnabled = false
+
+    /** Set by Bit Perfect mode to force a flat passthrough without disturbing
+     *  [equalizerEnabled]/the saved profile, so turning Bit Perfect back off
+     *  restores EQ exactly as the user left it. */
+    @Volatile
+    var forceBypass = false
 
     private var inputBuffer: ByteBuffer = EMPTY_BUFFER
     private var outputBuffer: ByteBuffer = EMPTY_BUFFER
@@ -138,7 +145,7 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
         return inputAudioFormat
     }
 
-    override fun isActive(): Boolean = isActive
+    override fun isActive(): Boolean = isActive && !forceBypass
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         if (!equalizerEnabled || filters.isEmpty()) {
@@ -193,6 +200,21 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
     }
 
     /**
+     * Boosted bands + preamp can push a sample past full scale; a hard clamp there
+     * is an abrupt brick-wall cut that reads as audible crackle/distortion on peaks.
+     * Only engages above 0.9 amplitude and asymptotically approaches ±1.0, so normal
+     * (non-clipping) audio passes through completely unchanged.
+     */
+    private fun softClip(x: Double): Double {
+        val threshold = 0.9
+        return when {
+            x > threshold -> threshold + (1 - threshold) * tanh((x - threshold) / (1 - threshold))
+            x < -threshold -> -(threshold + (1 - threshold) * tanh((-x - threshold) / (1 - threshold)))
+            else -> x
+        }
+    }
+
+    /**
      * Process 16-bit PCM audio through all biquad filters
      */
     private fun processAudioBuffer16Bit(input: ByteBuffer, output: ByteBuffer) {
@@ -217,8 +239,8 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
                     // Apply preamp gain
                     processed *= preampGain
 
-                    // Clamp and convert back to 16-bit
-                    val outputSample = (processed * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
+                    // Soft-knee limit, then convert back to 16-bit
+                    val outputSample = (softClip(processed) * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
                     output.putShort(outputSample)
                 }
                 2 -> {
@@ -240,9 +262,9 @@ class CustomEqualizerAudioProcessor : AudioProcessor {
                     processedLeft *= preampGain
                     processedRight *= preampGain
 
-                    // Clamp and convert back to 16-bit
-                    val outputLeft = (processedLeft * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
-                    val outputRight = (processedRight * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
+                    // Soft-knee limit, then convert back to 16-bit
+                    val outputLeft = (softClip(processedLeft) * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
+                    val outputRight = (softClip(processedRight) * 32768.0).coerceIn(-32768.0, 32767.0).toInt().toShort()
 
                     output.putShort(outputLeft)
                     output.putShort(outputRight)

@@ -3,7 +3,7 @@ package com.convx.music.ui.theme
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.LocalContentColor
+import com.convx.music.ui.ios.compat.LocalContentColor
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -83,10 +83,10 @@ object AppleTokens {
     // content tile; a card corner means the object is genuinely a card.
     // Every one of them is drawn with continuous (squircle) curvature — see
     // [AppShapes] — so nothing in the app mixes circular and continuous corners.
-    val Artwork = 12.dp
-    val Control = 12.dp
-    val CardCorner = 22.dp
-    val CardCornerLarge = 28.dp
+    val Artwork = 8.dp
+    val Control = 8.dp
+    val CardCorner = 14.dp
+    val CardCornerLarge = 18.dp
 
     // Motion — one spring, three tempers, modelled on SwiftUI's `.smooth`: a spring
     // with a 0.5s natural period and zero bounce. That is the default here, and

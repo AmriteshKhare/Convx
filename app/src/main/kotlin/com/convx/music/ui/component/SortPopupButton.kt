@@ -12,13 +12,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.DropdownMenu
+import com.convx.music.ui.ios.compat.DropdownMenuItem
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -126,11 +126,11 @@ private fun SortMenuRow(
             ) {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     color = if (checked) {
-                        MaterialTheme.colorScheme.primary
+                        AppTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.onSurface
+                        AppTheme.colorScheme.onSurface
                     },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -144,9 +144,9 @@ private fun SortMenuRow(
                     painter = painterResource(trailingIcon),
                     contentDescription = null,
                     tint = if (checked) {
-                        MaterialTheme.colorScheme.primary
+                        AppTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        AppTheme.colorScheme.onSurfaceVariant
                     },
                     modifier = Modifier
                         .size(18.dp)
@@ -156,7 +156,7 @@ private fun SortMenuRow(
                 checked -> Icon(
                     painter = painterResource(R.drawable.check),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = AppTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp),
                 )
             }

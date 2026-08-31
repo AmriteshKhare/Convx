@@ -16,8 +16,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -99,7 +99,7 @@ fun LyricsLineV2(
         // Fallback for lines without word timings (e.g. standard LRC without word sync)
         Text(
             text = entry.text,
-            style = MaterialTheme.typography.headlineMedium.copy(
+            style = AppTheme.typography.headlineMedium.copy(
                 fontSize = if (entry.isBackground) (baseFontSize * 0.85f).sp else baseFontSize.sp,
                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                 fontStyle = if (entry.isBackground) FontStyle.Italic else FontStyle.Normal,
@@ -187,7 +187,7 @@ fun AnimatedWordV2(
         // Layer 1: Base text (always dimmed)
         Text(
             text = word.text,
-            style = MaterialTheme.typography.headlineMedium.copy(
+            style = AppTheme.typography.headlineMedium.copy(
                 fontSize = fontSize.sp,
                 fontWeight = fontWeight,
                 fontStyle = if (isBackground) FontStyle.Italic else FontStyle.Normal,
@@ -200,7 +200,7 @@ fun AnimatedWordV2(
         if (isWordComplete || isWordActive) {
             Text(
                 text = word.text,
-                style = MaterialTheme.typography.headlineMedium.copy(
+                style = AppTheme.typography.headlineMedium.copy(
                     fontSize = fontSize.sp,
                     fontWeight = fontWeight,
                     fontStyle = if (isBackground) FontStyle.Italic else FontStyle.Normal,

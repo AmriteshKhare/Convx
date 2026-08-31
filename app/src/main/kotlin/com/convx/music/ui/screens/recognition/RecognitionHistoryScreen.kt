@@ -49,29 +49,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.text.KeyboardOptions
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Card
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.CardDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.IconButton
+import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Scaffold
+import com.convx.music.ui.ios.compat.Scaffold
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextField
+import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TextFieldDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -217,7 +217,7 @@ fun RecognitionHistoryScreen(
         ) {
             Text(
                 text = stringResource(R.string.clear_recognition_history_confirm),
-                style = MaterialTheme.typography.bodyMedium
+                style = AppTheme.typography.bodyMedium
             )
         }
     }
@@ -252,7 +252,7 @@ fun RecognitionHistoryScreen(
         ) {
             Text(
                 text = stringResource(R.string.delete_playlist_confirm, item.title),
-                style = MaterialTheme.typography.bodyMedium
+                style = AppTheme.typography.bodyMedium
             )
         }
     }
@@ -298,15 +298,15 @@ fun RecognitionHistoryScreen(
                 placeholder = {
                     Text(
                         text = stringResource(R.string.search),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = AppTheme.typography.bodyLarge,
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                 },
                 leadingIcon = {
                     Icon(
                         painter = painterResource(R.drawable.search),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = AppTheme.colorScheme.onSurfaceVariant
                     )
                 },
                 trailingIcon = {
@@ -315,7 +315,7 @@ fun RecognitionHistoryScreen(
                             Icon(
                                 painter = painterResource(R.drawable.close),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -324,8 +324,8 @@ fun RecognitionHistoryScreen(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 shape = RoundedCornerShape(28.dp),
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor   = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    focusedContainerColor   = AppTheme.colorScheme.surfaceVariant,
+                    unfocusedContainerColor = AppTheme.colorScheme.surfaceVariant,
                     focusedIndicatorColor   = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor  = Color.Transparent,
@@ -350,13 +350,13 @@ fun RecognitionHistoryScreen(
                                 painter = painterResource(R.drawable.history),
                                 contentDescription = null,
                                 modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                tint = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "No recognition history",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = AppTheme.typography.bodyLarge,
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -374,13 +374,13 @@ fun RecognitionHistoryScreen(
                                 painter = painterResource(R.drawable.search),
                                 contentDescription = null,
                                 modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                tint = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "No results for \"${query.text}\"",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = AppTheme.typography.bodyLarge,
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -400,7 +400,7 @@ fun RecognitionHistoryScreen(
                                         title = label,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.surface)
+                                            .background(AppTheme.colorScheme.surface)
                                     )
                                 }
                                 items(
@@ -459,7 +459,7 @@ private fun RecognitionHistoryItem(
             .bounceClick { onClick() },
         shape = ThumbnailRoundedShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            containerColor = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
     ) {
         Row(
@@ -486,22 +486,22 @@ private fun RecognitionHistoryItem(
             ) {
                 Text(
                     text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = AppTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = item.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = item.recognizedAt.format(dateFormatter),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    style = AppTheme.typography.bodySmall,
+                    color = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
 
@@ -510,7 +510,7 @@ private fun RecognitionHistoryItem(
                 Icon(
                     painter = painterResource(R.drawable.delete),
                     contentDescription = stringResource(R.string.delete_from_history),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = AppTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

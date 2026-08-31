@@ -18,15 +18,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -41,17 +42,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import android.os.Build
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.convx.music.R
-import com.convx.music.constants.HomeCardCornerRadiusOverrideKey
 import com.convx.music.constants.HomeHeroCardHeightOverrideKey
-import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.utils.rememberPreference
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * The "star of the day" card that opens Home.
@@ -76,20 +79,34 @@ fun HomeHeroCard(
     modifier: Modifier = Modifier,
 ) {
     val (heightOverride) = rememberPreference(HomeHeroCardHeightOverrideKey, 0)
-    val (cornerOverride) = rememberPreference(HomeCardCornerRadiusOverrideKey, 0)
-    val cornerRadius = if (cornerOverride > 0) cornerOverride.dp else AppleTokens.CardCornerLarge
+    val cardShape = rememberHomeCardShape()
+
+    // Zoom-in entrance: the artwork starts 12 % larger and invisible, settling to
+    // normal scale over 500 ms.  One-shot on first composition per [thumbnailUrl] key.
+    val scale = remember { Animatable(1.12f) }
+    val alpha = remember { Animatable(0f) }
+    LaunchedEffect(thumbnailUrl) {
+        scale.snapTo(1.12f)
+        alpha.snapTo(0f)
+        coroutineScope {
+            launch { scale.animateTo(1f, animationSpec = tween(500)) }
+            launch { alpha.animateTo(1f, animationSpec = tween(400)) }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .then(
                 if (heightOverride > 0) Modifier.height(heightOverride.dp) else Modifier.aspectRatio(4f / 3f)
             )
-            .clip(ContinuousRoundedRectangle(cornerRadius))
+            .clip(cardShape)
             // Under the artwork, not decoration: a song whose thumbnailUrl is null or
             // fails to load left the card fully transparent, so the section read as
             // "the hero card never rendered" rather than as a card with no cover.
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .bounceClick(onClick = onClick),
+            .background(AppTheme.colorScheme.surfaceContainerHigh)
+            .bounceClick(onClick = onClick)
+            .homeCardRim(cardShape),
     ) {
         // Bound the decode to the card's real on-screen pixels and skip the crossfade:
         // the hero is a full-bleed artwork card, so a full-size decode + fade costs GPU
@@ -108,11 +125,21 @@ fun HomeHeroCard(
                         .build()
                 }
             }
+            // Read out here: inside the frost Box below, BoxScope shadows this
+            // BoxWithConstraintsScope, so `maxWidth` is no longer resolvable there.
+            val frostBlurDp = HeroFrostBlurRadius.value *
+                (LocalConfiguration.current.screenWidthDp / maxWidth.value)
             AsyncImage(
                 model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = scale.value
+                        scaleY = scale.value
+                        this.alpha = alpha.value
+                    },
             )
 
             // Frosted band over the lower portion: the cover again, blurred, revealed by
@@ -141,13 +168,16 @@ fun HomeHeroCard(
                             )
                         },
                 ) {
-                    AsyncImage(
-                        model = request,
-                        contentDescription = null,
+                    // Baked once per artwork rather than blurred live: a non-null
+                    // RenderEffect is re-evaluated on every composite, so this band --
+                    // static once the cover loads -- was a full-card blur pass on every
+                    // frame Home drew. The radius is projected for the full screen width
+                    // inside the helper, so scale it for the card's narrower width.
+                    BlurredBackdropImage(
+                        model = thumbnailUrl,
+                        screenBlurRadiusDp = frostBlurDp,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(HeroFrostBlurRadius),
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
@@ -174,7 +204,7 @@ fun HomeHeroCard(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = AppTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 maxLines = 1,
@@ -182,7 +212,7 @@ fun HomeHeroCard(
             )
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
+                style = AppTheme.typography.bodyMedium,
                 color = Color.White.copy(alpha = 0.75f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -230,7 +260,7 @@ private fun HeroPill(
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = AppTheme.typography.labelLarge,
             color = Color.White,
             maxLines = 1,
         )

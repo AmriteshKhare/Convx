@@ -27,11 +27,11 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -65,7 +65,6 @@ import com.music.innertube.models.AlbumItem
 import com.music.innertube.models.ArtistItem
 import com.music.innertube.models.PlaylistItem
 import com.music.innertube.models.SongItem
-import com.music.innertube.models.WatchEndpoint
 import com.music.innertube.models.YTItem
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -78,8 +77,7 @@ import com.convx.music.R
 import com.convx.music.constants.MiniPlayerBottomSpacing
 import com.convx.music.constants.MiniPlayerHeight
 import com.convx.music.constants.NavigationBarHeight
-import com.convx.music.models.toMediaMetadata
-import com.convx.music.playback.queues.YouTubeQueue
+import com.convx.music.playback.queues.searchResultQueue
 import com.convx.music.ui.component.ChipsRow
 import com.convx.music.ui.component.EmptyPlaceholder
 import com.convx.music.ui.component.LocalMenuState
@@ -172,7 +170,12 @@ fun OnlineSearchResult(
         }
     }
 
-    val ytItemContent: @Composable LazyItemScope.(YTItem, Int, Int) -> Unit = { item: YTItem, index: Int, size: Int ->
+    // Takes the whole row list, not just its size: tapping a song has to be able to queue the
+    // songs shown next to it (see the SongItem branch below), which is what YT Music does and
+    // what starting a one-song radio queue never did.
+    val searchedSongsTitle = stringResource(R.string.queue_searched_songs)
+    val ytItemContent: @Composable LazyItemScope.(YTItem, Int, List<YTItem>) -> Unit = { item: YTItem, index: Int, siblings: List<YTItem> ->
+        val size = siblings.size
         val longClick = {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
             menuState.show {
@@ -236,12 +239,7 @@ fun OnlineSearchResult(
                                 if (item.id == mediaMetadata?.id) {
                                     playerConnection.togglePlayPause()
                                 } else {
-                                    playerConnection.playQueue(
-                                        YouTubeQueue(
-                                            WatchEndpoint(videoId = item.id),
-                                            item.toMediaMetadata()
-                                        )
-                                    )
+                                    playerConnection.playQueue(searchResultQueue(item, siblings, searchedSongsTitle))
                                 }
                             }
 
@@ -291,7 +289,7 @@ fun OnlineSearchResult(
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(heroUrl)
-                        .size(100, 100)
+                        .size(544, 544)
                         .allowHardware(false)
                         .build(),
                     contentDescription = null,
@@ -314,7 +312,7 @@ fun OnlineSearchResult(
                     .background(
                         Brush.verticalGradient(
                             0.55f to Color.Transparent,
-                            1f to MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+                            1f to AppTheme.colorScheme.primary.copy(alpha = 0.55f),
                         )
                     )
             )
@@ -384,7 +382,7 @@ fun OnlineSearchResult(
                                     key = { index, item -> "${summary.title}/${item.id}/$index" },
                                     contentType = { _, _ -> "yt_item_row" },
                                 ) { index, item ->
-                                    ytItemContent(item, index, summary.items.size)
+                                    ytItemContent(item, index, summary.items)
                                 }
                             }
 
@@ -406,7 +404,7 @@ fun OnlineSearchResult(
                                 key = { _, it -> "filtered_${it.id}" },
                                 contentType = { _, _ -> "yt_item_row" },
                             ) { index, item ->
-                                ytItemContent(item, index, distinctItems.size)
+                                ytItemContent(item, index, distinctItems)
                             }
 
                             if (itemsPage?.continuation != null) {

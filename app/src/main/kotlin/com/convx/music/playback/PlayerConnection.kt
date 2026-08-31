@@ -23,7 +23,11 @@ import com.convx.music.extensions.getQueueWindows
 import com.convx.music.extensions.metadata
 import com.convx.music.extensions.togglePlayPause
 import com.convx.music.playback.MusicService.MusicBinder
+import com.convx.music.constants.AskBeforeReplacingQueueKey
+import com.convx.music.playback.queues.ListQueue
 import com.convx.music.playback.queues.Queue
+import com.convx.music.utils.dataStore
+import com.convx.music.utils.get
 import com.convx.music.utils.reportException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,6 +52,7 @@ class PlayerConnection(
     }
 
     val service = binder.service
+    private val appContext = context.applicationContext
     private val playerReadinessFlow = service.isPlayerReady
     
     /**
@@ -233,7 +238,28 @@ class PlayerConnection(
     val playbackLockedByRoom: Boolean
         get() = !allowInternalSync && shouldBlockPlaybackChanges?.invoke() == true
 
-    fun playQueue(queue: Queue) {
+    /**
+     * A queue the user asked to play while something else was already queued, parked here
+     * until they say whether to keep or clear what is playing. Consumed by
+     * `QueueConflictDialog`, which is hosted once at the root — the prompt has to live at a
+     * single point because every "play this" in the app funnels through [playQueue].
+     */
+    val pendingQueue = MutableStateFlow<Queue?>(null)
+
+    /**
+     * The queue that was just silently replaced (asking-before-replacing is off), so a
+     * snackbar can offer to undo it. Not set when the user replaced via the prompt or force
+     * came from an internal caller — both are already a deliberate choice with nothing to
+     * undo.
+     */
+    val queueReplacedForUndo = MutableStateFlow<Queue?>(null)
+
+    /**
+     * @param force skips the keep-or-clear prompt. Set by the prompt itself when the user
+     *   picks "clear and play", and by internal callers that are already a deliberate replace
+     *   (queue restore, Listen Together sync).
+     */
+    fun playQueue(queue: Queue, force: Boolean = false) {
         // Every "play this" in the app funnels through here — song rows, album and
         // playlist headers, search results, Home tiles, radio. It was the one entry
         // point with no room gate, so an owner-only room still let a guest start its
@@ -246,12 +272,73 @@ class PlayerConnection(
         if (!playerReadinessFlow.value) {
             Timber.tag(TAG).w("playQueue called before player ready; delegating to service")
         }
+        val isReplace = hasLiveQueue() && !startsInsideCurrentQueue(queue)
+        if (!force && appContext.dataStore.get(AskBeforeReplacingQueueKey, false) && isReplace) {
+            pendingQueue.value = queue
+            return
+        }
+        // Only a silent replace (prompt off) needs an undo offer — a forced replace is
+        // already the user's or the system's deliberate choice.
+        val previousQueue = if (!force && isReplace) snapshotCurrentQueue() else null
         try {
             service.playQueue(queue)
+            previousQueue?.let { queueReplacedForUndo.value = it }
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error in playQueue")
             throw e
         }
+    }
+
+    /** Captures what is currently playing as a replayable [ListQueue], for undo. */
+    private fun snapshotCurrentQueue(): Queue? = try {
+        if (player.mediaItemCount == 0) null else ListQueue(
+            items = (0 until player.mediaItemCount).map { player.getMediaItemAt(it) },
+            startIndex = player.currentMediaItemIndex,
+            position = player.currentPosition,
+        )
+    } catch (e: Exception) {
+        Timber.tag(TAG).w(e, "snapshotCurrentQueue failed")
+        null
+    }
+
+    /** Appends [queue] to what is already playing instead of replacing it. */
+    fun enqueueQueue(queue: Queue) {
+        if (playbackLockedByRoom) {
+            playbackBlockedByRoom.value = true
+            return
+        }
+        service.enqueueQueue(queue)
+    }
+
+    /**
+     * True when there is a queue worth asking about: at least one more item than the one the
+     * user just tapped would replace, and a player that is not sitting idle after being
+     * emptied.
+     */
+    private fun hasLiveQueue(): Boolean = try {
+        playerReadinessFlow.value &&
+            player.mediaItemCount > 0 &&
+            player.playbackState != Player.STATE_IDLE
+    } catch (e: Exception) {
+        Timber.tag(TAG).w(e, "hasLiveQueue check failed")
+        false
+    }
+
+    /**
+     * True when the song this queue would start on is already sitting in the current queue —
+     * i.e. the user tapped another row of the list they are already playing. Replacing there
+     * is what they expect, so the keep-or-clear prompt would only be in the way; it is meant
+     * for starting something genuinely unrelated.
+     */
+    private fun startsInsideCurrentQueue(queue: Queue): Boolean = try {
+        val startId = when (queue) {
+            is ListQueue -> queue.items.getOrNull(queue.startIndex)?.mediaId
+            else -> queue.preloadItem?.id
+        }
+        startId != null && (0 until player.mediaItemCount).any { player.getMediaItemAt(it).mediaId == startId }
+    } catch (e: Exception) {
+        Timber.tag(TAG).w(e, "startsInsideCurrentQueue check failed")
+        false
     }
 
     fun startRadioSeamlessly() {

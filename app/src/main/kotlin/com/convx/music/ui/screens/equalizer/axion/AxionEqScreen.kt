@@ -1,5 +1,9 @@
 package com.convx.music.ui.screens.equalizer.axion
 
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.SegmentedButton
+import com.convx.music.ui.ios.compat.SingleChoiceSegmentedButtonRow
+
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -22,9 +26,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -32,8 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.convx.music.R
 import com.convx.music.eq.data.SavedEQProfile
-import com.convx.music.ui.component.Material3SettingsGroup
-import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.component.IosSettingsGroup
+import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.backToMain
 import kotlin.math.abs
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
@@ -74,9 +75,9 @@ fun AxionEqScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Material3SettingsGroup(
+            IosSettingsGroup(
                 items = listOf(
-                    Material3SettingsItem(
+                    IosSettingsItem(
                         icon = androidx.compose.ui.res.painterResource(R.drawable.equalizer),
                         title = { Text(stringResource(R.string.eq_enable_title)) },
                         description = { Text(stringResource(R.string.eq_enable_summary)) },
@@ -100,26 +101,19 @@ fun AxionEqScreen(
                 )
             )
 
-            Row(
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
             ) {
-                ToggleButton(
-                    checked = mode == 0,
-                    onCheckedChange = { viewModel.setMode(0) },
-                    modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
-                    shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                ) {
-                    Text(stringResource(R.string.eq_simple))
-                }
-                ToggleButton(
-                    checked = mode == 1,
-                    onCheckedChange = { viewModel.setMode(1) },
-                    modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
-                    shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                ) {
-                    Text(stringResource(R.string.eq_advanced))
-                }
+                SegmentedButton(
+                    selected = mode == 0,
+                    onClick = { viewModel.setMode(0) },
+                    label = { Text(stringResource(R.string.eq_simple)) },
+                )
+                SegmentedButton(
+                    selected = mode == 1,
+                    onClick = { viewModel.setMode(1) },
+                    label = { Text(stringResource(R.string.eq_advanced)) },
+                )
             }
 
             AnimatedContent(
@@ -279,7 +273,7 @@ private fun SimpleEqMode(
             OutlinedButton(
                 onClick = onSaveClick,
                 modifier = Modifier.padding(bottom = 8.dp),
-                shape = MaterialTheme.shapes.medium,
+                shape = AppTheme.shapes.medium,
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)
             ) {
                 Icon(
@@ -290,7 +284,7 @@ private fun SimpleEqMode(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.eq_save),
-                    style = MaterialTheme.typography.labelLarge
+                    style = AppTheme.typography.labelLarge
                 )
             }
         }
@@ -344,8 +338,8 @@ private fun PresetSection(
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.typography.titleSmall,
+                    color = AppTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                 )
                 
@@ -357,7 +351,7 @@ private fun PresetSection(
                         Icon(
                             imageVector = Icons.Rounded.Edit,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = AppTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -365,35 +359,28 @@ private fun PresetSection(
             }
         }
 
-        Row(
+        SingleChoiceSegmentedButtonRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         ) {
             presets.forEachIndexed { index, (nameRes, bands) ->
                 val name = presetNames?.getOrNull(index) ?: stringResource(nameRes)
                 val isSelected = remember(bandGains) {
-                    bandGains.size == bands.size && 
+                    bandGains.size == bands.size &&
                     bandGains.zip(bands).all { (g, b) -> abs(g - b) < 10f }
                 }
 
-                ToggleButton(
-                    checked = isSelected,
-                    onCheckedChange = { if (enabled) viewModel.setBandsGains(bands) },
+                SegmentedButton(
+                    selected = isSelected,
+                    onClick = { if (enabled) viewModel.setBandsGains(bands) },
                     enabled = enabled,
-                    shapes = when {
-                        presets.size == 1 || index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        index == presets.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    label = {
+                        Text(
+                            text = name,
+                            style = AppTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
                     },
-                    modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
-                    Text(
-                        text = name,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1
-                    )
-                }
+                )
             }
         }
     }
@@ -417,7 +404,7 @@ private fun SavePresetDialog(
                 .padding(horizontal = 24.dp)
                 .widthIn(max = 320.dp),
             shape = cardShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = AppTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 8.dp,
         ) {
             Column(
@@ -426,7 +413,7 @@ private fun SavePresetDialog(
             ) {
                 Surface(
                     shape = blockShape,
-                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    color = AppTheme.colorScheme.surfaceContainer,
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
@@ -435,7 +422,7 @@ private fun SavePresetDialog(
                         // Header section removed redundant badge
                         Text(
                             text = stringResource(R.string.eq_save_dialog_title),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = AppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -446,11 +433,11 @@ private fun SavePresetDialog(
                             placeholder = { Text(stringResource(R.string.eq_save_name_hint)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.medium,
-                            textStyle = MaterialTheme.typography.bodyMedium,
+                            shape = AppTheme.shapes.medium,
+                            textStyle = AppTheme.typography.bodyMedium,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                                focusedBorderColor = AppTheme.colorScheme.primary,
+                                unfocusedBorderColor = AppTheme.colorScheme.outlineVariant
                             )
                         )
                     }
@@ -493,8 +480,8 @@ private fun AdvancedEqMode(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(MaterialTheme.shapes.extraLarge)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .clip(AppTheme.shapes.extraLarge)
+                .background(AppTheme.colorScheme.surfaceContainerLow)
                 .padding(vertical = 16.dp)
         ) {
             Row(
@@ -540,9 +527,9 @@ private fun EqBandSlider(
     ) {
         Text(
             text = "%.1f".format(value / 10f),
-            style = MaterialTheme.typography.labelSmall,
-            color = if (enabled) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outline,
+            style = AppTheme.typography.labelSmall,
+            color = if (enabled) AppTheme.colorScheme.primary
+            else AppTheme.colorScheme.outline,
             textAlign = TextAlign.Center,
         )
 
@@ -581,8 +568,8 @@ private fun EqBandSlider(
 
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.labelSmall,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
     }
@@ -607,7 +594,7 @@ private fun ManagePresetsDialog(
                 .padding(horizontal = 24.dp)
                 .widthIn(max = 320.dp),
             shape = cardShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = AppTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 8.dp,
         ) {
             Column(
@@ -616,7 +603,7 @@ private fun ManagePresetsDialog(
             ) {
                 Surface(
                     shape = blockShape,
-                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    color = AppTheme.colorScheme.surfaceContainer,
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
@@ -624,20 +611,20 @@ private fun ManagePresetsDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.eq_manage_presets),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = AppTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                         )
                         
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            color = AppTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
 
                         if (customProfiles.isEmpty()) {
                             Text(
                                 text = stringResource(R.string.eq_no_custom_presets),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = AppTheme.typography.bodyMedium,
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
                             LazyColumn(
@@ -650,7 +637,7 @@ private fun ManagePresetsDialog(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clip(MaterialTheme.shapes.small)
+                                            .clip(AppTheme.shapes.small)
                                             .bounceClick {
                                                 if (isSelected) selectedIds.remove(profile.id)
                                                 else selectedIds.add(profile.id)
@@ -667,8 +654,8 @@ private fun ManagePresetsDialog(
                                         Spacer(Modifier.width(8.dp))
                                         Text(
                                             text = profile.name,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            style = AppTheme.typography.bodyLarge,
+                                            color = AppTheme.colorScheme.onSurface
                                         )
                                     }
                                 }
@@ -679,7 +666,7 @@ private fun ManagePresetsDialog(
 
                 HorizontalDivider(
                     modifier = Modifier.padding(bottom = 4.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    color = AppTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                 )
 
                 Row(
@@ -695,7 +682,7 @@ private fun ManagePresetsDialog(
                             onClick = { onDeleteSelected(selectedIds.toList()) },
                             shape = actionShape,
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error
+                                contentColor = AppTheme.colorScheme.error
                             )
                         ) {
                             Text(text = stringResource(R.string.eq_delete_selected))

@@ -9,6 +9,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.music.innertube.YouTube
+import com.music.innertube.models.WatchEndpoint
+import com.music.innertube.models.YTItem
 import com.music.innertube.models.filterExplicit
 import com.music.innertube.pages.ExplorePage
 import com.convx.music.constants.HideExplicitKey
@@ -32,6 +34,24 @@ constructor(
     val database: MusicDatabase,
 ) : ViewModel() {
     val explorePage = MutableStateFlow<ExplorePage?>(null)
+
+    /** A shelf of items related to whatever the user played most recently — the same
+     *  seed-and-related approach Home's own similar-recommendations shelf uses, just
+     *  one seed rather than several, since this is a single row, not multiple. */
+    val recommendedForYou = MutableStateFlow<List<YTItem>?>(null)
+
+    private suspend fun loadRecommendedForYou() {
+        val hideExplicit = context.dataStore.get(HideExplicitKey, false)
+        val seedSong = database.events().first().firstOrNull()?.song ?: return
+        val endpoint = YouTube.next(WatchEndpoint(videoId = seedSong.id)).getOrNull()?.relatedEndpoint ?: return
+        YouTube.related(endpoint).onSuccess { page ->
+            recommendedForYou.value = (page.songs + page.albums + page.artists + page.playlists)
+                .distinctBy { it.id }
+                .filterExplicit(hideExplicit)
+                .shuffled()
+                .take(15)
+        }
+    }
 
     private suspend fun load() {
         YouTube
@@ -79,6 +99,7 @@ constructor(
     fun refresh() {
         viewModelScope.launch(Dispatchers.IO) {
             load()
+            loadRecommendedForYou()
         }
     }
 }

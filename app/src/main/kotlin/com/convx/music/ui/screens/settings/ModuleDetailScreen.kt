@@ -22,12 +22,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.DropdownMenuItem
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedTextField
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -133,8 +133,8 @@ fun ModuleDetailScreen(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(50))
                 .background(
-                    if (isEnabled) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    if (isEnabled) AppTheme.colorScheme.primaryContainer
+                    else AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 )
                 .padding(horizontal = 24.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -142,9 +142,9 @@ fun ModuleDetailScreen(
         ) {
             Text(
                 text = stringResource(R.string.enable_module),
-                style = MaterialTheme.typography.titleMedium,
-                color = if (isEnabled) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.titleMedium,
+                color = if (isEnabled) AppTheme.colorScheme.onPrimaryContainer
+                else AppTheme.colorScheme.onSurfaceVariant,
             )
             ModernSwitch(
                 checked = isEnabled,
@@ -156,8 +156,8 @@ fun ModuleDetailScreen(
 
         Text(
             text = stringResource(R.string.module_info),
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),
         )
 
@@ -165,7 +165,7 @@ fun ModuleDetailScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(AppleTokens.CardCorner))
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(AppTheme.colorScheme.surfaceContainer)
                 .padding(16.dp),
         ) {
             ModuleInfoRow(stringResource(R.string.module_id), moduleId)
@@ -179,16 +179,16 @@ fun ModuleDetailScreen(
 
         Text(
             text = stringResource(R.string.module_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
         )
 
         Spacer(Modifier.height(24.dp))
 
         Text(
             text = "QUALITY SETTINGS",
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 8.dp),
         )
 
@@ -196,13 +196,13 @@ fun ModuleDetailScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(AppleTokens.CardCorner))
-                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .background(AppTheme.colorScheme.surfaceContainer)
                 .padding(16.dp),
         ) {
             Text(
                 text = "Primary Quality",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
             ExposedDropdownMenuBox(
@@ -245,8 +245,8 @@ fun ModuleDetailScreen(
 
             Text(
                 text = "Tidal Fallback Quality",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
             ExposedDropdownMenuBox(
@@ -316,13 +316,13 @@ private fun ModuleInfoRow(label: String, value: String) {
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurface,
         )
     }
 }

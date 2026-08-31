@@ -24,8 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,7 +89,7 @@ fun WrappedTotalAlbumsScreen(uniqueAlbumCount: Int, isVisible: Boolean) {
                 Text(
                     text = stringResource(R.string.wrapped_total_albums_title),
                     modifier = Modifier.padding(horizontal = 24.dp),
-                    style = MaterialTheme.typography.headlineSmall.copy(
+                    style = AppTheme.typography.headlineSmall.copy(
                         color = Color.White,
                         textAlign = TextAlign.Center
                     )
@@ -99,7 +99,7 @@ fun WrappedTotalAlbumsScreen(uniqueAlbumCount: Int, isVisible: Boolean) {
 
             BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 val density = LocalDensity.current
-                val baseStyle = MaterialTheme.typography.displayLarge.copy(
+                val baseStyle = AppTheme.typography.displayLarge.copy(
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
@@ -136,7 +136,7 @@ fun WrappedTotalAlbumsScreen(uniqueAlbumCount: Int, isVisible: Boolean) {
                 Text(
                     text = stringResource(R.string.wrapped_total_albums_subtitle),
                     modifier = Modifier.padding(horizontal = 24.dp),
-                    style = MaterialTheme.typography.bodyLarge.copy(
+                    style = AppTheme.typography.bodyLarge.copy(
                         color = Color.White.copy(alpha = 0.8f),
                         textAlign = TextAlign.Center
                     )

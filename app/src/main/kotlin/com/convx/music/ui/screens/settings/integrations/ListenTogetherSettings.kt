@@ -55,33 +55,33 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.Button
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Card
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.CardDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.HorizontalDivider
+import com.convx.music.ui.ios.compat.HorizontalDivider
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.OutlinedTextField
+import com.convx.music.ui.ios.compat.OutlinedTextField
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Surface
+import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.GlassSwitchCompat as Switch
+import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SwitchDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -323,8 +323,8 @@ fun ListenTogetherSettings(
             ) {
                 Text(
                     text = stringResource(R.string.listen_together_create_room_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedTextField(
                     value = createUsername,
@@ -483,16 +483,7 @@ fun ListenTogetherSettings(
                                 checked = autoApproval,
                                 onCheckedChange = { autoApproval = it },
                                 // Only disable for guests in a room (hosts can always change)
-                                enabled = roomState == null || role != RoomRole.GUEST,
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (autoApproval) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                    )
-                                }
+                                enabled = roomState == null || role != RoomRole.GUEST
                             )
                         },
                         // Allow clicking to see disabled state, but only change if enabled
@@ -508,16 +499,7 @@ fun ListenTogetherSettings(
                             Switch(
                                 checked = autoAddSuggestions,
                                 onCheckedChange = { autoAddSuggestions = it },
-                                enabled = roomState == null || role != RoomRole.GUEST,
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (autoAddSuggestions) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                    )
-                                }
+                                enabled = roomState == null || role != RoomRole.GUEST
                             )
                         },
                         onClick = {
@@ -535,16 +517,7 @@ fun ListenTogetherSettings(
                         trailingContent = {
                             Switch(
                                 checked = syncHostVolume,
-                                onCheckedChange = { syncHostVolume = it },
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (syncHostVolume) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                    )
-                                }
+                                onCheckedChange = { syncHostVolume = it }
                             )
                         },
                         onClick = { syncHostVolume = !syncHostVolume }
@@ -558,16 +531,7 @@ fun ListenTogetherSettings(
                         trailingContent = {
                             Switch(
                                 checked = smartResync,
-                                onCheckedChange = { smartResync = it },
-                                thumbContent = {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (smartResync) R.drawable.check else R.drawable.close
-                                        ),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                    )
-                                }
+                                onCheckedChange = { smartResync = it }
                             )
                         },
                         onClick = { smartResync = !smartResync }
@@ -667,7 +631,7 @@ fun LogsDialog(
                 ) {
                     Text(
                         text = stringResource(R.string.listen_together_no_logs),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                 }
             } else {
@@ -720,9 +684,9 @@ private fun ServerChooserDialog(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelected) {
-                            MaterialTheme.colorScheme.primaryContainer
+                            AppTheme.colorScheme.primaryContainer
                         } else {
-                            MaterialTheme.colorScheme.surfaceVariant
+                            AppTheme.colorScheme.surfaceVariant
                         }
                     )
                 ) {
@@ -735,18 +699,18 @@ private fun ServerChooserDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = server.name,
-                                style = MaterialTheme.typography.titleSmall,
+                                style = AppTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = "${server.location} - ${server.operator}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = AppTheme.typography.bodySmall,
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = server.url,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = AppTheme.typography.labelSmall,
+                                color = AppTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -755,7 +719,7 @@ private fun ServerChooserDialog(
                             Icon(
                                 painter = painterResource(R.drawable.done),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = AppTheme.colorScheme.primary
                             )
                         }
                     }
@@ -766,7 +730,7 @@ private fun ServerChooserDialog(
 
             Text(
                 text = stringResource(R.string.listen_together_custom_server),
-                style = MaterialTheme.typography.titleSmall,
+                style = AppTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
             OutlinedTextField(
@@ -806,29 +770,29 @@ fun LogEntryItem(log: LogEntry) {
         ) {
             Text(
                 text = log.timestamp,
-                style = MaterialTheme.typography.labelSmall,
+                style = AppTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = AppTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
                 shape = RoundedCornerShape(8.dp),
                 color = when (log.level) {
-                    LogLevel.ERROR -> MaterialTheme.colorScheme.errorContainer
+                    LogLevel.ERROR -> AppTheme.colorScheme.errorContainer
                     LogLevel.WARNING -> Color(0xFFFFF3CD)
-                    LogLevel.DEBUG -> MaterialTheme.colorScheme.surfaceVariant
-                    LogLevel.INFO -> MaterialTheme.colorScheme.primaryContainer
+                    LogLevel.DEBUG -> AppTheme.colorScheme.surfaceVariant
+                    LogLevel.INFO -> AppTheme.colorScheme.primaryContainer
                 }
             ) {
                 Text(
                     text = log.level.name,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = AppTheme.typography.labelSmall,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                     color = when (log.level) {
-                        LogLevel.ERROR -> MaterialTheme.colorScheme.onErrorContainer
+                        LogLevel.ERROR -> AppTheme.colorScheme.onErrorContainer
                         LogLevel.WARNING -> Color(0xFF856404)
-                        LogLevel.DEBUG -> MaterialTheme.colorScheme.onSurfaceVariant
-                        LogLevel.INFO -> MaterialTheme.colorScheme.onPrimaryContainer
+                        LogLevel.DEBUG -> AppTheme.colorScheme.onSurfaceVariant
+                        LogLevel.INFO -> AppTheme.colorScheme.onPrimaryContainer
                     }
                 )
             }
@@ -836,15 +800,15 @@ fun LogEntryItem(log: LogEntry) {
 
         Text(
             text = log.message,
-            style = MaterialTheme.typography.bodySmall,
+            style = AppTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace
         )
         log.details?.let { details ->
             Text(
                 text = details,
-                style = MaterialTheme.typography.bodySmall,
+                style = AppTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AppTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -882,7 +846,7 @@ fun BlockedUsersDialog(
                 ) {
                     Text(
                         text = stringResource(R.string.listen_together_no_blocked_users),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                 }
             } else {
@@ -897,7 +861,7 @@ fun BlockedUsersDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .background(AppTheme.colorScheme.surfaceVariant)
                                 .padding(12.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -909,12 +873,12 @@ fun BlockedUsersDialog(
                                     painter = painterResource(R.drawable.person),
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = username,
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = AppTheme.typography.bodyMedium
                                 )
                             }
                             TextButton(

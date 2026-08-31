@@ -26,8 +26,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -234,7 +234,7 @@ data class MockupStyle(
 
 @Composable
 private fun rememberMockupStyle(): MockupStyle {
-    val accent = MaterialTheme.colorScheme.primary
+    val accent = AppTheme.colorScheme.primary
     val background by rememberEnumPreference(
         PlayerBackgroundStyleKey,
         defaultValue = PlayerBackgroundStyle.APPLE_MUSIC,
@@ -254,7 +254,7 @@ private fun rememberMockupStyle(): MockupStyle {
     val (cornerRadius) = rememberPreference(ThumbnailCornerRadiusKey, defaultValue = 3f)
     val (hideThumbnail) = rememberPreference(HidePlayerThumbnailKey, defaultValue = false)
 
-    val tertiary = MaterialTheme.colorScheme.tertiary
+    val tertiary = AppTheme.colorScheme.tertiary
     return remember(
         accent, background, artwork, buttons, slider,
         staticColor, gradientStops, gradientAngle, cornerRadius, hideThumbnail, tertiary,

@@ -17,10 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,8 +38,8 @@ import com.convx.music.R
 import com.convx.music.db.entities.SpeedDialItem
 import com.convx.music.db.entities.ArtistEntity
 import com.convx.music.playback.queues.YouTubeQueue
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.ui.component.YouTubeListItem
@@ -95,7 +95,7 @@ fun YouTubeArtistMenu(
                                             painter = painterResource(R.drawable.radio),
                                             contentDescription = null,
                                             modifier = Modifier.size(28.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            tint = AppTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     text = stringResource(R.string.start_an_radio),
@@ -115,7 +115,7 @@ fun YouTubeArtistMenu(
                                     painter = painterResource(if (isPinned) R.drawable.remove else R.drawable.add),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = if (isPinned) "Unpin" else "Pin",
@@ -139,7 +139,7 @@ fun YouTubeArtistMenu(
                                     painter = painterResource(R.drawable.share),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.share),
@@ -161,9 +161,9 @@ fun YouTubeArtistMenu(
         }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOf(
-                    Material3MenuItemData(
+                    IosMenuItemData(
                         title = {
                             Text(text = if (libraryArtist?.artist?.bookmarkedAt != null) stringResource(R.string.subscribed) else stringResource(R.string.subscribe))
                         },

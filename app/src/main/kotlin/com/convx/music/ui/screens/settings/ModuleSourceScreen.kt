@@ -25,16 +25,16 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.AlertDialog
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedTextField
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -165,8 +165,8 @@ fun ModuleSourceScreen(
                 )
                 Text(
                     text = stringResource(R.string.module_sources),
-                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onBackground,
+                    style = AppTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = AppTheme.colorScheme.onBackground,
                     modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 8.dp)
                 )
             }
@@ -174,8 +174,8 @@ fun ModuleSourceScreen(
             item {
                 Text(
                     text = "SOURCES",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 8.dp)
                 )
             }
@@ -186,13 +186,13 @@ fun ModuleSourceScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                         .clip(RoundedCornerShape(AppleTokens.CardCorner))
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .background(AppTheme.colorScheme.surfaceContainer)
                 ) {
                     sourceUrls.forEachIndexed { index, url ->
                         if (index > 0) {
                             HorizontalDivider(
                                 modifier = Modifier.padding(start = 64.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant,
+                                color = AppTheme.colorScheme.outlineVariant,
                                 thickness = 0.5.dp,
                             )
                         }
@@ -205,15 +205,15 @@ fun ModuleSourceScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = url.substringAfter("://").take(40),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = AppTheme.typography.bodyLarge,
+                                    color = AppTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Text(
                                     text = url,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = AppTheme.typography.bodySmall,
+                                    color = AppTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -225,7 +225,7 @@ fun ModuleSourceScreen(
                                 Icon(
                                     painterResource(R.drawable.close),
                                     contentDescription = stringResource(R.string.remove),
-                                    tint = MaterialTheme.colorScheme.error,
+                                    tint = AppTheme.colorScheme.error,
                                     modifier = Modifier.size(18.dp),
                                 )
                             }
@@ -242,14 +242,14 @@ fun ModuleSourceScreen(
                         Icon(
                             painterResource(R.drawable.add),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = AppTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(12.dp))
                         Text(
                             text = stringResource(R.string.add_source),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
+                            style = AppTheme.typography.bodyLarge,
+                            color = AppTheme.colorScheme.primary,
                         )
                     }
                 }
@@ -301,8 +301,8 @@ fun ModuleSourceScreen(
                 item {
                     Text(
                         text = "ENABLED — DRAG TO SET PRIORITY",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp)
                     )
                 }
@@ -322,8 +322,8 @@ fun ModuleSourceScreen(
                 item {
                     Text(
                         text = "AVAILABLE MODULES",
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp)
                     )
                 }
@@ -344,8 +344,8 @@ fun ModuleSourceScreen(
                 item {
                     Text(
                         text = stringResource(R.string.no_modules_found),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp)
                     )
                 }
@@ -366,8 +366,8 @@ fun ModuleSourceScreen(
                 Column {
                     Text(
                         text = stringResource(R.string.add_module_source_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
@@ -447,14 +447,14 @@ private fun EnabledModulesPriorityList(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(AppleTokens.CardCorner))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(AppTheme.colorScheme.surfaceContainer)
     ) {
         order.forEachIndexed { index, moduleId ->
             val module = modulesById[moduleId] ?: return@forEachIndexed
             if (index > 0) {
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 64.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant,
+                    color = AppTheme.colorScheme.outlineVariant,
                     thickness = 0.5.dp,
                 )
             }
@@ -473,23 +473,23 @@ private fun EnabledModulesPriorityList(
             ) {
                 Text(
                     text = "${index + 1}",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = AppTheme.colorScheme.primary,
                     modifier = Modifier.width(24.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = module.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        style = AppTheme.typography.bodyLarge,
+                        color = AppTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = module.author,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodySmall,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -501,14 +501,14 @@ private fun EnabledModulesPriorityList(
                     Icon(
                         painterResource(R.drawable.close),
                         contentDescription = stringResource(R.string.remove),
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = AppTheme.colorScheme.error,
                         modifier = Modifier.size(18.dp),
                     )
                 }
                 Icon(
                     painter = painterResource(R.drawable.drag_handle),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = AppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .size(24.dp)
                         .pointerInput(moduleId) {
@@ -566,7 +566,7 @@ private fun ModuleItem(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(AppleTokens.CardCorner))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(AppTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -575,8 +575,8 @@ private fun ModuleItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = module.name,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = AppTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = AppTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -584,11 +584,11 @@ private fun ModuleItem(
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "LOSSLESS",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
+                        style = AppTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = AppTheme.colorScheme.primary,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                            .background(AppTheme.colorScheme.primary.copy(alpha = 0.1f))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     )
                 }
@@ -596,14 +596,14 @@ private fun ModuleItem(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = "${module.author} v${module.version}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
             if (module.description.isNotBlank()) {
                 Text(
                     text = module.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodySmall,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -614,11 +614,11 @@ private fun ModuleItem(
                     module.tags.take(4).forEach { tag ->
                         Text(
                             text = tag,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.typography.labelSmall,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .background(AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }

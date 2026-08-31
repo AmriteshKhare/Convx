@@ -85,29 +85,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Card
+import com.convx.music.ui.ios.compat.Card
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.CardDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Icon
+import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.IconButton
+import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.MaterialTheme
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.dynamicDarkColorScheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.dynamicLightColorScheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.ripple
+import com.convx.music.ui.ios.compat.ripple
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -170,7 +170,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SelectedThemeColorKey
 import com.convx.music.constants.AppBackgroundColorKey
 import com.convx.music.constants.AppTextColorKey
-import androidx.compose.material3.Surface
+import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.constants.AppFont
 import com.convx.music.constants.SelectedFontKey
 import com.convx.music.utils.rememberPreference
@@ -356,8 +356,8 @@ private fun FontQuickLink(
 ) {
     Surface(
         onClick = onClick,
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = AppTheme.shapes.large,
+        color = AppTheme.colorScheme.surfaceContainer,
         modifier = modifier,
     ) {
         Row(
@@ -367,11 +367,11 @@ private fun FontQuickLink(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(stringResource(R.string.app_font), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.app_font), style = AppTheme.typography.bodyLarge)
             Text(
                 fontLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = AppTheme.typography.bodyMedium,
+                color = AppTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -464,7 +464,7 @@ fun ThemeControls(
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = AppTheme.colorScheme.surfaceContainerHigh
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -475,8 +475,8 @@ fun ThemeControls(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = stringResource(R.string.theme_mode),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = AppTheme.typography.titleMedium,
+                    color = AppTheme.colorScheme.onSurface
                 )
                 
                 Row(
@@ -501,7 +501,7 @@ fun ThemeControls(
                         modifier = Modifier
                             .width(1.dp)
                             .height(32.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant)
+                            .background(AppTheme.colorScheme.outlineVariant)
                     )
                     
                     // Manual modes (Light, Dark, Pure Black)
@@ -575,8 +575,8 @@ private fun AppBackgroundTextColorSection() {
     // "Unset" swatch shown here matches what every consuming call site's own
     // fallback actually resolves to (surfaceContainerHigh / onSurface), so
     // the picker never shows a color that doesn't match reality.
-    val backgroundColor = if (backgroundColorInt == 0) MaterialTheme.colorScheme.surfaceContainerHigh else Color(backgroundColorInt)
-    val textColor = if (textColorInt == 0) MaterialTheme.colorScheme.onSurface else Color(textColorInt)
+    val backgroundColor = if (backgroundColorInt == 0) AppTheme.colorScheme.surfaceContainerHigh else Color(backgroundColorInt)
+    val textColor = if (textColorInt == 0) AppTheme.colorScheme.onSurface else Color(textColorInt)
 
     var showBackgroundPicker by remember { mutableStateOf(false) }
     var showTextPicker by remember { mutableStateOf(false) }
@@ -584,13 +584,13 @@ private fun AppBackgroundTextColorSection() {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = stringResource(R.string.app_background_text_color),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
+            style = AppTheme.typography.titleMedium,
+            color = AppTheme.colorScheme.onSurface
         )
         Text(
             text = stringResource(R.string.app_background_text_color_desc),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = AppTheme.typography.bodySmall,
+            color = AppTheme.colorScheme.onSurfaceVariant
         )
 
         Row(
@@ -654,12 +654,12 @@ private fun AppColorSwatchButton(
                 .size(48.dp)
                 .clip(CircleShape)
                 .background(color)
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), CircleShape)
+                .border(1.dp, AppTheme.colorScheme.outline.copy(alpha = 0.4f), CircleShape)
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = AppTheme.typography.bodySmall,
+            color = AppTheme.colorScheme.onSurface,
         )
     }
 }
@@ -742,7 +742,7 @@ fun ModeCircle(
                 if (borderWidth > 0.dp) {
                     Modifier.border(
                         width = borderWidth,
-                        color = MaterialTheme.colorScheme.inversePrimary,
+                        color = AppTheme.colorScheme.inversePrimary,
                         shape = CircleShape
                     )
                 } else {
@@ -786,7 +786,7 @@ fun ModeCircle(
                     Icon(
                         painter = painterResource(R.drawable.check),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.inversePrimary,
+                        tint = AppTheme.colorScheme.inversePrimary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -819,9 +819,9 @@ fun ThemeMockup(
                 .aspectRatio(9f / 18f),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = AppTheme.colorScheme.surface
             ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(1.dp, AppTheme.colorScheme.outlineVariant),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
@@ -831,7 +831,7 @@ fun ThemeMockup(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(40.dp)
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .background(AppTheme.colorScheme.surfaceContainer)
                         .padding(10.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -843,12 +843,12 @@ fun ThemeMockup(
                         Box(
                             modifier = Modifier
                                 .size(18.dp)
-                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .background(AppTheme.colorScheme.primary, CircleShape)
                         )
                         Box(
                             modifier = Modifier
                                 .size(18.dp)
-                                .background(MaterialTheme.colorScheme.secondary, CircleShape)
+                                .background(AppTheme.colorScheme.secondary, CircleShape)
                         )
                     }
                 }
@@ -863,7 +863,7 @@ fun ThemeMockup(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(32.dp)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
+                            .background(AppTheme.colorScheme.primary, RoundedCornerShape(6.dp))
                     )
                     
                     Row(
@@ -874,14 +874,14 @@ fun ThemeMockup(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(40.dp)
-                                .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(6.dp))
+                                .background(AppTheme.colorScheme.secondary, RoundedCornerShape(6.dp))
                         )
                         
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(40.dp)
-                                .background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(6.dp))
+                                .background(AppTheme.colorScheme.tertiary, RoundedCornerShape(6.dp))
                         )
                     }
                 }
@@ -895,7 +895,7 @@ fun ThemeMockup(
                     Box(
                         modifier = Modifier
                             .size(30.dp)
-                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                            .background(AppTheme.colorScheme.primaryContainer, CircleShape)
                     )
                 }
             }
@@ -926,9 +926,9 @@ fun ThemeMockupPortrait(
                 .fillMaxSize(),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = AppTheme.colorScheme.surface
             ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(1.dp, AppTheme.colorScheme.outlineVariant),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Column(
@@ -939,7 +939,7 @@ fun ThemeMockupPortrait(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(0.2f)
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .background(AppTheme.colorScheme.surfaceContainer)
                         .padding(6.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -951,12 +951,12 @@ fun ThemeMockupPortrait(
                         Box(
                             modifier = Modifier
                                 .size(12.dp)
-                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                .background(AppTheme.colorScheme.primary, CircleShape)
                         )
                         Box(
                             modifier = Modifier
                                 .size(12.dp)
-                                .background(MaterialTheme.colorScheme.secondary, CircleShape)
+                                .background(AppTheme.colorScheme.secondary, CircleShape)
                         )
                     }
                 }
@@ -972,7 +972,7 @@ fun ThemeMockupPortrait(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
+                            .background(AppTheme.colorScheme.primary, RoundedCornerShape(4.dp))
                     )
                     
                     Row(
@@ -985,14 +985,14 @@ fun ThemeMockupPortrait(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(4.dp))
+                                .background(AppTheme.colorScheme.secondary, RoundedCornerShape(4.dp))
                         )
                         
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(4.dp))
+                                .background(AppTheme.colorScheme.tertiary, RoundedCornerShape(4.dp))
                         )
                     }
                 }
@@ -1008,7 +1008,7 @@ fun ThemeMockupPortrait(
                     Box(
                         modifier = Modifier
                             .size(18.dp)
-                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                            .background(AppTheme.colorScheme.primaryContainer, CircleShape)
                     )
                 }
             }

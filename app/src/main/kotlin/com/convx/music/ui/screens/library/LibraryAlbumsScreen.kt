@@ -8,7 +8,6 @@ package com.convx.music.ui.screens.library
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
@@ -24,15 +23,15 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
+import com.convx.music.ui.ios.compat.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.SegmentedButton
+import com.convx.music.ui.ios.compat.SingleChoiceSegmentedButtonRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,9 +45,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -77,6 +73,9 @@ import com.convx.music.ui.component.buildAlphabetSectionIndex
 import com.convx.music.ui.component.ListScrollRail
 import com.convx.music.ui.component.ChipsRow
 import com.convx.music.ui.component.LargeScreenTitle
+import com.convx.music.ui.component.TopFadeBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.component.EmptyPlaceholder
 import com.convx.music.ui.component.LibraryAlbumGridItem
 import com.convx.music.ui.component.LibraryAlbumListItem
@@ -129,7 +128,7 @@ fun LibraryAlbumsScreen(
             FilterChip(
                 label = { Text(stringResource(R.string.albums)) },
                 selected = true,
-                colors = FilterChipDefaults.filterChipColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = FilterChipDefaults.filterChipColors(containerColor = AppTheme.colorScheme.surface),
                 onClick = onDeselect,
                 shape = RoundedCornerShape(16.dp),
                 leadingIcon = {
@@ -170,6 +169,9 @@ fun LibraryAlbumsScreen(
     // Pull-to-refresh only: no hero artwork on this screen, so heroZoom.scale
     // goes unread and the modifier contributes just the rubber-band stretch.
     val heroZoom = rememberHeroZoom()
+    // Progressive top blur so the list dissolves under the status bar instead
+    // of cutting off hard — same technique as the rest of the app's screens.
+    val hazeState = remember { HazeState() }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val scrollToTop =
@@ -212,36 +214,29 @@ fun LibraryAlbumsScreen(
 
             Text(
                 text = pluralStringResource(R.plurals.n_album, albums.size, albums.size),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.secondary,
+                style = AppTheme.typography.titleSmall,
+                color = AppTheme.colorScheme.secondary,
             )
 
-            FlowRow(
+            SingleChoiceSegmentedButtonRow(
                 modifier = Modifier.padding(start = 12.dp, end = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                LibraryViewType.entries.forEachIndexed { index, type ->
-                    ToggleButton(
-                        checked = viewType == type,
-                        onCheckedChange = { viewType = type },
-                        shapes = when (index) {
-                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                            LibraryViewType.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                LibraryViewType.entries.forEach { type ->
+                    SegmentedButton(
+                        selected = viewType == type,
+                        onClick = { viewType = type },
+                        icon = {
+                            Icon(
+                                painter = painterResource(
+                                    when (type) {
+                                        LibraryViewType.LIST -> R.drawable.list
+                                        LibraryViewType.GRID -> R.drawable.grid_view
+                                    }
+                                ),
+                                contentDescription = null,
+                            )
                         },
-                        modifier = Modifier.semantics { role = Role.RadioButton },
-                    ) {
-                        Icon(
-                            painter = painterResource(
-                                when (type) {
-                                    LibraryViewType.LIST -> R.drawable.list
-                                    LibraryViewType.GRID -> R.drawable.grid_view
-                                }
-                            ),
-                            contentDescription = null,
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -262,7 +257,7 @@ fun LibraryAlbumsScreen(
                 LazyColumn(
                     state = lazyListState,
                     overscrollEffect = heroZoom.listOverscroll(),
-                    modifier = Modifier.heroPullZoom(heroZoom),
+                    modifier = Modifier.heroPullZoom(heroZoom).hazeSource(hazeState),
                     contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
                 ) {
                     item(
@@ -320,7 +315,7 @@ fun LibraryAlbumsScreen(
                 LazyVerticalGrid(
                     state = lazyGridState,
                     overscrollEffect = heroZoom.listOverscroll(),
-                    modifier = Modifier.heroPullZoom(heroZoom),
+                    modifier = Modifier.heroPullZoom(heroZoom).hazeSource(hazeState),
                     columns = rememberGridColumns(),
                     contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
                 ) {
@@ -379,6 +374,12 @@ fun LibraryAlbumsScreen(
                     }
                 }
         }
+
+        TopFadeBlur(
+            hazeState = hazeState,
+            pageColor = AppTheme.colorScheme.background,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
 
         ListScrollRail(
             lazyListState = lazyListState,

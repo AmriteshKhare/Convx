@@ -14,14 +14,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.convx.music.utils.listItemShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -124,7 +124,7 @@ fun AddToPlaylistDialog(
                         Image(
                             painter = painterResource(R.drawable.add),
                             contentDescription = null,
-                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground),
+                            colorFilter = ColorFilter.tint(AppTheme.colorScheme.onBackground),
                             modifier = Modifier.size(ListThumbnailSize)
                         )
                     },
@@ -143,15 +143,15 @@ fun AddToPlaylistDialog(
                         placeholder = { 
                             Text(
                                 text = stringResource(R.string.search),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                style = AppTheme.typography.bodyMedium,
+                                color = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             ) 
                         },
                         leadingIcon = {
                             Icon(
                                 painter = painterResource(R.drawable.search),
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = AppTheme.colorScheme.primary
                             )
                         },
                         trailingIcon = {
@@ -160,21 +160,21 @@ fun AddToPlaylistDialog(
                                     Icon(
                                         painter = painterResource(R.drawable.close),
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = AppTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
                         },
                         singleLine = true,
-                        shape = RoundedCornerShape(24.dp),
+                        shape = ContinuousRoundedRectangle(24.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                            cursorColor = MaterialTheme.colorScheme.primary,
+                            focusedBorderColor = AppTheme.colorScheme.primary,
+                            unfocusedBorderColor = AppTheme.colorScheme.outlineVariant,
+                            focusedContainerColor = AppTheme.colorScheme.surfaceVariant,
+                            unfocusedContainerColor = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                            cursorColor = AppTheme.colorScheme.primary,
                         ),
-                        textStyle = MaterialTheme.typography.bodyMedium,
+                        textStyle = AppTheme.typography.bodyMedium,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -210,8 +210,8 @@ fun AddToPlaylistDialog(
                 item {
                     Text(
                         text = stringResource(R.string.no_results_found),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 16.dp),

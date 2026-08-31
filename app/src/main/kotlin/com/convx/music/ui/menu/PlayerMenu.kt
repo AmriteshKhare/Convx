@@ -29,22 +29,23 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import com.convx.music.ui.component.shapes.ContinuousCapsule
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.ios.compat.AlertDialog
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.FilledTonalButton
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LinearProgressIndicator
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -89,8 +90,8 @@ import com.convx.music.models.MediaMetadata
 import com.convx.music.playback.ExoDownloadService
 import com.convx.music.ui.component.BottomSheetState
 import com.convx.music.ui.component.ListDialog
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.ui.component.VolumeSlider
@@ -245,13 +246,13 @@ fun PlayerMenu(
                         painter = painterResource(R.drawable.cast),
                         contentDescription = null,
                         modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = AppTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = stringResource(R.string.casting_to, castDeviceName ?: ""),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.primary
                     )
                 }
             }
@@ -302,7 +303,7 @@ fun PlayerMenu(
                                     painter = painterResource(R.drawable.radio),
                                     contentDescription = null,
                                     modifier = Modifier.size(32.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.start_an_radio),
@@ -319,7 +320,7 @@ fun PlayerMenu(
                                 painter = painterResource(R.drawable.playlist_add),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.add_to_an_playlist),
@@ -331,7 +332,7 @@ fun PlayerMenu(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share),
@@ -355,12 +356,12 @@ fun PlayerMenu(
         }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     // ── Single smart Retry button ────────────────────────────
                     // Always visible. Re-triggers the full resolution chain.
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.retry_stream)) },
                             description = {
                                 Text(
@@ -389,7 +390,7 @@ fun PlayerMenu(
 
                     if (artists.isNotEmpty()) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_artist)) },
                                 description = {
                                     Text(
@@ -419,7 +420,7 @@ fun PlayerMenu(
                     }
                     if (mediaMetadata.album != null) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_album)) },
                                 description = {
                                     Text(
@@ -446,7 +447,7 @@ fun PlayerMenu(
                     // Add to Library option
                     val isInLibrary = librarySong?.song?.inLibrary != null
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { 
                                 Text(
                                     text = stringResource(
@@ -478,11 +479,11 @@ fun PlayerMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOf(
                     when (download?.state) {
                         Download.STATE_COMPLETED -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = {
                                     Text(
                                         text = stringResource(R.string.remove_download)
@@ -507,7 +508,7 @@ fun PlayerMenu(
                         }
 
                         Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
                                     CircularProgressIndicator(
@@ -527,7 +528,7 @@ fun PlayerMenu(
                         }
 
                         else -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 icon = {
                                     Icon(
@@ -563,10 +564,10 @@ fun PlayerMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.listen_together)) },
                             icon = {
                                 // Show a small badge when there are pending suggestions
@@ -578,17 +579,17 @@ fun PlayerMenu(
                                     )
                                     if (pendingSuggestions.isNotEmpty()) {
                                         Surface(
-                                            shape = RoundedCornerShape(12.dp),
-                                            color = MaterialTheme.colorScheme.primary,
+                                            shape = ContinuousRoundedRectangle(12.dp),
+                                            color = AppTheme.colorScheme.primary,
                                             modifier = Modifier
                                                 .offset(x = 8.dp, y = (-6).dp)
                                                 .align(Alignment.TopEnd)
                                         ) {
                                             Text(
                                                 text = pendingSuggestions.size.toString(),
-                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                color = AppTheme.colorScheme.onPrimary,
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                style = MaterialTheme.typography.labelSmall
+                                                style = AppTheme.typography.labelSmall
                                             )
                                         }
                                     }
@@ -599,7 +600,7 @@ fun PlayerMenu(
                     )
                     if (isListenTogetherGuest) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.resync)) },
                                 icon = {
                                     Icon(
@@ -622,10 +623,10 @@ fun PlayerMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {
@@ -644,7 +645,7 @@ fun PlayerMenu(
 
                     if (isQueueTrigger != true) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.equalizer)) },
                                 description = { Text(text = stringResource(R.string.equalizer_desc)) },
                                 icon = {
@@ -661,7 +662,7 @@ fun PlayerMenu(
                             )
                         )
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.advanced)) },
                                 description = { Text(text = stringResource(R.string.advanced_desc)) },
                                 icon = {
@@ -678,7 +679,7 @@ fun PlayerMenu(
                         )
                     }
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
                                 Icon(
@@ -703,7 +704,7 @@ fun PlayerMenu(
                         )
                     )
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.ambient_mode)) },
                             icon = {
                                 Icon(
@@ -829,7 +830,7 @@ fun <T> ValueAdjuster(
 
         Text(
             text = valueText(currentValue),
-            style = MaterialTheme.typography.titleMedium,
+            style = AppTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.width(80.dp),
         )
@@ -872,28 +873,28 @@ fun ListenTogetherDialog(
                     Icon(
                         painter = painterResource(R.drawable.group),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = AppTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = stringResource(R.string.listen_together),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = AppTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = AppTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = stringResource(R.string.listen_together_not_configured),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = AppTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
                         onClick = onDismiss,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                            containerColor = AppTheme.colorScheme.primary
                         )
                     ) {
                         Text(stringResource(android.R.string.ok))
@@ -948,21 +949,21 @@ fun ListenTogetherDialog(
                     Icon(
                         painter = painterResource(R.drawable.group),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = AppTheme.colorScheme.primary,
                         modifier = Modifier.size(40.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text(
                             text = stringResource(R.string.manage_user),
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = AppTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppTheme.colorScheme.primary
                         )
                         Text(
                             text = selectedUsername ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = AppTheme.typography.bodyMedium,
+                            color = AppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -983,8 +984,8 @@ fun ListenTogetherDialog(
                             selectedUserForMenu = null
                             selectedUsername = null
                         },
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.errorContainer
+                    shape = ContinuousRoundedRectangle(12.dp),
+                    color = AppTheme.colorScheme.errorContainer
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -993,21 +994,21 @@ fun ListenTogetherDialog(
                         Icon(
                             painter = painterResource(R.drawable.close),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
+                            tint = AppTheme.colorScheme.error,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.kick_user),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = AppTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.error
+                                color = AppTheme.colorScheme.error
                             )
                             Text(
                                 text = stringResource(R.string.kick_user_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = AppTheme.typography.bodySmall,
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -1032,8 +1033,8 @@ fun ListenTogetherDialog(
                             selectedUserForMenu = null
                             selectedUsername = null
                         },
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                    shape = ContinuousRoundedRectangle(12.dp),
+                    color = AppTheme.colorScheme.surfaceVariant
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1042,21 +1043,21 @@ fun ListenTogetherDialog(
                         Icon(
                             painter = painterResource(R.drawable.close),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
+                            tint = AppTheme.colorScheme.error,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.permanently_kick_user),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = AppTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = AppTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = stringResource(R.string.permanently_kick_user_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = AppTheme.typography.bodySmall,
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -1078,8 +1079,8 @@ fun ListenTogetherDialog(
                             selectedUserForMenu = null
                             selectedUsername = null
                         },
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    shape = ContinuousRoundedRectangle(12.dp),
+                    color = AppTheme.colorScheme.primaryContainer
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1088,21 +1089,21 @@ fun ListenTogetherDialog(
                         Icon(
                             painter = painterResource(R.drawable.crown),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = AppTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.transfer_ownership),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = AppTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = AppTheme.colorScheme.primary
                             )
                             Text(
                                 text = stringResource(R.string.transfer_ownership_desc),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = AppTheme.typography.bodySmall,
+                                color = AppTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -1171,7 +1172,7 @@ fun ListenTogetherDialog(
                 Icon(
                     painter = painterResource(R.drawable.group),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = AppTheme.colorScheme.primary,
                     modifier = Modifier.size(40.dp)
                 )
                 Spacer(modifier = Modifier.width(16.dp))
@@ -1181,9 +1182,9 @@ fun ListenTogetherDialog(
                     } else {
                         stringResource(R.string.listen_together)
                     },
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = AppTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = AppTheme.colorScheme.primary
                 )
             }
         }
@@ -1194,12 +1195,12 @@ fun ListenTogetherDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = ContinuousRoundedRectangle(16.dp),
                 color = when (connectionState) {
-                    ConnectionState.CONNECTED -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                    ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
-                    ConnectionState.ERROR -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
-                    ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.surfaceVariant
+                    ConnectionState.CONNECTED -> AppTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> AppTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                    ConnectionState.ERROR -> AppTheme.colorScheme.error.copy(alpha = 0.15f)
+                    ConnectionState.DISCONNECTED -> AppTheme.colorScheme.surfaceVariant
                 }
             ) {
                 Column(
@@ -1215,12 +1216,12 @@ fun ListenTogetherDialog(
                                 .size(10.dp)
                                 .background(
                                     color = when (connectionState) {
-                                        ConnectionState.CONNECTED -> MaterialTheme.colorScheme.primary
-                                        ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> MaterialTheme.colorScheme.secondary
-                                        ConnectionState.ERROR -> MaterialTheme.colorScheme.error
-                                        ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.outline
+                                        ConnectionState.CONNECTED -> AppTheme.colorScheme.primary
+                                        ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> AppTheme.colorScheme.secondary
+                                        ConnectionState.ERROR -> AppTheme.colorScheme.error
+                                        ConnectionState.DISCONNECTED -> AppTheme.colorScheme.outline
                                     },
-                                    shape = RoundedCornerShape(50)
+                                    shape = ContinuousCapsule()
                                 )
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1232,13 +1233,13 @@ fun ListenTogetherDialog(
                                 ConnectionState.ERROR -> stringResource(R.string.listen_together_error)
                                 ConnectionState.DISCONNECTED -> stringResource(R.string.listen_together_disconnected)
                             },
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = when (connectionState) {
-                                ConnectionState.CONNECTED -> MaterialTheme.colorScheme.primary
-                                ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> MaterialTheme.colorScheme.secondary
-                                ConnectionState.ERROR -> MaterialTheme.colorScheme.error
-                                ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
+                                ConnectionState.CONNECTED -> AppTheme.colorScheme.primary
+                                ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> AppTheme.colorScheme.secondary
+                                ConnectionState.ERROR -> AppTheme.colorScheme.error
+                                ConnectionState.DISCONNECTED -> AppTheme.colorScheme.onSurfaceVariant
                             }
                         )
                     }
@@ -1247,7 +1248,7 @@ fun ListenTogetherDialog(
                         Spacer(modifier = Modifier.height(12.dp))
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppTheme.colorScheme.primary
                         )
                     }
                     
@@ -1262,7 +1263,7 @@ fun ListenTogetherDialog(
                                 onClick = { listenTogetherManager.connect() },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary
+                                    containerColor = AppTheme.colorScheme.primary
                                 )
                             ) {
                                 Text(stringResource(R.string.connect), fontWeight = FontWeight.SemiBold)
@@ -1272,7 +1273,7 @@ fun ListenTogetherDialog(
                                 onClick = { listenTogetherManager.disconnect() },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary
+                                    containerColor = AppTheme.colorScheme.primary
                                 )
                             ) {
                                 Text(stringResource(R.string.disconnect), fontWeight = FontWeight.SemiBold)
@@ -1295,8 +1296,8 @@ fun ListenTogetherDialog(
             item {
                 Text(
                     text = stringResource(R.string.listen_together_background_disconnect_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodySmall,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 24.dp),
                     textAlign = TextAlign.Center
                 )
@@ -1312,8 +1313,8 @@ fun ListenTogetherDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                        shape = ContinuousRoundedRectangle(16.dp),
+                        color = AppTheme.colorScheme.primary.copy(alpha = 0.1f)
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
@@ -1321,8 +1322,8 @@ fun ListenTogetherDialog(
                         ) {
                             Text(
                                 text = stringResource(R.string.room_code),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary
+                                style = AppTheme.typography.labelMedium,
+                                color = AppTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
@@ -1331,8 +1332,8 @@ fun ListenTogetherDialog(
                             ) {
                                 Text(
                                     text = room.roomCode,
-                                    style = MaterialTheme.typography.headlineLarge,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    style = AppTheme.typography.headlineLarge,
+                                    color = AppTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 6.sp
                                 )
@@ -1400,9 +1401,9 @@ fun ListenTogetherDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.connected_users, connectedUsers.size),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = AppTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = AppTheme.colorScheme.primary,
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         
@@ -1431,13 +1432,13 @@ fun ListenTogetherDialog(
                                     ) {
                                         Surface(
                                             modifier = Modifier.size(52.dp),
-                                            shape = RoundedCornerShape(50),
+                                            shape = ContinuousCapsule(),
                                             color = if (user.isHost) {
-                                                MaterialTheme.colorScheme.primary
+                                                AppTheme.colorScheme.primary
                                             } else if (user.userId == userId) {
-                                                MaterialTheme.colorScheme.secondary
+                                                AppTheme.colorScheme.secondary
                                             } else {
-                                                MaterialTheme.colorScheme.surfaceVariant
+                                                AppTheme.colorScheme.surfaceVariant
                                             }
                                         ) {
                                             Box(
@@ -1446,14 +1447,14 @@ fun ListenTogetherDialog(
                                             ) {
                                                 Text(
                                                     text = user.username.take(1).uppercase(),
-                                                    style = MaterialTheme.typography.titleLarge,
+                                                    style = AppTheme.typography.titleLarge,
                                                     fontWeight = FontWeight.Bold,
                                                     color = if (user.isHost) {
-                                                        MaterialTheme.colorScheme.onPrimary
+                                                        AppTheme.colorScheme.onPrimary
                                                     } else if (user.userId == userId) {
-                                                        MaterialTheme.colorScheme.onSecondary
+                                                        AppTheme.colorScheme.onSecondary
                                                     } else {
-                                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                                        AppTheme.colorScheme.onSurfaceVariant
                                                     }
                                                 )
                                             }
@@ -1466,8 +1467,8 @@ fun ListenTogetherDialog(
                                                     .align(Alignment.BottomEnd)
                                                     .offset(x = 4.dp, y = 4.dp)
                                                     .size(18.dp),
-                                                shape = RoundedCornerShape(50),
-                                                color = if (user.isHost) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                                shape = ContinuousCapsule(),
+                                                color = if (user.isHost) AppTheme.colorScheme.primary else AppTheme.colorScheme.secondary
                                             ) {
                                                 Box(
                                                     contentAlignment = Alignment.Center,
@@ -1478,7 +1479,7 @@ fun ListenTogetherDialog(
                                                             if (user.isHost) R.drawable.crown else R.drawable.person
                                                         ),
                                                         contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                                        tint = AppTheme.colorScheme.onPrimary,
                                                         modifier = Modifier.size(12.dp)
                                                     )
                                                 }
@@ -1491,12 +1492,12 @@ fun ListenTogetherDialog(
                                     // Username
                                     Text(
                                         text = user.username,
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = AppTheme.typography.labelMedium,
                                         fontWeight = if (user.userId == userId) FontWeight.Bold else FontWeight.Medium,
                                         color = if (user.isHost) {
-                                            MaterialTheme.colorScheme.primary
+                                            AppTheme.colorScheme.primary
                                         } else {
-                                            MaterialTheme.colorScheme.onSurface
+                                            AppTheme.colorScheme.onSurface
                                         },
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -1507,14 +1508,14 @@ fun ListenTogetherDialog(
                                     if (user.isHost) {
                                         Text(
                                             text = stringResource(R.string.host_label),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+                                            style = AppTheme.typography.labelSmall,
+                                            color = AppTheme.colorScheme.primary.copy(alpha = 0.8f)
                                         )
                                     } else if (user.userId == userId) {
                                         Text(
                                             text = stringResource(R.string.you_label),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f)
+                                            style = AppTheme.typography.labelSmall,
+                                            color = AppTheme.colorScheme.secondary.copy(alpha = 0.8f)
                                         )
                                     }
                                 }
@@ -1531,9 +1532,9 @@ fun ListenTogetherDialog(
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = stringResource(R.string.pending_requests),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = AppTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = AppTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -1544,8 +1545,8 @@ fun ListenTogetherDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                            shape = ContinuousRoundedRectangle(12.dp),
+                            color = AppTheme.colorScheme.secondary.copy(alpha = 0.15f)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1559,8 +1560,8 @@ fun ListenTogetherDialog(
                                 ) {
                                     Surface(
                                         modifier = Modifier.size(36.dp),
-                                        shape = RoundedCornerShape(50),
-                                        color = MaterialTheme.colorScheme.secondary
+                                        shape = ContinuousCapsule(),
+                                        color = AppTheme.colorScheme.secondary
                                     ) {
                                         Box(
                                             contentAlignment = Alignment.Center,
@@ -1568,17 +1569,17 @@ fun ListenTogetherDialog(
                                         ) {
                                             Text(
                                                 text = request.username.take(1).uppercase(),
-                                                style = MaterialTheme.typography.titleMedium,
+                                                style = AppTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSecondary
+                                                color = AppTheme.colorScheme.onSecondary
                                             )
                                         }
                                     }
                                     Text(
                                         text = request.username,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = AppTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = AppTheme.colorScheme.onSurface
                                     )
                                 }
                                 
@@ -1589,7 +1590,7 @@ fun ListenTogetherDialog(
                                         Icon(
                                             painter = painterResource(R.drawable.check),
                                             contentDescription = stringResource(R.string.approve),
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = AppTheme.colorScheme.primary,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -1599,7 +1600,7 @@ fun ListenTogetherDialog(
                                         Icon(
                                             painter = painterResource(R.drawable.close),
                                             contentDescription = stringResource(R.string.reject),
-                                            tint = MaterialTheme.colorScheme.error,
+                                            tint = AppTheme.colorScheme.error,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -1617,9 +1618,9 @@ fun ListenTogetherDialog(
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = stringResource(R.string.pending_suggestions),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = AppTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = AppTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -1630,8 +1631,8 @@ fun ListenTogetherDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                            shape = ContinuousRoundedRectangle(12.dp),
+                            color = AppTheme.colorScheme.secondary.copy(alpha = 0.15f)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1646,22 +1647,22 @@ fun ListenTogetherDialog(
                                     Icon(
                                         painter = painterResource(R.drawable.queue_music),
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = AppTheme.colorScheme.primary,
                                         modifier = Modifier.size(24.dp)
                                     )
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = suggestion.trackInfo.title,
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            style = AppTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSurface,
+                                            color = AppTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             text = suggestion.fromUsername,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = AppTheme.typography.bodySmall,
+                                            color = AppTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -1675,7 +1676,7 @@ fun ListenTogetherDialog(
                                         Icon(
                                             painter = painterResource(R.drawable.check),
                                             contentDescription = stringResource(R.string.approve),
-                                            tint = MaterialTheme.colorScheme.primary,
+                                            tint = AppTheme.colorScheme.primary,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -1685,7 +1686,7 @@ fun ListenTogetherDialog(
                                         Icon(
                                             painter = painterResource(R.drawable.close),
                                             contentDescription = stringResource(R.string.reject),
-                                            tint = MaterialTheme.colorScheme.error,
+                                            tint = AppTheme.colorScheme.error,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -1720,7 +1721,7 @@ fun ListenTogetherDialog(
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error
+                                containerColor = AppTheme.colorScheme.error
                             )
                         ) {
                             Icon(
@@ -1742,8 +1743,8 @@ fun ListenTogetherDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    shape = ContinuousRoundedRectangle(16.dp),
+                    color = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -1751,8 +1752,8 @@ fun ListenTogetherDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.listen_together_description),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = AppTheme.typography.bodyMedium,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                         
@@ -1765,7 +1766,7 @@ fun ListenTogetherDialog(
                                 Icon(
                                     painterResource(R.drawable.person),
                                     null,
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = AppTheme.colorScheme.primary
                                 )
                             },
                             trailingIcon = {
@@ -1776,11 +1777,11 @@ fun ListenTogetherDialog(
                                 }
                             },
                             singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = ContinuousRoundedRectangle(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                focusedLabelColor = MaterialTheme.colorScheme.primary
+                                focusedBorderColor = AppTheme.colorScheme.primary,
+                                unfocusedBorderColor = AppTheme.colorScheme.outline,
+                                focusedLabelColor = AppTheme.colorScheme.primary
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -1789,9 +1790,9 @@ fun ListenTogetherDialog(
                         
                         Text(
                             text = stringResource(R.string.join_existing_room),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = AppTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppTheme.colorScheme.primary
                         )
                         
                         OutlinedTextField(
@@ -1802,23 +1803,23 @@ fun ListenTogetherDialog(
                             supportingText = {
                                 Text(
                                     text = "${roomCodeInput.length}/8",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    style = AppTheme.typography.labelSmall,
+                                    color = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             leadingIcon = {
                                 Icon(
                                     painterResource(R.drawable.token),
                                     null,
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = AppTheme.colorScheme.primary
                                 )
                             },
                             singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = ContinuousRoundedRectangle(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                                focusedLabelColor = MaterialTheme.colorScheme.primary
+                                focusedBorderColor = AppTheme.colorScheme.primary,
+                                unfocusedBorderColor = AppTheme.colorScheme.outline,
+                                focusedLabelColor = AppTheme.colorScheme.primary
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -1833,13 +1834,13 @@ fun ListenTogetherDialog(
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = AppTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = waitingForApprovalText,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    style = AppTheme.typography.bodyMedium,
+                                    color = AppTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -1848,8 +1849,8 @@ fun ListenTogetherDialog(
                         joinErrorMessage?.let { msg ->
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f)
+                                shape = ContinuousRoundedRectangle(8.dp),
+                                color = AppTheme.colorScheme.error.copy(alpha = 0.1f)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -1860,13 +1861,13 @@ fun ListenTogetherDialog(
                                         painterResource(R.drawable.error),
                                         contentDescription = null,
                                         modifier = Modifier.size(18.dp),
-                                        tint = MaterialTheme.colorScheme.error
+                                        tint = AppTheme.colorScheme.error
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = msg,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.error,
+                                        style = AppTheme.typography.bodyMedium,
+                                        color = AppTheme.colorScheme.error,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -1912,7 +1913,7 @@ fun ListenTogetherDialog(
                             modifier = Modifier.weight(1f),
                             enabled = (usernameInput.trim().isNotBlank() || savedUsername.isNotBlank()),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
+                                containerColor = AppTheme.colorScheme.primary
                             )
                         ) {
                             Icon(
@@ -1948,7 +1949,7 @@ fun ListenTogetherDialog(
                                 modifier = Modifier.weight(1f),
                                 enabled = (usernameInput.trim().isNotBlank() || savedUsername.isNotBlank()),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondary
+                                    containerColor = AppTheme.colorScheme.secondary
                                 )
                             ) {
                                 Icon(
@@ -1969,7 +1970,7 @@ fun ListenTogetherDialog(
                         Text(
                             stringResource(R.string.cancel),
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = AppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

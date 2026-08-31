@@ -230,13 +230,12 @@ constructor(
                 upsert(updatedSong)
 
                 // Pre-cache the high-res thumbnail immediately when download starts.
-                // Keyed on the raw (un-resized) URL, not the default (the actual
-                // request data, which is this same string): every UI thumbnail
-                // request instead resizes this URL to its own target decode size
-                // first, so without a shared stable key this entry sits under a
-                // URL nothing else ever asks for and is invisible offline despite
-                // being cached. ItemThumbnail/LocalThumbnail below key their
-                // requests the same way, off the same DB-stored thumbnailUrl.
+                // No resize here -- this IS the raw maxresdefault URL already (see
+                // thumbnailUrl above), the same one the full-screen player requests
+                // via ThumbnailImage, so that view hits this cache entry offline.
+                // Grid/list tiles resize this URL down to their own decode size
+                // (ItemThumbnail/LocalThumbnail) and cache each size under its own
+                // key now, so they no longer share -- or collide on -- this slot.
                 updatedSong.thumbnailUrl?.let { url ->
                     val request = ImageRequest.Builder(context)
                         .data(url)

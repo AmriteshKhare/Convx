@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,7 +46,7 @@ import com.convx.music.R
             modifier = Modifier
                 .size(40.dp)
                 .background(
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = AppTheme.colorScheme.primaryContainer,
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -54,7 +54,7 @@ import com.convx.music.R
             Icon(
                 painter = painterResource(R.drawable.commit), // add commit icon or use a fallback
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = AppTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -67,9 +67,9 @@ import com.convx.music.R
             // Main commit message
             Text(
                 text = commit.message,
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = AppTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -81,32 +81,32 @@ import com.convx.music.R
             ) {
                 Text(
                     text = commit.authorName,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = AppTheme.typography.labelMedium,
+                    color = AppTheme.colorScheme.primary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "·",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.typography.labelMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = commit.date,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.typography.labelMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             // Short SHA chip
             Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
+                color = AppTheme.colorScheme.secondaryContainer,
                 shape = RoundedCornerShape(4.dp)
             ) {
                 Text(
                     text = commit.sha.take(7),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    style = AppTheme.typography.labelSmall,
+                    color = AppTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                 )
             }
@@ -129,16 +129,16 @@ import com.convx.music.R
                 modifier = Modifier
                     .size(36.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        color = AppTheme.colorScheme.tertiaryContainer,
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = commit.authorName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = AppTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                    color = AppTheme.colorScheme.onTertiaryContainer
                 )
             }
         }

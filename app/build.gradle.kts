@@ -290,11 +290,24 @@ dependencies {
 
     implementation(libs.shimmer)
 
+    implementation(libs.haze)
+    implementation(libs.haze.materials)
+
+    // Apple-Music-style karaoke lyrics: per-syllable timing, background/accompaniment
+    // lines, and left/right alignment for duets. Same renderer ArchiveTune uses --
+    // writing this by hand is ~1400 lines of text layout and interruptible scroll.
+    implementation(libs.accompanist.lyrics.ui)
+    implementation(libs.accompanist.lyrics.core)
+
     implementation(libs.media3)
     implementation(libs.media3.session)
     implementation(libs.media3.hls)
     implementation(libs.media3.ui)
     implementation(libs.media3.okhttp)
+    // FFmpeg audio decoder fallback for local files the platform MediaCodec can't
+    // decode (e.g. ALAC — no AOSP device ships a decoder for it). Only engages when
+    // the platform has no decoder for a format; every existing decode path is untouched.
+    implementation(libs.nextlib.media3ext)
 
     // Google Cast - only included in GMS flavor (not available in F-Droid/FOSS builds)
     "gmsImplementation"(libs.media3.cast)
@@ -331,6 +344,7 @@ dependencies {
     implementation(project(":jiosaavn"))
     implementation(project(":spotify"))
     implementation(project(":spine"))
+    implementation(project(":hig"))
 
 
     implementation(libs.ktor.client.core)

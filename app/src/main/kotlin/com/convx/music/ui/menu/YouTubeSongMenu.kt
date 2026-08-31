@@ -23,15 +23,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.HorizontalDivider
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.ListItem
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -78,8 +77,8 @@ import com.convx.music.playback.ExoDownloadService
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.ListDialog
 import com.convx.music.ui.component.LocalBottomSheetPageState
-import com.convx.music.ui.component.Material3MenuGroup
-import com.convx.music.ui.component.Material3MenuItemData
+import com.convx.music.ui.component.IosMenuGroup
+import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.ui.utils.ShowMediaInfo
@@ -237,7 +236,7 @@ fun YouTubeSongMenu(
             ) {  
                 Icon(  
                     painter = painterResource(if (librarySong?.song?.liked == true) R.drawable.favorite else R.drawable.favorite_border),  
-                    tint = if (librarySong?.song?.liked == true) MaterialTheme.colorScheme.error else LocalContentColor.current,  
+                    tint = if (librarySong?.song?.liked == true) AppTheme.colorScheme.error else LocalContentColor.current,  
                     contentDescription = null,  
                 )  
             }  
@@ -272,7 +271,7 @@ fun YouTubeSongMenu(
                                     painter = painterResource(R.drawable.playlist_play),
                                     contentDescription = null,
                                     modifier = Modifier.size(28.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.play_next),
@@ -288,7 +287,7 @@ fun YouTubeSongMenu(
                                 painter = painterResource(R.drawable.playlist_add),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.add_to_an_playlist),
@@ -302,7 +301,7 @@ fun YouTubeSongMenu(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share),
@@ -323,10 +322,10 @@ fun YouTubeSongMenu(
         }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOfNotNull(
                     if (listenTogetherManager != null && listenTogetherManager.isInRoom && !listenTogetherManager.isHost) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.suggest_to_host)) },
                             icon = {
                                 Icon(
@@ -350,7 +349,7 @@ fun YouTubeSongMenu(
                         )
                     } else null,
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.start_radio)) },
                             description = { Text(text = stringResource(R.string.start_radio_desc)) },
                             icon = {
@@ -366,7 +365,7 @@ fun YouTubeSongMenu(
                         )
                     } else null,
                     if (!isGuest) {
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.add_to_queue)) },
                             description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                             icon = {
@@ -388,11 +387,11 @@ fun YouTubeSongMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     if (song.historyRemoveToken != null) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.remove_from_history)) },
                                 icon = {
                                     Icon(
@@ -412,7 +411,7 @@ fun YouTubeSongMenu(
                         )
                     }
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { 
                                 Text(
                                     text = if (isPinned) stringResource(R.string.unpin_from_speed_dial) else stringResource(R.string.pin_to_speed_dial)
@@ -437,7 +436,7 @@ fun YouTubeSongMenu(
                         )
                     )
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = {
                                 Text(text = if (librarySong?.song?.inLibrary != null) stringResource(R.string.remove_from_library) else stringResource(R.string.add_to_library))
                             },
@@ -481,11 +480,11 @@ fun YouTubeSongMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = listOf(
                     when (download?.state) {
                         Download.STATE_COMPLETED -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = {
                                     Text(
                                         text = stringResource(R.string.remove_download)
@@ -508,7 +507,7 @@ fun YouTubeSongMenu(
                             )
                         }
                         Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
                                     CircularProgressIndicator(
@@ -527,7 +526,7 @@ fun YouTubeSongMenu(
                             )
                         }
                         else -> {
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 description = { Text(text = stringResource(R.string.download_desc)) },
                                 icon = {
@@ -562,11 +561,11 @@ fun YouTubeSongMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         item {
-            Material3MenuGroup(
+            IosMenuGroup(
                 items = buildList {
                     if (artists.isNotEmpty()) {
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_artist)) },
                                 description = { Text(text = song.artists.joinToString { it.name }) },
                                 icon = {
@@ -588,7 +587,7 @@ fun YouTubeSongMenu(
                     }
                     song.album?.let { album ->
                         add(
-                            Material3MenuItemData(
+                            IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_album)) },
                                 description = { Text(text = album.name) },
                                 icon = {
@@ -605,7 +604,7 @@ fun YouTubeSongMenu(
                         )
                     }
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {
@@ -623,7 +622,7 @@ fun YouTubeSongMenu(
                         )
                     )
                     add(
-                        Material3MenuItemData(
+                        IosMenuItemData(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
                                 Icon(

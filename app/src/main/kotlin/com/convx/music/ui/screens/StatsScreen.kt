@@ -47,10 +47,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,7 +79,7 @@ import com.convx.music.models.toMediaMetadata
 import com.convx.music.playback.queues.ListQueue
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.ChoiceChipsRow
-import com.convx.music.ui.component.CollapsedTitleBar
+import com.convx.music.ui.component.FrostedTopBar
 import com.convx.music.ui.component.HideOnScrollFAB
 import com.convx.music.ui.component.LargeScreenTitle
 import com.convx.music.ui.component.rememberTitleCollapseProgress
@@ -487,10 +487,10 @@ fun StatsScreen(
             }
 
             // Top bar logic
-            CollapsedTitleBar(
+            FrostedTopBar(
                 title = stringResource(R.string.stats),
-                progress = rememberTitleCollapseProgress(lazyListState),
-                color = onTint,
+                titleAlpha = rememberTitleCollapseProgress(lazyListState),
+                titleColor = onTint,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
 

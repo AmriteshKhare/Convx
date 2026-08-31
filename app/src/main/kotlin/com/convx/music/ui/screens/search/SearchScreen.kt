@@ -30,15 +30,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -95,7 +95,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CircularWavyProgressIndicator
+import com.convx.music.ui.ios.compat.CircularWavyProgressIndicator
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -127,6 +127,9 @@ import com.convx.music.ui.component.backdrop.catalog.components.LiquidBottomTab
 import com.convx.music.ui.component.backdrop.catalog.components.LiquidBottomTabs
 import androidx.compose.ui.text.font.FontWeight
 import com.convx.music.ui.component.GlassCircleButton
+import com.convx.music.ui.component.TopFadeBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.offset
@@ -302,10 +305,24 @@ fun SearchScreen(
             ) {
                 if (navSearch.query.text.isEmpty() && !localOnly) {
                     val tabPadding = PaddingValues(bottom = bottomPadding + 50.dp)
-                    when (selectedTabIndex) {
-                        0 -> ExploreTabContent(navController = navController, contentPadding = tabPadding)
-                        1 -> SuggestionsTabContent(navController = navController, contentPadding = tabPadding)
-                        2 -> AlbumsTabContent(navController = navController, contentPadding = tabPadding)
+                    // The tab strip used to hand off to the list with a hard
+                    // edge; a short haze fade in its place reads as the list
+                    // sliding under glass instead of hitting a line.
+                    val tabHazeState = remember { HazeState() }
+                    Box(Modifier.fillMaxSize()) {
+                        Box(Modifier.fillMaxSize().hazeSource(tabHazeState)) {
+                            when (selectedTabIndex) {
+                                0 -> ExploreTabContent(navController = navController, contentPadding = tabPadding)
+                                1 -> SuggestionsTabContent(navController = navController, contentPadding = tabPadding)
+                                2 -> AlbumsTabContent(navController = navController, contentPadding = tabPadding)
+                            }
+                        }
+                        TopFadeBlur(
+                            hazeState = tabHazeState,
+                            pageColor = tint,
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            heightOverride = 40.dp,
+                        )
                     }
                 } else {
                     when (navSearch.searchSource) {
@@ -405,7 +422,7 @@ fun ExploreTabContent(
                         ) {
                             Text(
                                 text = item.title,
-                                style = MaterialTheme.typography.labelLarge,
+                                style = AppTheme.typography.labelLarge,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )

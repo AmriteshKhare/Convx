@@ -1,8 +1,9 @@
 package com.convx.music.ui.screens.search.suggestions
 
+import com.convx.music.ui.ios.compat.AppTheme
+
 import androidx.compose.animation.core.animateDpAsState
 import com.convx.music.ui.utils.bounceClick
-import com.convx.music.ui.utils.combinedBounceClick
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -15,12 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
+import com.convx.music.ui.ios.compat.ModalBottomSheet
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.convx.music.constants.SuggestionRegionSlugToName
 import kotlinx.coroutines.launch
@@ -51,7 +51,7 @@ fun SuggestionRegionSheet(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "Choose Suggestions Region",
-                style = MaterialTheme.typography.labelLarge
+                style = AppTheme.typography.labelLarge
             )
             
             DockedSearchBar(
@@ -89,7 +89,7 @@ fun SuggestionRegionSheet(
                 item {
                     Text(
                         text = "System",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = AppTheme.typography.titleSmall,
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                     )
                 }
@@ -118,7 +118,7 @@ fun SuggestionRegionSheet(
                 item {
                     Text(
                         text = "Countries & Regions",
-                        style = MaterialTheme.typography.titleSmall,
+                        style = AppTheme.typography.titleSmall,
                         modifier = Modifier.padding(
                             top = 14.dp,
                             bottom = 16.dp,
@@ -202,11 +202,11 @@ fun RegionListItem(
         } else null,
         colors =
             if (selected) ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(
+                containerColor = AppTheme.colorScheme.primaryContainer.copy(
                     alpha = 0.3f
-                ), leadingIconColor = MaterialTheme.colorScheme.primary
+                ), leadingIconColor = AppTheme.colorScheme.primary
             )
-            else ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            else ListItemDefaults.colors(containerColor = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         modifier = Modifier
             .clip(
                 if (selected) CircleShape

@@ -43,21 +43,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.component.DefaultDialog
-import androidx.compose.material3.Button
+import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.SegmentedButton
+import com.convx.music.ui.ios.compat.SegmentedButtonDefaults
+import com.convx.music.ui.ios.compat.SingleChoiceSegmentedButtonRow
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -236,7 +236,7 @@ fun ListenTogetherScreen(
         state = lazyListState,
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(AppTheme.colorScheme.background)
             .imePadding(),
         contentPadding = PaddingValues(
             // Include the side-panel inset so content clears the floating side bar
@@ -267,8 +267,8 @@ fun ListenTogetherScreen(
             item {
                 Text(
                     text = stringResource(R.string.listen_together_background_disconnect_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = AppTheme.typography.bodySmall,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -358,7 +358,7 @@ fun ListenTogetherScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(ContinuousRoundedRectangle(percent = 50))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .background(AppTheme.colorScheme.surfaceContainerHigh)
                             .bounceClick(onClick = { listenTogetherManager.leaveRoom() })
                             .padding(vertical = 15.dp),
                         horizontalArrangement = Arrangement.Center,
@@ -368,14 +368,14 @@ fun ListenTogetherScreen(
                             painter = painterResource(R.drawable.logout),
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.error
+                            tint = AppTheme.colorScheme.error
                         )
                         Spacer(Modifier.width(9.dp))
                         Text(
                             text = stringResource(R.string.leave_room),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = AppTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.error
+                            color = AppTheme.colorScheme.error
                         )
                     }
                 }
@@ -476,22 +476,22 @@ private fun NotConfiguredContent() {
             Icon(
                 painter = painterResource(R.drawable.group),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = AppTheme.colorScheme.primary,
                 modifier = Modifier.size(64.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.listen_together),
-                style = MaterialTheme.typography.headlineMedium,
+                style = AppTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = AppTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.listen_together_not_configured),
-                style = MaterialTheme.typography.bodyLarge,
+                style = AppTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = AppTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -507,15 +507,15 @@ private fun HeaderSection(isInRoom: Boolean = false) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.listen_together),
-            style = MaterialTheme.typography.displaySmall,
+            style = AppTheme.typography.displaySmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
+            color = AppTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.listen_together_description),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = AppTheme.typography.bodyMedium,
+            color = AppTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -537,10 +537,10 @@ private fun ConnectionStatusCard(
         connectionState == ConnectionState.RECONNECTING
 
     val tone = when (connectionState) {
-        ConnectionState.CONNECTED -> MaterialTheme.colorScheme.primary
-        ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> MaterialTheme.colorScheme.tertiary
-        ConnectionState.ERROR -> MaterialTheme.colorScheme.error
-        ConnectionState.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
+        ConnectionState.CONNECTED -> AppTheme.colorScheme.primary
+        ConnectionState.CONNECTING, ConnectionState.RECONNECTING -> AppTheme.colorScheme.tertiary
+        ConnectionState.ERROR -> AppTheme.colorScheme.error
+        ConnectionState.DISCONNECTED -> AppTheme.colorScheme.onSurfaceVariant
     }
 
     Row(
@@ -570,16 +570,16 @@ private fun ConnectionStatusCard(
                 ConnectionState.ERROR -> stringResource(R.string.listen_together_error)
                 ConnectionState.DISCONNECTED -> stringResource(R.string.listen_together_disconnected)
             },
-            style = MaterialTheme.typography.bodySmall,
+            style = AppTheme.typography.bodySmall,
             color = tone,
             modifier = Modifier.weight(1f)
         )
         if (broken) {
             Text(
                 text = stringResource(R.string.connect),
-                style = MaterialTheme.typography.labelMedium,
+                style = AppTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                color = AppTheme.colorScheme.primary,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .bounceClick(onClick = onConnect)
@@ -596,7 +596,7 @@ private fun RoomStatusCard(
     context: Context,
     navController: NavController
 ) {
-    val accent = MaterialTheme.colorScheme.primary
+    val accent = AppTheme.colorScheme.primary
     val copiedText = stringResource(R.string.copied_to_clipboard)
 
     fun copy(label: String, value: String) {
@@ -631,9 +631,9 @@ private fun RoomStatusCard(
                 } else {
                     stringResource(R.string.listen_together_you_are_guest)
                 },
-                style = MaterialTheme.typography.labelMedium,
+                style = AppTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = AppTheme.colorScheme.onSurface
             )
         }
 
@@ -653,14 +653,14 @@ private fun RoomStatusCard(
                     modifier = Modifier
                         .size(width = 40.dp, height = 52.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)),
+                        .background(AppTheme.colorScheme.surface.copy(alpha = 0.55f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = ch.toString(),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = AppTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = AppTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -669,8 +669,8 @@ private fun RoomStatusCard(
         Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.listen_together_tap_code_to_copy),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = AppTheme.typography.bodySmall,
+            color = AppTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(Modifier.height(18.dp))
@@ -709,7 +709,7 @@ private fun RoomAction(icon: Int, label: String, onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.45f))
+            .background(AppTheme.colorScheme.surface.copy(alpha = 0.45f))
             .bounceClick(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 11.dp)
     ) {
@@ -717,13 +717,13 @@ private fun RoomAction(icon: Int, label: String, onClick: () -> Unit) {
             painter = painterResource(icon),
             contentDescription = label,
             modifier = Modifier.size(19.dp),
-            tint = MaterialTheme.colorScheme.onSurface
+            tint = AppTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(5.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = AppTheme.typography.labelSmall,
+            color = AppTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -762,14 +762,14 @@ private fun ConnectedUsersSection(
                     modifier = Modifier
                         .size(46.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        .background(AppTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "+${users.size - 8}",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = AppTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -778,8 +778,8 @@ private fun ConnectedUsersSection(
         Spacer(Modifier.height(12.dp))
         Text(
             text = users.joinToString(", ") { it.username },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.bodySmall,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -787,8 +787,8 @@ private fun ConnectedUsersSection(
             Spacer(Modifier.height(6.dp))
             Text(
                 text = stringResource(R.string.listen_together_tap_member_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
         }
     }
@@ -800,10 +800,10 @@ private fun ConnectedUsersSection(
 private fun SectionLabel(text: String) {
     Text(
         text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
+        style = AppTheme.typography.labelSmall,
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.2.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+        color = AppTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -834,7 +834,7 @@ private fun MemberAvatar(
                 // avatar sitting on the surface rather than being outlined, which
                 // is what lets them overlap cleanly.
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.background)
+                .background(AppTheme.colorScheme.background)
                 .padding(2.dp)
                 .clip(CircleShape)
                 .background(tint)
@@ -843,7 +843,7 @@ private fun MemberAvatar(
         ) {
             Text(
                 text = username.take(1).uppercase(),
-                style = MaterialTheme.typography.titleMedium,
+                style = AppTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
@@ -853,14 +853,14 @@ private fun MemberAvatar(
                 modifier = Modifier
                     .size(16.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.background),
+                    .background(AppTheme.colorScheme.background),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     painter = painterResource(R.drawable.star),
                     contentDescription = null,
                     modifier = Modifier.size(11.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = AppTheme.colorScheme.primary
                 )
             }
         }
@@ -896,7 +896,7 @@ private fun PendingJoinRequestsSection(
                 Spacer(Modifier.width(14.dp))
                 Text(
                     text = request.username,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = AppTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -904,14 +904,14 @@ private fun PendingJoinRequestsSection(
                 )
                 RowAction(
                     icon = R.drawable.close,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = AppTheme.colorScheme.onSurfaceVariant,
                     description = stringResource(R.string.reject),
                     onClick = { onReject(request.userId) }
                 )
                 Spacer(Modifier.width(6.dp))
                 RowAction(
                     icon = R.drawable.check,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = AppTheme.colorScheme.primary,
                     description = stringResource(R.string.approve),
                     onClick = { onApprove(request.userId) }
                 )
@@ -932,7 +932,7 @@ private fun RowAction(
         modifier = Modifier
             .size(38.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .background(AppTheme.colorScheme.surfaceContainerHighest)
             .bounceClick(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -969,13 +969,13 @@ private fun PendingSuggestionsSection(
                     modifier = Modifier
                         .size(42.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        .background(AppTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.queue_music),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = AppTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -983,7 +983,7 @@ private fun PendingSuggestionsSection(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = suggestion.trackInfo.title,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = AppTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -993,22 +993,22 @@ private fun PendingSuggestionsSection(
                             R.string.listen_together_suggested_by,
                             suggestion.fromUsername
                         ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = AppTheme.typography.bodySmall,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
                 RowAction(
                     icon = R.drawable.close,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = AppTheme.colorScheme.onSurfaceVariant,
                     description = stringResource(R.string.reject),
                     onClick = { onReject(suggestion.suggestionId) }
                 )
                 Spacer(Modifier.width(6.dp))
                 RowAction(
                     icon = R.drawable.check,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = AppTheme.colorScheme.primary,
                     description = stringResource(R.string.approve),
                     onClick = { onApprove(suggestion.suggestionId) }
                 )
@@ -1050,7 +1050,7 @@ private fun JoinCreateRoomSection(
                 if (usernameInput.isNotBlank()) {
                     RowAction(
                         icon = R.drawable.close,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = AppTheme.colorScheme.onSurfaceVariant,
                         description = null,
                         onClick = { onUsernameChange("") }
                     )
@@ -1096,8 +1096,8 @@ private fun JoinCreateRoomSection(
             Spacer(Modifier.height(12.dp))
             Text(
                 text = joinErrorMessage,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
+                style = AppTheme.typography.bodySmall,
+                color = AppTheme.colorScheme.error
             )
         }
     }
@@ -1122,10 +1122,10 @@ private fun EntryField(
             Text(
                 text = placeholder,
                 letterSpacing = letterSpacing,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                color = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
         },
-        textStyle = MaterialTheme.typography.bodyLarge.copy(
+        textStyle = AppTheme.typography.bodyLarge.copy(
             letterSpacing = letterSpacing,
             fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal
         ),
@@ -1135,8 +1135,8 @@ private fun EntryField(
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Color.Transparent,
             unfocusedBorderColor = Color.Transparent,
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            focusedContainerColor = AppTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = AppTheme.colorScheme.surfaceContainerHigh
         ),
         modifier = modifier
             .fillMaxWidth()
@@ -1146,10 +1146,10 @@ private fun EntryField(
 
 @Composable
 private fun PrimaryAction(label: String, enabled: Boolean, onClick: () -> Unit) {
-    val bg = if (enabled) MaterialTheme.colorScheme.primary
-             else MaterialTheme.colorScheme.surfaceContainerHigh
-    val fg = if (enabled) MaterialTheme.colorScheme.onPrimary
-             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val bg = if (enabled) AppTheme.colorScheme.primary
+             else AppTheme.colorScheme.surfaceContainerHigh
+    val fg = if (enabled) AppTheme.colorScheme.onPrimary
+             else AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1161,7 +1161,7 @@ private fun PrimaryAction(label: String, enabled: Boolean, onClick: () -> Unit) 
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.titleSmall,
+            style = AppTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = fg
         )
@@ -1175,13 +1175,13 @@ private fun SecondaryAction(
     loading: Boolean,
     onClick: () -> Unit
 ) {
-    val fg = if (enabled || loading) MaterialTheme.colorScheme.onSurface
-             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val fg = if (enabled || loading) AppTheme.colorScheme.onSurface
+             else AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(ContinuousRoundedRectangle(percent = 50))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(AppTheme.colorScheme.surfaceContainerHigh)
             .then(if (enabled) Modifier.bounceClick(onClick = onClick) else Modifier)
             .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.Center,
@@ -1191,13 +1191,13 @@ private fun SecondaryAction(
             CircularProgressIndicator(
                 modifier = Modifier.size(15.dp),
                 strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary
+                color = AppTheme.colorScheme.primary
             )
             Spacer(Modifier.width(10.dp))
         }
         Text(
             text = label,
-            style = MaterialTheme.typography.titleSmall,
+            style = AppTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = fg
         )
@@ -1211,19 +1211,19 @@ private fun DividerWithLabel(label: String) {
             Modifier
                 .weight(1f)
                 .height(1.dp)
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
+                .background(AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = AppTheme.typography.labelSmall,
+            color = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 14.dp)
         )
         Box(
             Modifier
                 .weight(1f)
                 .height(1.dp)
-                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
+                .background(AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f))
         )
     }
 }
@@ -1243,19 +1243,19 @@ private fun SettingsLinkCard(onClick: () -> Unit) {
         Icon(
             painter = painterResource(R.drawable.settings),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(14.dp))
         Text(
             text = stringResource(R.string.settings),
-            style = MaterialTheme.typography.bodyMedium,
+            style = AppTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
         )
         Icon(
             painter = painterResource(R.drawable.arrow_forward),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(16.dp)
         )
     }
@@ -1286,8 +1286,8 @@ private fun UserActionDialog(
                 )
                 Text(
                     text = username,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
@@ -1306,7 +1306,7 @@ private fun UserActionDialog(
                     .fillMaxWidth()
                     .bounceClick(onClick = onKick),
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.errorContainer
+                color = AppTheme.colorScheme.errorContainer
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1315,21 +1315,21 @@ private fun UserActionDialog(
                     Icon(
                         painter = painterResource(R.drawable.close),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = AppTheme.colorScheme.error,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.kick_user),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.error
+                            color = AppTheme.colorScheme.error
                         )
                         Text(
                             text = stringResource(R.string.kick_user_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = AppTheme.typography.bodySmall,
+                            color = AppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1341,7 +1341,7 @@ private fun UserActionDialog(
                     .fillMaxWidth()
                     .bounceClick(onClick = onPermanentKick),
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+                color = AppTheme.colorScheme.surfaceVariant
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1350,20 +1350,20 @@ private fun UserActionDialog(
                     Icon(
                         painter = painterResource(R.drawable.close),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = AppTheme.colorScheme.error,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.permanently_kick_user),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             text = stringResource(R.string.permanently_kick_user_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = AppTheme.typography.bodySmall,
+                            color = AppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1375,7 +1375,7 @@ private fun UserActionDialog(
                     .fillMaxWidth()
                     .bounceClick(onClick = onTransferOwnership),
                 shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+                color = AppTheme.colorScheme.primaryContainer
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1384,21 +1384,21 @@ private fun UserActionDialog(
                     Icon(
                         painter = painterResource(R.drawable.crown),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = AppTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.transfer_ownership),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = AppTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = AppTheme.colorScheme.primary
                         )
                         Text(
                             text = stringResource(R.string.transfer_ownership_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = AppTheme.typography.bodySmall,
+                            color = AppTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -1446,9 +1446,9 @@ private fun SessionCountdownCard(
     // an always-red panel trains people to ignore it, and then it cannot warn
     // them about anything.
     val tone = if (expiring) {
-        MaterialTheme.colorScheme.error
+        AppTheme.colorScheme.error
     } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        AppTheme.colorScheme.onSurfaceVariant
     }
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1467,7 +1467,7 @@ private fun SessionCountdownCard(
                 else R.string.listen_together_session_ends,
                 pretty
             ),
-            style = MaterialTheme.typography.bodySmall,
+            style = AppTheme.typography.bodySmall,
             fontWeight = if (expiring) FontWeight.SemiBold else FontWeight.Normal,
             color = tone,
             modifier = Modifier.weight(1f)
@@ -1475,9 +1475,9 @@ private fun SessionCountdownCard(
         if (isHost && extensionsLeft > 0) {
             Text(
                 text = stringResource(R.string.listen_together_extend),
-                style = MaterialTheme.typography.labelMedium,
+                style = AppTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                color = AppTheme.colorScheme.primary,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .bounceClick(onClick = onExtend)
@@ -1511,8 +1511,8 @@ private fun ControlModeCard(
                 if (everyone) R.string.listen_together_control_everyone_desc
                 else R.string.listen_together_control_owner_desc
             ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = AppTheme.typography.bodySmall,
+            color = AppTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(12.dp))
         run {

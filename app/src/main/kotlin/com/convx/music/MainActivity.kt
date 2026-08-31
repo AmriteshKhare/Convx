@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,16 +66,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Scaffold
+import com.convx.music.ui.ios.compat.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
@@ -90,6 +91,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -142,15 +144,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import coil3.compose.AsyncImage
-import coil3.imageLoader
-import coil3.request.CachePolicy
-import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.request.crossfade
-import coil3.toBitmap
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.convx.music.ui.ios.foundation.LocalIosBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberNavTransitionFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberPagerTransitionFreeze
 import com.convx.music.ui.utils.Motion
@@ -160,6 +159,8 @@ import com.convx.music.ui.utils.markMorphDirection
 import com.convx.music.ui.utils.morphArtworkId
 import com.convx.music.ui.utils.isMorphRoute
 import com.convx.music.ui.component.prewarmHeroTint
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
@@ -172,7 +173,6 @@ import com.convx.music.constants.AppLanguageKey
 import com.convx.music.constants.DarkModeKey
 import com.convx.music.constants.DefaultOpenTabKey
 import com.convx.music.constants.DisableScreenshotKey
-import com.convx.music.constants.DynamicThemeKey
 import com.convx.music.constants.SearchSource
 import com.convx.music.constants.LocalOnlyModeKey
 import com.convx.music.constants.SearchSourceKey
@@ -188,7 +188,6 @@ import com.convx.music.constants.NavigationBarHeight
 import com.convx.music.constants.OverlayMenuStyleKey
 import com.convx.music.constants.PauseListenHistoryKey
 import com.convx.music.constants.LiquidGlassGlobalEnabledKey
-import com.convx.music.constants.LiquidGlassPlayerEnabledKey
 import com.convx.music.constants.LiquidGlassMiniPlayerEnabledKey
 import com.convx.music.constants.LiquidGlassNavBarEnabledKey
 import com.convx.music.constants.LiquidGlassSidePanelEnabledKey
@@ -244,10 +243,14 @@ import com.convx.music.ui.component.LocalItemPrefs
 import com.convx.music.ui.component.LocalNavSearchState
 import com.convx.music.ui.component.rememberAppBackgroundTint
 import com.convx.music.ui.component.rememberItemPrefs
+import com.convx.music.ui.component.FrostedTopBar
+import com.convx.music.ui.component.LocalHomeTopBarLogoProgress
+import com.convx.music.ui.component.TopFadeBlur
 import com.convx.music.ui.component.NavSearchState
 import com.convx.music.ui.component.GlassEffectConfig
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.LocalAppBackdrop
+import com.convx.music.ui.component.LocalAppBackdropFrozen
 import com.convx.music.ui.component.GlassStyle
 import com.convx.music.ui.component.glassContentColorFor
 import com.convx.music.ui.component.LocalAppleMusicUi
@@ -269,8 +272,14 @@ import com.convx.music.ui.component.BottomSheetMenu
 import com.convx.music.ui.component.OverlayMenu
 import com.convx.music.ui.component.BottomSheetPage
 import com.convx.music.ui.component.ListenTogetherOverlay
+import com.convx.music.ui.component.QueueConflictDialog
+import com.convx.music.ui.component.QueueReplacedUndoSnackbar
 import com.convx.music.ui.component.LocalBottomSheetPageState
 import com.convx.music.ui.component.LocalMenuState
+import com.convx.music.ui.component.iosSheetPresentation
+import com.convx.music.ui.component.LocalSheetPresentation
+import com.convx.music.ui.component.SheetPresentationState
+import com.convx.music.ui.component.rememberSheetPresentation
 import com.convx.music.ui.component.rememberBottomSheetState
 import com.convx.music.ui.component.shimmer.ShimmerTheme
 import com.convx.music.ui.menu.YouTubeSongMenu
@@ -284,13 +293,10 @@ import com.convx.music.ui.screens.SettingDialoge
 import com.convx.music.ui.screens.navigationBuilder
 import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.screens.settings.NavigationTab
-import com.convx.music.ui.theme.ColorSaver
-import com.convx.music.ui.theme.DefaultThemeColor
 import com.convx.music.ui.theme.BrandName
+import com.convx.music.ui.theme.DefaultThemeColor
 import com.convx.music.ui.theme.LocalAccentTextColor
 import com.convx.music.ui.theme.rememberBrandFontFamily
-import com.convx.music.ui.theme.extractThemeColor
-import com.convx.music.ui.theme.extractThemeColorFromVideoFrame
 import com.convx.music.ui.theme.vivimusicTheme
 import com.convx.music.ui.utils.appBarScrollBehavior
 import com.convx.music.ui.utils.resetHeightOffset
@@ -298,9 +304,6 @@ import com.convx.music.utils.SyncUtils
 import com.convx.music.utils.dataStore
 import com.convx.music.utils.get
 import com.convx.music.utils.rememberEnumPreference
-import com.convx.music.constants.CanvasSource
-import com.convx.music.constants.CanvasSourceKey
-import com.convx.music.ui.player.CanvasArtworkPlaybackCache
 import com.convx.music.utils.rememberPreference
 import com.convx.music.constants.IosOverscrollKey
 import com.convx.music.ui.utils.rememberIosOverscrollFactory
@@ -331,14 +334,6 @@ import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 
 
-@Suppress("DEPRECATION", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-/**
- * Dynamic-theme colors keyed by song id: [extractThemeColor] decodes + runs
- * Palette on the full artwork for every song, so a bounded cache skips the
- * repeat work when a song recurs in a session.
- */
-private val themeColorCache = android.util.LruCache<String, androidx.compose.ui.graphics.Color>(64)
-
 // DIAGNOSTIC ONLY â€” keep false. Bypasses the full-screen layerBackdrop pass so the cost of
 // the glass pipeline can be measured against the cost of the content itself. Glass surfaces
 // fall back to their translucent look while this is true, so it must never ship enabled.
@@ -348,6 +343,7 @@ private val themeColorCache = android.util.LruCache<String, androidx.compose.ui.
 private val TabRootRoutes = setOf(
     Screens.Home.route,
     Screens.Library.route,
+    Screens.Explore.route,
     Screens.Settings.route,
     Screens.Songs.route,
 )
@@ -364,59 +360,6 @@ private val WebViewRoutes = setOf(
     "settings/spotify",
     "settings/discord/login",
 )
-
-/**
- * Drives whether the top bar's blur/scrim strip is drawn at all: shown while the
- * list is at the top and while the user is scrolling back up, hidden once they
- * scroll down into the content. Without this the darkened strip sits over every
- * screen permanently.
- *
- * MainActivity doesn't own any screen's list state â€” the nested scroll stream is
- * the only app-level scroll signal available here, so direction is tracked from
- * the deltas rather than read off a LazyListState.
- */
-@Stable
-private class TopBarChromeVisibility {
-    var visible by mutableStateOf(true)
-        private set
-
-    /** True while the content is against its top edge. */
-    private var atTop = true
-
-    val connection = object : NestedScrollConnection {
-        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-            // Finger moving down (positive y) scrolls the content back up.
-            val dy = available.y
-            if (dy > ScrollSlopPx) {
-                visible = true
-            } else if (dy < -ScrollSlopPx && !atTop) {
-                visible = false
-            }
-            return Offset.Zero
-        }
-
-        override fun onPostScroll(
-            consumed: Offset,
-            available: Offset,
-            source: NestedScrollSource,
-        ): Offset {
-            // Leftover downward delta the list could not consume means it is
-            // already pinned at its top edge.
-            if (available.y > 0f) {
-                atTop = true
-                visible = true
-            } else if (consumed.y != 0f) {
-                atTop = false
-            }
-            return Offset.Zero
-        }
-    }
-
-    private companion object {
-        /** Ignore sub-pixel jitter so the strip doesn't flicker while settling. */
-        const val ScrollSlopPx = 1.5f
-    }
-}
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -598,7 +541,6 @@ class MainActivity : ComponentActivity() {
         downloadUtil: DownloadUtil,
         syncUtils: SyncUtils,
     ) {
-        val enableDynamicTheme by rememberPreference(DynamicThemeKey, defaultValue = true)
         val enableHighRefreshRate by rememberPreference(EnableHighRefreshRateKey, defaultValue = true)
         val context = LocalContext.current
 
@@ -688,19 +630,14 @@ class MainActivity : ComponentActivity() {
             pureBlackEnabled && useDarkTheme
         }
 
+        // The seed for the whole app's ColorScheme. Static on purpose: it used to be
+        // re-derived from every track's artwork, which built a NEW ColorScheme object per
+        // song change. That invalidates MaterialTheme, and every composable in the app
+        // reading AppTheme.colorScheme.* recomposes with it -- a full-tree recompose
+        // on each track transition. Per-artwork colour still exists where it is local and
+        // cheap (HeroArtwork's tints); it no longer reseeds the global theme.
         val (selectedThemeColorInt) = rememberPreference(SelectedThemeColorKey, defaultValue = DefaultThemeColor.toArgb())
-        val selectedThemeColor = Color(selectedThemeColorInt)
-        val (canvasSource) = rememberEnumPreference(CanvasSourceKey, defaultValue = CanvasSource.AUTO)
-
-        var themeColor by rememberSaveable(stateSaver = ColorSaver) {
-            mutableStateOf(selectedThemeColor)
-        }
-
-        LaunchedEffect(selectedThemeColor) {
-            if (!enableDynamicTheme) {
-                themeColor = selectedThemeColor
-            }
-        }
+        val themeColor = Color(selectedThemeColorInt)
 
         // A guest in an owner-controlled room has every "play this" refused at
         // PlayerConnection. Refusing silently reads as the app being broken, and the
@@ -716,57 +653,6 @@ class MainActivity : ComponentActivity() {
                     Toast.LENGTH_SHORT,
                 ).show()
                 connection.playbackBlockedByRoom.value = false
-            }
-        }
-
-        LaunchedEffect(playerConnection, enableDynamicTheme, selectedThemeColor) {
-            val playerConnection = playerConnection
-            if (!enableDynamicTheme || playerConnection == null) {
-                themeColor = selectedThemeColor
-                return@LaunchedEffect
-            }
-
-            playerConnection.service.currentMediaMetadata.collectLatest { song ->
-                if (song?.thumbnailUrl != null) {
-                    val cached = themeColorCache.get(song.id)
-                    if (cached != null) {
-                        themeColor = cached
-                    } else withContext(Dispatchers.IO) {
-                        try {
-                            // Prefer a frame from the song's canvas video over the static
-                            // cover art when one's already been fetched/confirmed playing
-                            // (see Player.kt) â€” canvas videos are often more colorful/
-                            // representative than the plain album art.
-                            val canvasVideoUrl = CanvasArtworkPlaybackCache
-                                .get("${song.id}:${canvasSource.name}")
-                                ?.preferredAnimationUrl
-
-                            val extracted = canvasVideoUrl?.let { extractThemeColorFromVideoFrame(it) }
-                                ?: imageLoader.execute(
-                                    ImageRequest.Builder(this@MainActivity)
-                                        .data(song.thumbnailUrl)
-                                        .allowHardware(false)
-                                        .memoryCachePolicy(CachePolicy.ENABLED)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                        .networkCachePolicy(CachePolicy.ENABLED)
-                                        .crossfade(false)
-                                        .build()
-                                ).image?.toBitmap()?.extractThemeColor()
-
-                            if (extracted != null) {
-                                themeColorCache.put(song.id, extracted)
-                                themeColor = extracted
-                            } else {
-                                themeColor = selectedThemeColor
-                            }
-                        } catch (e: Exception) {
-                            // Fallback to default on error
-                            themeColor = selectedThemeColor
-                        }
-                    }
-                } else {
-                    themeColor = selectedThemeColor
-                }
             }
         }
 
@@ -788,7 +674,7 @@ class MainActivity : ComponentActivity() {
                         when {
                             appBackgroundColorInt != 0 -> Color(appBackgroundColorInt)
                             pureBlack -> Color.Black
-                            else -> MaterialTheme.colorScheme.surface
+                            else -> AppTheme.colorScheme.surface
                         }
                     )
             ) {
@@ -859,10 +745,11 @@ class MainActivity : ComponentActivity() {
                 }
                 val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
                 val (appleMusicUi) = rememberPreference(AppleMusicUiKey, defaultValue = true)
-                // The Settings tab is exclusive to the floating (iOS-style) tab bar â€”
-                // the classic nav bar keeps settings behind the top bar icon.
+                // The Explore (discovery) tab is exclusive to the floating (iOS-style)
+                // tab bar — the classic nav bar keeps discovery off the row and
+                // settings behind the top bar icon.
                 val floatingNavigationItems = remember(navigationItems) {
-                    navigationItems + Screens.Settings
+                    navigationItems + Screens.Explore
                 }
                 val floatingNavBarScrollConnection = rememberFloatingTabBarScrollConnection()
                 val (liquidGlassGlobalEnabled) = rememberPreference(LiquidGlassGlobalEnabledKey, defaultValue = true)
@@ -898,7 +785,6 @@ class MainActivity : ComponentActivity() {
                 // tint the user actually picked â€” a dark tint at high opacity reads
                 // dark even in light mode, which is where white-on-glass disappears.
                 val themeGlassTextColor = if (useDarkTheme) Color.White else Color(0xFF1A1A1A)
-                val (liquidGlassPlayerEnabled) = rememberPreference(LiquidGlassPlayerEnabledKey, defaultValue = true)
                 val (liquidGlassMiniPlayerEnabled) = rememberPreference(LiquidGlassMiniPlayerEnabledKey, defaultValue = true)
                 val (liquidGlassNavBarEnabled) = rememberPreference(LiquidGlassNavBarEnabledKey, defaultValue = true)
                 val (liquidGlassSidePanelEnabled) = rememberPreference(LiquidGlassSidePanelEnabledKey, defaultValue = true)
@@ -924,7 +810,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     Color(liquidGlassSidePanelColorInt)
                 }
-                val glassSurfaceBehind = MaterialTheme.colorScheme.surface
+                val glassSurfaceBehind = AppTheme.colorScheme.surface
                 val adaptiveGlassTextColor = if (liquidGlassAdaptiveContrast) {
                     glassContentColorFor(glassSurfaceBehind, resolvedGlassTint, liquidGlassSurfaceOpacity)
                 } else {
@@ -944,7 +830,7 @@ class MainActivity : ComponentActivity() {
                     liquidGlassGlobalEnabled, liquidGlassVibrancy, liquidGlassBlurRadius,
                     liquidGlassLensHeight, liquidGlassLensAmount, liquidGlassChromaticAberration,
                     liquidGlassDepthEffect, liquidGlassSurfaceTintColorInt,
-                    liquidGlassSurfaceOpacity, liquidGlassTextColorInt, liquidGlassPlayerEnabled,
+                    liquidGlassSurfaceOpacity, liquidGlassTextColorInt,
                     liquidGlassHighlightColorInt, liquidGlassHighlightOpacity, liquidGlassStyle,
                     liquidGlassPuckColorInt, liquidGlassPuckOpacity,
                     liquidGlassMiniPlayerEnabled, liquidGlassNavBarEnabled, liquidGlassSidePanelEnabled,
@@ -978,7 +864,6 @@ class MainActivity : ComponentActivity() {
                         puckColor = if (liquidGlassPuckColorInt == 0) Color.Unspecified else Color(liquidGlassPuckColorInt),
                         puckOpacity = liquidGlassPuckOpacity,
                         textColor = if (liquidGlassTextColorInt == 0) adaptiveGlassTextColor else Color(liquidGlassTextColorInt),
-                        playerEnabled = liquidGlassPlayerEnabled,
                         miniPlayerEnabled = liquidGlassMiniPlayerEnabled,
                         navBarEnabled = liquidGlassNavBarEnabled,
                         sidePanelEnabled = liquidGlassSidePanelEnabled,
@@ -1229,7 +1114,11 @@ class MainActivity : ComponentActivity() {
                     (glassEffectConfig.navBarEnabled && shouldShowNavigationBar && !showRail) ||
                         (glassEffectConfig.sidePanelEnabled && showRail) ||
                         (glassEffectConfig.miniPlayerEnabled && hasDockedPlayerAccessory) ||
-                        (glassEffectConfig.playerEnabled && !playerBottomSheetState.isCollapsed)
+                        // The full player's own glass has no on/off switch any more (the old
+                        // "Glass Player" toggle never actually gated it -- see GlassEffect.kt),
+                        // so it is an unconditional backdrop consumer whenever the sheet isn't
+                        // collapsed, same as before minus the always-true config check.
+                        !playerBottomSheetState.isCollapsed
 
                 val playerAwareWindowInsets = remember(
                     bottomInset,
@@ -1270,10 +1159,6 @@ class MainActivity : ComponentActivity() {
                             (playerBottomSheetState.isCollapsed || playerBottomSheetState.isDismissed)
                     },
                 )
-
-                // Shows the top bar's blur/scrim strip only at the top of a list
-                // or while scrolling back up â€” see TopBarChromeVisibility.
-                val topBarChrome = remember { TopBarChromeVisibility() }
 
                 // Navigation tracking. Keyed on effectiveRoute too, not just
                 // navBackStackEntry -- a pager tab switch (Home/Search/Library/
@@ -1403,6 +1288,7 @@ class MainActivity : ComponentActivity() {
                         Screens.Search.route -> R.string.search
                         Screens.Library.route -> R.string.filter_library
                         Screens.ListenTogether.route -> R.string.together
+                        Screens.Explore.route -> R.string.tab_explore
                         else -> null
                     }
                 }
@@ -1417,7 +1303,7 @@ class MainActivity : ComponentActivity() {
                     historyButtonEnabled && !(pauseListenHistory && eventCount == 0)
                 }
 
-                val baseBg = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+                val baseBg = if (pureBlack) Color.Black else AppTheme.colorScheme.surfaceContainer
 
                 // Remember the draw lambda so rememberLayerBackdrop (which keys on it)
                 // isn't recreated on every app recomposition, forcing a full backdrop
@@ -1456,9 +1342,18 @@ class MainActivity : ComponentActivity() {
                 // switch IS a route change and navTransitionFreeze above already covers
                 // it -- the separate pager-motion freeze this used to need doesn't
                 // apply once there is no pager motion to miss.
-                val backdropFrozenProvider = {
-                    backdropFreeze.frozen() ||
-                        navTransitionFreeze.frozen()
+                // Remembered so the lambda keeps its identity across recompositions.
+                // LayerBackdropElement compares `frozen` in equals(), so a fresh lambda
+                // every recomposition counted as a modifier change and forced an
+                // invalidateDraw() -- harmless when only the app backdrop read it, but it
+                // now also feeds the tab bar's backdrop through LocalAppBackdropFrozen.
+                // Both freezes are stable objects; navTransitionFreeze is itself keyed on
+                // the current route, so it changes exactly when it should.
+                val backdropFrozenProvider = remember(backdropFreeze, navTransitionFreeze) {
+                    {
+                        backdropFreeze.frozen() ||
+                            navTransitionFreeze.frozen()
+                    }
                 }
 
                 // One provider replaces Android's stretch/glow edge effect with the
@@ -1536,15 +1431,25 @@ class MainActivity : ComponentActivity() {
                     focusRequester = searchFocusRequester,
                 )
 
+                // Counts the sheets currently on screen, so the presentation below holds
+                // until the last one closes rather than the first. Every sheet registers
+                // itself through the shared presenter -- see PresentingSheetEffect.
+                val sheetPresentationState = remember { SheetPresentationState() }
+
+                // See HomeTopBarState.kt — Home writes into this from its own
+                // scroll state, the top bar's leading logo reads it.
+                val homeTopBarLogoProgress = remember { mutableFloatStateOf(0f) }
+
                 CompositionLocalProvider(
                     LocalOverscrollFactory provides
                         if (iosOverscroll) iosOverscrollFactory else LocalOverscrollFactory.current,
                     LocalDatabase provides database,
                     LocalNavSearchState provides navSearchState,
+                    LocalSheetPresentation provides sheetPresentationState,
                     // onSurface already carries the accent-contrast treatment (see
                     // ColorScheme.accentText), so pure black must not force plain white
                     // back over it.
-                    LocalContentColor provides MaterialTheme.colorScheme.onSurface,
+                    LocalContentColor provides AppTheme.colorScheme.onSurface,
                     LocalPlayerConnection provides playerConnection,
                     LocalPlayerAwareWindowInsets provides playerAwareWindowInsets,
                     LocalDownloadUtil provides downloadUtil,
@@ -1557,6 +1462,9 @@ class MainActivity : ComponentActivity() {
                     LocalGlassEffectConfig provides glassEffectConfig,
                     LocalTabView provides showRail,
                     LocalAppBackdrop provides appBackdrop,
+                    // Same backdrop, for the ios/ component library's glass surfaces.
+                    LocalIosBackdrop provides appBackdrop,
+                    LocalAppBackdropFrozen provides backdropFrozenProvider,
                     LocalAppleMusicUi provides appleMusicUi,
                     LocalRingtoneViewModel provides ringtoneViewModel,
                     // Read once here instead of inside every list row and grid tile —
@@ -1565,7 +1473,28 @@ class MainActivity : ComponentActivity() {
                     // One collector for the whole app instead of one per list row —
                     // see LocalDownloads.
                     LocalDownloads provides downloadUtil.downloads.collectAsState().value,
+                    // Hand-off between Home's own scroll state and the top bar's
+                    // logo, which live in different parts of the composition — see
+                    // HomeTopBarState.kt.
+                    LocalHomeTopBarLogoProgress provides homeTopBarLogoProgress,
                 ) {
+
+                    // The screen a sheet is covering shrinks back behind it, the way
+                    // iOS presents one card over another. Driven from the same MenuState
+                    // the sheets read, so no call site has to know about it.
+                    val sheetPresentation = rememberSheetPresentation(
+                        LocalMenuState.current.isVisible,
+                        LocalBottomSheetPageState.current.isVisible,
+                    )
+
+                    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+                    // Source for the top bar's TopFadeBlur on the top-level tabs (Home/
+                    // Library/Search etc.) — tagged onto the NavHost's own content Box
+                    // below via hazeSource. Detail screens (Album/Artist/Playlist) pass
+                    // their own existing per-screen HazeState instead, already paid for
+                    // by HeroMergeBand/HeroTopBlur.
+                    val topBarHazeState = remember { HazeState() }
 
                     Scaffold(
                         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -1575,97 +1504,60 @@ class MainActivity : ComponentActivity() {
                                 enter = fadeIn(animationSpec = tween(durationMillis = 300)),
                                 exit = fadeOut(animationSpec = tween(durationMillis = 200))
                             ) {
-                                Row {
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        // Scrim only â€” no backdrop capture. This was a blurred
-                                        // capture of the screen behind it (once two stacked
-                                        // captures, then one at 0.45 scale), which meant the top
-                                        // bar sampled and re-blurred the full-screen backdrop on
-                                        // top of everything else the scroll frame was already
-                                        // paying for. The gradient below carried most of the
-                                        // legibility anyway, and it fades out on its own, so
-                                        // dropping the blur also drops the DstIn mask and the
-                                        // Offscreen buffer that mask required.
-                                        //
-                                        // Plain alpha rather than AnimatedVisibility: this sits in
-                                        // a Box nested in a Row, so AnimatedVisibility resolves
-                                        // against RowScope and does not compile here. Animating
-                                        // alpha in graphicsLayer keeps the fade off the
-                                        // recomposition path anyway, and the `if` drops the
-                                        // backdrop capture entirely once it is fully hidden.
-                                        //
-                                        // The fade is asymmetric on purpose: coming back has
-                                        // to feel immediate, because it trails the scroll
-                                        // that asked for it. Going away can be lazy.
-                                        val chromeAlpha by animateFloatAsState(
-                                            targetValue = if (topBarChrome.visible) 1f else 0f,
-                                            animationSpec = tween(
-                                                durationMillis = if (topBarChrome.visible) 90 else 200
-                                            ),
-                                            label = "topBarChromeAlpha",
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .windowInsetsPadding(
+                                            cutoutInsets.only(WindowInsetsSides.Start + WindowInsetsSides.End)
                                         )
-                                        // The scrim is the screen's OWN background faded
-                                        // out, not a fixed black: hardcoded black read as
-                                        // a dark band across the top of every light-theme
-                                        // screen. Same expression the top-level screens
-                                        // paint behind their content, so it honours the
-                                        // picked theme colour when dynamic colour is off.
-                                        val scrimColor = rememberAppBackgroundTint(
-                                            MaterialTheme.colorScheme.background
-                                        )
-                                        if (chromeAlpha > 0.01f) {
-                                            // Replaces the blur that used to sit here: one drawn
-                                            // rect, no capture, no layer of its own beyond the
-                                            // alpha fade. Weighted toward the top and held near
-                                            // full opacity across the whole bar rather than
-                                            // falling off immediately — the bar's title and icons
-                                            // sit in the first two thirds, and with the blur gone
-                                            // there is nothing but this gradient separating them
-                                            // from whatever artwork scrolls underneath.
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(AppBarHeight * 1.9f)
-                                                    .align(Alignment.TopCenter)
-                                                    .graphicsLayer { alpha = chromeAlpha }
-                                                    .background(
-                                                        Brush.verticalGradient(
-                                                            0f to scrimColor.copy(alpha = 0.82f),
-                                                            0.42f to scrimColor.copy(alpha = 0.70f),
-                                                            0.68f to scrimColor.copy(alpha = 0.38f),
-                                                            0.86f to scrimColor.copy(alpha = 0.14f),
-                                                            1f to Color.Transparent,
-                                                        )
-                                                    )
-                                            )
-                                        }
-                                        TopAppBar(
-                                        title = {
-                                            // Home shows the wordmark; every other tab keeps
-                                            // its own title.
-                                            val isHome = effectiveRoute == Screens.Home.route
-                                            Text(
-                                                text = if (isHome) {
-                                                    BrandName
-                                                } else {
-                                                    currentTitleRes?.let { stringResource(it) } ?: ""
-                                                },
-                                                style = MaterialTheme.typography.titleLarge.copy(
-                                                    // Display face is for the wordmark only;
-                                                    // other tab titles keep the app typeface.
-                                                    fontFamily = if (isHome) rememberBrandFontFamily() else null,
-                                                    fontWeight = if (isHome) FontWeight.SemiBold else FontWeight.Bold,
-                                                    fontSize = 24.sp,
-                                                    letterSpacing = if (isHome) 1.5.sp else 0.sp,
-                                                ),
-                                                // The bar is a Scaffold slot outside the screen
-                                                // content, so this is the app-wide accent text
-                                                // colour, not any screen's hero tint.
-                                                color = LocalAccentTextColor.current,
-                                                modifier = Modifier.padding(start = 4.dp),
-                                            )
+                                        // The side bar now spans most of the screen height,
+                                        // not the small centered capsule this used to be — it
+                                        // reaches the top bar's row, so the bar needs the same
+                                        // start inset every screen's own content already gets.
+                                        .padding(start = if (showRail) sideBarContentInset else 0.dp),
+                                ) {
+                                    // Persistent, not scroll-linked — the blur (and the bar
+                                    // above it) used to fade out with topBarChrome's
+                                    // hide-on-scroll, which read as the whole bar vanishing
+                                    // rather than staying put. shouldShowTopBar (per-route)
+                                    // is still what actually hides this on Settings etc.
+                                    TopFadeBlur(
+                                        hazeState = topBarHazeState,
+                                        // Honours the picked theme colour when dynamic
+                                        // colour is off — same expression the old scrim used.
+                                        pageColor = rememberAppBackgroundTint(
+                                            AppTheme.colorScheme.background
+                                        ),
+                                    )
+                                    val isHome = effectiveRoute == Screens.Home.route
+                                    FrostedTopBar(
+                                        leading = {
+                                            if (isHome) {
+                                                // Home's own big logo (first item of its list)
+                                                // fades OUT with the same progress this fades
+                                                // IN with — see LocalHomeTopBarLogoProgress.
+                                                val logoProgress = LocalHomeTopBarLogoProgress.current.floatValue
+                                                Text(
+                                                    text = BrandName,
+                                                    style = AppTheme.typography.titleLarge.copy(
+                                                        fontFamily = rememberBrandFontFamily(),
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontSize = 26.sp,
+                                                        letterSpacing = 1.5.sp,
+                                                    ),
+                                                    color = LocalAccentTextColor.current,
+                                                    modifier = Modifier.graphicsLayer { alpha = logoProgress },
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = currentTitleRes?.let { stringResource(it) } ?: "",
+                                                    style = AppTheme.typography.titleLarge.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 24.sp,
+                                                    ),
+                                                    color = LocalAccentTextColor.current,
+                                                )
+                                            }
                                         },
                                         actions = {
                                             // History/Stats/Together moved to Settings (see
@@ -1716,27 +1608,7 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         },
-                                        scrollBehavior = topAppBarScrollBehavior,
-                                        colors = TopAppBarDefaults.topAppBarColors(
-                                            // Floating: transparent bar over the content/hero background.
-                                            containerColor = Color.Transparent,
-                                            scrolledContainerColor = Color.Transparent,
-                                            titleContentColor = MaterialTheme.colorScheme.onSurface,
-                                            actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        modifier = Modifier
-                                            .windowInsetsPadding(
-                                                cutoutInsets.only(WindowInsetsSides.Start + WindowInsetsSides.End)
-                                            )
-                                            // The side bar now spans most of the screen
-                                            // height, not the small centered capsule this
-                                            // used to be — it reaches the top bar's row,
-                                            // so the bar needs the same start inset every
-                                            // screen's own content already gets.
-                                            .padding(start = if (showRail) sideBarContentInset else 0.dp)
                                     )
-                                    }
                                 }
                             }
                         },
@@ -1891,7 +1763,7 @@ class MainActivity : ComponentActivity() {
                                             // Keep the bar compact/portrait-width in landscape
                                             // instead of stretching across the wide screen.
                                             .widthIn(max = 500.dp)
-                                            .padding(horizontal = 16.dp)
+                                            .padding(horizontal = 12.dp)
                                             .padding(bottom = bottomInset + 8.dp)
                                             .graphicsLayer {
                                                 // The floating bar (especially with the docked
@@ -1942,6 +1814,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
+                            .iosSheetPresentation(sheetPresentation, statusBarTop)
                     ) {
                         Box(Modifier.fillMaxSize()) {
                             val onRailItemClick: (Screens, Boolean) -> Unit = remember(navController, coroutineScope, topAppBarScrollBehavior, playerBottomSheetState, enterSearch) {
@@ -2014,7 +1887,10 @@ class MainActivity : ComponentActivity() {
                                         // either one the window's default black showed straight
                                         // through the gap -- a partially-released back swipe flashed
                                         // black instead of just settling back to the current screen.
-                                        .background(MaterialTheme.colorScheme.background)
+                                        .background(AppTheme.colorScheme.background)
+                                        // What the top-level tabs' TopFadeBlur samples — see
+                                        // topBarHazeState above.
+                                        .hazeSource(topBarHazeState)
                                         // Skipped on WebView routes: layerBackdrop records
                                         // this whole subtree into a GraphicsLayer so glass
                                         // can sample it, which means the subtree is drawn
@@ -2074,7 +1950,6 @@ class MainActivity : ComponentActivity() {
                                             }
                                         )
                                         .nestedScroll(backdropFreezeConnection)
-                                        .nestedScroll(topBarChrome.connection)
                                         .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
                                         .nestedScroll(floatingNavBarScrollConnection)
                                 ) {
@@ -2377,7 +2252,7 @@ class MainActivity : ComponentActivity() {
                     // One preference decides the presentation for every long-press menu
                     // in the app. Both hosts read the same MenuState, so the ~30 call
                     // sites are untouched either way.
-                    val (overlayMenuStyle) = rememberPreference(OverlayMenuStyleKey, defaultValue = true)
+                    val (overlayMenuStyle) = rememberPreference(OverlayMenuStyleKey, defaultValue = false)
                     if (overlayMenuStyle) {
                         OverlayMenu(state = LocalMenuState.current)
                     } else {
@@ -2398,6 +2273,15 @@ class MainActivity : ComponentActivity() {
                     ListenTogetherOverlay(
                         manager = LocalListenTogetherManager.current,
                         playerConnection = playerConnection,
+                    )
+
+                    // Same reasoning as the overlay above: playQueue is a single choke point,
+                    // so its keep-or-clear prompt is hosted once here instead of at ~50 call
+                    // sites.
+                    QueueConflictDialog(playerConnection = playerConnection)
+                    QueueReplacedUndoSnackbar(
+                        playerConnection = playerConnection,
+                        snackbarHostState = snackbarHostState,
                     )
 
 
@@ -2568,6 +2452,39 @@ val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No Downl
 val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
 val LocalListenTogetherManager = staticCompositionLocalOf<com.convx.music.listentogether.ListenTogetherManager?> { null }
 val LocalIsPlayerExpanded = compositionLocalOf { false }
+
+/**
+ * The current screen's own background/hero colour (Album/Artist/Playlist's extracted
+ * artwork tint, Home's background image tint, etc.), published by whichever screen is
+ * on top so the nav bar and mini player — siblings of the NavHost, not descendants of
+ * any one screen — can boost their glass rim light from it. A screen with no hero of
+ * its own should set [Color.Unspecified] so readers fall back to their own default
+ * rather than holding a stale colour from whatever screen set it last.
+ *
+ * A single process-wide [MutableState], not one scoped per composition: the nav bar
+ * and every screen need to agree on the *same* instance despite having no shared
+ * ancestor to `CompositionLocalProvider` it from (the nav bar is a sibling of the
+ * NavHost, not a descendant of any one screen), and there is only ever one "current
+ * screen" regardless of which Activity or window reads it.
+ */
+private val ambientBackgroundColorState = mutableStateOf(Color.Unspecified)
+val LocalAmbientBackgroundColor = staticCompositionLocalOf { ambientBackgroundColorState }
+
+/** Publishes [color] as the current screen's ambient background for the nav bar's
+ *  rim tint. Call once near the top of a screen; resets to [Color.Unspecified] when
+ *  the screen leaves composition so the next screen's own default isn't inherited. */
+@Composable
+fun PublishAmbientBackgroundColor(color: Color) {
+    val ambient = LocalAmbientBackgroundColor.current
+    // Tracks every value of color, not just its initial one -- a plain LaunchedEffect
+    // keyed on color would re-fire per change, which is what's wanted here, but
+    // clearing on screen-exit needs its own effect keyed on Unit so it fires once,
+    // on leaving composition, not on every colour update in between.
+    LaunchedEffect(color) { ambient.value = color }
+    DisposableEffect(Unit) {
+        onDispose { ambient.value = Color.Unspecified }
+    }
+}
 
 /**
  * True while the app is laid out for tab view â€” the vertical floating side bar
