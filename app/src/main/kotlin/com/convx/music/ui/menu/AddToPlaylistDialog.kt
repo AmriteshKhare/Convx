@@ -59,6 +59,7 @@ import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
 import com.convx.music.viewmodels.PlaylistsViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
@@ -254,7 +255,18 @@ fun AddToPlaylistDialog(
         CreatePlaylistDialog(
             onDismiss = { showCreatePlaylistDialog = false },
             initialTextFieldValue = initialTextFieldValue,
-            allowSyncing = allowSyncing
+            allowSyncing = allowSyncing,
+            // Creating a playlist from this song picker never added the songs the
+            // user was picking a destination for — CreatePlaylistDialog only ever
+            // creates the empty playlist, nothing in this dialog wired the pending
+            // selection to it afterward.
+            onPlaylistCreated = { playlistId ->
+                coroutineScope.launch(Dispatchers.IO) {
+                    val newPlaylist = database.playlist(playlistId).first() ?: return@launch
+                    val ids = songIds ?: onGetSong(newPlaylist)
+                    database.addSongToPlaylist(newPlaylist, ids)
+                }
+            }
         )
     }
 

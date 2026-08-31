@@ -1,6 +1,6 @@
 ---
 id: 004-playlist-add-songs-bug
-status: pending
+status: in_progress
 iteration: 0
 iteration_cap: unlimited   # objective: all added songs persist, or they don't
 worker_model: sonnet

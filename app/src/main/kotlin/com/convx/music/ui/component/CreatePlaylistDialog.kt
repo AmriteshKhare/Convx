@@ -60,6 +60,14 @@ fun CreatePlaylistDialog(
         title = { Text(text = stringResource(R.string.create_playlist)) },
         initialTextFieldValue = TextFieldValue(initialTextFieldValue ?: ""),
         onDismiss = onDismiss,
+        // TextFieldDialog's default autoDismiss calls onDismiss() BEFORE onDone() runs.
+        // That tears this composable down mid-flight — its coroutineScope gets cancelled
+        // right as the coroutine below hits withContext(Dispatchers.Main), so the toast
+        // and onPlaylistCreated callback silently never ran (the insert just before it
+        // is a plain non-suspending call, so cancellation couldn't interrupt that part,
+        // which is why the playlist itself still got created). Dismiss explicitly once
+        // the work is actually done instead.
+        autoDismiss = false,
         onDone = { playlistName ->
             coroutineScope.launch(Dispatchers.IO) {
                 // YouTube.createPlaylist is the one innertube call that is NOT wrapped in
@@ -83,9 +91,12 @@ fun CreatePlaylistDialog(
                     isEditable = true,
                 )
 
-                database.query {
-                    insert(playlistEntity)
-                }
+                // database.query{} schedules on queryExecutor and returns immediately —
+                // a caller relying on onPlaylistCreated to find this row (e.g. to add
+                // pending songs to it) could run before the scheduled insert lands.
+                // Call the DAO insert directly so it blocks this IO-dispatcher coroutine
+                // until the row actually exists.
+                database.insert(playlistEntity)
 
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
@@ -97,6 +108,7 @@ fun CreatePlaylistDialog(
                         Toast.LENGTH_SHORT
                     ).show()
                     onPlaylistCreated?.invoke(playlistEntity.id)
+                    onDismiss()
                 }
             }
         },

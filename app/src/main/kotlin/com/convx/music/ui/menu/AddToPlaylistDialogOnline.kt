@@ -25,7 +25,6 @@ import com.convx.music.ui.ios.compat.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,7 +53,6 @@ import com.convx.music.constants.ListThumbnailSize
 import com.convx.music.constants.PlaylistSortType
 import com.convx.music.db.entities.Playlist
 import com.convx.music.db.entities.Song
-import com.convx.music.models.ItemsPage
 import com.convx.music.models.toMediaMetadata
 import com.convx.music.ui.component.CreatePlaylistDialog
 import com.convx.music.ui.component.DefaultDialog
@@ -87,7 +85,6 @@ fun AddToPlaylistDialogOnline(
     val database = LocalDatabase.current
     val syncUtils = LocalSyncUtils.current
     val coroutineScope = rememberCoroutineScope()
-    val viewStateMap = remember { mutableStateMapOf<String, ItemsPage?>() }
     val (sortType, onSortTypeChange) = rememberEnumPreference(
         AddToPlaylistSortTypeKey,
         PlaylistSortType.NAME
@@ -259,10 +256,14 @@ fun AddToPlaylistDialogOnline(
                                             .onSuccess { result ->
                                                 val items = result.items.distinctBy { it.id }
                                                 if (items.isNotEmpty()) {
-                                                    viewStateMap[YouTube.SearchFilter.FILTER_SONG.value] =
-                                                        ItemsPage(items, result.continuation)
-                                                    val itemsPage = viewStateMap.entries.firstOrNull()?.value
-                                                    val firstSong = itemsPage?.items?.firstOrNull() as? SongItem
+                                                    // Was round-tripped through the shared viewStateMap,
+                                                    // which every concurrently-launched per-song coroutine
+                                                    // here writes and clears — a race that let one song's
+                                                    // result clobber another's before it could be read back,
+                                                    // so all but whichever coroutine won the race silently
+                                                    // skipped insertion. Read straight off this coroutine's
+                                                    // own local result instead.
+                                                    val firstSong = items.firstOrNull() as? SongItem
                                                     if (firstSong != null) {
                                                         val firstSongMedia = firstSong.toMediaMetadata()
                                                         val ids = listOf(firstSong.id)
@@ -277,7 +278,6 @@ fun AddToPlaylistDialogOnline(
                                                             syncUtils.uploadPlaylistToYouTube(playlist.id, ids)
                                                         }
                                                     }
-                                                    viewStateMap.clear()
                                                 }
                                                 songsIdx += 1
                                             }
@@ -327,10 +327,9 @@ fun AddToPlaylistDialogOnline(
                                             .onSuccess { result ->
                                                 val items = result.items.distinctBy { it.id }
                                                 if (items.isNotEmpty()) {
-                                                    viewStateMap[YouTube.SearchFilter.FILTER_SONG.value] =
-                                                        ItemsPage(items, result.continuation)
-                                                    val itemsPage = viewStateMap.entries.firstOrNull()?.value
-                                                    val firstSong = itemsPage?.items?.firstOrNull() as? SongItem
+                                                    // Same shared-map race as the add-to-playlist branch
+                                                    // above — read this coroutine's own result directly.
+                                                    val firstSong = items.firstOrNull() as? SongItem
                                                     if (firstSong != null) {
                                                         val firstSongMedia = firstSong.toMediaMetadata()
                                                         val firstSongEnt = firstSong.toMediaMetadata().toSongEntity()
@@ -346,7 +345,6 @@ fun AddToPlaylistDialogOnline(
                                                             }
                                                         }
                                                     }
-                                                    viewStateMap.clear()
                                                 }
                                                 songsIdx += 1
                                             }
