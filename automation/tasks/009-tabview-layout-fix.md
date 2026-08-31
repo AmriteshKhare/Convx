@@ -32,3 +32,8 @@ Tab-view work in progress per `tabview-progress-2026-08-10`: side-bar drag
 puck + Album/Playlist/Home heroes done; Library/Search wide grids were still
 open. Re-derive current state fresh — don't trust that memory as still
 accurate, it's a point-in-time snapshot.
+
+Reference look for the tablet/wide-layout artist page:
+`ui glicthes/newui _animataion_that/tab ui playlist looks .jpg` (Taylor
+Swift artist page, wide layout, glassy dark bottom toolbar) — match this
+structure where the current wide-layout artist page diverges from it.

@@ -38,6 +38,17 @@ fixed, non-user-adjustable default style.
   mini player, and visibly does NOT change a top bar or bottom sheet's
   glass style.
 
+## Additional confirmed detail from a user-annotated screenshot
+
+The Glass Effect settings screen's "Side Panel Effect (overrides above)"
+section (tablet side-panel glass tuning, duplicating every main glass
+setting: Vibrancy, Blur Radius, Lens Refraction, Surface Tint, etc.) should
+be combined into the single main glass settings block — keep independent
+controls only for what's genuinely orientation-specific (e.g. portrait vs.
+landscape/tablet layout differences), not a full duplicate settings tree.
+(`ui glicthes/Screenshot_20260831-1143132.jpg`, "Combine all settings into
+one liquid glass; independent settings to extra portrait or landscape.")
+
 ## Context
 
 `app/src/main/kotlin/com/convx/music/ui/component/GlassEffect.kt`

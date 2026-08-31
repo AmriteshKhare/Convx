@@ -1,6 +1,6 @@
 ---
 id: 002-ui-glitches-generator
-status: pending
+status: done
 iteration: 0
 iteration_cap: unlimited   # objective: file is either manifested+task-generated or not
 worker_model: sonnet

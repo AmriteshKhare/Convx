@@ -48,3 +48,35 @@ visual theme — reuse what exists.
 depends on 001 (needs the settings audit's judgment on what's
 "advanced-prone") and 012 (needs the glass-scope narrowing done first so
 this task's glass default section has something real to point at).
+
+Additional concrete moves the user annotated directly on screenshots
+(treat these as confirmed acceptance items, not suggestions):
+- Content settings screen: "Show Album Canvas" and the "App language" row
+  don't belong there — move Album Canvas to wherever album-display options
+  live (Appearance), and App language to General/System settings.
+  (`ui glicthes/Screenshot_20260831-1141352.jpg`)
+- Player Advanced settings: remove "Hide Volume Bar", "Compact player in
+  tab view", and "Stop music on task clear" entirely (user marked these
+  with a hard X, not a move) — confirm with the settings-audit task (001)
+  whether these are genuinely low-value before deleting; if 001 finds real
+  use, downgrade to "move to an even-more-advanced/hidden spot" instead of
+  deleting. Move "Albums by release year" to Appearance settings. Move
+  "Prevent duplicate tracks in queue" to sit under the Queue section
+  header explicitly (currently ambiguous placement).
+  (`ui glicthes/Screenshot_20260831-1145163.jpg`)
+- Content Advanced settings: the 7 individual lyrics-provider enable
+  toggles (LrcLib, KuGou, Better Lyrics, SimpMusic, YouLyPlus, PaxSenix,
+  Musixmatch) should combine into one control — the existing "Lyrics
+  provider priority" drag-order list should be the single source of truth
+  for which providers are active, not a separate on/off toggle per one.
+  (`ui glicthes/Screenshot_20260831-1146502.jpg`)
+- DIY/Theme customization screen: user flagged the whole "Theme Mode /
+  Background & Text Color" section as too complex — simplify or split into
+  a basic vs. advanced sub-section within that screen.
+  (`ui glicthes/Screenshot_20260831-1142332.jpg`)
+- Settings root screen and its search bar: user explicitly said "this
+  should be left alone" — do not touch this screen's layout.
+  (`ui glicthes/Screenshot_20260831-1147592.jpg`)
+- Settings "Appearance" row: user wants a blur/glass treatment added
+  there (`ui glicthes/Screenshot_20260831-123909.png`, "Blur pls" note) —
+  minor visual addition, not a restructuring.
