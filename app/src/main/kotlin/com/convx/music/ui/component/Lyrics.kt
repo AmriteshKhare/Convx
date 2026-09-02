@@ -159,6 +159,8 @@ import com.convx.music.constants.DeeplFormalityKey
 import com.convx.music.constants.PlayerBackgroundStyleKey
 import com.convx.music.db.entities.LyricsEntity.Companion.LYRICS_NOT_FOUND
 import com.convx.music.lyrics.LyricsEntry
+import com.convx.music.lyrics.isSingerSectionStart
+import com.convx.music.lyrics.primaryAgentId
 import com.convx.music.lyrics.LyricsUtils.findCurrentLineIndex
 import com.convx.music.lyrics.LyricsUtils.isBelarusian
 import com.convx.music.lyrics.LyricsUtils.isBulgarian
@@ -945,6 +947,10 @@ fun Lyrics(
                 val lyricsOffset = currentSong?.song?.lyricsOffset?.toLong() ?: 0L
                 val effectivePlaybackPosition = currentPlaybackPosition + lyricsOffset
 
+                val singerNames = remember(lines, mediaMetadata?.artists) {
+                    resolveSingerNames(lines, mediaMetadata?.artists?.map { it.name } ?: emptyList())
+                }
+
                 itemsIndexed(
                     items = lines,
                     key = { index, item -> "$index-${item.time}" } // Add stable key
@@ -1228,29 +1234,8 @@ fun Lyrics(
                     )
 
                     // Determine alignment based on agent for multi-singer support
-                    val agentAlignment = when {
-                        item.isBackground -> Alignment.CenterHorizontally // Background always centered
-                        item.agent == "v1" -> Alignment.Start // First vocalist - left
-                        item.agent == "v2" -> Alignment.End // Second vocalist - right
-                        item.agent == "v1000" -> Alignment.CenterHorizontally // Group/chorus - center
-                        else -> when (lyricsTextPosition) {
-                            LyricsPosition.LEFT -> Alignment.Start
-                            LyricsPosition.CENTER -> Alignment.CenterHorizontally
-                            LyricsPosition.RIGHT -> Alignment.End
-                        }
-                    }
-                    
-                    val agentTextAlign = when {
-                        item.isBackground -> TextAlign.Center
-                        item.agent == "v1" -> TextAlign.Left
-                        item.agent == "v2" -> TextAlign.Right
-                        item.agent == "v1000" -> TextAlign.Center
-                        else -> when (lyricsTextPosition) {
-                            LyricsPosition.LEFT -> TextAlign.Left
-                            LyricsPosition.CENTER -> TextAlign.Center
-                            LyricsPosition.RIGHT -> TextAlign.Right
-                        }
-                    }
+                    val agentAlignment = singerLineAlignment(item.agent, item.isBackground, lyricsTextPosition)
+                    val agentTextAlign = singerTextAlign(item.agent, item.isBackground, lyricsTextPosition)
                     
                     // Smaller scale for background vocals
                     val bgScale = if (item.isBackground) 0.85f else 1f
@@ -1273,7 +1258,14 @@ fun Lyrics(
                             expressiveAccent.copy(alpha = if (item.isBackground) 0.5f else 0.7f)
                         }
                         val alignment = agentTextAlign
-                        
+
+                        val singerAgentId = item.agent?.let { primaryAgentId(it) }
+                        AnimatedSingerBadge(
+                            visible = isActiveLine && isSingerSectionStart(lines, index),
+                            name = singerAgentId?.let { singerNames[it] },
+                            color = expressiveAccent,
+                        )
+
                         val romanizedTextState by item.romanizedTextFlow.collectAsState()
                         val romanizedText = romanizedTextState
                         val isRomanizedAvailable = romanizedText != null
@@ -1851,11 +1843,7 @@ fun Lyrics(
                                     text = text,
                                     fontSize = 18.sp,
                                     color = expressiveAccent.copy(alpha = 0.6f),
-                                    textAlign = when (lyricsTextPosition) {
-                                        LyricsPosition.LEFT -> TextAlign.Left
-                                        LyricsPosition.CENTER -> TextAlign.Center
-                                        LyricsPosition.RIGHT -> TextAlign.Right
-                                    },
+                                    textAlign = agentTextAlign,
                                     fontWeight = FontWeight.Normal,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
@@ -1872,11 +1860,7 @@ fun Lyrics(
                                     text = translated,
                                     fontSize = (lyricsTextSize * 0.7f).sp,
                                     color = expressiveAccent.copy(alpha = 0.8f),
-                                    textAlign = when (lyricsTextPosition) {
-                                        LyricsPosition.LEFT -> TextAlign.Left
-                                        LyricsPosition.CENTER -> TextAlign.Center
-                                        LyricsPosition.RIGHT -> TextAlign.Right
-                                    },
+                                    textAlign = agentTextAlign,
                                     fontWeight = FontWeight.Medium,
                                     modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
                                     lineHeight = (lyricsTextSize * 0.7f * lyricsLineSpacing.coerceAtMost(1.3f)).sp
