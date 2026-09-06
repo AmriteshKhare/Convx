@@ -146,6 +146,7 @@ import androidx.navigation.compose.rememberNavController
 import coil3.compose.AsyncImage
 import coil3.request.allowHardware
 import coil3.request.crossfade
+import com.convx.music.R
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
@@ -253,7 +254,6 @@ import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalAppBackdropFrozen
 import com.convx.music.ui.component.GlassStyle
 import com.convx.music.ui.component.glassContentColorFor
-import com.convx.music.ui.component.LocalAppleMusicUi
 import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.AppFloatingNowPlayingPill
 import com.convx.music.ui.component.FloatingMiniPlayerWidthFraction
@@ -267,7 +267,6 @@ import com.convx.music.ui.component.SideBarCollapsedWidth
 import com.convx.music.ui.component.SideBarLink
 import com.convx.music.ui.component.SideBarSection
 import com.convx.music.ui.component.TabletWidthThreshold
-import com.convx.music.ui.component.AppNavigationRail
 import com.convx.music.ui.component.BottomSheetMenu
 import com.convx.music.ui.component.OverlayMenu
 import com.convx.music.ui.component.BottomSheetPage
@@ -649,7 +648,7 @@ class MainActivity : ComponentActivity() {
                 if (!blocked) return@collect
                 Toast.makeText(
                     this@MainActivity,
-                    getString(R.string.listen_together_host_controls),
+                    this@MainActivity.getString(R.string.listen_together_host_controls),
                     Toast.LENGTH_SHORT,
                 ).show()
                 connection.playbackBlockedByRoom.value = false
@@ -704,6 +703,7 @@ class MainActivity : ComponentActivity() {
                     // otherwise read as a pop (0 < -1 is false, so it's actually safe
                     // either way, but the explicit sentinel makes that not an accident).
                     var previousBackStackSize = -1
+                    @SuppressLint("RestrictedApi")
                     val listener = NavController.OnDestinationChangedListener { controller, _, args ->
                         val currentSize = controller.currentBackStack.value.size
                         val isPop = previousBackStackSize != -1 && currentSize < previousBackStackSize
@@ -1284,11 +1284,11 @@ class MainActivity : ComponentActivity() {
 
                 val currentTitleRes = remember(effectiveRoute) {
                     when (effectiveRoute) {
-                        Screens.Home.route -> R.string.music
-                        Screens.Search.route -> R.string.search
-                        Screens.Library.route -> R.string.filter_library
-                        Screens.ListenTogether.route -> R.string.together
-                        Screens.Explore.route -> R.string.tab_explore
+                        Screens.Home.route -> com.convx.music.R.string.music
+                        Screens.Search.route -> com.convx.music.R.string.search
+                        Screens.Library.route -> com.convx.music.R.string.filter_library
+                        Screens.ListenTogether.route -> com.convx.music.R.string.together
+                        Screens.Explore.route -> com.convx.music.R.string.tab_explore
                         else -> null
                     }
                 }
@@ -1465,7 +1465,6 @@ class MainActivity : ComponentActivity() {
                     // Same backdrop, for the ios/ component library's glass surfaces.
                     LocalIosBackdrop provides appBackdrop,
                     LocalAppBackdropFrozen provides backdropFrozenProvider,
-                    LocalAppleMusicUi provides appleMusicUi,
                     LocalRingtoneViewModel provides ringtoneViewModel,
                     // Read once here instead of inside every list row and grid tile —
                     // see ItemPrefs for what that was costing on scroll.
@@ -1480,14 +1479,87 @@ class MainActivity : ComponentActivity() {
                 ) {
 
                     // The screen a sheet is covering shrinks back behind it, the way
-                    // iOS presents one card over another. Driven from the same MenuState
-                    // the sheets read, so no call site has to know about it.
-                    val sheetPresentation = rememberSheetPresentation(
+                    // iOS presents one card over another.
+                    val menuPresentation = rememberSheetPresentation(
                         LocalMenuState.current.isVisible,
                         LocalBottomSheetPageState.current.isVisible,
                     )
 
+                    // The Scaffold shrinks for BOTH the player expansion and any menu.
+                    // The player layer ONLY shrinks for a menu (it is the card in front).
+                    val scaffoldPresentation = {
+                        val playerProgress = playerBottomSheetState.progress
+                        maxOf(menuPresentation, playerProgress)
+                    }
+                    val playerLayerPresentation = { menuPresentation }
+
                     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+                    // Moved up from Scaffold.bottomBar to be shared with the new bottom layer
+                    val onNavItemClick: (Screens, Boolean) -> Unit = remember(navController, coroutineScope, topAppBarScrollBehavior, playerBottomSheetState, enterSearch) {
+                        var lastNavRoute: String? = null
+                        var lastNavTimeMs = 0L
+                        { screen: Screens, isSelected: Boolean ->
+                            if (playerBottomSheetState.isExpanded) {
+                                playerBottomSheetState.collapseSoft()
+                            }
+
+                            // Search is an overlay, not a NavHost destination -- the
+                            // fallback below would navigate("search_input"), a route that
+                            // doesn't exist in the graph. The tablet side bar still lists
+                            // Search as an item, so this cannot live only on the phone
+                            // bar's search circle.
+                            if (screen == Screens.Search) {
+                                enterSearch()
+                            } else if (isSelected) {
+                                navController.currentBackStackEntry?.savedStateHandle?.set("scrollToTop", true)
+                                coroutineScope.launch {
+                                    topAppBarScrollBehavior.state.resetHeightOffset()
+                                }
+                            } else {
+                                val now = SystemClock.elapsedRealtime()
+                                // The debounce below only suppresses a genuine duplicate
+                                // fire for a tab we are still sitting on. Once the user
+                                // has moved anywhere else (tapped a song, opened an
+                                // artist), the remembered route is stale — leaving it set
+                                // meant a tab tap within the debounce window was silently
+                                // swallowed and you stayed on the previous screen, which
+                                // is why Home sometimes did nothing.
+                                // effectiveRoute (not the raw destination route): it also
+                                // reflects the search overlay, which the raw route can't.
+                                if (effectiveRoute != lastNavRoute) {
+                                    lastNavRoute = null
+                                }
+                                // Guards against a double-fire from the floating tab bar's
+                                // predictive (press/drag-threshold) nav landing on top of the
+                                // puck's own release-fire for the same target.
+                                if (screen.route != lastNavRoute || now - lastNavTimeMs >= NavDebounceMs) {
+                                    lastNavRoute = screen.route
+                                    lastNavTimeMs = now
+                                    // Plain navigate() with the standard multi-back-stack
+                                    // pattern, same as every other route.
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.startDestinationId) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    val onSearchLongClick: () -> Unit = remember(navController) {
+                        {
+                            navController.navigate("recognition") {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+
+                    // Pre-calculate values for graphicsLayer to avoid reading state during composition
+                    val navBarTotalHeight = bottomInset + NavigationBarHeight
 
                     // Source for the top bar's TopFadeBlur on the top-level tabs (Home/
                     // Library/Search etc.) — tagged onto the NavHost's own content Box
@@ -1496,326 +1568,145 @@ class MainActivity : ComponentActivity() {
                     // by HeroMergeBand/HeroTopBlur.
                     val topBarHazeState = remember { HazeState() }
 
-                    Scaffold(
-                        snackbarHost = { SnackbarHost(snackbarHostState) },
-                        topBar = {
-                            AnimatedVisibility(
-                                visible = shouldShowTopBar,
-                                enter = fadeIn(animationSpec = tween(durationMillis = 300)),
-                                exit = fadeOut(animationSpec = tween(durationMillis = 200))
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .windowInsetsPadding(
-                                            cutoutInsets.only(WindowInsetsSides.Start + WindowInsetsSides.End)
-                                        )
-                                        // The side bar now spans most of the screen height,
-                                        // not the small centered capsule this used to be — it
-                                        // reaches the top bar's row, so the bar needs the same
-                                        // start inset every screen's own content already gets.
-                                        .padding(start = if (showRail) sideBarContentInset else 0.dp),
+                    Box(Modifier.fillMaxSize()) {
+                        Scaffold(
+                            snackbarHost = { SnackbarHost(snackbarHostState) },
+                            topBar = {
+                                AnimatedVisibility(
+                                    visible = shouldShowTopBar,
+                                    enter = fadeIn(animationSpec = tween(durationMillis = 300)),
+                                    exit = fadeOut(animationSpec = tween(durationMillis = 200))
                                 ) {
-                                    // Persistent, not scroll-linked — the blur (and the bar
-                                    // above it) used to fade out with topBarChrome's
-                                    // hide-on-scroll, which read as the whole bar vanishing
-                                    // rather than staying put. shouldShowTopBar (per-route)
-                                    // is still what actually hides this on Settings etc.
-                                    TopFadeBlur(
-                                        hazeState = topBarHazeState,
-                                        // Honours the picked theme colour when dynamic
-                                        // colour is off — same expression the old scrim used.
-                                        pageColor = rememberAppBackgroundTint(
-                                            AppTheme.colorScheme.background
-                                        ),
-                                    )
-                                    val isHome = effectiveRoute == Screens.Home.route
-                                    FrostedTopBar(
-                                        leading = {
-                                            if (isHome) {
-                                                // Home's own big logo (first item of its list)
-                                                // fades OUT with the same progress this fades
-                                                // IN with — see LocalHomeTopBarLogoProgress.
-                                                val logoProgress = LocalHomeTopBarLogoProgress.current.floatValue
-                                                Text(
-                                                    text = BrandName,
-                                                    style = AppTheme.typography.titleLarge.copy(
-                                                        fontFamily = rememberBrandFontFamily(),
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        fontSize = 26.sp,
-                                                        letterSpacing = 1.5.sp,
-                                                    ),
-                                                    color = LocalAccentTextColor.current,
-                                                    modifier = Modifier.graphicsLayer { alpha = logoProgress },
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = currentTitleRes?.let { stringResource(it) } ?: "",
-                                                    style = AppTheme.typography.titleLarge.copy(
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 24.sp,
-                                                    ),
-                                                    color = LocalAccentTextColor.current,
-                                                )
-                                            }
-                                        },
-                                        actions = {
-                                            // History/Stats/Together moved to Settings (see
-                                            // SettingsScreen.kt's ACTIVITY section + the
-                                            // existing ACCOUNT entry) â€” the top bar now
-                                            // shows only the wordmark and this settings/
-                                            // profile pill, per the simplified-chrome pass.
-                                             IconButton(onClick = {
-                                                  if (enableSettingsPopup) {
-                                                      showSettingDialoge = true
-                                                  } else {
-                                                      navController.navigate(Screens.Settings.route) {
-                                                          popUpTo(navController.graph.startDestinationId) {
-                                                              saveState = true
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .windowInsetsPadding(
+                                                cutoutInsets.only(WindowInsetsSides.Start + WindowInsetsSides.End)
+                                            )
+                                            // The side bar now spans most of the screen height,
+                                            // not the small centered capsule this used to be — it
+                                            // reaches the top bar's row, so the bar needs the same
+                                            // start inset every screen's own content already gets.
+                                            .padding(start = if (showRail) sideBarContentInset else 0.dp),
+                                    ) {
+                                        // Persistent, not scroll-linked — the blur (and the bar
+                                        // above it) used to fade out with topBarChrome's
+                                        // hide-on-scroll, which read as the whole bar vanishing
+                                        // rather than staying put. shouldShowTopBar (per-route)
+                                        // is still what actually hides this on Settings etc.
+                                        TopFadeBlur(
+                                            hazeState = topBarHazeState,
+                                            // Honours the picked theme colour when dynamic
+                                            // colour is off — same expression the old scrim used.
+                                            pageColor = rememberAppBackgroundTint(
+                                                AppTheme.colorScheme.background
+                                            ),
+                                        )
+                                        val isHome = effectiveRoute == Screens.Home.route
+                                        FrostedTopBar(
+                                            leading = {
+                                                if (isHome) {
+                                                    // Home's own big logo (first item of its list)
+                                                    // fades OUT with the same progress this fades
+                                                    // IN with — see LocalHomeTopBarLogoProgress.
+                                                    val logoProgress = LocalHomeTopBarLogoProgress.current.floatValue
+                                                    Text(
+                                                        text = BrandName,
+                                                        style = AppTheme.typography.titleLarge.copy(
+                                                            fontFamily = rememberBrandFontFamily(),
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            fontSize = 26.sp,
+                                                            letterSpacing = 1.5.sp,
+                                                        ),
+                                                        color = LocalAccentTextColor.current,
+                                                        modifier = Modifier.graphicsLayer { alpha = logoProgress },
+                                                    )
+                                                } else {
+                                                    Text(
+                                                        text = currentTitleRes?.let { stringResource(it) } ?: "",
+                                                        style = AppTheme.typography.titleLarge.copy(
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 24.sp,
+                                                        ),
+                                                        color = LocalAccentTextColor.current,
+                                                    )
+                                                }
+                                            },
+                                            actions = {
+                                                // History/Stats/Together moved to Settings (see
+                                                // SettingsScreen.kt's ACTIVITY section + the
+                                                // existing ACCOUNT entry) — the top bar now
+                                                // shows only the wordmark and this settings/
+                                                // profile pill, per the simplified-chrome pass.
+                                                // GlassCircleButton (not a plain IconButton) so
+                                                // this gets the same liquid-glass rim + elastic
+                                                // press stretch as every other floating chrome
+                                                // button (back/share on detail screens).
+                                                GlassCircleButton(onClick = {
+                                                      if (enableSettingsPopup) {
+                                                          showSettingDialoge = true
+                                                      } else {
+                                                          navController.navigate(Screens.Settings.route) {
+                                                              popUpTo(navController.graph.startDestinationId) {
+                                                                  saveState = true
+                                                              }
+                                                              launchSingleTop = true
+                                                              restoreState = true
                                                           }
-                                                          launchSingleTop = true
-                                                          restoreState = true
                                                       }
-                                                  }
-                                              }) {
-                                                BadgedBox(badge = {}) {
-                                                    if (accountImageUrl != null) {
-                                                        AsyncImage(
-                                                            model = accountImageUrl,
-                                                            contentDescription = stringResource(R.string.account),
-                                                            modifier = Modifier
-                                                                .size(34.dp)
-                                                                .clip(CircleShape)
-                                                        )
-                                                    } else {
-                                                        val composition by rememberLottieComposition(
-                                                            LottieCompositionSpec.RawRes(R.raw.setting)
-                                                        )
-                                                        val progress by animateLottieCompositionAsState(
-                                                            composition = composition,
-                                                            isPlaying = true,
-                                                            iterations = 1,
-                                                            speed = 1.5f
-                                                        )
+                                                  }) {
+                                                    BadgedBox(badge = {}) {
+                                                        if (accountImageUrl != null) {
+                                                            AsyncImage(
+                                                                model = accountImageUrl,
+                                                                contentDescription = stringResource(com.convx.music.R.string.account),
+                                                                modifier = Modifier
+                                                                    .size(34.dp)
+                                                                    .clip(CircleShape)
+                                                            )
+                                                        } else {
+                                                            val composition by rememberLottieComposition(
+                                                                LottieCompositionSpec.RawRes(com.convx.music.R.raw.setting)
+                                                            )
+                                                            val progress by animateLottieCompositionAsState(
+                                                                composition = composition,
+                                                                isPlaying = true,
+                                                                iterations = 1,
+                                                                speed = 1.5f
+                                                            )
 
-                                                        LottieAnimation(
-                                                            composition = composition,
-                                                            progress = { progress },
-                                                            modifier = Modifier.size(50.dp),
-                                                            contentScale = ContentScale.Fit
-                                                        )
+                                                            LottieAnimation(
+                                                                composition = composition,
+                                                                progress = { progress },
+                                                                modifier = Modifier.size(34.dp),
+                                                                contentScale = ContentScale.Fit
+                                                            )
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        },
-                                    )
+                                            },
+                                        )
+                                    }
                                 }
-                            }
-                        },
+                            },
                         bottomBar = {
-                            val onNavItemClick: (Screens, Boolean) -> Unit = remember(navController, coroutineScope, topAppBarScrollBehavior, playerBottomSheetState, enterSearch) {
-                                var lastNavRoute: String? = null
-                                var lastNavTimeMs = 0L
-                                { screen: Screens, isSelected: Boolean ->
-                                    if (playerBottomSheetState.isExpanded) {
-                                        playerBottomSheetState.collapseSoft()
-                                    }
-
-                                    // Search is an overlay, not a NavHost destination -- the
-                                    // fallback below would navigate("search_input"), a route that
-                                    // doesn't exist in the graph. The tablet side bar still lists
-                                    // Search as an item, so this cannot live only on the phone
-                                    // bar's search circle.
-                                    if (screen == Screens.Search) {
-                                        enterSearch()
-                                    } else if (isSelected) {
-                                        navController.currentBackStackEntry?.savedStateHandle?.set("scrollToTop", true)
-                                        coroutineScope.launch {
-                                            topAppBarScrollBehavior.state.resetHeightOffset()
-                                        }
-                                    } else {
-                                        val now = SystemClock.elapsedRealtime()
-                                        // The debounce below only suppresses a genuine duplicate
-                                        // fire for a tab we are still sitting on. Once the user
-                                        // has moved anywhere else (tapped a song, opened an
-                                        // artist), the remembered route is stale â€” leaving it set
-                                        // meant a tab tap within the debounce window was silently
-                                        // swallowed and you stayed on the previous screen, which
-                                        // is why Home sometimes did nothing.
-                                        // effectiveRoute (not the raw destination route): it also
-                                        // reflects the search overlay, which the raw route can't.
-                                        if (effectiveRoute != lastNavRoute) {
-                                            lastNavRoute = null
-                                        }
-                                        // Guards against a double-fire from the floating tab bar's
-                                        // predictive (press/drag-threshold) nav landing on top of the
-                                        // puck's own release-fire for the same target.
-                                        if (screen.route != lastNavRoute || now - lastNavTimeMs >= NavDebounceMs) {
-                                            lastNavRoute = screen.route
-                                            lastNavTimeMs = now
-                                            // Plain navigate() with the standard multi-back-stack
-                                            // pattern, same as every other route.
-                                            navController.navigate(screen.route) {
-                                                popUpTo(navController.graph.startDestinationId) {
-                                                    saveState = true
-                                                }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            val onSearchLongClick: () -> Unit = remember(navController) {
-                                {
-                                    navController.navigate("recognition") {
-                                        launchSingleTop = true
-                                    }
-                                }
-                            }
-
-                            // Pre-calculate values for graphicsLayer to avoid reading state during composition
-                            val navBarTotalHeight = bottomInset + NavigationBarHeight
-
-                            if (!showRail && !showSettingDialoge && currentRoute?.startsWith("settings/") != true && currentRoute !in setOf("wrapped", "update", "listen_together/chat", "login", "equalizer", "ambient_mode")) {
-                                Box {
-                                    // Apple Music-style progressive scrim: content fades out under
-                                    // the floating glass bar instead of hard-clipping, so the bar
-                                    // stays legible over bright artwork.  The horizontal gradient
-                                    // on the left/right edges mimics Apple Music's edge blur.
-                                    if (appleMusicUi && isGlassAllowed()) {
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.BottomCenter)
-                                                .fillMaxWidth()
-                                                .height(navBarTotalHeight + 56.dp)
-                                                .background(
-                                                    Brush.verticalGradient(
-                                                        0f to Color.Transparent,
-                                                        0.35f to baseBg.copy(alpha = 0.15f),
-                                                        0.6f to baseBg.copy(alpha = 0.4f),
-                                                        0.85f to baseBg.copy(alpha = 0.7f),
-                                                        1f to baseBg,
-                                                    )
-                                                )
-                                        )
-                                    }
-
-                                    Box(
-                                        // Above the bars for as long as the player is anything
-                                        // other than fully collapsed, so the growing container
-                                        // covers them instead of the bars having to get out of
-                                        // its way. Melox's own full player does exactly this.
-                                        // Derived, so it flips twice a gesture rather than
-                                        // recomposing per frame.
-                                        modifier = Modifier.zIndex(if (playerAboveBars) 1f else 0f),
-                                    ) {
-                                        BottomSheetPlayer(
-                                            state = playerBottomSheetState,
-                                            navController = navController,
-                                            pureBlack = pureBlack
-                                        )
-                                    }
-
-                                    // Use graphicsLayer instead of offset to avoid recomposition
-                                    // graphicsLayer runs during draw phase, not composition phase
-                                    val navBarGraphicsLayer: Modifier = Modifier.graphicsLayer {
-                                        val navBarHeightPx = navigationBarHeight.toPx()
-                                        val totalHeightPx = navBarTotalHeight.toPx()
-
-                                        translationY = if (navBarHeightPx == 0f) {
-                                            totalHeightPx
-                                        } else {
-                                            // Read progress only during draw phase
-                                            val progress = playerBottomSheetState.progress.coerceIn(0f, 1f)
-                                            val slideOffset = totalHeightPx * progress
-                                            val hideOffset = totalHeightPx * (1 - navBarHeightPx / NavigationBarHeight.toPx())
-                                            slideOffset + hideOffset
-                                        }
-
-                                    }
-
-                                    AppFloatingNavBar(
-                                        navigationItems = floatingNavigationItems,
-                                        currentRoute = effectiveRoute,
-                                        onItemClick = onNavItemClick,
-                                        scrollConnection = floatingNavBarScrollConnection,
-                                        pureBlack = pureBlack,
-                                        showPlayerAccessory = hasDockedPlayerAccessory,
-                                        onAccessoryClick = { playerBottomSheetState.expandSoft() },
-                                        onAccessoryLyricsClick = {
-                                            playerBottomSheetState.expandSoft()
-                                            playerConnection?.requestShowLyrics?.value = true
-                                        },
-                                        onAccessoryQueueClick = {
-                                            playerBottomSheetState.expandSoft()
-                                            playerConnection?.requestShowQueue?.value = true
-                                        },
-                                        // tabPosition omitted (defaults to null): there is no
-                                        // pager to follow now that the tabs are real NavHost
-                                        // destinations again, so the puck goes back to its
-                                        // normal selectedTabKey-driven spring. The parameter and
-                                        // its plumbing through FloatingTabBar/FloatingNavBar are
-                                        // left in place, unused, rather than torn out.
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            // Keep the bar compact/portrait-width in landscape
-                                            // instead of stretching across the wide screen.
-                                            .widthIn(max = 500.dp)
-                                            .padding(horizontal = 12.dp)
-                                            .padding(bottom = bottomInset + 8.dp)
-                                            .graphicsLayer {
-                                                // The floating bar (especially with the docked
-                                                // player accessory) is taller than the classic
-                                                // nav bar, so hide it by its own measured height
-                                                // instead of the fixed nav bar height.
-                                                val hiddenOffset =
-                                                    size.height + (bottomInset + 8.dp).toPx()
-                                                val navBarHeightPx = navigationBarHeight.toPx()
-                                                // Held still for the whole gesture -- see the
-                                                // classic bar above. The pill docks in here, so
-                                                // a bar that slides drags the morph's source
-                                                // rect along with it.
-                                                translationY = if (navBarHeightPx == 0f) {
-                                                    hiddenOffset
-                                                } else {
-                                                    hiddenOffset * (1 - navBarHeightPx / NavigationBarHeight.toPx())
-                                                }
-
-                                            }
-                                    )
-
-
-                                }
-                            } else {
-                                if (currentRoute != "wrapped" && currentRoute != "update" && currentRoute != "listen_together/chat" && currentRoute != "ambient_mode") {
-                                    BottomSheetPlayer(
-                                        state = playerBottomSheetState,
-                                        navController = navController,
-                                        pureBlack = pureBlack
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .align(Alignment.BottomCenter)
-                                        .height(bottomInsetDp)
-                                        // Use graphicsLayer for background color changes
-                                        .graphicsLayer {
-                                            val progress = playerBottomSheetState.progress
-                                            alpha = if (progress > 0f || (useNewMiniPlayerDesign && !shouldShowNavigationBar)) 0f else 1f
-                                        }
-                                        .background(baseBg)
-                                )
-                            }
+                            // The player and navigation elements moved to the root Box to escape
+                            // the Scaffold's shrink modifier, preventing the "double shrink"
+                            // where the player would shrink back even when it was the one
+                            // expanding.
                         },
                         modifier = Modifier
                             .fillMaxSize()
                             .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
-                            .iosSheetPresentation(sheetPresentation, statusBarTop)
+                            .iosSheetPresentation(scaffoldPresentation, statusBarTop)
                     ) {
+                        // No paddingValues consumed here on purpose: the top bar
+                        // floats over content (TopFadeBlur/FrostedTopBar are an
+                        // overlay, not a space-reserving bar), and every screen
+                        // already carries its own top clearance via
+                        // LocalPlayerAwareWindowInsets. Applying Scaffold's
+                        // paddingValues here on top of that pushed every screen's
+                        // content down by the bar's height a second time.
                         Box(Modifier.fillMaxSize()) {
                             val onRailItemClick: (Screens, Boolean) -> Unit = remember(navController, coroutineScope, topAppBarScrollBehavior, playerBottomSheetState, enterSearch) {
                                 var lastNavRoute: String? = null
@@ -1889,8 +1780,21 @@ class MainActivity : ComponentActivity() {
                                         // black instead of just settling back to the current screen.
                                         .background(AppTheme.colorScheme.background)
                                         // What the top-level tabs' TopFadeBlur samples — see
-                                        // topBarHazeState above.
-                                        .hazeSource(topBarHazeState)
+                                        // topBarHazeState above. Skipped on settings routes:
+                                        // they're never a shouldShowTopBar destination (this
+                                        // source has no consumer there) and each settings page
+                                        // now runs its own hazeSource via GlassScreenChrome —
+                                        // nesting that inside this outer one made the inner
+                                        // source draw nothing (Haze's zIndex filter excludes
+                                        // it), which silently killed the per-screen progressive
+                                        // blur on every settings page.
+                                        .then(
+                                            if (currentRoute == "settings" || currentRoute?.startsWith("settings/") == true) {
+                                                Modifier
+                                            } else {
+                                                Modifier.hazeSource(topBarHazeState)
+                                            },
+                                        )
                                         // Skipped on WebView routes: layerBackdrop records
                                         // this whole subtree into a GraphicsLayer so glass
                                         // can sample it, which means the subtree is drawn
@@ -2249,7 +2153,104 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // One preference decides the presentation for every long-press menu
+                    // Player and Navigation Layer
+                    // This layer floats over the Scaffold and ONLY shrinks when a menu sheet
+                    // is open, escaping the Scaffold's own shrink-when-player-expands.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .iosSheetPresentation(playerLayerPresentation, statusBarTop)
+                    ) {
+                        if (!showRail && !showSettingDialoge && currentRoute?.startsWith("settings/") != true && currentRoute !in setOf("wrapped", "update", "listen_together/chat", "login", "equalizer", "ambient_mode")) {
+                            Box(Modifier.fillMaxSize()) {
+                                // Apple Music-style progressive scrim
+                                if (appleMusicUi && isGlassAllowed()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .height(navBarTotalHeight + 56.dp)
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    0f to Color.Transparent,
+                                                    0.35f to baseBg.copy(alpha = 0.15f),
+                                                    0.6f to baseBg.copy(alpha = 0.4f),
+                                                    0.85f to baseBg.copy(alpha = 0.7f),
+                                                    1f to baseBg,
+                                                )
+                                            )
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier.zIndex(if (playerAboveBars) 1f else 0f),
+                                ) {
+                                    BottomSheetPlayer(
+                                        state = playerBottomSheetState,
+                                        navController = navController,
+                                        pureBlack = pureBlack
+                                    )
+                                }
+
+                                AppFloatingNavBar(
+                                    navigationItems = floatingNavigationItems,
+                                    currentRoute = effectiveRoute,
+                                    onItemClick = onNavItemClick,
+                                    scrollConnection = floatingNavBarScrollConnection,
+                                    pureBlack = pureBlack,
+                                    showPlayerAccessory = hasDockedPlayerAccessory,
+                                    onAccessoryClick = { playerBottomSheetState.expandSoft() },
+                                    onAccessoryLyricsClick = {
+                                        playerBottomSheetState.expandSoft()
+                                        playerConnection?.requestShowLyrics?.value = true
+                                    },
+                                    onAccessoryQueueClick = {
+                                        playerBottomSheetState.expandSoft()
+                                        playerConnection?.requestShowQueue?.value = true
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .widthIn(max = 500.dp)
+                                        .padding(horizontal = 12.dp)
+                                        .padding(bottom = bottomInset + 8.dp)
+                                        .graphicsLayer {
+                                            val hiddenOffset =
+                                                size.height + (bottomInset + 8.dp).toPx()
+                                            val navBarHeightPx = navigationBarHeight.toPx()
+                                            translationY = if (navBarHeightPx == 0f) {
+                                                hiddenOffset
+                                            } else {
+                                                hiddenOffset * (1 - navBarHeightPx / NavigationBarHeight.toPx())
+                                            }
+
+                                        }
+                                )
+                            }
+                        } else {
+                            if (currentRoute != "wrapped" && currentRoute != "update" && currentRoute != "listen_together/chat" && currentRoute != "ambient_mode") {
+                                BottomSheetPlayer(
+                                    state = playerBottomSheetState,
+                                    navController = navController,
+                                    pureBlack = pureBlack
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.BottomCenter)
+                                    .height(bottomInsetDp)
+                                    .graphicsLayer {
+                                        val progress = playerBottomSheetState.progress
+                                        alpha = if (progress > 0f || (useNewMiniPlayerDesign && !shouldShowNavigationBar)) 0f else 1f
+                                    }
+                                    .background(baseBg)
+                            )
+                        }
+                    }
+                } // Box end
+
+                // One preference decides the presentation for every long-press menu
                     // in the app. Both hosts read the same MenuState, so the ~30 call
                     // sites are untouched either way.
                     val (overlayMenuStyle) = rememberPreference(OverlayMenuStyleKey, defaultValue = false)
