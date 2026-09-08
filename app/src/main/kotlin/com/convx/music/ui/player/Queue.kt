@@ -5,7 +5,6 @@
 
 package com.convx.music.ui.player
 
-import com.convx.music.ui.ios.foundation.IosTheme
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -18,7 +17,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -36,7 +34,6 @@ import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.only
@@ -52,36 +49,35 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonGroupDefaults
-import com.convx.music.ui.ios.compat.Checkbox
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import com.convx.music.ui.ios.compat.FilledIconToggleButton
+import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FilledTonalIconButton
-import com.convx.music.ui.ios.compat.HorizontalDivider
-import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.ios.compat.IconButton
-import com.convx.music.ui.ios.compat.LocalContentColor
-import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.ios.compat.OutlinedButton
-import com.convx.music.ui.ios.compat.PlainTooltip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Slider
-import com.convx.music.ui.ios.compat.ToggleButton
+import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.SnackbarDuration
-import com.convx.music.ui.ios.compat.SnackbarHost
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
-import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.ios.compat.TextButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -101,7 +97,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboard
@@ -142,9 +137,7 @@ import com.convx.music.ui.menu.PlayerMenu
 import com.convx.music.ui.menu.QueueMenu
 import com.convx.music.ui.menu.SelectionMediaMetadataMenu
 import com.convx.music.ui.screens.CommentSheet
-import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.utils.ShowMediaInfo
-import com.convx.music.utils.joinByBullet
 import com.convx.music.utils.listItemShape
 import com.convx.music.utils.makeTimeString
 import com.convx.music.utils.rememberPreference
@@ -174,107 +167,9 @@ import coil3.request.crossfade
 import coil3.size.Size as CoilSize
 import kotlinx.coroutines.coroutineScope
 import kotlin.math.roundToInt
-import androidx.compose.ui.graphics.vector.ImageVector
-import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFBubbleLeftAndBubbleRightFill
-import com.composables.sfsymbols.monochrome.SFGaugeWithNeedleFill
-import com.composables.sfsymbols.monochrome.SFListBullet
-import com.composables.sfsymbols.monochrome.SFQuoteBubble
-import com.composables.sfsymbols.monochrome.SFQuoteBubbleFill
-import com.composables.sfsymbols.monochrome.SFRepeat
-import com.composables.sfsymbols.monochrome.SFRepeat1
-import com.composables.sfsymbols.monochrome.SFShuffle
-import com.composables.sfsymbols.monochrome.SFAirpods
-import com.composables.sfsymbols.monochrome.SFHomepodFill
 
 @SuppressLint("UnrememberedMutableState")
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-/**
- * How wide the queue's rows are allowed to get.
- *
- * The queue is one column of 64dp rows, and a column of 64dp rows does not become more
- * readable by being 1200px wide — it becomes artwork pinned to the left edge with a lake of
- * empty space beside it, and a swipe that has to travel the whole tablet to delete one
- * track. Capped and centred instead.
- *
- * Not two columns: the reorder handle and the swipe-to-remove both address rows by their
- * index in one list, so splitting the list in two would need both of those re-derived
- * against a layout that no longer matches the queue's real order. A single narrow column is
- * what Music does on iPad for the same reason.
- *
- * No tab-view flag: at 560dp the cap simply never binds on a phone, so this is a no-op there
- * rather than a branch.
- */
-private val QueueMaxContentWidth = 560.dp
-
-/**
- * Height of the shuffle/repeat/radio pills.
- *
- * They were 56.dp — within 8dp of a whole queue row, so in V17's short queue pane the three
- * pills carried nearly as much visual weight as the list they sit above and the section read
- * as top-heavy. 48.dp is the Material minimum touch target, so this is the smallest they can
- * get without costing reachability.
- */
-private val QueueActionPillHeight = 48.dp
-
-/**
- * What sits behind a queue row while it is being swiped away.
- *
- * The slot was empty, so a swipe dragged the row across bare background and the gesture had
- * no state until the row was already gone — on a tablet especially, where the row has the
- * whole width to travel. Flamingo fills it with a coloured panel and an icon that grows as
- * the drag commits (0.82 to 1.0), which is the part that makes the swipe feel like it is
- * arming rather than just sliding.
- *
- * The icon follows the edge the row is leaving toward, so it is always the thing the row is
- * uncovering rather than something waiting on the far side.
- */
-@Composable
-private fun QueueSwipeReveal(
-    direction: SwipeToDismissBoxValue,
-    progress: Float,
-) {
-    if (direction == SwipeToDismissBoxValue.Settled) return
-
-    // Both directions remove — the reveal reports what the gesture will do, and changing
-    // that to Flamingo's asymmetric right-adds/left-deletes would change what an existing
-    // user's muscle memory does, which is a decision, not a detail.
-    val alignment = if (direction == SwipeToDismissBoxValue.StartToEnd) {
-        Alignment.CenterStart
-    } else {
-        Alignment.CenterEnd
-    }
-    // Commit is the far end of the travel, so the panel arrives with the gesture rather than
-    // being fully lit from the first pixel of movement.
-    val committed = progress.coerceIn(0f, 1f)
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            // The full destructive red, faded in by the gesture. errorContainer is already a
-            // 15%-alpha tint in this theme, so fading *that* in leaves an almost invisible
-            // panel — the one thing this slot exists to not be.
-            .background(AppTheme.colorScheme.error.copy(alpha = committed * 0.9f)),
-        contentAlignment = alignment,
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.delete),
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .size(24.dp)
-                .graphicsLayer {
-                    val iconScale = 0.82f + (committed * 0.18f)
-                    scaleX = iconScale
-                    scaleY = iconScale
-                    alpha = committed
-                },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun Queue(
     state: BottomSheetState,
@@ -300,14 +195,6 @@ fun Queue(
      *  and back gesture are still how it closes. */
     sheetDraggable: Boolean = true,
 ) {
-    // The queue sheet's own visible surface is `background` (the current song's hero
-    // tint), independent of the caller-supplied TextBackgroundColor (which matches the
-    // rest of the player chrome, not this sheet). Rows and the "Continue Playing"
-    // header actually sit on `background`, so their text has to be contrast-derived
-    // from it — a fixed white/theme color goes unreadable against a bright hero tint.
-    val queueContentColor = if (background == Color.Transparent) Color.White else remember(background) { AppleTokens.onColor(background) }
-    val queueSecondaryColor = if (background == Color.Transparent) Color.White.copy(alpha = 0.7f) else remember(background) { AppleTokens.onColorSecondary(background) }
-
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val clipboardManager = LocalClipboard.current
@@ -481,7 +368,6 @@ fun Queue(
 
                     PlayerQueueButton(
                         icon = R.drawable.queue_music,
-                        iconVector = SfSymbols.Monochrome.SFListBullet,
                         onClick = { state.expandSoft() },
                         isActive = false,
                         shape = queueShape,
@@ -495,8 +381,6 @@ fun Queue(
 
                     PlayerQueueButton(
                         icon = R.drawable.bedtime,
-                        iconVector = SfSymbols.Monochrome.SFGaugeWithNeedleFill,
-                        activeIconVector = SfSymbols.Monochrome.SFGaugeWithNeedleFill,
                         onClick = {
                             if (sleepTimerEnabled) {
                                 playerConnection.service.sleepTimer.clear()
@@ -519,8 +403,6 @@ fun Queue(
                     PlayerQueueButton(
                         icon = R.drawable.lyrics,
                         activeIcon = R.drawable.lyrics_active,
-                        iconVector = SfSymbols.Monochrome.SFQuoteBubble,
-                        activeIconVector = SfSymbols.Monochrome.SFQuoteBubbleFill,
                         onClick = { onToggleLyrics() },
                         isActive = showInlineLyrics,
                         shape = middleShape,
@@ -535,7 +417,6 @@ fun Queue(
                     if (showCommentButton) {
                         PlayerQueueButton(
                             icon = R.drawable.chat_msg,
-                            iconVector = SfSymbols.Monochrome.SFBubbleLeftAndBubbleRightFill,
                             onClick = { showCommentSheet = true },
                             isActive = showCommentSheet,
                             shape = middleShape,
@@ -551,7 +432,6 @@ fun Queue(
                     val shuffleModeEnabledInside by playerConnection.shuffleModeEnabled.collectAsState()
                     PlayerQueueButton(
                         icon = R.drawable.shuffle,
-                        iconVector = SfSymbols.Monochrome.SFShuffle,
                         onClick = {
                             coroutineScope.launch {
                                 lazyListState.animateScrollToItem(
@@ -579,10 +459,6 @@ fun Queue(
                             Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
                             else -> R.drawable.repeat
                         },
-                        iconVector = when (repeatMode) {
-                            Player.REPEAT_MODE_ONE -> SfSymbols.Monochrome.SFRepeat1
-                            else -> SfSymbols.Monochrome.SFRepeat
-                        },
                         onClick = {
                             playerConnection.player.toggleRepeatMode()
                         },
@@ -603,10 +479,7 @@ fun Queue(
                         modifier = Modifier
                             .size(buttonSize)
                             .clip(CircleShape)
-                            // Was a fully opaque fill in the same colour as the icon tint
-                            // below, so the glyph vanished into its own background.
-                            // Translucent instead, same tint as every other player icon.
-                            .background(textButtonColor.copy(alpha = 0.6f))
+                            .background(textButtonColor)
                             .clickable {
                                 menuState.show {
                                     PlayerMenu(
@@ -653,21 +526,31 @@ fun Queue(
                     // equal gaps, not equal-width halves, so the asymmetry showed up
                     // as the middle pair reading visibly off-center.
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        IconButton(
-                            onClick = { state.expandSoft() },
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.15f))
-                                .border(0.5.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                                .size(48.dp)
+                    TextButton(
+                        onClick = { state.expandSoft() },
+                        modifier = Modifier.wrapContentWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
                         ) {
                             Icon(
-                                painter = painterResource(id = R.drawable.flamingo_queue),
-                                contentDescription = stringResource(id = R.string.queue),
-                                modifier = Modifier.size(24.dp),
-                                tint = Color.White
+                                painter = painterResource(id = R.drawable.queue_music),
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = TextBackgroundColor
                             )
+//                            Spacer(modifier = Modifier.width(6.dp))
+//                            Text(
+//                                text = stringResource(id = R.string.queue),
+//                                color = TextBackgroundColor,
+//                                maxLines = 1,
+//                                overflow = TextOverflow.Ellipsis,
+//                                textAlign = TextAlign.Center,
+//                                modifier = Modifier.basicMarquee()
+//                            )
                         }
+                    }
                     }
 
                     Row(
@@ -681,19 +564,21 @@ fun Queue(
                             },
                             shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
                             modifier = Modifier
-                                .height(48.dp)
+                                .height(56.dp)
                                 .weight(1f),
                             colors = ToggleButtonDefaults.toggleButtonColors(
-                                containerColor = Color.White.copy(alpha = 0.15f),
-                                contentColor = Color.White,
-                                checkedContainerColor = Color.White.copy(alpha = 0.35f),
-                                checkedContentColor = Color.White
+                                containerColor = TextBackgroundColor.copy(alpha = 0.2f),
+                                contentColor = TextBackgroundColor,
+                                checkedContainerColor = TextBackgroundColor.copy(alpha = 0.4f),
+                                checkedContentColor = TextBackgroundColor
                             )
                         ) {
                             Icon(
-                                imageVector = if (isBluetoothConnected) SfSymbols.Monochrome.SFAirpods else SfSymbols.Monochrome.SFHomepodFill,
+                                painter = painterResource(
+                                    if (isBluetoothConnected) R.drawable.headset_applemusic else R.drawable.speaker_apple
+                                ),
                                 contentDescription = null,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(30.dp)
                             )
                         }
 
@@ -710,13 +595,13 @@ fun Queue(
                             },
                             shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
                             modifier = Modifier
-                                .height(48.dp)
+                                .height(56.dp)
                                 .weight(1f),
                             colors = ToggleButtonDefaults.toggleButtonColors(
-                                containerColor = Color.White.copy(alpha = 0.15f),
-                                contentColor = Color.White,
-                                checkedContainerColor = Color.White.copy(alpha = 0.35f),
-                                checkedContentColor = Color.White
+                                containerColor = TextBackgroundColor.copy(alpha = 0.2f),
+                                contentColor = TextBackgroundColor,
+                                checkedContainerColor = TextBackgroundColor.copy(alpha = 0.4f),
+                                checkedContentColor = TextBackgroundColor
                             )
                         ) {
                             Row(
@@ -726,14 +611,14 @@ fun Queue(
                                 Icon(
                                     painter = painterResource(id = R.drawable.timer),
                                     contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(30.dp)
                                 )
                                 if (sleepTimerEnabled) {
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = makeTimeString(sleepTimerTimeLeft),
-                                        style = AppTheme.typography.labelSmall,
-                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextBackgroundColor,
                                         maxLines = 1
                                     )
                                 }
@@ -742,21 +627,33 @@ fun Queue(
                     }
 
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                        IconButton(
-                            onClick = { onToggleLyrics() },
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = if (showInlineLyrics) 0.35f else 0.15f))
-                                .border(0.5.dp, Color.White.copy(alpha = if (showInlineLyrics) 0.45f else 0.2f), CircleShape)
-                                .size(48.dp)
+                    TextButton(
+                        onClick = {
+                            onToggleLyrics()
+                        },
+                        modifier = Modifier.wrapContentWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
                         ) {
                             Icon(
-                                painter = painterResource(id = if (showInlineLyrics) R.drawable.flamingo_lyricson else R.drawable.flamingo_lyrics),
-                                contentDescription = stringResource(R.string.lyrics),
-                                modifier = Modifier.size(24.dp),
-                                tint = Color.White
+                                painter = painterResource(id = R.drawable.lyrics),
+                                contentDescription = null,
+                                modifier = Modifier.size(60.dp),
+                                tint = TextBackgroundColor
                             )
+//                            Spacer(modifier = Modifier.width(6.dp))
+//                            Text(
+//                                text = stringResource(R.string.lyrics),
+//                                color = TextBackgroundColor,
+//                                maxLines = 1,
+//                                overflow = TextOverflow.Ellipsis,
+//                                textAlign = TextAlign.Center,
+//                                modifier = Modifier.basicMarquee()
+//                            )
                         }
+                    }
                     }
                 }
             }
@@ -775,7 +672,7 @@ fun Queue(
                                 text = stringResource(R.string.sleep_timer),
                                 overflow = TextOverflow.Ellipsis,
                                 maxLines = 1,
-                                style = AppTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.headlineSmall,
                             )
                         }
                     },
@@ -791,36 +688,36 @@ fun Queue(
                         sleepTimerValue = 30f // Default value
                     },
                     content = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = pluralStringResource(
                                     R.plurals.minute,
                                     sleepTimerValue.roundToInt(),
                                     sleepTimerValue.roundToInt()
                                 ),
-                                style = IosTheme.typography.title,
-                                color = IosTheme.colors.label,
+                                style = MaterialTheme.typography.bodyLarge,
                             )
 
                             Spacer(Modifier.height(16.dp))
 
-                            com.convx.music.ui.ios.compat.Slider(
+                            Slider(
                                 value = sleepTimerValue,
                                 onValueChange = { sleepTimerValue = it },
                                 valueRange = 5f..120f,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                                steps = (120 - 5) / 5 - 1,
+                                modifier = Modifier.fillMaxWidth()
                             )
 
-                            Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(8.dp))
 
-                            com.convx.music.ui.ios.component.IosButton(
-                                title = stringResource(R.string.end_of_song),
+                            OutlinedButton(
                                 onClick = {
                                     showSleepTimerDialog = false
                                     playerConnection.service.sleepTimer.start(-1)
-                                },
-                                modifier = Modifier.fillMaxWidth(0.75f)
-                            )
+                                }
+                            ) {
+                                Text(stringResource(R.string.end_of_song))
+                            }
                         }
                     }
                 )
@@ -921,9 +818,6 @@ fun Queue(
             Column(
                 modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = QueueMaxContentWidth)
-                    .align(Alignment.CenterHorizontally)
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -950,14 +844,6 @@ fun Queue(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            // Collapses the queue's own sheet, not the outer player's --
-                            // that's what actually reveals the normal player view, since
-                            // Queue is drawn as a sibling sheet stacked over it.
-                            .clickable(
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() },
-                                onClick = { state.collapseSoft() },
-                            )
                     )
 
                     Spacer(Modifier.width(12.dp))
@@ -965,16 +851,16 @@ fun Queue(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = mediaMetadata?.title.orEmpty(),
-                            style = AppTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            color = queueContentColor,
+                            color = TextBackgroundColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
-                            style = AppTheme.typography.bodyMedium,
-                            color = queueSecondaryColor,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextBackgroundColor.copy(alpha = 0.7f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -996,7 +882,7 @@ fun Queue(
                                     else R.drawable.favorite_border
                                 ),
                                 contentDescription = likeDescription,
-                                tint = if (currentSong?.song?.liked == true) AppTheme.colorScheme.error else LocalContentColor.current
+                                tint = if (currentSong?.song?.liked == true) MaterialTheme.colorScheme.error else LocalContentColor.current
                             )
                         }
                     }
@@ -1052,18 +938,9 @@ fun Queue(
                 }
                 }
 
-                // Gutter, not 12.dp: the pills used to start 8dp left of the queue
-                // rows and the section header below them, so the block read as three
-                // stacked left edges. SectionGap under it is what separates "actions"
-                // from "the list" — with 8dp they were one undifferentiated cluster.
                 FlowRow(
                     modifier = Modifier
-                        .padding(
-                            start = AppleTokens.Gutter,
-                            end = AppleTokens.Gutter,
-                            top = 4.dp,
-                            bottom = AppleTokens.SectionGap,
-                        )
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                         .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
                 ) {
@@ -1081,14 +958,14 @@ fun Queue(
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
                         colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = AppTheme.colorScheme.secondaryContainer,
-                            contentColor = AppTheme.colorScheme.onSecondaryContainer,
-                            checkedContainerColor = AppTheme.colorScheme.primaryContainer,
-                            checkedContentColor = AppTheme.colorScheme.onPrimaryContainer
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(QueueActionPillHeight),
+                            .height(56.dp),
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.shuffle),
@@ -1098,7 +975,7 @@ fun Queue(
                         Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
                         Text(
                             text = stringResource(R.string.shuffle),
-                            style = AppTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                             )
@@ -1112,14 +989,14 @@ fun Queue(
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
                         colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = AppTheme.colorScheme.secondaryContainer,
-                            contentColor = AppTheme.colorScheme.onSecondaryContainer,
-                            checkedContainerColor = AppTheme.colorScheme.primaryContainer,
-                            checkedContentColor = AppTheme.colorScheme.onPrimaryContainer
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(QueueActionPillHeight),
+                            .height(56.dp),
                     ) {
                         Icon(
                             painter = painterResource(
@@ -1135,7 +1012,7 @@ fun Queue(
                         Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
                         Text(
                             text = stringResource(R.string.repeat),
-                            style = AppTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1150,14 +1027,14 @@ fun Queue(
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
                         colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = AppTheme.colorScheme.secondaryContainer,
-                            contentColor = AppTheme.colorScheme.onSecondaryContainer,
-                            checkedContainerColor = AppTheme.colorScheme.primaryContainer,
-                            checkedContentColor = AppTheme.colorScheme.onPrimaryContainer
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(QueueActionPillHeight),
+                            .height(56.dp),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -1168,7 +1045,7 @@ fun Queue(
                             Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
                             Text(
                                 text = stringResource(R.string.start_an_radio),
-                                style = AppTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1177,49 +1054,48 @@ fun Queue(
                 }
 
 
-                // Header sits on the same Gutter as the rows below it, and its four
-                // stacked text lines (title/subtitle on the left, count/duration on
-                // the right) collapse to three: count and duration are one bulleted
-                // meta line, so the eye gets one two-line block plus one meta line
-                // instead of two competing two-line columns.
                 Row(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = AppleTokens.Gutter, end = 12.dp, bottom = 10.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(AppleTokens.TextGap)
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.continue_playing),
-                            style = AppTheme.typography.titleMedium,
-                            color = queueContentColor
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextBackgroundColor
                         )
                         Text(
                             text = stringResource(R.string.next_in_queue),
-                            style = AppTheme.typography.bodySmall,
-                            color = queueSecondaryColor
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextBackgroundColor.copy(alpha = 0.7f)
                         )
                     }
 
-                    Text(
-                        text = joinByBullet(
-                            pluralStringResource(
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = pluralStringResource(
                                 R.plurals.n_song,
                                 queueWindows.size,
                                 queueWindows.size
                             ),
-                            makeTimeString(queueLength * 1000L),
-                        ),
-                        style = AppTheme.typography.labelSmall,
-                        color = queueSecondaryColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 12.dp)
-                    )
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextBackgroundColor.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = makeTimeString(queueLength * 1000L),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextBackgroundColor.copy(alpha = 0.7f)
+                        )
+                    }
 
                     // The header row's lock toggle only exists when showHeaderRow hid it —
                     // this is that same control's one home instead, not a second copy.
@@ -1308,25 +1184,9 @@ fun Queue(
                         }
                     }
                 }
-
-                // The list scrolls under this header with nothing marking where the
-                // header ends, so a half-scrolled row's artwork bleeds up against the
-                // "Continue Playing" text and the whole block reads as one pile. Same
-                // hairline the rows already use between themselves, same inset.
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = AppleTokens.Gutter),
-                    thickness = 0.75.dp,
-                    color = AppleTokens.divider,
-                )
             }
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .widthIn(max = QueueMaxContentWidth)
-                    .align(Alignment.CenterHorizontally)
-            ) {
+            Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
                     state = lazyListState,
                     contentPadding =
@@ -1334,7 +1194,7 @@ fun Queue(
                             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
                             .add(
                                 WindowInsets(
-                                    top = 4.dp,
+                                    top = 8.dp,
                                     bottom = ListItemHeight + 8.dp,
                                 ),
                             ).asPaddingValues(),
@@ -1358,18 +1218,7 @@ fun Queue(
                         ReorderableItem(
                             state = reorderableState,
                             key = window.uid.hashCode(),
-                        ) { isDragging ->
-                            // Flamingo lifts the row it is carrying. Without it a drag reads
-                            // as the list scrolling under a stationary finger, because nothing
-                            // else on screen says which row is attached to it.
-                            val dragHighlight by animateColorAsState(
-                                targetValue = if (isDragging) {
-                                    LocalContentColor.current.copy(alpha = 0.08f)
-                                } else {
-                                    Color.Transparent
-                                },
-                                label = "queueDragHighlight",
-                            )
+                        ) {
                             val currentItem by rememberUpdatedState(window)
                             val isActive = window.uid == currentPlayingUid
                             val dismissBoxState =
@@ -1482,7 +1331,6 @@ fun Queue(
                                             Modifier
                                                 .fillMaxWidth()
                                                 .background(background)
-                                                .background(dragHighlight)
                                                 .combinedClickable(
                                                     onClick = {
                                                         if (inSelectMode) {
@@ -1540,12 +1388,7 @@ fun Queue(
                             } else {
                                 SwipeToDismissBox(
                                     state = dismissBoxState,
-                                    backgroundContent = {
-                                        QueueSwipeReveal(
-                                            direction = dismissBoxState.dismissDirection,
-                                            progress = dismissBoxState.progress,
-                                        )
-                                    },
+                                    backgroundContent = {},
                                 ) {
                                     content()
                                 }
@@ -1555,19 +1398,10 @@ fun Queue(
 
                     if (automix.isNotEmpty()) {
                         item(key = "automix_divider") {
-                            // Was an unstyled label on the row gutter's inside edge with no
-                            // vertical padding at all — it butted straight into the queue row
-                            // above it and read as a stray line of body text, not a section
-                            // break. Same gutter and weight as "Continue Playing".
+
                             Text(
                                 text = stringResource(R.string.similar_content),
-                                style = AppTheme.typography.titleSmall,
-                                modifier = Modifier.padding(
-                                    start = AppleTokens.Gutter,
-                                    end = AppleTokens.Gutter,
-                                    top = AppleTokens.SectionGap,
-                                    bottom = 8.dp,
-                                ),
+                                modifier = Modifier.padding(start = 16.dp),
                             )
                         }
 
@@ -1670,9 +1504,7 @@ fun Queue(
 @Composable
 private fun PlayerQueueButton(
     icon: Int,
-    iconVector: ImageVector? = null,
     activeIcon: Int? = null,
-    activeIconVector: ImageVector? = null,
     onClick: () -> Unit,
     isActive: Boolean,
     enabled: Boolean = true,
@@ -1692,20 +1524,14 @@ private fun PlayerQueueButton(
     val alphaFactor = if (enabled) 1f else 0.35f
 
     val appliedModifier = if (isActive) {
-        modifier.then(
-            buttonModifier
-                .background(Color.White.copy(alpha = 0.35f))
-                .border(0.5.dp, Color.White.copy(alpha = 0.45f), shape)
-        ).alpha(alphaFactor)
+        modifier.then(buttonModifier.background(textButtonColor)).alpha(alphaFactor)
     } else {
         modifier.then(
-            buttonModifier
-                .background(Color.White.copy(alpha = 0.15f))
-                .border(
-                    width = 0.5.dp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    shape = shape
-                )
+            buttonModifier.border(
+                width = 1.dp,
+                color = textButtonColor.copy(alpha = 0.3f),
+                shape = shape
+            )
         ).alpha(alphaFactor)
     }
 
@@ -1716,7 +1542,7 @@ private fun PlayerQueueButton(
         if (text != null) {
             Text(
                 text = text,
-                color = Color.White.copy(alpha = if (enabled) 1f else 0.6f),
+                color = iconButtonColor.copy(alpha = if (enabled) 1f else 0.6f),
                 fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1727,28 +1553,27 @@ private fun PlayerQueueButton(
             )
         } else {
             val baseTint = if (isActive) {
-                Color.White
+                iconButtonColor
             } else {
-                Color.White.copy(alpha = 0.85f)
+                // Dimmed on purpose: iconButtonColor/textButtonColor are often
+                // white-on-photo too, so without a clear alpha drop the "off"
+                // state was indistinguishable from "active" at this icon size —
+                // the filled-vs-outlined button background was the only tell.
+                when (playerBackground) {
+                    PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT ->
+                        Color.White.copy(alpha = 0.55f)
+                    PlayerBackgroundStyle.DEFAULT ->
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                }
             }
             val finalTint = if (enabled) baseTint else baseTint.copy(alpha = 0.5f)
             val resolvedIcon = if (isActive && activeIcon != null) activeIcon else icon
-            val resolvedVector = if (isActive && activeIconVector != null) activeIconVector else iconVector
-            if (resolvedVector != null) {
-                Icon(
-                    imageVector = resolvedVector,
-                    contentDescription = null,
-                    modifier = Modifier.size(iconSize),
-                    tint = finalTint
-                )
-            } else {
-                Icon(
-                    painter = painterResource(id = resolvedIcon),
-                    contentDescription = null,
-                    modifier = Modifier.size(iconSize),
-                    tint = finalTint
-                )
-            }
+            Icon(
+                painter = painterResource(id = resolvedIcon),
+                contentDescription = null,
+                modifier = Modifier.size(iconSize),
+                tint = finalTint
+            )
         }
     }
 }

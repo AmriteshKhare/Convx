@@ -175,6 +175,7 @@ import com.convx.music.LocalTabView
 import com.convx.music.R
 import com.convx.music.constants.AudioQuality
 import com.convx.music.constants.AudioQualityKey
+import com.convx.music.constants.AppTextColorKey
 import com.convx.music.constants.CropAlbumArtKey
 import com.convx.music.constants.DarkModeKey
 import com.convx.music.constants.CompactPlayerInTabViewKey
@@ -246,9 +247,7 @@ import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.ScrollingWaveformSeekBar
 import com.convx.music.ui.component.rememberPlaybackFraction
 import com.convx.music.ui.component.WavySlider
-import androidx.compose.material3.IconButton
 import com.convx.music.ui.component.GlassCircleButton
-import com.convx.music.ui.component.asRimPop
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalBackdropLoopBucket
 import com.convx.music.ui.component.backdrop.backdrops.backdropStaticRegion
@@ -260,9 +259,8 @@ import com.convx.music.ui.menu.OldPlayerMenu
 import com.convx.music.ui.menu.PlayerMenu
 import com.convx.music.ui.component.VolumeSlider
 import com.convx.music.ui.screens.settings.DarkMode
+import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.PlayerColorExtractor
-import com.convx.music.ui.theme.colorengine.ColorEngine
-import com.convx.music.ui.theme.PlayerSliderColors
 import com.convx.music.ui.utils.ShowMediaInfo
 import com.convx.music.ui.utils.ShowOffsetDialog
 import com.convx.music.utils.makeTimeString
@@ -305,6 +303,7 @@ import com.convx.music.extensions.metadata
 import com.convx.music.ui.player.CanvasArtworkPlaybackCache
 import com.convx.music.ui.player.normalizeCanvasArtistName
 import com.convx.music.ui.player.normalizeCanvasSongTitle
+import com.convx.music.ui.theme.PlayerSliderColors
 import com.convx.music.vivimusiccanvas.ViviMusicCanvasProvider
 import com.convx.music.vivimusiccanvas.EchoMusicCanvasProvider
 import java.util.Locale
@@ -714,23 +713,10 @@ fun BottomSheetPlayer(
                                     palette.getDarkMutedColor(fallbackColor).let { Color(it) }
                                 ).distinct()
                             } else {
-                                ColorEngine.analyze(bitmap, cacheKey = currentMetadata.thumbnailUrl)
-                                    ?.let { result ->
-                                        val dominant = result.palette.dominant
-                                        listOf(
-                                            dominant,
-                                            dominant.copy(
-                                                red = (dominant.red * 0.6f).coerceAtLeast(0f),
-                                                green = (dominant.green * 0.6f).coerceAtLeast(0f),
-                                                blue = (dominant.blue * 0.6f).coerceAtLeast(0f),
-                                            ),
-                                            Color.Black,
-                                        )
-                                    }
-                                    ?: PlayerColorExtractor.extractGradientColors(
-                                        palette = palette,
-                                        fallbackColor = fallbackColor
-                                    )
+                                PlayerColorExtractor.extractGradientColors(
+                                    palette = palette,
+                                    fallbackColor = fallbackColor
+                                )
                             }
                             gradientColorsCache[currentMetadata.id] = extractedColors
                             withContext(Dispatchers.Main) { gradientColors = extractedColors }
@@ -744,10 +730,11 @@ fun BottomSheetPlayer(
     }
 
     val (showUpNext) = rememberPreference(ShowUpNextKey, defaultValue = false)
-    // Back to the original per-background/theme pick -- no mesh blend, no global custom
-    // colour override, just what it looked like before either of those existed.
+    // User's global button/text color choice (AppTextColorKey) — DEFAULT alone
+    // follows the per-background/theme pick below; any custom color wins outright.
+    val (appTextColorInt) = rememberPreference(AppTextColorKey, defaultValue = 0)
     val TextBackgroundColor by animateColorAsState(
-        targetValue = when (playerBackground) {
+        targetValue = if (appTextColorInt != 0) Color(appTextColorInt) else when (playerBackground) {
             PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.onBackground
             PlayerBackgroundStyle.BLUR -> Color.White
             PlayerBackgroundStyle.GRADIENT -> Color.White
@@ -902,10 +889,11 @@ fun BottomSheetPlayer(
         }
     }
 
-    // Seek bar's loaded (active) color: the same textButtonColor every other player control
-    // uses. Every slider style's inactive track is a faded version of this same color (see
+    // Seek bar's loaded (active) color: the user's global color when set, else the
+    // same textButtonColor every other player control uses. Every slider style's
+    // inactive track is a faded version of this same color (see
     // PlayerSliderColors), so both halves of the seek bar read as one color, not two.
-    val seekBarActiveColor = textButtonColor
+    val seekBarActiveColor = if (appTextColorInt != 0) Color(appTextColorInt) else textButtonColor
     // Back on, per user request: player chrome is composited additively onto the
     // background/mesh again.
     val additiveChrome = true
@@ -2394,19 +2382,15 @@ fun BottomSheetPlayer(
                                     isFullScreen = !isFullScreen
                                     if (oneTapFullscreenLyrics && !isFullScreen) showInlineLyrics = false
                                 },
-                                rimTintColor = TextBackgroundColor.asRimPop(),
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.fullscreen),
                                     contentDescription = null,
-                                    tint = TextBackgroundColor,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
                         } else {
-                            // Bare icon, same as V17's own more-menu button — no glass
-                            // circle behind it, same glyph, same 32dp size.
-                            IconButton(
+                            GlassCircleButton(
                                 onClick = {
                                     menuState.show {
                                         OldPlayerMenu(
@@ -2427,9 +2411,9 @@ fun BottomSheetPlayer(
                             ) {
                                 PlayerGlyph(
                                     slot = PlayerIconSlot.MORE,
-                                    fallback = R.drawable.flamingo_more,
-                                    tint = TextBackgroundColor,
-                                    modifier = Modifier.size(32.dp)
+                                    fallback = R.drawable.more_vert,
+                                    tint = LocalContentColor.current,
+                                    modifier = Modifier.size(24.dp)
                                         .additiveChrome(additiveChrome)
                                         .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                 )
@@ -2460,28 +2444,25 @@ fun BottomSheetPlayer(
                                         )
                                     }
                                 },
-                                rimTintColor = TextBackgroundColor.asRimPop(),
                             ) {
                                 PlayerGlyph(
                                     slot = PlayerIconSlot.MORE,
                                     fallback = R.drawable.more_horiz,
-                                    tint = TextBackgroundColor,
+                                    tint = LocalContentColor.current,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
                         } else {
-                            // Bare icon, same as V17's own like button — no glass circle,
-                            // same glyph pair, same 32dp size.
-                            IconButton(
+                            GlassCircleButton(
                                 onClick = playerConnection::toggleLike,
                             ) {
                                 PlayerGlyph(
                                     slot = if (currentSong?.song?.liked == true)
                                         PlayerIconSlot.LIKED else PlayerIconSlot.LIKE,
                                     fallback = if (currentSong?.song?.liked == true)
-                                        R.drawable.flamingo_favorited else R.drawable.flamingo_favorite,
-                                    tint = if (currentSong?.song?.liked == true) AppTheme.colorScheme.error else TextBackgroundColor,
-                                    modifier = Modifier.size(32.dp)
+                                        R.drawable.favorite else R.drawable.favorite_border,
+                                    tint = if (currentSong?.song?.liked == true) AppTheme.colorScheme.error else LocalContentColor.current,
+                                    modifier = Modifier.size(24.dp)
                                         .additiveChrome(additiveChrome)
                                         .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                 )
@@ -3021,6 +3002,10 @@ fun BottomSheetPlayer(
                                     .additiveChrome(additiveChrome)
                                     .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                             ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
                                     if (isListenTogetherGuest) {
                                         // Guests get a mute toggle in this position rather than
                                         // transport, and that button is not a customisable slot
@@ -3045,7 +3030,17 @@ fun BottomSheetPlayer(
                                             modifier = Modifier.size(32.dp)
                                         )
                                     }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isListenTogetherGuest) {
+                                            if (isMuted) stringResource(R.string.unmute) else stringResource(R.string.mute)
+                                        } else {
+                                            if (effectiveIsPlaying) stringResource(R.string.pause) else stringResource(R.string.play)
+                                        },
+                                        style = AppTheme.typography.titleMedium
+                                    )
                                 }
+                            }
 
                             Spacer(modifier = Modifier.width(8.dp))
 
@@ -3123,10 +3118,7 @@ fun BottomSheetPlayer(
                             Box(
                                 modifier =
                                 Modifier
-                                    // Matches Player_v2's play/pause button size (58.5dp) --
-                                    // was 48dp with a 48dp glyph filling it exactly, which
-                                    // clipped the icon against the rounded-corner shape.
-                                    .size(58.5.dp)
+                                    .size(100.dp) //100
                                     .clip(RoundedCornerShape(playPauseRoundness))
                                     .additiveChrome(additiveChrome)
                                     .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
@@ -3164,7 +3156,7 @@ fun BottomSheetPlayer(
                                         modifier =
                                         Modifier
                                             .align(Alignment.Center)
-                                            .size(40.5.dp),
+                                            .size(72.dp),
                                     )
                                 } else {
                                     AnimatedPlayerGlyph(
@@ -3176,8 +3168,8 @@ fun BottomSheetPlayer(
                                         tint = TextBackgroundColor,
                                         playDescription = stringResource(R.string.play),
                                         pauseDescription = stringResource(R.string.pause),
-                                        playSize = 40.5.dp,
-                                        pauseSize = 38.5.dp,
+                                        playSize = 72.dp,
+                                        pauseSize = 72.dp,
                                         modifier =
                                         Modifier
                                             .align(Alignment.Center),
@@ -3552,10 +3544,11 @@ fun BottomSheetPlayer(
             navController = navController,
             background = queueBackground,
             onBackgroundColor = onBackgroundColor,
-            // Same adaptive tint as the seek bar and every other classic-player
-            // icon (and as Player_v2's queue sheet) instead of a colour derived
-            // from the queue's own song-tinted background.
-            TextBackgroundColor = TextBackgroundColor,
+            // Same adaptive-contrast pattern as the playlist screens' onTint —
+            // computed from the queue's own song-tinted background, not the
+            // player-wide TextBackgroundColor (which tracks playerBackground
+            // style instead and can clash with an arbitrary song tint).
+            TextBackgroundColor = AppleTokens.onColor(queueBackground),
             textButtonColor = textButtonColor,
             iconButtonColor = iconButtonColor,
             pureBlack = pureBlack,
@@ -3665,10 +3658,10 @@ fun MoreActionsButton(
     val bottomSheetPageState = LocalBottomSheetPageState.current
 
     Box(
-        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(44.dp)
+            .size(40.dp)
             .clip(RoundedCornerShape(24.dp))
+            .background(textButtonColor)
             .clickable {
                 menuState.show {
                     PlayerMenu(
@@ -3687,12 +3680,6 @@ fun MoreActionsButton(
                 }
             }
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(textButtonColor)
-        )
         // Routed through PlayerGlyph like every other control: this one drew the stock
         // glyph straight from resources, so the More slot in player-icon settings did
         // nothing here even though the sibling PlayerMoreMenuButton honoured it.
@@ -3719,8 +3706,9 @@ private fun PlayerMoreMenuButton(
         contentAlignment = Alignment.Center,
         modifier =
         Modifier
-            .size(44.dp)
+            .size(40.dp)
             .clip(RoundedCornerShape(24.dp))
+            .background(textButtonColor)
             .clickable {
                 menuState.show {
                     PlayerMenu(
@@ -3739,12 +3727,6 @@ private fun PlayerMoreMenuButton(
                 }
             },
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(textButtonColor)
-        )
         // PlayerGlyph, not a raw Image with an unconditional tint: a user's own
         // image for this slot was being flattened to a solid colour regardless of
         // the slot's per-icon tint flag, so a photo came out as a coloured blob.

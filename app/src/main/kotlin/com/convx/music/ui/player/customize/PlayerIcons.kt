@@ -53,14 +53,14 @@ enum class PlayerIconSlot(
     @StringRes val labelRes: Int,
     val isV2: Boolean = false,
 ) {
-    PLAY(R.drawable.flamingo_play, R.string.player_icon_play),
-    PAUSE(R.drawable.flamingo_pause, R.string.player_icon_pause),
-    PREVIOUS(R.drawable.flamingo_rewind, R.string.player_icon_previous),
-    NEXT(R.drawable.flamingo_fforward, R.string.player_icon_next),
+    PLAY(R.drawable.play_applemusic, R.string.player_icon_play),
+    PAUSE(R.drawable.pause_applemusic, R.string.player_icon_pause),
+    PREVIOUS(R.drawable.skip_previous_legacy, R.string.player_icon_previous),
+    NEXT(R.drawable.fast_forward, R.string.player_icon_next),
     REPLAY(R.drawable.replay, R.string.player_icon_replay),
-    LIKE(R.drawable.flamingo_favorite, R.string.player_icon_like),
-    LIKED(R.drawable.flamingo_favorited, R.string.player_icon_liked),
-    MORE(R.drawable.flamingo_more, R.string.player_icon_more),
+    LIKE(R.drawable.favorite_border, R.string.player_icon_like),
+    LIKED(R.drawable.favorite, R.string.player_icon_liked),
+    MORE(R.drawable.more_horiz, R.string.player_icon_more),
     SEEK_THUMB(R.drawable.play_applemusic, R.string.player_icon_seek_thumb),
 
     // V2 Apple Music Player slots
