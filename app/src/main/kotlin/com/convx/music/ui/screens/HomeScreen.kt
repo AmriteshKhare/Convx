@@ -51,7 +51,6 @@ import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
 import com.convx.music.ui.ios.compat.Card
 import androidx.compose.material3.CardDefaults
-import com.convx.music.ui.ios.compat.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import com.convx.music.ui.ios.compat.Icon
@@ -161,6 +160,8 @@ import com.convx.music.playback.queues.LocalAlbumRadio
 import com.convx.music.playback.queues.YouTubeAlbumRadio
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFPersonCropCircle
 import com.convx.music.ui.component.AlbumGridItem
 import com.convx.music.ui.component.ChipsRow
 import com.convx.music.ui.component.ListItem
@@ -739,9 +740,8 @@ fun HomeScreen(
                 // logoCollapseProgress above.
                 item(key = "listen_now_title", contentType = "section_title") {
                     Text(
-                        text = BrandName,
+                        text = stringResource(R.string.home),
                         style = AppTheme.typography.displayLarge.copy(
-                            fontFamily = rememberBrandFontFamily(),
                             fontWeight = FontWeight.Bold,
                             letterSpacing = (-0.02).em,
                         ),
@@ -836,7 +836,12 @@ fun HomeScreen(
                                             }
                                         }
                                     } else {
-                                        ContainedLoadingIndicator()
+                                        com.convx.music.ui.component.ShimmerBox(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp)
+                                                .height(160.dp),
+                                        )
                                     }
                                 }
                             }
@@ -1883,7 +1888,7 @@ private fun LazyListScope.accountPlaylistsSection(
                         )
                     } else {
                         Icon(
-                            painter = painterResource(id = R.drawable.person),
+                            imageVector = SfSymbols.Monochrome.SFPersonCropCircle,
                             contentDescription = null,
                             modifier = Modifier.size(ListThumbnailSize)
                         )

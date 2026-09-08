@@ -7,6 +7,7 @@ package com.convx.music.ui.screens.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,13 +24,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import com.convx.music.ui.ios.compat.DropdownMenuItem
-import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.OutlinedTextField
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,10 +45,8 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
 import com.convx.music.constants.EnabledModulesKey
 import com.convx.music.constants.ModuleSettingsKey
-import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.ModernSwitch
 import com.convx.music.ui.theme.AppleTokens
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.rememberPreference
 import org.json.JSONArray
@@ -114,20 +111,12 @@ fun ModuleDetailScreen(
     val currentQuality = moduleSettings["quality"] ?: ""
     val currentTidalQuality = moduleSettings["tidalQuality"] ?: ""
 
-    Column(
-        Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.module_detail),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 24.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-            )
-        )
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -287,23 +276,8 @@ fun ModuleDetailScreen(
         }
 
         Spacer(Modifier.height(36.dp))
+    
     }
-
-    TopAppBar(
-        windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.module_detail)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        },
-    )
 }
 
 @Composable

@@ -44,17 +44,19 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_ALBUM
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_ARTIST
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_COMMUNITY_PLAYLIST
@@ -225,7 +227,7 @@ fun OnlineSearchResult(
                     onClick = longClick,
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.more_vert),
+                        imageVector = SfSymbols.Monochrome.SFEllipsis,
                         contentDescription = null,
                     )
                 }
@@ -277,14 +279,14 @@ fun OnlineSearchResult(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(tint)
+            .background(AppTheme.colorScheme.background)
     ) {
         if (hasCustomHomeBackground()) {
             // Matches Home/Library: the user's own picture, not this screen's
             // auto-generated hero blur, once a custom background is set.
             HomeImageBackground(withGradient = true)
         } else {
-            // Blurred hero artwork background
+            // Blurred hero artwork background with smooth unified tone
             if (heroUrl != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
@@ -296,25 +298,15 @@ fun OnlineSearchResult(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
-                        .blur(150.dp)
+                        .blur(120.dp)
+                        .graphicsLayer { alpha = 0.55f }
                 )
             }
-            // Dark overlay for readability
+            // Smooth uniform dark overlay for clean contrast across entire screen
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
-            )
-            // Primary-color wash at the bottom
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0.55f to Color.Transparent,
-                            1f to AppTheme.colorScheme.primary.copy(alpha = 0.55f),
-                        )
-                    )
+                    .background(Color.Black.copy(alpha = 0.45f))
             )
         }
 
@@ -358,7 +350,9 @@ fun OnlineSearchResult(
                         selectedContainerColor = onTint.copy(alpha = 0.2f),
                         labelColor = onTint.copy(alpha = 0.8f),
                         selectedLabelColor = onTint,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp, bottom = 4.dp)
                     )
 
                     LazyColumn(

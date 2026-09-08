@@ -64,6 +64,16 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronLeft
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFLine3Horizontal
+import com.composables.sfsymbols.monochrome.SFLock
+import com.composables.sfsymbols.monochrome.SFLockOpen
+import com.composables.sfsymbols.monochrome.SFMagnifyingglass
+import com.composables.sfsymbols.monochrome.SFSquareAndPencil
+import com.composables.sfsymbols.monochrome.SFShuffle
+import com.composables.sfsymbols.monochrome.SFXmark
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -158,6 +168,7 @@ import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
 import com.convx.music.ui.component.LocalItemPrefs
@@ -176,6 +187,9 @@ import com.convx.music.ui.menu.LocalPlaylistMenu
 import com.convx.music.ui.menu.SelectionSongMenu
 import com.convx.music.ui.menu.SongMenu
 import com.convx.music.ui.component.AlbumStyleHeroImage
+import com.convx.music.ui.player.MeshGradientBackground
+import com.convx.music.ui.player.dimmed
+import com.convx.music.ui.player.rememberArtworkMeshPalette
 import com.convx.music.ui.component.HeroTopBlur
 import com.convx.music.ui.component.rememberHeroTopBlur
 import dev.chrisbanes.haze.HazeState
@@ -188,7 +202,6 @@ import com.convx.music.ui.component.HeroBackground
 import com.convx.music.ui.component.HeroCardHeader
 import com.convx.music.ui.component.rememberHeroSource
 import com.convx.music.ui.component.rememberHeroTint
-import com.convx.music.ui.component.rememberHeroPalette
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.utils.backToMain
@@ -578,16 +591,19 @@ fun LocalPlaylistScreen(
         heroUrl = rawHeroUrl
     }
 
-    val heroPalette = rememberHeroPalette(heroUrl)
-    val tint = heroPalette.background
+    // Same mesh backdrop as ArtistScreen/AlbumScreen/OnlinePlaylistScreen/the player's
+    // BITCHORD_MESH style, not the flat single-swatch fill rememberHeroPalette used to
+    // paint here.
+    val meshPalette = rememberArtworkMeshPalette(heroUrl)
+    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
-    // now the colour engine's own primary text tier for THIS artwork -- derived against
-    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
-    // a fixed shift of the background.
-    val onTint = heroPalette.primaryText
+    // Same flat white every icon/text reads in the player on a mesh background,
+    // rather than a per-artwork computed contrast colour.
+    val onTint = Color.White
 
-    val glassConfig = LocalGlassEffectConfig.current
+    // Glass Effect setting only drives the nav bar/mini player now — this
+    // screen's top-bar chrome keeps glass but pinned to the fixed style.
+    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
     val chromeContentColor = if (useGlass) glassConfig.textColor else onTint
@@ -637,6 +653,11 @@ fun LocalPlaylistScreen(
             .background(tint)
             .hazeSource(hazeState),
     ) {
+    MeshGradientBackground(
+        palette = meshPalette,
+        trackKey = heroUrl,
+        modifier = Modifier.matchParentSize(),
+    )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeBackgroundModifier = if (useGlass) {
             Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
@@ -745,12 +766,12 @@ fun LocalPlaylistScreen(
                                     ) {
                                         if (locked) {
                                             Icon(
-                                                painter = painterResource(R.drawable.lock),
+                                                imageVector = SfSymbols.Monochrome.SFLock,
                                                 contentDescription = description,
                                             )
                                         } else {
                                             Icon(
-                                                painter = painterResource(R.drawable.lock_open),
+                                                imageVector = SfSymbols.Monochrome.SFLockOpen,
                                                 contentDescription = description,
                                             )
                                         }
@@ -857,7 +878,7 @@ fun LocalPlaylistScreen(
                                         },
                                     ) {
                                         Icon(
-                                            painter = painterResource(R.drawable.more_vert),
+                                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                                             contentDescription = null,
                                         )
                                     }
@@ -868,7 +889,7 @@ fun LocalPlaylistScreen(
                                             modifier = Modifier.draggableHandle(),
                                         ) {
                                             Icon(
-                                                painter = painterResource(R.drawable.drag_handle),
+                                                imageVector = SfSymbols.Monochrome.SFLine3Horizontal,
                                                 contentDescription = null,
                                             )
                                         }
@@ -992,7 +1013,7 @@ fun LocalPlaylistScreen(
             if (inSelectMode) {
                 GlassCircleButton(onClick = onExitSelectionMode) {
                     Icon(
-                        painter = painterResource(R.drawable.close),
+                        imageVector = SfSymbols.Monochrome.SFXmark,
                         contentDescription = null,
                     )
                 }
@@ -1043,7 +1064,7 @@ fun LocalPlaylistScreen(
                         }
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.more_vert),
+                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                             contentDescription = null
                         )
                     }
@@ -1056,7 +1077,7 @@ fun LocalPlaylistScreen(
                     },
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.arrow_back),
+                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
                         contentDescription = null
                     )
                 }
@@ -1102,7 +1123,7 @@ fun LocalPlaylistScreen(
                     onLongClick = { navController.backToMain() },
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.arrow_back),
+                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
                         contentDescription = null
                     )
                 }
@@ -1125,7 +1146,7 @@ fun LocalPlaylistScreen(
 
                 GlassCircleButton(onClick = { isSearching = true }) {
                     Icon(
-                        painter = painterResource(R.drawable.search),
+                        imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                         contentDescription = null
                     )
                 }
@@ -1219,18 +1240,11 @@ fun LocalPlaylistHeader(
         heroUrl = rawHeroUrl
     }
 
-    val heroSource = rememberHeroSource(
-        staticArt = heroUrl,
-        songs = songs.map { it.song.song.thumbnailUrl to false },
-    )
-    val heroPalette = rememberHeroPalette(heroUrl)
-    val tint = heroPalette.background
-    com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
-    // now the colour engine's own primary text tier for THIS artwork -- derived against
-    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
-    // a fixed shift of the background.
-    val onTint = heroPalette.primaryText
+    // The enclosing LocalPlaylistScreen already paints the mesh background; this header
+    // only needs the same flat white every icon/text reads over it, like the player.
+    val meshPalette = rememberArtworkMeshPalette(heroUrl)
+    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
+    val onTint = Color.White
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -1342,7 +1356,7 @@ fun LocalPlaylistHeader(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.edit),
+                            imageVector = SfSymbols.Monochrome.SFSquareAndPencil,
                             contentDescription = stringResource(R.string.edit_playlist_cover),
                             tint = Color.White,
                             modifier = Modifier.size(20.dp),
@@ -1474,7 +1488,7 @@ fun LocalPlaylistHeader(
                     size = 48.dp,
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.more_vert),
+                        imageVector = SfSymbols.Monochrome.SFEllipsis,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
                     )
@@ -1508,7 +1522,7 @@ fun LocalPlaylistHeader(
                 ) {
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlayingThisPlaylist,
-                        tint = tint,
+                        tint = onTint,
                         size = 32.dp,
                         modifier = Modifier.offset(x = 2.dp),
                     )
@@ -1528,7 +1542,7 @@ fun LocalPlaylistHeader(
                     size = 48.dp,
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.shuffle),
+                        imageVector = SfSymbols.Monochrome.SFShuffle,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
                     )
@@ -1559,7 +1573,7 @@ fun LocalPlaylistHeader(
                 )
 
                 androidx.compose.runtime.CompositionLocalProvider(
-                    androidx.compose.material3.LocalContentColor provides heroPalette.secondaryText,
+                    androidx.compose.material3.LocalContentColor provides onTint.copy(alpha = 0.7f),
                 ) {
                     ExpandableText(
                         text = staticDescription,

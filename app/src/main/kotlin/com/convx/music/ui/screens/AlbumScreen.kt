@@ -88,7 +88,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.LinkAnnotation
@@ -122,13 +121,25 @@ import com.convx.music.LocalDownloadUtil
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
+import com.composables.sfsymbols.monochrome.SFChevronLeft
+import com.composables.sfsymbols.monochrome.SFECircle
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFXmark
+import com.composables.sfsymbols.monochrome.SFShuffle
+import com.composables.sfsymbols.monochrome.SFSquareStack
+import com.composables.sfsymbols.monochrome.SFStar
 import com.convx.music.constants.HideExplicitKey
 import com.convx.music.constants.DataSaverEnabledKey
 import com.convx.music.constants.HideVideoSongsKey
 import com.convx.music.constants.AlbumCanvasEnabledKey
 import com.convx.music.db.entities.Album
+import com.convx.music.extensions.toMediaItem
 import com.convx.music.playback.ExoDownloadService
+import com.convx.music.playback.queues.ListQueue
 import com.convx.music.playback.queues.LocalAlbumRadio
+import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.AlbumGradient
 import com.convx.music.ui.component.thumbnailPx
 import com.convx.music.ui.component.ExpandableText
@@ -161,6 +172,9 @@ import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.utils.fadingEdge
 import com.convx.music.ui.player.CanvasArtworkPlayer
+import com.convx.music.ui.player.MeshGradientBackground
+import com.convx.music.ui.player.dimmed
+import com.convx.music.ui.player.rememberArtworkMeshPalette
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.rememberHeroTint
 import com.convx.music.ui.component.rememberHeroTopBlur
@@ -171,6 +185,7 @@ import com.convx.music.viewmodels.AlbumViewModel
 import com.convx.music.ui.component.HeroMergeBand
 import com.convx.music.ui.component.HeroMergeBandHeight
 import com.convx.music.ui.component.HeroTopBlur
+import com.music.innertube.models.SongItem
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 
@@ -303,14 +318,15 @@ fun AlbumScreen(
         }
     }
 
-    val heroPalette = com.convx.music.ui.component.rememberHeroPalette(albumWithSongs?.album?.thumbnailUrl)
-    val tint = heroPalette.background
+    // Same mesh backdrop as ArtistScreen/OnlinePlaylistScreen/the player's BITCHORD_MESH
+    // style, not the flat single-swatch wash rememberHeroPalette+HeroMeshWash used to
+    // paint here.
+    val meshPalette = rememberArtworkMeshPalette(albumWithSongs?.album?.thumbnailUrl)
+    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
-    // now the colour engine's own primary text tier for THIS artwork -- derived against
-    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
-    // a fixed shift of the background.
-    val onTint = heroPalette.primaryText
+    // Same flat white every icon/text reads in the player on a mesh background,
+    // rather than a per-artwork computed contrast colour.
+    val onTint = Color.White
 
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
@@ -358,9 +374,9 @@ fun AlbumScreen(
             .background(tint)
             .hazeSource(hazeState)
     ) {
-    com.convx.music.ui.component.HeroMeshWash(
-        palette = heroPalette,
-        screenBackground = screenBackground,
+    MeshGradientBackground(
+        palette = meshPalette,
+        trackKey = albumWithSongs?.album?.thumbnailUrl,
         modifier = Modifier.matchParentSize(),
     )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -454,9 +470,8 @@ fun AlbumScreen(
                                 drawContent()
                                 drawRect(
                                     brush = Brush.verticalGradient(
-                                        colors = listOf(Color.Black, Color.Transparent),
-                                        startY = size.height * 0.4f,
-                                        endY = size.height
+                                        0.55f to Color.Black,
+                                        1.00f to Color.Transparent,
                                     ),
                                     blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
                                 )
@@ -658,7 +673,7 @@ fun AlbumScreen(
                                             color = onTint.copy(alpha = 0.7f)
                                         )
                                         Icon(
-                                            painter = painterResource(R.drawable.explicit),
+                                            imageVector = SfSymbols.Monochrome.SFECircle,
                                             contentDescription = stringResource(R.string.explicit),
                                             modifier = Modifier.size(14.dp),
                                             tint = onTint.copy(alpha = 0.7f)
@@ -684,7 +699,7 @@ fun AlbumScreen(
                                     modifier = Modifier
                                 ) {
                                     Icon(
-                                        painter = painterResource(R.drawable.album),
+                                        imageVector = SfSymbols.Monochrome.SFSquareStack,
                                         contentDescription = null,
                                         modifier = Modifier.size(30.dp),
                                         tint = onTint
@@ -719,7 +734,7 @@ fun AlbumScreen(
                                             color = onTint.copy(alpha = 0.7f)
                                         )
                                         Icon(
-                                            painter = painterResource(R.drawable.explicit),
+                                            imageVector = SfSymbols.Monochrome.SFECircle,
                                             contentDescription = stringResource(R.string.explicit),
                                             modifier = Modifier.size(14.dp),
                                             tint = onTint.copy(alpha = 0.7f)
@@ -758,14 +773,16 @@ fun AlbumScreen(
                             size = 48.dp,
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.shuffle),
+                                imageVector = SfSymbols.Monochrome.SFShuffle,
                                 contentDescription = stringResource(R.string.shuffle_label),
                                 modifier = Modifier.size(22.dp)
                             )
                         }
-
                         // Play Button (Center - Large Circle)
-                        Surface(
+
+                        ContrastCircleButton(
+                            onTint = onTint,
+                            filled = true,
                             onClick = {
                                 if (isPlaying && mediaMetadata?.album?.id == albumWithSongs.album.id) {
                                     playerConnection.player.pause()
@@ -778,19 +795,17 @@ fun AlbumScreen(
                                     )
                                 }
                             },
-                            shape = CircleShape,
-                            color = LocalContentColor.current,
-                            modifier = Modifier.size(72.dp)
+                            size = 72.dp,
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                AnimatedPlayPauseIcon(
-                                    isPlaying = isPlaying && mediaMetadata?.album?.id == albumWithSongs.album.id,
-                                    tint = tint,
-                                    size = 32.dp,
-                                    modifier = Modifier.offset(x = 2.dp)
-                                )
-                            }
+                            AnimatedPlayPauseIcon(
+                                isPlaying = isPlaying && mediaMetadata?.album?.id == albumWithSongs.album.id,
+                                tint = tint,
+                                size = 32.dp,
+
+                            )
                         }
+
+
 
                         // Favorite/Save Button (Right - Circular)
                         ContrastCircleButton(
@@ -803,13 +818,7 @@ fun AlbumScreen(
                             size = 48.dp,
                         ) {
                             Icon(
-                                painter = painterResource(
-                                    if (albumWithSongs.album.bookmarkedAt != null) {
-                                        R.drawable.favorite
-                                    } else {
-                                        R.drawable.favorite_border
-                                    }
-                                ),
+                                imageVector = SfSymbols.Monochrome.SFStar,
                                 contentDescription = if (albumWithSongs.album.bookmarkedAt != null) stringResource(R.string.saved) else stringResource(R.string.save),
                                 modifier = Modifier.size(22.dp),
                                 tint = if (albumWithSongs.album.bookmarkedAt != null) {
@@ -846,8 +855,8 @@ fun AlbumScreen(
                         )
 
                         androidx.compose.runtime.CompositionLocalProvider(
-                            // Engine-derived secondary tier, not the heading colour.
-                            androidx.compose.material3.LocalContentColor provides heroPalette.secondaryText,
+                            // Same secondary alpha the player uses for its dimmer text.
+                            androidx.compose.material3.LocalContentColor provides onTint.copy(alpha = 0.7f),
                         ) {
                             ExpandableText(
                                 text = description ?: staticDescription,
@@ -941,7 +950,7 @@ fun AlbumScreen(
                                     },
                                 ) {
                                     Icon(
-                                        painter = painterResource(R.drawable.more_vert),
+                                        imageVector = SfSymbols.Monochrome.SFEllipsis,
                                         contentDescription = null,
                                     )
                                 }
@@ -1131,7 +1140,7 @@ fun AlbumScreen(
             if (inSelectMode) {
                 GlassCircleButton(onClick = onExitSelectionMode) {
                     Icon(
-                        painter = painterResource(R.drawable.close),
+                        imageVector = SfSymbols.Monochrome.SFXmark,
                         contentDescription = null,
                     )
                 }
@@ -1179,7 +1188,7 @@ fun AlbumScreen(
                         }
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.more_vert),
+                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                             contentDescription = null
                         )
                     }
@@ -1190,7 +1199,7 @@ fun AlbumScreen(
                     onLongClick = { navController.backToMain() },
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.arrow_back_ios),
+                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
                         contentDescription = null
                     )
                 }
@@ -1226,7 +1235,7 @@ fun AlbumScreen(
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.ios_share),
+                                imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                                 contentDescription = stringResource(R.string.share),
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1248,7 +1257,7 @@ fun AlbumScreen(
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.more_vert),
+                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = stringResource(R.string.more_options),
                                 modifier = Modifier.size(20.dp)
                             )

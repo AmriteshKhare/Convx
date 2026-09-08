@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.convx.music.ui.player.customize.PlayerIconSlot
@@ -40,6 +42,7 @@ import com.convx.music.ui.player.customize.rememberPlayerIcon
 @Composable
 fun ResizableIconButton(
     @DrawableRes icon: Int,
+    iconVector: ImageVector? = null,
     modifier: Modifier = Modifier,
     color: Color = IosTheme.colors.label,
     enabled: Boolean = true,
@@ -49,7 +52,9 @@ fun ResizableIconButton(
 ) {
     val custom = if (slot != null) rememberPlayerIcon(slot) else null
     Image(
-        painter = custom?.painter ?: painterResource(icon),
+        painter = if (custom != null) custom.painter else {
+            if (iconVector != null) rememberVectorPainter(iconVector) else painterResource(icon)
+        },
         contentDescription = null,
         colorFilter = if (custom == null) ColorFilter.tint(color) else custom.colorFilterFor(color),
         modifier = modifier

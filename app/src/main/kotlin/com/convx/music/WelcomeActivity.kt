@@ -73,6 +73,8 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Forum
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFEllipsisBubble
 import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
 import com.convx.music.ui.ios.compat.Card
@@ -541,7 +543,7 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                         Spacer(modifier = Modifier.height(2.dp))
 
                         PermissionCard(
-                            icon = painterResource(com.convx.music.R.drawable.discord),
+                            icon = rememberVectorPainter(SfSymbols.Monochrome.SFEllipsisBubble),
                             iconColor = Color(0xFF67d4ff),
                             iconTint = Color(0xFF004e5d),
                             title = "Join Discord",

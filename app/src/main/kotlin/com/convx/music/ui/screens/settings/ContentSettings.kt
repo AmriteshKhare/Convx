@@ -6,18 +6,21 @@
 package com.convx.music.ui.screens.settings
 
 import androidx.compose.foundation.layout.Box
-import com.convx.music.ui.component.FrostedTopBar
-import com.convx.music.ui.component.TopFadeBlur
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFGlobeAsiaAustraliaFill
+import com.composables.sfsymbols.monochrome.SFLeaf
+import com.composables.sfsymbols.monochrome.SFGlobe
+import com.composables.sfsymbols.monochrome.SFLine3Horizontal
+import com.composables.sfsymbols.monochrome.SFMappinAndEllipse
+import com.composables.sfsymbols.monochrome.SFPlayRectangle
+import com.composables.sfsymbols.monochrome.SFEyeSlashFill
+import com.composables.sfsymbols.monochrome.SFShuffle
+import com.composables.sfsymbols.monochrome.SFSliderHorizontal3
 import com.convx.music.ui.ios.foundation.IosTheme
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import android.content.Intent
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import android.os.Build
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import android.provider.Settings
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
@@ -97,23 +100,17 @@ import androidx.compose.ui.Alignment
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.platform.LocalContext
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.core.net.toUri
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.constants.AppLanguageKey
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ContentCountryKey
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -139,8 +136,6 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.HideVideoSongsKey
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.HideYoutubeShortsKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.constants.AlbumCanvasEnabledKey
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LanguageCodeToName
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -203,11 +198,7 @@ fun ContentSettings(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    // Used only before Android 13
-    val (appLanguage, onAppLanguageChange) = rememberPreference(key = AppLanguageKey, defaultValue = SYSTEM_DEFAULT)
 
     val (contentLanguage, onContentLanguageChange) = rememberPreference(key = ContentLanguageKey, defaultValue = "system")
     val (contentCountry, onContentCountryChange) = rememberPreference(key = ContentCountryKey, defaultValue = "system")
@@ -226,7 +217,6 @@ fun ContentSettings(
         RandomizeHomeOrderKey,
         defaultValue = true
     )
-    val (albumCanvasEnabled, onAlbumCanvasEnabledChange) = rememberPreference(key = AlbumCanvasEnabledKey, defaultValue = false)
     var showSuggestionSheet by rememberSaveable { mutableStateOf(false) }
 
     var showContentLanguageDialog by rememberSaveable {
@@ -269,26 +259,6 @@ fun ContentSettings(
         )
     }
 
-    var showAppLanguageDialog by rememberSaveable {
-        mutableStateOf(false)
-    }
-
-    if (showAppLanguageDialog) {
-        EnumDialog(
-            onDismiss = { showAppLanguageDialog = false },
-            onSelect = {
-                onAppLanguageChange(it)
-                showAppLanguageDialog = false
-            },
-            title = stringResource(R.string.app_language),
-            current = appLanguage,
-            values = (listOf(SYSTEM_DEFAULT) + LanguageCodeToName.keys.toList()),
-            valueText = {
-                LanguageCodeToName.getOrElse(it) { stringResource(R.string.system_default) }
-            }
-        )
-    }
-
     if (showSuggestionSheet) {
         SuggestionRegionSheet(
             currentRegionSlug = suggestionRegion,
@@ -297,20 +267,17 @@ fun ContentSettings(
         )
     }
 
-    val hazeState = remember { HazeState() }
-    Box(modifier = Modifier) {
-    Column(
-        Modifier
-            .hazeSource(hazeState)
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.content),
+        pageColor = IosTheme.colors.systemGroupedBackground,
+        horizontalPadding = 16.dp,
     ) {
         IosSettingsGroup(
             title = stringResource(R.string.general),
             items = listOf(
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.language),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFGlobe),
                     title = { Text(stringResource(R.string.content_language)) },
                     description = {
                         Text(
@@ -320,7 +287,7 @@ fun ContentSettings(
                     onClick = { showContentLanguageDialog = true }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.location_on),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFMappinAndEllipse),
                     title = { Text(stringResource(R.string.content_country)) },
                     description = {
                         Text(
@@ -330,7 +297,7 @@ fun ContentSettings(
                     onClick = { showContentCountryDialog = true }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.globe_location_pin),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFGlobeAsiaAustraliaFill),
                     title = { Text("Suggestions Region") },
                     description = {
                         Text(
@@ -351,7 +318,7 @@ fun ContentSettings(
                     onClick = { onHideExplicitChange(!hideExplicit) }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.slow_motion_video),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFPlayRectangle),
                     title = { Text(stringResource(R.string.hide_video_songs)) },
                     trailingContent = {
                         Switch(
@@ -362,7 +329,7 @@ fun ContentSettings(
                     onClick = { onHideVideoSongsChange(!hideVideoSongs) }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.offline),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFLeaf),
                     title = { Text(stringResource(R.string.data_saver_mode)) },
                     description = { Text(stringResource(R.string.data_saver_mode_desc)) },
                     trailingContent = {
@@ -375,7 +342,7 @@ fun ContentSettings(
                 ),
 
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.hide_image),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFEyeSlashFill),
                     title = { Text(stringResource(R.string.hide_youtube_shorts)) },
                     trailingContent = {
                         Switch(
@@ -385,59 +352,6 @@ fun ContentSettings(
                     },
                     onClick = { onHideYoutubeShortsChange(!hideYoutubeShorts) }
                 )
-            )
-        )
-
-        Spacer(modifier = Modifier.height(27.dp))
-
-        IosSettingsGroup(
-            title = stringResource(R.string.album_text),
-            items = listOf(
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.slow_motion_video),
-                    title = { Text(stringResource(R.string.show_album_canvas)) },
-                    description = { Text(stringResource(R.string.show_album_canvas_desc)) },
-                    trailingContent = {
-                        Switch(
-                            checked = albumCanvasEnabled,
-                            onCheckedChange = onAlbumCanvasEnabledChange
-                        )
-                    },
-                    onClick = { onAlbumCanvasEnabledChange(!albumCanvasEnabled) }
-                )
-            )
-        )
-
-        Spacer(modifier = Modifier.height(27.dp))
-
-        IosSettingsGroup(
-            title = stringResource(R.string.app_language),
-            items = listOf(
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    IosSettingsItem(
-                        icon = painterResource(R.drawable.language),
-                        title = { Text(stringResource(R.string.app_language)) },
-                        onClick = {
-                            context.startActivity(
-                                Intent(
-                                    Settings.ACTION_APP_LOCALE_SETTINGS,
-                                    "package:${context.packageName}".toUri()
-                                )
-                            )
-                        }
-                    )
-                } else {
-                    IosSettingsItem(
-                        icon = painterResource(R.drawable.language),
-                        title = { Text(stringResource(R.string.app_language)) },
-                        description = {
-                            Text(
-                                LanguageCodeToName.getOrElse(appLanguage) { stringResource(R.string.system_default) }
-                            )
-                        },
-                        onClick = { showAppLanguageDialog = true }
-                    )
-                }
             )
         )
 
@@ -476,7 +390,7 @@ fun ContentSettings(
             title = stringResource(R.string.misc),
             items = listOf(
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.shuffle),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFShuffle),
                     title = { Text(stringResource(R.string.randomize_home_order)) },
                     description = { Text(stringResource(R.string.randomize_home_order_desc)) },
                     trailingContent = {
@@ -488,13 +402,13 @@ fun ContentSettings(
                     onClick = { onRandomizeHomeOrderChange(!randomizeHomeOrder) }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.drag_handle),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFLine3Horizontal),
                     title = { Text(stringResource(R.string.home_feed_order)) },
                     description = { Text(stringResource(R.string.home_feed_order_desc)) },
                     onClick = { navController.navigate("settings/home_feed_order") }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.tune),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFSliderHorizontal3),
                     title = { Text(stringResource(R.string.show_mood_filters)) },
                     description = { Text(stringResource(R.string.show_mood_filters_desc)) },
                     trailingContent = {
@@ -514,7 +428,7 @@ fun ContentSettings(
             title = stringResource(R.string.advanced),
             items = listOf(
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.tune),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFSliderHorizontal3),
                     title = { Text(stringResource(R.string.advanced)) },
                     description = { Text(stringResource(R.string.advanced_settings_desc)) },
                     onClick = { navController.navigate("settings/content/advanced") }
@@ -522,19 +436,6 @@ fun ContentSettings(
             )
         )
         Spacer(modifier = Modifier.height(16.dp))
-    }
-
-        TopFadeBlur(
-            hazeState = hazeState,
-            pageColor = IosTheme.colors.systemGroupedBackground,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
-
-        FrostedTopBar(
-            onBack = navController::navigateUp,
-            title = stringResource(R.string.content),
-            titleAlpha = 1f,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+    
     }
 }

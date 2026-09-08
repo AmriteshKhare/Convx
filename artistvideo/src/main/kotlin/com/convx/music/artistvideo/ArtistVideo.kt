@@ -26,7 +26,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -34,12 +33,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import okhttp3.OkHttpClient
-import java.util.Locale
 
 @Composable
 fun ArtistVideo(
     videoUrl: String,
     modifier: Modifier = Modifier,
+    resizeMode: Int = AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -87,17 +86,10 @@ fun ArtistVideo(
 
     LaunchedEffect(videoUrl, exoPlayer) {
         val normalized = videoUrl.trim()
-        val mimeType =
-            when {
-                normalized.lowercase(Locale.ROOT).contains("m3u8") -> MimeTypes.APPLICATION_M3U8
-                normalized.lowercase(Locale.ROOT).contains("mp4") -> MimeTypes.VIDEO_MP4
-                else -> MimeTypes.APPLICATION_M3U8
-            }
 
         val mediaItem =
             MediaItem.Builder()
                 .setUri(normalized)
-                .setMimeType(mimeType)
                 .build()
 
         exoPlayer.stop()
@@ -129,7 +121,7 @@ fun ArtistVideo(
             factory = { viewContext ->
                 AspectRatioFrameLayout(viewContext).apply {
                     layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    this.resizeMode = resizeMode
 
                     val textureView = TextureView(viewContext).apply {
                         layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
@@ -137,6 +129,11 @@ fun ArtistVideo(
                     addView(textureView)
                     exoPlayer.setVideoTextureView(textureView)
                     setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                }
+            },
+            update = { view ->
+                if (view.resizeMode != resizeMode) {
+                    view.resizeMode = resizeMode
                 }
             },
             modifier = Modifier

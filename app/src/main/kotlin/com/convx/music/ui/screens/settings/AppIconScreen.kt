@@ -30,12 +30,11 @@ import com.convx.music.ui.ios.compat.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.ios.compat.Scaffold
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,7 +57,9 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
 import com.convx.music.constants.AppIconKey
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.topBarContentPadding
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.AppIcon
 import com.convx.music.utils.rememberPreference
@@ -104,34 +105,30 @@ fun AppIconScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                windowInsets = appTopBarWindowInsets(),
-                title = { Text(stringResource(R.string.app_icon)) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = navController::navigateUp,
-                        onLongClick = navController::backToMain,
-                    ) {
-                        Icon(painterResource(R.drawable.arrow_back), contentDescription = null)
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { padding ->
+    val gridState = rememberLazyGridState()
+
+    SettingsScaffold(
+        navController = navController,
+        title = stringResource(R.string.app_icon),
+        titleAlpha = rememberTitleCollapseProgress(gridState),
+        pageColor = AppTheme.colorScheme.background,
+    ) { chrome ->
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Adaptive(96.dp),
-            modifier = Modifier
-                .padding(padding)
+            modifier = chrome.contentModifier()
                 .windowInsetsPadding(
-                    LocalPlayerAwareWindowInsets.current.only(
-                        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
-                    ),
+                    LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal)
                 )
                 .fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            // Top padding, not a top inset on the grid itself: the tiles have to
+            // travel under the bar for the blur to have anything to frost.
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = topBarContentPadding(),
+                bottom = 16.dp,
+            ),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

@@ -44,11 +44,12 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
@@ -76,6 +77,7 @@ import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -138,7 +140,9 @@ fun LocalSearchScreen(
     val tint = if (pureBlack) Color.Black else rememberAppBackgroundColor(AppleTokens.BgElevated)
     val onTint = AppleTokens.onColor(tint)
 
-    val glassConfig = LocalGlassEffectConfig.current
+    // Glass Effect setting only drives the nav bar/mini player now — this
+    // screen's top-bar chrome keeps glass but pinned to the fixed style.
+    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val heroBackdrop = rememberLayerBackdrop()
 
@@ -248,7 +252,7 @@ fun LocalSearchScreen(
                                 }
                             ) {
                                 Icon(
-                                    painter = painterResource(R.drawable.more_vert),
+                                    imageVector = SfSymbols.Monochrome.SFEllipsis,
                                     contentDescription = null,
                                 )
                             }

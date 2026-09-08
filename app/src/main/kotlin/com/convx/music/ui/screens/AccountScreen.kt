@@ -95,6 +95,10 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.AccountContentType
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.AccountViewModel
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import com.convx.music.ui.component.ScreenLargeTitle
+import com.convx.music.ui.component.ScreenScaffold
+import com.convx.music.ui.component.rememberTitleCollapseProgress
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -114,10 +118,24 @@ fun AccountScreen(
     val selectedContentType by viewModel.selectedContentType.collectAsState()
     val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
 
+    val gridState = rememberLazyGridState()
+
+    ScreenScaffold(
+        title = stringResource(R.string.account),
+        titleAlpha = rememberTitleCollapseProgress(gridState),
+        onBack = navController::navigateUp,
+        onBackLongClick = navController::backToMain,
+    ) { chrome ->
     LazyVerticalGrid(
+        state = gridState,
         columns = rememberGridColumns(),
+        modifier = chrome.contentModifier(),
         contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
     ) {
+        item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
+            ScreenLargeTitle(stringResource(R.string.account))
+        }
+
         item(span = { GridItemSpan(maxLineSpan) }) {
             ChipsRow(
                 chips = listOf(
@@ -240,19 +258,5 @@ fun AccountScreen(
         }
     }
 
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.account)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        },
-    )
+    }
 }

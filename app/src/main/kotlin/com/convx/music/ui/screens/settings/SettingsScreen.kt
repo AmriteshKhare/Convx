@@ -41,15 +41,12 @@ import com.convx.music.ui.ios.compat.Switch
 import androidx.compose.material3.SwitchDefaults
 import com.convx.music.ui.ios.compat.Text
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.component.FrostedTopBar
-import com.convx.music.ui.component.TopFadeBlur
 import com.convx.music.ui.component.rememberTitleCollapseProgress
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,41 +87,14 @@ fun SettingsScreen(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val searchLower = searchQuery.trim().lowercase()
     val listState = rememberLazyListState()
-    // Progressive top blur so the list dissolves under the status bar instead
-    // of cutting off hard — same technique as the rest of the app's screens.
-    val hazeState = remember { HazeState() }
-
-    Box(
-        modifier = Modifier
-            // Explicit rather than relying on whatever's painted behind the NavHost:
-            // this is an iOS grouped-list page, so it owns the grouped background
-            // token directly instead of inheriting MainActivity's flat systemBackground.
-            .background(IosTheme.colors.systemGroupedBackground),
+    SettingsLazyPage(
+        navController = navController,
+        title = stringResource(R.string.settings),
+        pageColor = IosTheme.colors.systemGroupedBackground,
+        // Shared with the search field below, which collapses on the way down —
+        // the page's own title handoff reads the same state.
+        listState = listState,
     ) {
-    androidx.compose.foundation.lazy.LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .hazeSource(hazeState)
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal))
-    ) {
-        item(key = "top_spacer") {
-            Spacer(
-                Modifier.windowInsetsPadding(
-                    LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-                )
-            )
-        }
-
-        // Large title (iOS style)
-        item(key = "title") {
-            Text(
-                text = stringResource(R.string.settings),
-                style = IosTheme.typography.largeTitle,
-                color = IosTheme.colors.label,
-                modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 14.dp)
-            )
-        }
-
         // Search field — filters the settings catalog and jumps to the matching screen.
         // It collapses as you scroll down and comes back on the way up, the way iOS
         // hides the search bar in Settings and Mail. A query in progress pins it open:
@@ -296,12 +266,8 @@ fun SettingsScreen(
             }
         }
 
-        item(key = "bottom_spacer") {
-            Spacer(
-                Modifier
-                    .height(50.dp)
-                    .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom))
-            )
+        item(key = "settings_bottom_spacer") {
+            Spacer(Modifier.height(100.dp))
         }
         } else {
             item(key = "search_results") {
@@ -333,21 +299,11 @@ fun SettingsScreen(
                     )
                 }
             }
+            item(key = "settings_search_bottom_spacer") {
+                Spacer(Modifier.height(100.dp))
+            }
         }
-    }
-
-        TopFadeBlur(
-            hazeState = hazeState,
-            pageColor = IosTheme.colors.systemGroupedBackground,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
-
-        FrostedTopBar(
-            onBack = navController::navigateUp,
-            title = stringResource(R.string.settings),
-            titleAlpha = rememberTitleCollapseProgress(listState),
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+    
     }
 }
 

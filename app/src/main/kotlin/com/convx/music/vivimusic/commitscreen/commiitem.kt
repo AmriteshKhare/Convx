@@ -21,7 +21,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronLeftForwardslashChevronRight
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,7 +53,7 @@ import com.convx.music.R
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                painter = painterResource(R.drawable.commit), // add commit icon or use a fallback
+                imageVector = SfSymbols.Monochrome.SFChevronLeftForwardslashChevronRight, // add commit icon or use a fallback
                 contentDescription = null,
                 tint = AppTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(20.dp)

@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens.settings
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -42,7 +43,6 @@ import com.convx.music.constants.DisableLoadMoreWhenRepeatAllKey
 import com.convx.music.constants.EnableSaavnStreamingKey
 import com.convx.music.constants.HideVolumeBarKey
 import com.convx.music.constants.HistoryDuration
-import com.convx.music.constants.LocalAlbumsByYearKey
 import com.convx.music.constants.PersistentShuffleAcrossQueuesKey
 import com.convx.music.constants.PreventDuplicateTracksInQueueKey
 import com.convx.music.constants.SaavnAudioQuality
@@ -51,6 +51,7 @@ import com.convx.music.constants.SeekExtraSeconds
 import com.convx.music.constants.ShufflePlaylistFirstKey
 import com.convx.music.constants.SkipSilenceInstantKey
 import com.convx.music.constants.SkipSilenceKey
+import com.convx.music.constants.SpatialAudioKey
 import com.convx.music.constants.StopMusicOnTaskClearKey
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.IosSettingsGroup
@@ -87,10 +88,6 @@ fun PlayerAdvancedSettings(
         CompactPlayerInTabViewKey,
         defaultValue = false
     )
-    val (localAlbumsByYear, onLocalAlbumsByYearChange) = rememberPreference(
-        LocalAlbumsByYearKey,
-        defaultValue = true
-    )
     val (historyDuration, onHistoryDurationChange) = rememberPreference(
         HistoryDuration,
         defaultValue = 30f
@@ -106,6 +103,10 @@ fun PlayerAdvancedSettings(
     )
     val (bitPerfect, onBitPerfectChange) = rememberPreference(
         key = BitPerfectKey,
+        defaultValue = false
+    )
+    val (spatialAudio, onSpatialAudioChange) = rememberPreference(
+        key = SpatialAudioKey,
         defaultValue = false
     )
     val context = LocalContext.current
@@ -146,23 +147,14 @@ fun PlayerAdvancedSettings(
         defaultValue = false
     )
 
-    LazyColumn(
-        Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
-            .padding(horizontal = 16.dp)
+    SettingsLazyPage(
+        navController = navController,
+        title = stringResource(R.string.advanced),
+        pageColor = com.convx.music.ui.ios.compat.AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
         item(key = "player_advanced_settings_content") {
             Column {
-                Spacer(
-                    Modifier.windowInsetsPadding(
-                        LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-                    )
-                )
-
                 IosSettingsGroup(
                     title = stringResource(R.string.player),
                     items = buildList {
@@ -211,18 +203,6 @@ fun PlayerAdvancedSettings(
                                 )
                             },
                             onClick = { onCompactPlayerInTabViewChange(!compactPlayerInTabView) }
-                        ))
-                        add(IosSettingsItem(
-                            icon = painterResource(R.drawable.album),
-                            title = { Text(stringResource(R.string.local_albums_by_year)) },
-                            description = { Text(stringResource(R.string.local_albums_by_year_desc)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = localAlbumsByYear,
-                                    onCheckedChange = onLocalAlbumsByYearChange
-                                )
-                            },
-                            onClick = { onLocalAlbumsByYearChange(!localAlbumsByYear) }
                         ))
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.library_music),
@@ -295,6 +275,26 @@ fun PlayerAdvancedSettings(
                                 )
                             },
                             onClick = { if (!crossfadeEnabled) onBitPerfectChange(!bitPerfect) }
+                        ))
+                        add(IosSettingsItem(
+                            icon = painterResource(R.drawable.equalizer),
+                            title = { Text(stringResource(R.string.spatial_audio)) },
+                            description = {
+                                Text(
+                                    // Gate on the raw preference, matching what MusicService's
+                                    // BitPerfectKey collector actually acts on.
+                                    if (bitPerfect) stringResource(R.string.spatial_audio_disabled_by_bit_perfect)
+                                    else stringResource(R.string.spatial_audio_description)
+                                )
+                            },
+                            trailingContent = {
+                                Switch(
+                                    checked = if (bitPerfect) false else spatialAudio,
+                                    onCheckedChange = onSpatialAudioChange,
+                                    enabled = !bitPerfect
+                                )
+                            },
+                            onClick = { if (!bitPerfect) onSpatialAudioChange(!spatialAudio) }
                         ))
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.arrow_forward),
@@ -394,21 +394,6 @@ fun PlayerAdvancedSettings(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    
     }
-
-    TopAppBar(
-        windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.advanced)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null
-                )
-            }
-        }
-    )
 }

@@ -276,13 +276,17 @@ fun SliderPreference(
     icon: (@Composable () -> Unit)? = null,
     value: Float,
     onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..100f,
+    defaultValue: Float = value,
+    valueFormatter: (Float) -> String = { it.roundToInt().toString() },
+    dialogTitle: String? = null,
     isEnabled: Boolean = true,
 ) {
     var showDialog by remember {
         mutableStateOf(false)
     }
 
-    var sliderValue by remember {
+    var sliderValue by remember(value) {
         mutableFloatStateOf(value)
     }
 
@@ -293,12 +297,18 @@ fun SliderPreference(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text = stringResource(R.string.history_duration),
-                        overflow = TextOverflow.Ellipsis,
-                        maxLines = 1,
-                        style = IosTheme.typography.headline,
-                    )
+                    if (dialogTitle != null) {
+                        Text(
+                            text = dialogTitle,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1,
+                            style = IosTheme.typography.headline,
+                        )
+                    } else {
+                        ProvideTextStyle(IosTheme.typography.headline) {
+                            title()
+                        }
+                    }
                 }
             },
             onDismiss = { showDialog = false },
@@ -311,26 +321,23 @@ fun SliderPreference(
                 showDialog = false
             },
             onReset = {
-                sliderValue = 30f // Default value or any reset value you prefer
+                sliderValue = defaultValue
             },
             content = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = pluralStringResource(
-                            R.plurals.seconds,
-                            sliderValue.roundToInt(),
-                            sliderValue.roundToInt()
-                        ),
-                        style = IosTheme.typography.body,
+                        text = valueFormatter(sliderValue),
+                        style = IosTheme.typography.title,
+                        color = IosTheme.colors.label,
                     )
 
                     Spacer(Modifier.height(16.dp))
 
-                    IosSlider(
+                    com.convx.music.ui.ios.compat.Slider(
                         value = sliderValue,
                         onValueChange = { sliderValue = it },
-                        valueRange = 15f..60f,
-                        modifier = Modifier.fillMaxWidth()
+                        valueRange = valueRange,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                     )
                 }
             }
@@ -340,9 +347,12 @@ fun SliderPreference(
     PreferenceEntry(
         modifier = modifier,
         title = title,
-        description = value.roundToInt().toString(),
+        description = valueFormatter(value),
         icon = icon,
-        onClick = { showDialog = true },
+        onClick = { 
+            sliderValue = value
+            showDialog = true 
+        },
         isEnabled = isEnabled,
     )
 }

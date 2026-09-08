@@ -36,6 +36,7 @@ import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.AccountSettingsViewModel
+import com.convx.music.ui.component.ScreenPage
 
 /**
  * Shown right after a WebView login when the signed-in Google Account has more
@@ -50,23 +51,12 @@ fun ChannelPickerScreen(navController: NavController) {
     val accountSettingsViewModel: AccountSettingsViewModel = hiltViewModel()
     val channels = PendingChannelLogin.channels
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                windowInsets = appTopBarWindowInsets(),
-                title = { Text(stringResource(R.string.choose_channel_title)) },
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .windowInsetsPadding(
-                    LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-                )
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-        ) {
+    ScreenPage(
+        title = stringResource(R.string.choose_channel_title),
+        // No back button on purpose: this page exists because a channel has to
+        // be picked before anything else can continue.
+        horizontalPadding = 16.dp,
+    ) {
             Text(
                 text = stringResource(R.string.choose_channel_subtitle),
                 style = AppTheme.typography.bodyMedium,
@@ -108,6 +98,6 @@ fun ChannelPickerScreen(navController: NavController) {
                     )
                 },
             )
-        }
+        
     }
 }

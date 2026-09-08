@@ -35,6 +35,7 @@ import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
+import com.composables.sfsymbols.SfSymbols
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,7 +50,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +58,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.composables.sfsymbols.monochrome.SFArrowUp
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFClock
+import com.composables.sfsymbols.monochrome.SFMagnifyingglass
+import com.composables.sfsymbols.monochrome.SFXmark
 import com.music.innertube.models.AlbumItem
 import com.music.innertube.models.ArtistItem
 import com.music.innertube.models.PlaylistItem
@@ -286,7 +291,7 @@ fun OnlineSearchScreen(
                         }
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.more_vert),
+                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                             contentDescription = null
                         )
                     }
@@ -389,7 +394,7 @@ fun SuggestionItem(
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)),
         ) {
             Icon(
-                painterResource(if (online) R.drawable.search else R.drawable.history),
+                if (online) SfSymbols.Monochrome.SFMagnifyingglass else SfSymbols.Monochrome.SFClock,
                 contentDescription = null,
                 tint = contentColor,
                 modifier = Modifier.padding(horizontal = 16.dp).alpha(0.5f)
@@ -409,7 +414,7 @@ fun SuggestionItem(
                     modifier = Modifier.alpha(0.5f),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.close),
+                        imageVector = SfSymbols.Monochrome.SFXmark,
                         contentDescription = null,
                         tint = contentColor,
                     )
@@ -421,7 +426,7 @@ fun SuggestionItem(
                 modifier = Modifier.alpha(0.5f),
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.arrow_top_left),
+                    imageVector = SfSymbols.Monochrome.SFArrowUp,
                     contentDescription = null,
                     tint = contentColor,
                 )

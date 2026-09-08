@@ -308,6 +308,12 @@ private const val HighlightAngleFrozen = (HighlightAngleMin + HighlightAngleMax)
 
 val LocalGlassEffectConfig = staticCompositionLocalOf { GlassEffectConfig() }
 
+/** Force a glass surface on regardless of the user's global glass on/off switch.
+ *  Nav bar and mini player follow that switch for the main bar, but fixed
+ *  floating buttons like these always render glass — the setting only decides
+ *  whether the bar itself is glass, not these. */
+fun GlassEffectConfig.withFixedStyle(): GlassEffectConfig = copy(globalEnabled = true)
+
 /** The backdrop content (app UI) that glass surfaces sample from. */
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop> { error("No AppBackdrop provided") }
 

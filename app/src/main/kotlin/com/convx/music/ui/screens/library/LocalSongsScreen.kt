@@ -18,6 +18,8 @@ import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFEllipsis
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -188,7 +190,7 @@ fun LocalSongsScreen(
                             },
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.more_vert),
+                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = null,
                             )
                         }

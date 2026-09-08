@@ -7,24 +7,12 @@ package com.convx.music.ui.component
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.EaseIn
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -44,6 +32,7 @@ import androidx.compose.material3.SheetState
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
@@ -52,26 +41,30 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.isSpecified
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.convx.music.constants.SheetCornerRadiusKey
+import com.convx.music.ui.ios.compat.LocalContentColor
 import com.convx.music.ui.ios.foundation.IosTheme
-import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.utils.concentricRadius
-import com.convx.music.ui.utils.rimLight
-import com.convx.music.utils.rememberPreference
-import kotlinx.coroutines.launch
 import kotlin.math.tanh
+import kotlinx.coroutines.launch
+import zone.ien.hig.CupertinoModalBottomSheet
+import zone.ien.hig.PresentationDetent
+import zone.ien.hig.PresentationStyle
+import zone.ien.hig.rememberCupertinoSheetState
+
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.Alignment
+import com.convx.music.constants.SheetCornerRadiusKey
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.utils.rememberPreference
 
 val LocalMenuState = compositionLocalOf { MenuState() }
 
@@ -172,13 +165,6 @@ private val CupertinoSheetEasing = CubicBezierEasing(0.2833f, 0.99f, 0.31833f, 0
 private const val CupertinoSheetEnterMillis = 400
 private const val CupertinoSheetExitMillis = 150
 
-/** Matches [io.github.alexzhirkevich.cupertino.CupertinoDialogsDefaults.ScrimColor]. */
-@Composable
-private fun cupertinoScrimColor(): Color = Color.Black.copy(alpha = if (isSystemInDarkTheme()) 0.4f else 0.2f)
-
-/** How far the sheet must be dragged down before release commits a dismiss. */
-private val MenuDragCommitDistance = 120.dp
-
 /** Range the rubber-band resist eases across — pulling past this barely moves it further. */
 private val MenuDragResistRange = 320.dp
 
@@ -191,23 +177,32 @@ fun BottomSheetMenu(
     background: Color = Color.Unspecified,
 ) {
     val iosColors = IosTheme.colors
-    val sheetBackground = if (background.isSpecified) background else iosColors.systemGroupedBackground
-    val focusManager = LocalFocusManager.current
-    val density = LocalDensity.current
-    val coroutineScope = rememberCoroutineScope()
+    val isDark = isSystemInDarkTheme()
     val (sheetCornerRadius) = rememberPreference(SheetCornerRadiusKey, MenuSheetCornerRadius.value)
-    val sheetShape = remember(sheetCornerRadius) { ContinuousRoundedRectangle(sheetCornerRadius.dp) }
+    val sheetShape = remember(sheetCornerRadius) {
+        ContinuousRoundedRectangle(
+            topStart = sheetCornerRadius.dp,
+            topEnd = sheetCornerRadius.dp,
+            bottomEnd = 0.dp,
+            bottomStart = 0.dp,
+        )
+    }
+    val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberCupertinoSheetState(
+        presentationStyle = PresentationStyle.Modal(
+            detents = setOf(PresentationDetent.Medium, PresentationDetent.Large),
+        ),
+    )
 
+    // Routed through hig's own detent state machine (CupertinoSheetState) via
+    // CupertinoModalBottomSheet — the real library mechanism, not a hand-rolled
+    // stand-in: opens to the Medium detent, drags to Large, dismisses past Medium.
+    // hide() plays the real slide-down settle; MenuState.isVisible only flips once
+    // that finishes (see onDismissRequest below), so this stays composed for it.
     fun dismiss() {
         focusManager.clearFocus()
-        state.isVisible = false
-    }
-
-    // Own drag offset on top of the enter/exit slide below — dragging never fights the
-    // open/close animation, it just adds further translation while a finger is down.
-    val dragOffsetPx = remember { Animatable(0f) }
-    LaunchedEffect(state.isVisible) {
-        if (state.isVisible) dragOffsetPx.snapTo(0f)
+        scope.launch { sheetState.hide() }
     }
 
     AnimatedVisibility(
@@ -216,108 +211,42 @@ fun BottomSheetMenu(
         exit = fadeOut(tween(CupertinoSheetExitMillis, easing = EaseIn)),
         modifier = modifier,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(cupertinoScrimColor())
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = ::dismiss,
-                ),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             BackHandler(onBack = ::dismiss)
 
-            AnimatedVisibility(
-                visible = state.isVisible,
-                // A morph-style grow rather than a plain slide: the sheet scales up from
-                // the bottom edge it's anchored to (not just translating in at full size),
-                // so it reads as unfolding into place. Not a true origin-tracking morph off
-                // the button that opened it (that needs every one of the ~30 call sites
-                // wired with a position, like PlayerContainerMorph's mini-player pill) —
-                // this is the cheap version: one fixed anchor, same effect from any opener.
-                enter = slideInVertically(
-                    animationSpec = tween(CupertinoSheetEnterMillis, easing = CupertinoSheetEasing),
-                    initialOffsetY = { it },
-                ) + scaleIn(
-                    animationSpec = tween(CupertinoSheetEnterMillis, easing = CupertinoSheetEasing),
-                    initialScale = 0.85f,
-                    transformOrigin = TransformOrigin(0.5f, 1f),
-                ),
-                exit = slideOutVertically(
-                    animationSpec = tween(CupertinoSheetExitMillis, easing = EaseIn),
-                    targetOffsetY = { it },
-                ) + scaleOut(
-                    animationSpec = tween(CupertinoSheetExitMillis, easing = EaseIn),
-                    targetScale = 0.85f,
-                    transformOrigin = TransformOrigin(0.5f, 1f),
-                ),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(horizontal = 8.dp, vertical = 12.dp)
-                        .widthIn(max = 500.dp)
-                        .fillMaxWidth()
-                        .graphicsLayer { translationY = dragOffsetPx.value }
-                        .pointerInput(Unit) {
-                            val resistRangePx = MenuDragResistRange.toPx()
-                            val commitPx = MenuDragCommitDistance.toPx()
-                            detectVerticalDragGestures(
-                                onVerticalDrag = { change, dragAmount ->
-                                    change.consume()
-                                    // Rubber-band: the further already pulled, the less an
-                                    // additional pixel of drag moves it — never lets go slack.
-                                    val resisted = if (dragAmount > 0f) {
-                                        val eased = (1f - (dragOffsetPx.value / resistRangePx).coerceIn(0f, 1f))
-                                            .coerceAtLeast(0.15f)
-                                        dragAmount * eased
-                                    } else {
-                                        dragAmount
-                                    }
-                                    coroutineScope.launch {
-                                        dragOffsetPx.snapTo((dragOffsetPx.value + resisted).coerceAtLeast(0f))
-                                    }
-                                },
-                                onDragEnd = {
-                                    if (dragOffsetPx.value > commitPx) {
-                                        dismiss()
-                                    } else {
-                                        coroutineScope.launch {
-                                            dragOffsetPx.animateTo(
-                                                0f,
-                                                spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = Spring.StiffnessMedium,
-                                                ),
-                                            )
-                                        }
-                                    }
-                                },
-                                onDragCancel = {
-                                    coroutineScope.launch {
-                                        dragOffsetPx.animateTo(0f, spring(stiffness = Spring.StiffnessMedium))
-                                    }
-                                },
-                            )
-                        }
-                        .clip(sheetShape)
-                        .background(sheetBackground, sheetShape)
-                        .rimLight(shape = sheetShape)
-                        // Swallows taps so a press on the menu itself does not reach the
-                        // scrim's dismiss handler underneath.
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {},
-                        ),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    IosGrabber(dragOffsetPx = dragOffsetPx.value)
-                    Column(
+            val resolvedContainerColor = when {
+                background.isSpecified -> background
+                isDark -> Color(0xFF141416)
+                else -> iosColors.secondarySystemGroupedBackground
+            }
+
+            CupertinoModalBottomSheet(
+                onDismissRequest = { state.isVisible = false },
+                sheetState = sheetState,
+                shape = sheetShape,
+                containerColor = resolvedContainerColor,
+                contentColor = iosColors.label,
+                dragHandle = {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = MenuSheetContentInset)
+                            .padding(top = 8.dp, bottom = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        IosGrabber()
+                    }
+                },
+            ) {
+                // CupertinoModalBottomSheet provides hig's own LocalContentColor, but
+                // this app's screens are built on the ios.compat Icon/Text, which reads
+                // a separate compat LocalContentColor — provide that one too, or content
+                // here falls back to Compose's global-default black regardless.
+                CompositionLocalProvider(LocalContentColor provides iosColors.label) {
+                    Column(
+                        modifier = Modifier
+                            .widthIn(max = 500.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = MenuSheetContentInset),
                     ) {
                         state.content(this)
                     }
@@ -331,12 +260,14 @@ fun BottomSheetMenu(
  * The iOS sheet grabber: a 36x5 capsule sitting close under the sheet's own top edge,
  * not floating in a tall Material-sized handle area.
  *
- * [dragOffsetPx] is the sheet's own drag-to-dismiss offset (see [BottomSheetMenu]'s
- * `dragOffsetPx`) — the grabber stretches into a wider, thinner capsule as the sheet
- * is pulled, same tanh-damped "elastic" feel as [GlassCircleButton]'s press/drag
- * distortion, just driven by the sheet's existing drag state instead of its own
- * gesture (the whole sheet already owns vertical drag; a second detector on the
- * grabber alone would fight it).
+ * [dragOffsetPx] is the caller's own drag-to-dismiss offset — the grabber stretches
+ * into a wider, thinner capsule as the sheet is pulled, same tanh-damped "elastic"
+ * feel as [GlassCircleButton]'s press/drag distortion, just driven by the sheet's
+ * existing drag state instead of its own gesture (the whole sheet already owns
+ * vertical drag; a second detector on the grabber alone would fight it). Used as the
+ * drag handle for Material's [ModalBottomSheet]-backed sheets ([IosCompatTail]'s
+ * default, [BottomSheetPage]) — [BottomSheetMenu] drags through hig's
+ * [zone.ien.hig.CupertinoModalBottomSheet], which draws its own grabber.
  */
 @Composable
 fun IosGrabber(modifier: Modifier = Modifier, dragOffsetPx: Float = 0f) {

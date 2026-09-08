@@ -39,6 +39,8 @@ import androidx.compose.material3.FilterChipDefaults
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -55,17 +57,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Tune
 import com.convx.music.ui.ios.compat.VerticalDivider
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.convx.music.R
 import com.convx.music.ui.screens.OptionStats
+import com.convx.music.ui.theme.AppleTokens
 
 @Composable
-fun <E> ChipsRow(
-    chips: List<Pair<E, String>>,
-    currentValue: E,
-    onValueUpdate: (E) -> Unit,
+fun <T> ChipsRow(
+    chips: List<Pair<T, String>>,
+    currentValue: T,
+    onValueUpdate: (T) -> Unit,
     modifier: Modifier = Modifier,
     containerColor: Color = AppTheme.colorScheme.surfaceContainer,
     // Callers sitting over their own blurred hero backdrop (search results, over
@@ -80,11 +82,12 @@ fun <E> ChipsRow(
         modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)),
+            .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
+            .padding(vertical = 8.dp),
     ) {
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(AppleTokens.Gutter))
 
-        chips.forEach { (value, label) ->
+        chips.forEachIndexed { index, (value, label) ->
             val isSelected = currentValue == value
 
             // Animate the corner radius based on selection
@@ -191,7 +194,7 @@ fun <Int> ChoiceChipsRow(
                     },
                     trailingIcon = {
                         Icon(
-                            painter = painterResource(R.drawable.expand_more),
+                            imageVector = SfSymbols.Monochrome.SFChevronDown,
                             contentDescription = null,
                             modifier = Modifier
                                 .graphicsLayer(rotationZ = rotationAnimation)

@@ -1,191 +1,100 @@
 package com.convx.music.ui.screens.settings
 
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.res.Configuration
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.os.Build
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.AnimatedVisibility
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.Spring
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.animateDpAsState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.animateFloatAsState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.spring
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.tween
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.fadeIn
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.fadeOut
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.scaleIn
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.scaleOut
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.BorderStroke
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.Canvas
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.background
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.bounceClick
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.combinedBounceClick
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.isSystemInDarkTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Box
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.PaddingValues
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.aspectRatio
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.heightIn
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.width
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.lazy.LazyRow
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.lazy.items
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.shape.CircleShape
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.shape.RoundedCornerShape
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.Card
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.CardDefaults
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.dynamicDarkColorScheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.dynamicLightColorScheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.ripple
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.runtime.Composable
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.ColorPickerDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.draw.clip
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.geometry.Offset
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.geometry.Size
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.graphics.Color
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.graphics.graphicsLayer
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.graphics.toArgb
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.platform.LocalConfiguration
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.platform.LocalContext
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.semantics.contentDescription
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.semantics.semantics
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.materialkolor.PaletteStyle
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.materialkolor.rememberDynamicColorScheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.constants.DarkModeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.constants.DynamicThemeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.constants.PureBlackKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.constants.PureBlackMiniPlayerKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.constants.SelectedThemeColorKey
-import com.convx.music.constants.AppBackgroundColorKey
-import com.convx.music.constants.AppTextColorKey
-import com.convx.music.ui.ios.compat.Surface
-import com.convx.music.constants.AppFont
-import com.convx.music.constants.SelectedFontKey
-import com.convx.music.utils.rememberPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.theme.AppleTokens
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.theme.DefaultThemeColor
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.theme.vivimusicTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.utils.rememberEnumPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.utils.rememberPreference
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFMoonFill
+import com.composables.sfsymbols.monochrome.SFMoonphaseFirstQuarterInverse
+import com.composables.sfsymbols.monochrome.SFSunMinFill
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.convx.music.LocalPlayerAwareWindowInsets
+import com.convx.music.R
+import com.convx.music.constants.AppFont
+import com.convx.music.constants.DarkModeKey
+import com.convx.music.constants.DynamicThemeKey
+import com.convx.music.constants.PureBlackKey
+import com.convx.music.constants.SelectedFontKey
+import com.convx.music.constants.SelectedThemeColorKey
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Card
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.ripple
+import com.convx.music.ui.theme.AppleTokens
+import com.convx.music.ui.theme.DefaultThemeColor
+import com.convx.music.ui.theme.vivimusicTheme
+import com.convx.music.ui.utils.bounceClick
+import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.utils.rememberEnumPreference
+import com.convx.music.utils.rememberPreference
+import com.materialkolor.PaletteStyle
+import com.materialkolor.rememberDynamicColorScheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -193,16 +102,10 @@ fun ThemeScreen(
     navController: NavController,
 ) {
     val (darkMode, onDarkModeChange) = rememberEnumPreference(DarkModeKey, DarkMode.AUTO)
-    val (pureBlack, onPureBlackChangeRaw) = rememberPreference(PureBlackKey, defaultValue = false)
-    val (_, onPureBlackMiniPlayerChange) = rememberPreference(
-        PureBlackMiniPlayerKey,
-        defaultValue = false
-    )
-
-    val onPureBlackChange: (Boolean) -> Unit = { enabled ->
-        onPureBlackChangeRaw(enabled)
-        onPureBlackMiniPlayerChange(enabled)
-    }
+    // Pure Black (AMOLED) is read-only here now -- it's a beginner-picker simplification
+    // (task 011): the toggle itself moved to AppearanceAdvancedSettings.kt, this screen
+    // only needs the current value to render the mode mockup/preview correctly.
+    val (pureBlack) = rememberPreference(PureBlackKey, defaultValue = false)
     val (selectedThemeColorInt, onSelectedThemeColorChange) = rememberPreference(
         SelectedThemeColorKey,
         DefaultThemeColor.toArgb()
@@ -236,49 +139,39 @@ fun ThemeScreen(
     // clearing it here would silently delete a file the user picked.
     val onReset: () -> Unit = {
         onDarkModeChange(DarkMode.AUTO)
-        onPureBlackChange(false)
         onSelectedThemeColorChange(DefaultThemeColor.toArgb())
         onDynamicThemeChange(true)
     }
 
-    if (isLandscape) {
-        LandscapeThemeLayout(
-            darkMode = darkMode,
-            onDarkModeChange = onDarkModeChange,
-            pureBlack = pureBlack,
-            onPureBlackChange = onPureBlackChange,
-            selectedThemeColor = selectedThemeColor,
-            onSelectedThemeColorChange = handleColorSelection,
-            onReset = onReset,
-            fontLabel = fontLabel,
-            onFontClick = onFontClick,
-        )
-    } else {
-        PortraitThemeLayout(
-            darkMode = darkMode,
-            onDarkModeChange = onDarkModeChange,
-            pureBlack = pureBlack,
-            onPureBlackChange = onPureBlackChange,
-            selectedThemeColor = selectedThemeColor,
-            onSelectedThemeColorChange = handleColorSelection,
-            onReset = onReset,
-            fontLabel = fontLabel,
-            onFontClick = onFontClick,
-        )
-    }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.theme_colors)) },
-        navigationIcon = {
-            IconButton(onClick = { navController.navigateUp() }) {
-                Icon(
-                    painter = painterResource(R.drawable.arrow_back),
-                    contentDescription = stringResource(R.string.cd_back)
-                )
-            }
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.theme_colors),
+        pageColor = AppTheme.colorScheme.background,
+    ) {
+        if (isLandscape) {
+            LandscapeThemeLayout(
+                darkMode = darkMode,
+                onDarkModeChange = onDarkModeChange,
+                pureBlack = pureBlack,
+                selectedThemeColor = selectedThemeColor,
+                onSelectedThemeColorChange = handleColorSelection,
+                onReset = onReset,
+                fontLabel = fontLabel,
+                onFontClick = onFontClick,
+            )
+        } else {
+            PortraitThemeLayout(
+                darkMode = darkMode,
+                onDarkModeChange = onDarkModeChange,
+                pureBlack = pureBlack,
+                selectedThemeColor = selectedThemeColor,
+                onSelectedThemeColorChange = handleColorSelection,
+                onReset = onReset,
+                fontLabel = fontLabel,
+                onFontClick = onFontClick,
+            )
         }
-    )
+    }
 }
 
 @Composable
@@ -286,7 +179,6 @@ fun PortraitThemeLayout(
     darkMode: DarkMode,
     onDarkModeChange: (DarkMode) -> Unit,
     pureBlack: Boolean,
-    onPureBlackChange: (Boolean) -> Unit,
     selectedThemeColor: Color,
     onSelectedThemeColorChange: (Color) -> Unit,
     onReset: () -> Unit,
@@ -294,15 +186,7 @@ fun PortraitThemeLayout(
     onFontClick: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            // Was a hardcoded PaddingValues(0.dp) from the caller, so content
-            // started at y=0 under the opaque TopAppBar below — the phone
-            // mockup's top edge rendered hidden behind the bar. This is the
-            // same top-bar-aware inset every other settings screen already
-            // uses (see GlassEffectSettings.kt).
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(24.dp))
@@ -326,7 +210,6 @@ fun PortraitThemeLayout(
             darkMode = darkMode,
             onDarkModeChange = onDarkModeChange,
             pureBlack = pureBlack,
-            onPureBlackChange = onPureBlackChange,
             onReset = onReset,
         )
 
@@ -382,7 +265,6 @@ fun LandscapeThemeLayout(
     darkMode: DarkMode,
     onDarkModeChange: (DarkMode) -> Unit,
     pureBlack: Boolean,
-    onPureBlackChange: (Boolean) -> Unit,
     selectedThemeColor: Color,
     onSelectedThemeColorChange: (Color) -> Unit,
     onReset: () -> Unit,
@@ -391,9 +273,8 @@ fun LandscapeThemeLayout(
 ) {
     Row(
         modifier = Modifier
-            .fillMaxSize()
-            // Same top-bar-hidden-mockup fix as PortraitThemeLayout above.
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
     ) {
         Column(
             modifier = Modifier
@@ -428,7 +309,6 @@ fun LandscapeThemeLayout(
                 darkMode = darkMode,
                 onDarkModeChange = onDarkModeChange,
                 pureBlack = pureBlack,
-                onPureBlackChange = onPureBlackChange,
                 onReset = onReset,
             )
 
@@ -455,7 +335,6 @@ fun ThemeControls(
     darkMode: DarkMode,
     onDarkModeChange: (DarkMode) -> Unit,
     pureBlack: Boolean,
-    onPureBlackChange: (Boolean) -> Unit,
     onReset: () -> Unit,
 ) {
     Card(
@@ -493,7 +372,7 @@ fun ThemeControls(
                         onClick = {
                             onDarkModeChange(DarkMode.AUTO)
                         },
-                        showIcon = true
+                        icon = SfSymbols.Monochrome.SFMoonphaseFirstQuarterInverse
                     )
                     
                     // Vertical divider to separate System from manual modes
@@ -504,7 +383,8 @@ fun ThemeControls(
                             .background(AppTheme.colorScheme.outlineVariant)
                     )
                     
-                    // Manual modes (Light, Dark, Pure Black)
+                    // Manual modes (Light, Dark). Pure Black (AMOLED) moved to
+                    // Advanced Appearance -- task 011 beginner-picker simplification.
                     ModeCircle(
                         darkMode = darkMode,
                         pureBlack = pureBlack,
@@ -512,38 +392,22 @@ fun ThemeControls(
                         targetPureBlack = false,
                         onClick = {
                             onDarkModeChange(DarkMode.OFF)
-                            onPureBlackChange(false)
                         },
-                        showIcon = false
+                        icon = SfSymbols.Monochrome.SFSunMinFill
                     )
-                    
+
                     ModeCircle(
                         darkMode = darkMode,
                         pureBlack = pureBlack,
                         targetMode = DarkMode.ON,
-                        targetPureBlack = false,
+                        targetPureBlack = pureBlack,
                         onClick = {
                             onDarkModeChange(DarkMode.ON)
-                            onPureBlackChange(false)
                         },
-                        showIcon = false
-                    )
-                    
-                    ModeCircle(
-                        darkMode = darkMode,
-                        pureBlack = pureBlack,
-                        targetMode = DarkMode.ON,
-                        targetPureBlack = true,
-                        onClick = {
-                            onDarkModeChange(DarkMode.ON)
-                            onPureBlackChange(true)
-                        },
-                        showIcon = false
+                        icon = SfSymbols.Monochrome.SFMoonFill
                     )
                 }
             }
-
-            AppBackgroundTextColorSection()
 
             TextButton(
                 onClick = onReset,
@@ -555,122 +419,13 @@ fun ThemeControls(
     }
 }
 
-/**
- * App-wide background/text color, independent of Liquid Glass. Replaces the
- * old accent-color palette picker in this screen — the seed-color mechanism
- * it wrote to ([SelectedThemeColorKey]/[DynamicThemeKey]) is untouched and
- * still drives the app's Material color scheme, this just removes its picker
- * UI here in favor of direct background/text color control.
- *
- * Both preferences default to 0 ("unset"): every call site that reads them
- * (Home's plain background, the shared nav chrome's non-glass fallback)
- * falls back to its exact pre-existing hardcoded color, so a user who never
- * opens this section sees no visual change at all.
- */
-@Composable
-private fun AppBackgroundTextColorSection() {
-    val (backgroundColorInt, onBackgroundColorChange) = rememberPreference(AppBackgroundColorKey, defaultValue = 0)
-    val (textColorInt, onTextColorChange) = rememberPreference(AppTextColorKey, defaultValue = 0)
-
-    // "Unset" swatch shown here matches what every consuming call site's own
-    // fallback actually resolves to (surfaceContainerHigh / onSurface), so
-    // the picker never shows a color that doesn't match reality.
-    val backgroundColor = if (backgroundColorInt == 0) AppTheme.colorScheme.surfaceContainerHigh else Color(backgroundColorInt)
-    val textColor = if (textColorInt == 0) AppTheme.colorScheme.onSurface else Color(textColorInt)
-
-    var showBackgroundPicker by remember { mutableStateOf(false) }
-    var showTextPicker by remember { mutableStateOf(false) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = stringResource(R.string.app_background_text_color),
-            style = AppTheme.typography.titleMedium,
-            color = AppTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(R.string.app_background_text_color_desc),
-            style = AppTheme.typography.bodySmall,
-            color = AppTheme.colorScheme.onSurfaceVariant
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            AppColorSwatchButton(
-                label = stringResource(R.string.background_color),
-                color = backgroundColor,
-                onClick = { showBackgroundPicker = true },
-                modifier = Modifier.weight(1f),
-            )
-            AppColorSwatchButton(
-                label = stringResource(R.string.text_color),
-                color = textColor,
-                onClick = { showTextPicker = true },
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-
-    if (showBackgroundPicker) {
-        ColorPickerDialog(
-            initialColor = backgroundColor,
-            title = stringResource(R.string.background_color),
-            onDismiss = { showBackgroundPicker = false },
-            onConfirm = {
-                onBackgroundColorChange(it.toArgb())
-                showBackgroundPicker = false
-            },
-        )
-    }
-
-    if (showTextPicker) {
-        ColorPickerDialog(
-            initialColor = textColor,
-            title = stringResource(R.string.text_color),
-            onDismiss = { showTextPicker = false },
-            onConfirm = {
-                onTextColorChange(it.toArgb())
-                showTextPicker = false
-            },
-        )
-    }
-}
-
-@Composable
-private fun AppColorSwatchButton(
-    label: String,
-    color: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.clickable(onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(color)
-                .border(1.dp, AppTheme.colorScheme.outline.copy(alpha = 0.4f), CircleShape)
-        )
-        Text(
-            text = label,
-            style = AppTheme.typography.bodySmall,
-            color = AppTheme.colorScheme.onSurface,
-        )
-    }
-}
-
 @Composable
 fun ModeCircle(
     darkMode: DarkMode,
     pureBlack: Boolean,
     targetMode: DarkMode,
     targetPureBlack: Boolean,
-    showIcon: Boolean,
+    icon: ImageVector,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -760,14 +515,6 @@ fun ModeCircle(
         contentAlignment = Alignment.Center
     ) {
         when {
-            showIcon -> {
-                Icon(
-                    painter = painterResource(R.drawable.sync),
-                    contentDescription = null,
-                    tint = modeColorScheme.onSurface,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
             isSelected -> {
                 AnimatedVisibility(
                     visible = isSelected,
@@ -790,6 +537,14 @@ fun ModeCircle(
                         modifier = Modifier.size(20.dp)
                     )
                 }
+            }
+            else -> {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = modeColorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
     }

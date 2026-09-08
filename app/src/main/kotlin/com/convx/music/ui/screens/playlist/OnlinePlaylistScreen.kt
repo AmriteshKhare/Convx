@@ -11,7 +11,6 @@ import android.content.Intent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import com.convx.music.ui.ios.compat.Checkbox
-import com.convx.music.ui.ios.compat.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import com.convx.music.ui.ios.compat.Icon
@@ -25,6 +24,18 @@ import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.ios.compat.Text
 import androidx.compose.foundation.shape.CircleShape
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowDownCircle
+import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
+import com.composables.sfsymbols.monochrome.SFChevronLeft
+import com.composables.sfsymbols.monochrome.SFECircle
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFHeart
+import com.composables.sfsymbols.monochrome.SFHeartFill
+import com.composables.sfsymbols.monochrome.SFMagnifyingglass
+import com.composables.sfsymbols.monochrome.SFShuffle
+import com.composables.sfsymbols.monochrome.SFWifiSlash
+import com.composables.sfsymbols.monochrome.SFXmark
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -138,6 +149,7 @@ import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.backdrop.backdrops.LayerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
@@ -162,7 +174,9 @@ import com.convx.music.ui.utils.rememberHeroZoom
 import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.component.rememberHeroTint
-import com.convx.music.ui.component.rememberHeroPalette
+import com.convx.music.ui.player.MeshGradientBackground
+import com.convx.music.ui.player.dimmed
+import com.convx.music.ui.player.rememberArtworkMeshPalette
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.theme.rememberArtworkTint
@@ -309,7 +323,9 @@ fun OnlinePlaylistScreen(
         label = "OnlinePlaylistScreenTint",
     )
 
-    val glassConfig = LocalGlassEffectConfig.current
+    // Glass Effect setting only drives the nav bar/mini player now — this
+    // screen's top-bar chrome keeps glass but pinned to the fixed style.
+    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
     val chromeContentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface
@@ -331,14 +347,16 @@ fun OnlinePlaylistScreen(
         staticArt = playlist?.thumbnail,
         songs = songs.map { it.thumbnail to false },
     )
-    val heroPalette = rememberHeroPalette(playlist?.thumbnail)
-    val tint = heroPalette.background
+    // Same mesh backdrop as ArtistScreen/the player's BITCHORD_MESH style, not the
+    // flat single-swatch fill rememberHeroPalette used to paint here -- this screen
+    // is reached straight off the artist page and read visibly flatter than the
+    // player over the same artwork.
+    val meshPalette = rememberArtworkMeshPalette(playlist?.thumbnail)
+    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
-    // now the colour engine's own primary text tier for THIS artwork -- derived against
-    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
-    // a fixed shift of the background.
-    val onTint = heroPalette.primaryText
+    // Same flat white every icon/text reads in the player on a mesh background,
+    // rather than a per-artwork computed contrast colour.
+    val onTint = Color.White
 
     // Fills the screen tint into the capture BEFORE the content, exactly like
     // MainActivity's appBackdrop does with its own background. Without it the
@@ -368,6 +386,11 @@ fun OnlinePlaylistScreen(
             .background(tint)
             .hazeSource(hazeState),
     ) {
+      MeshGradientBackground(
+          palette = meshPalette,
+          trackKey = playlist?.thumbnail,
+          modifier = Modifier.matchParentSize(),
+      )
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
         // root appBackdrop — sampling appBackdrop here is the RenderNode cycle.
@@ -507,7 +530,7 @@ fun OnlinePlaylistScreen(
                                             YouTubeSongMenu(songItem, navController, menuState::dismiss)
                                         }
                                     }) {
-                                        Icon(painterResource(R.drawable.more_vert), null)
+                                        Icon(imageVector = SfSymbols.Monochrome.SFEllipsis, null)
                                     }
                                 }
                             }
@@ -516,13 +539,8 @@ fun OnlinePlaylistScreen(
 
                     if (isLoadingMore) {
                         item(key = "loading_more") {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                ContainedLoadingIndicator()
+                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                                repeat(2) { index -> com.convx.music.ui.component.SongRowSkeleton(index = index) }
                             }
                         }
                     }
@@ -640,7 +658,7 @@ fun OnlinePlaylistScreen(
             if (inSelectMode) {
                 GlassCircleButton(onClick = onExitSelectionMode) {
                     Icon(
-                        painter = painterResource(R.drawable.close),
+                        imageVector = SfSymbols.Monochrome.SFXmark,
                         contentDescription = null
                     )
                 }
@@ -688,7 +706,7 @@ fun OnlinePlaylistScreen(
                         }
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.more_vert),
+                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                             contentDescription = null,
                             modifier = Modifier.alpha(if (selection.isNotEmpty()) 1f else 0.4f)
                         )
@@ -702,7 +720,7 @@ fun OnlinePlaylistScreen(
                     },
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.arrow_back),
+                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
                         contentDescription = null
                     )
                 }
@@ -748,7 +766,7 @@ fun OnlinePlaylistScreen(
                     onLongClick = { navController.backToMain() },
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.arrow_back),
+                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
                         contentDescription = null
                     )
                 }
@@ -773,11 +791,70 @@ fun OnlinePlaylistScreen(
                     }
                 }
 
-                GlassCircleButton(onClick = { isSearching = true }) {
-                    Icon(
-                        painter = painterResource(R.drawable.search),
-                        contentDescription = null
-                    )
+                Row(
+                    modifier = Modifier
+                        .height(48.dp)
+                        .clip(chromeShape)
+                        .then(chromeBackgroundModifier)
+                        .padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    IconButton(
+                        onClick = { isSearching = true },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(
+                            imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
+                            contentDescription = stringResource(R.string.search),
+                            modifier = Modifier.size(20.dp),
+                            tint = chromeContentColor
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            playlist?.shareLink?.let { link ->
+                                val intent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, link)
+                                }
+                                context.startActivity(Intent.createChooser(intent, null))
+                            }
+                        },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(
+                            imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
+                            contentDescription = stringResource(R.string.share),
+                            modifier = Modifier.size(20.dp),
+                            tint = chromeContentColor
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            playlist?.let { pl ->
+                                menuState.show {
+                                    YouTubePlaylistMenu(
+                                        playlist = pl,
+                                        songs = songs ?: emptyList(),
+                                        coroutineScope = coroutineScope,
+                                        onDismiss = menuState::dismiss,
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Icon(
+                            imageVector = SfSymbols.Monochrome.SFEllipsis,
+                            contentDescription = stringResource(R.string.more_options),
+                            modifier = Modifier.size(20.dp),
+                            tint = chromeContentColor
+                        )
+                    }
                 }
             }
         }
@@ -823,7 +900,9 @@ private fun OnlinePlaylistHeader(
     // Same glass/tint chrome as the enclosing OnlinePlaylistScreen's floating
     // top bar — recomputed here since this is a separate composable function.
     val artworkColors = rememberArtworkTint(playlist.thumbnail)
-    val glassConfig = LocalGlassEffectConfig.current
+    // Glass Effect setting only drives the nav bar/mini player now — this
+    // screen's top-bar chrome keeps glass but pinned to the fixed style.
+    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
     val chromeContentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface
@@ -838,14 +917,9 @@ private fun OnlinePlaylistHeader(
         staticArt = heroUrl,
         songs = songs.map { it.thumbnail to false },
     )
-    val heroPalette = rememberHeroPalette(heroUrl)
-    val tint = heroPalette.background
-    com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
-    // now the colour engine's own primary text tier for THIS artwork -- derived against
-    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
-    // a fixed shift of the background.
-    val onTint = heroPalette.primaryText
+    // The enclosing OnlinePlaylistScreen paints the actual mesh background; this header
+    // only needs the same flat white every icon/text reads over it, like the player.
+    val onTint = Color.White
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -929,7 +1003,7 @@ private fun OnlinePlaylistHeader(
                         size = 48.dp,
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.share),
+                            imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                             contentDescription = stringResource(R.string.share),
                             modifier = Modifier.size(20.dp)
                         )
@@ -967,7 +1041,7 @@ private fun OnlinePlaylistHeader(
                     ) {
                         AnimatedPlayPauseIcon(
                             isPlaying = isPlayingThisPlaylist,
-                            tint = tint,
+                            tint = onTint,
                             size = 32.dp,
                         )
                     }
@@ -1017,9 +1091,7 @@ private fun OnlinePlaylistHeader(
                         size = 48.dp,
                     ) {
                         Icon(
-                            painter = painterResource(
-                                if (isBookmarked) R.drawable.favorite else R.drawable.favorite_border
-                            ),
+                            imageVector = if (isBookmarked) SfSymbols.Monochrome.SFHeartFill else SfSymbols.Monochrome.SFHeart,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
                             tint = if (isBookmarked) AppTheme.colorScheme.error else LocalContentColor.current
@@ -1040,7 +1112,7 @@ private fun OnlinePlaylistHeader(
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.explicit),
+                        imageVector = SfSymbols.Monochrome.SFECircle,
                         contentDescription = "Explicit",
                         tint = chromeContentColor,
                         modifier = Modifier.size(14.dp)
@@ -1139,7 +1211,7 @@ private fun OnlinePlaylistHeader(
                     when (downloadState) {
                         Download.STATE_COMPLETED -> {
                             Icon(
-                                painter = painterResource(R.drawable.offline),
+                                imageVector = SfSymbols.Monochrome.SFWifiSlash,
                                 contentDescription = stringResource(R.string.saved),
                                 modifier = Modifier.size(20.dp),
                                 tint = chromeContentColor
@@ -1154,7 +1226,7 @@ private fun OnlinePlaylistHeader(
                         }
                         else -> {
                             Icon(
-                                painter = painterResource(R.drawable.download),
+                                imageVector = SfSymbols.Monochrome.SFArrowDownCircle,
                                 contentDescription = stringResource(R.string.action_download),
                                 modifier = Modifier.size(20.dp),
                                 tint = chromeContentColor
@@ -1191,7 +1263,7 @@ private fun OnlinePlaylistHeader(
                     size = 48.dp,
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.shuffle),
+                        imageVector = SfSymbols.Monochrome.SFShuffle,
                         contentDescription = stringResource(R.string.shuffle_content_desc),
                         modifier = Modifier.size(20.dp)
                     )
@@ -1213,7 +1285,7 @@ private fun OnlinePlaylistHeader(
                     size = 48.dp,
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.more_vert),
+                        imageVector = SfSymbols.Monochrome.SFEllipsis,
                         contentDescription = stringResource(R.string.more_options),
                         modifier = Modifier.size(20.dp)
                     )

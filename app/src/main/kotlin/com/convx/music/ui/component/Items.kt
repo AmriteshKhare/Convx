@@ -122,6 +122,7 @@ import com.convx.music.db.entities.Song
 import com.convx.music.extensions.toMediaItem
 import com.convx.music.models.MediaMetadata
 import com.convx.music.ui.theme.AppleTokens
+import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.utils.marqueeWhenVisible
 import com.convx.music.ui.utils.rememberGridSpacing
 import com.convx.music.ui.utils.resize
@@ -137,6 +138,26 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 const val ActiveBoxAlpha = 0.6f
+
+/**
+ * Strength of secondary content drawn through [additiveChrome]: below full so
+ * the blend doesn't clip to plain white — the same 0.45 the player uses for
+ * its own chrome, so rows match the player.
+ */
+const val SecondaryChromeAlpha = 0.45f
+
+/**
+ * Song titles only get a hint of the same treatment: near-full alpha keeps
+ * them the brightest line while still picking up the backdrop's glow.
+ */
+const val TitleChromeAlpha = 0.85f
+
+/**
+ * Extra dim on the subtitle text when chromed: player v2's own artist-line
+ * logic (white 0.35, then × 0.7) so row subtitles land at the same weight as
+ * the player's artist read. Badges keep the undimmed tier.
+ */
+private const val ChromedSubtitleDim = 0.7f
 
 @Composable
 fun currentGridThumbnailHeight(): Dp {
@@ -159,9 +180,49 @@ inline fun ListItem(
     shape: Shape = RectangleShape,
     drawHighlight: Boolean = true,
     flat: Boolean = false,
+    /**
+     * Draws the subtitle tier and the flat divider through additiveChrome
+     * (white content added onto the backdrop, player-style) instead of plain
+     * alpha white — for artwork-tinted screens. Trailing chrome stays with the
+     * caller's trailingContent. The title only gets a hint ([TitleChromeAlpha]).
+     */
+    secondaryAdditiveChrome: Boolean = false,
+    /**
+     * Full-width rule above the row (same guttered inset as the trailing one):
+     * for the first row of a section, so the section opens with a rule and the
+     * rows that follow divide with [trailingDividerInset].
+     */
+    leadingDivider: Boolean = false,
+    /**
+     * Start inset of the trailing rule. Null keeps the full guttered width;
+     * pass the thumbnail leading edge so inter-row rules stop just before the
+     * thumbnails while the section's outer rules stay full.
+     */
+    trailingDividerInset: Dp? = null,
+    /**
+     * Gap between the row gutter and the thumbnail. Lets a screen sit its
+     * thumbnails flush on the page gutter (0.dp, aligned with section titles)
+     * instead of the default nested step.
+     */
+    thumbnailStartInset: Dp = 12.dp,
 ) {
     val onSurface = LocalContentColor.current
+    // Draw modifier only: no layout node, so row measurement is unchanged.
+    // Alpha after additiveChrome, never before (see additiveChrome's own KDoc).
+    val secondaryChrome =
+        if (secondaryAdditiveChrome) Modifier.additiveChrome().graphicsLayer { alpha = SecondaryChromeAlpha }
+        else Modifier
+    val titleChrome =
+        if (secondaryAdditiveChrome) Modifier.additiveChrome().graphicsLayer { alpha = TitleChromeAlpha }
+        else Modifier
     Column(modifier) {
+        if (flat && leadingDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = AppleTokens.Gutter).then(secondaryChrome),
+                color = AppleTokens.divider,
+                thickness = 0.75.dp,
+            )
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -178,7 +239,12 @@ inline fun ListItem(
                 )
         ) {
             Box(
-                modifier = Modifier.padding(start = 12.dp, top = 6.dp, end = 6.dp, bottom = 6.dp),
+                modifier = Modifier.padding(
+                    start = thumbnailStartInset,
+                    top = 6.dp,
+                    end = 6.dp,
+                    bottom = 6.dp
+                ),
                 contentAlignment = Alignment.Center
             ) {
                 thumbnailContent()
@@ -216,13 +282,15 @@ inline fun ListItem(
                     color = onSurface,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = titleChrome,
                 )
 
                 if (subtitle != null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = secondaryChrome,
                     ) {
                         // Metadata is a fixed grey, not an alpha of the title colour:
                         // over artwork-tinted screens an alpha step reads as a faded
@@ -240,7 +308,12 @@ inline fun ListItem(
         }
         if (flat) {
             HorizontalDivider(
-                modifier = Modifier.padding(horizontal = AppleTokens.Gutter),
+                modifier = Modifier
+                    .padding(
+                        start = trailingDividerInset ?: AppleTokens.Gutter,
+                        end = AppleTokens.Gutter,
+                    )
+                    .then(secondaryChrome),
                 color = AppleTokens.divider,
                 thickness = 0.75.dp,
             )
@@ -261,6 +334,14 @@ fun ListItem(
     shape: Shape = RectangleShape,
     drawHighlight: Boolean = true,
     flat: Boolean = false,
+    /** See the base overload: subtitle tier + flat divider via additiveChrome. */
+    secondaryAdditiveChrome: Boolean = false,
+    /** See the base overload: full rule above the first row of a section. */
+    leadingDivider: Boolean = false,
+    /** See the base overload: start inset of the trailing rule. */
+    trailingDividerInset: Dp? = null,
+    /** See the base overload: gap between the row gutter and the thumbnail. */
+    thumbnailStartInset: Dp = 12.dp,
 ) = ListItem(
     title = title,
     subtitle = {
@@ -272,6 +353,10 @@ fun ListItem(
                 text = subtitle,
                 fontSize = AppleTokens.ItemSubtitle,
                 lineHeight = AppleTokens.ItemSubtitleLineHeight,
+                // Player v2 artist-line logic when chromed; identical otherwise.
+                color = LocalContentColor.current.copy(
+                    alpha = if (secondaryAdditiveChrome) ChromedSubtitleDim else 1f
+                ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -284,7 +369,11 @@ fun ListItem(
     isActive = isActive,
     shape = shape,
     drawHighlight = drawHighlight,
-    flat = flat
+    flat = flat,
+    secondaryAdditiveChrome = secondaryAdditiveChrome,
+    leadingDivider = leadingDivider,
+    trailingDividerInset = trailingDividerInset,
+    thumbnailStartInset = thumbnailStartInset,
 )
 
 // merge badges and subtitle text and pass to basic list item
@@ -301,6 +390,14 @@ fun ListItem(
     shape: Shape = RectangleShape,
     drawHighlight: Boolean = true,
     flat: Boolean = false,
+    /** See the base overload: subtitle tier + flat divider via additiveChrome. */
+    secondaryAdditiveChrome: Boolean = false,
+    /** See the base overload: full rule above the first row of a section. */
+    leadingDivider: Boolean = false,
+    /** See the base overload: start inset of the trailing rule. */
+    trailingDividerInset: Dp? = null,
+    /** See the base overload: gap between the row gutter and the thumbnail. */
+    thumbnailStartInset: Dp = 12.dp,
 ) = ListItem(
     title = title,
     subtitle = {
@@ -312,6 +409,10 @@ fun ListItem(
                 text = subtitle,
                 fontSize = AppleTokens.ItemSubtitle,
                 lineHeight = AppleTokens.ItemSubtitleLineHeight,
+                // Player v2 artist-line logic when chromed; identical otherwise.
+                color = LocalContentColor.current.copy(
+                    alpha = if (secondaryAdditiveChrome) ChromedSubtitleDim else 1f
+                ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -324,7 +425,11 @@ fun ListItem(
     isActive = isActive,
     shape = shape,
     drawHighlight = drawHighlight,
-    flat = flat
+    flat = flat,
+    secondaryAdditiveChrome = secondaryAdditiveChrome,
+    leadingDivider = leadingDivider,
+    trailingDividerInset = trailingDividerInset,
+    thumbnailStartInset = thumbnailStartInset,
 )
 
 @Composable
@@ -456,13 +561,25 @@ fun SongListItem(
     shape: Shape = RectangleShape,
     flat: Boolean = false,
     showIconOnly: Boolean = false,
+    /** Off for an album tracklist, where every row repeats the same artist under
+     *  the title the header already names — the reference sets those rows as a
+     *  single line. Badges are unaffected. */
+    showSubtitle: Boolean = true,
+    /** See the base ListItem: subtitle tier + flat divider via additiveChrome. */
+    secondaryAdditiveChrome: Boolean = false,
+    /** See the base ListItem: full rule above the first row of a section. */
+    leadingDivider: Boolean = false,
+    /** See the base ListItem: start inset of the trailing rule. */
+    trailingDividerInset: Dp? = null,
+    /** See the base ListItem: gap between the row gutter and the thumbnail. */
+    thumbnailStartInset: Dp = 12.dp,
 ) {
     val swipeEnabled = LocalItemPrefs.current.swipeToSong
 
     val content: @Composable () -> Unit = {
         ListItem(
             title = song.song.title,
-            subtitle = joinByBullet(
+            subtitle = if (!showSubtitle) null else joinByBullet(
                 song.artists.joinToString { it.name },
                 makeTimeString(song.song.duration * 1000L)
             ),
@@ -502,7 +619,11 @@ fun SongListItem(
             isActive = isActive,
             shape = shape,
             drawHighlight = drawHighlight,
-            flat = flat
+            flat = flat,
+            secondaryAdditiveChrome = secondaryAdditiveChrome,
+            leadingDivider = leadingDivider,
+            trailingDividerInset = trailingDividerInset,
+            thumbnailStartInset = thumbnailStartInset,
         )
     }
 
@@ -1152,7 +1273,7 @@ fun PlaylistGridItem(
                         painter = painterResource(getAutoPlaylistIcon(playlist.playlist.name)),
                         contentDescription = null,
                         tint = LocalContentColor.current.copy(alpha = 0.6f),
-                        modifier = Modifier.size(width / 2)
+                        modifier = Modifier.size(width / 3)
                     )
                 }
             },
@@ -1290,6 +1411,14 @@ fun YouTubeListItem(
     shape: Shape = RectangleShape,
     drawHighlight: Boolean = true,
     flat: Boolean = false,
+    /** See the base ListItem: subtitle tier + flat divider via additiveChrome. */
+    secondaryAdditiveChrome: Boolean = false,
+    /** See the base ListItem: full rule above the first row of a section. */
+    leadingDivider: Boolean = false,
+    /** See the base ListItem: start inset of the trailing rule. */
+    trailingDividerInset: Dp? = null,
+    /** See the base ListItem: gap between the row gutter and the thumbnail. */
+    thumbnailStartInset: Dp = 12.dp,
 ) {
     val swipeEnabled = LocalItemPrefs.current.swipeToSong
 
@@ -1326,7 +1455,11 @@ fun YouTubeListItem(
             isActive = isActive,
             shape = shape,
             drawHighlight = drawHighlight,
-            flat = flat
+            flat = flat,
+            secondaryAdditiveChrome = secondaryAdditiveChrome,
+            leadingDivider = leadingDivider,
+            trailingDividerInset = trailingDividerInset,
+            thumbnailStartInset = thumbnailStartInset,
         )
     }
 

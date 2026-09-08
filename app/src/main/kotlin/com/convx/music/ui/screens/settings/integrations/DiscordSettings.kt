@@ -204,6 +204,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.isActive
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.launch
+import com.convx.music.ui.screens.settings.SettingsPage
 
 private enum class DiscordStatus { ONLINE, IDLE, DND }
 private enum class DiscordActivityType { LISTENING, PLAYING, WATCHING, COMPETING }
@@ -448,22 +449,12 @@ fun DiscordSettings(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.discord_integration),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-            )
-        )
-
         // Warning Card
         AnimatedVisibility(visible = !infoDismissed) {
             Card(
@@ -829,23 +820,8 @@ fun DiscordSettings(
 
         // Bottom padding for mini player
         Spacer(Modifier.height(24.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.discord_integration)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        }
-    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

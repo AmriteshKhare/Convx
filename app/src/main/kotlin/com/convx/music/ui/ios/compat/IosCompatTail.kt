@@ -132,7 +132,11 @@ fun ModalBottomSheet(
             topStart = 28.dp,
             topEnd = 28.dp,
         ),
-        containerColor = if (containerColor.isSpecified) containerColor else colors.systemGroupedBackground,
+        // systemGroupedBackground is pure black in dark mode (that's correct for the
+        // base screen, which sits on the OLED background) — a floating sheet is an
+        // elevated surface, so it wants the *secondary* grouped background instead
+        // (Apple's #1C1C1E), or it reads as flat AMOLED black.
+        containerColor = if (containerColor.isSpecified) containerColor else colors.secondarySystemGroupedBackground,
         contentColor = if (contentColor.isSpecified) contentColor else colors.label,
         // The presenting screen shrinks behind the sheet, so a heavy scrim on top of
         // that just muddies it.
@@ -147,7 +151,7 @@ fun ModalBottomSheet(
         // that stops: everything inside the sheet is cupertino, the thing that animates it
         // up over the screen is still M3's.
         CupertinoBottomSheetContent(
-            containerColor = if (containerColor.isSpecified) containerColor else colors.systemGroupedBackground,
+            containerColor = if (containerColor.isSpecified) containerColor else colors.secondarySystemGroupedBackground,
             contentColor = if (contentColor.isSpecified) contentColor else colors.label,
         ) {
             Column { content() }

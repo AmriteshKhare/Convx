@@ -38,7 +38,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -52,6 +55,8 @@ import com.convx.music.LocalPlayerConnection
 import com.convx.music.playback.PlayerConnection
 import com.convx.music.constants.PlayerBackgroundStyle
 import com.convx.music.constants.PlayerBackgroundStyleKey
+import com.convx.music.constants.PlayerLook
+import com.convx.music.constants.PlayerLookKey
 import com.convx.music.constants.PlayerStaticColorKey
 import com.convx.music.constants.PlayerGradientStopsKey
 import com.convx.music.ui.theme.decodeGradientStops
@@ -73,6 +78,7 @@ import com.convx.music.ui.component.rememberBottomSheetState
 import com.convx.music.ui.component.expandedAnchor
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.offset
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalConfiguration
@@ -310,6 +316,8 @@ fun PlayerV2(
         storedPlayerBackground
     }
     
+    val playerLook by rememberEnumPreference(key = PlayerLookKey, defaultValue = PlayerLook.SQUARED)
+    val isHeroLook = playerLook == PlayerLook.HERO
     val showPlayerThumbnailShadow by rememberPreference(ShowPlayerThumbnailShadowKey, defaultValue = false)
     val playerThumbnailShadowElevation by rememberPreference(PlayerThumbnailShadowElevationKey, defaultValue = 8f)
     val enableGoogleCast by rememberPreference(EnableGoogleCastKey, defaultValue = true)
@@ -417,11 +425,11 @@ fun PlayerV2(
     val adaptiveSecondary by animateColorAsState(
         targetValue = when (playerBackground) {
             PlayerBackgroundStyle.DEFAULT -> AppTheme.colorScheme.onSurfaceVariant
-            PlayerBackgroundStyle.BLUR,
-            PlayerBackgroundStyle.GRADIENT,
-            PlayerBackgroundStyle.GLOW_ANIMATED,
-            PlayerBackgroundStyle.APPLE_MUSIC,
-            PlayerBackgroundStyle.LIVE_MESH,
+            PlayerBackgroundStyle.BLUR -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
+            PlayerBackgroundStyle.GRADIENT -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
+            PlayerBackgroundStyle.GLOW_ANIMATED -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
+            PlayerBackgroundStyle.APPLE_MUSIC -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
+            PlayerBackgroundStyle.LIVE_MESH -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
             PlayerBackgroundStyle.BITCHORD_MESH -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
             PlayerBackgroundStyle.STATIC,
             PlayerBackgroundStyle.CUSTOM_GRADIENT -> flatOnColor.copy(alpha = FlamingoSecondaryAlpha)
@@ -475,18 +483,23 @@ fun PlayerV2(
                 }
             }
     ) {
+        val systemBarsTopPadding = WindowInsets.systemBars.asPaddingValues().calculateTopPadding()
         PlayerV2Frame(
             isWide = isWidePlayerLayout,
+            // Hero Blend's artwork bleeds all the way to the true top of the screen, like the
+            // classic player's own APPLE_MUSIC background -- so the frame doesn't reserve top
+            // inset space here; the handle claims it itself instead, floating over the artwork.
+            overlayHandle = isHeroLook,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = WindowInsets.systemBars.asPaddingValues().calculateTopPadding())
+                .padding(top = if (isHeroLook) 0.dp else systemBarsTopPadding)
                 .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()),
             handle = {
             // Minimal drag handle header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 8.dp),
+                    .padding(top = if (isHeroLook) systemBarsTopPadding + 16.dp else 16.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
                 Box(
@@ -544,17 +557,43 @@ fun PlayerV2(
                                 )
                             }
                             Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 24.dp)
+                                modifier = Modifier.fillMaxSize()
                             ) {
-                                Spacer(modifier = Modifier.weight(1f))
+                                // Hero Blend starts flush from the top of the pane; Squared
+                                // centres its card with a spacer above and below.
+                                if (!isHeroLook) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
 
-                                // Massive Apple Music Style Artwork
+                                // Massive Apple Music Style Artwork -- Squared keeps the classic
+                                // centred square card; Hero Blend runs the artwork edge-to-edge
+                                // and fades its bottom into the controls below.
                                 Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .aspectRatio(1f)
+                                    modifier = if (isHeroLook) {
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight(0.72f)
+                                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                            .drawWithContent {
+                                                drawContent()
+                                                drawRect(
+                                                    brush = Brush.verticalGradient(
+                                                        colorStops = arrayOf(
+                                                            0.00f to Color.Black,
+                                                            0.72f to Color.Black,
+                                                            0.92f to Color.Black.copy(alpha = 0.35f),
+                                                            1.00f to Color.Transparent,
+                                                        )
+                                                    ),
+                                                    blendMode = BlendMode.DstIn
+                                                )
+                                            }
+                                    } else {
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 24.dp)
+                                            .aspectRatio(1f)
+                                    }
                                 ) {
                                     // Live swipe peek: the neighbour song's own card, revealed from
                                     // whichever side the finger is dragging toward, tracking the drag
@@ -575,11 +614,11 @@ fun PlayerV2(
                                                 }
                                                 .customSoftShadow(
                                                     elevation = playerThumbnailShadowElevation.dp,
-                                                    cornerRadius = 12.dp,
-                                                    enabled = showPlayerThumbnailShadow
+                                                    cornerRadius = if (isHeroLook) 0.dp else 12.dp,
+                                                    enabled = showPlayerThumbnailShadow && !isHeroLook
                                                 )
-                                                .background(adaptiveSurface, RoundedCornerShape(12.dp))
-                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(adaptiveSurface, RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
+                                                .clip(RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
                                         ) {
                                             AsyncImage(
                                                 model = ImageRequest.Builder(context)
@@ -626,9 +665,18 @@ fun PlayerV2(
                                                     offsetXAnimatable = heroDragOffset,
                                                 )
                                             )
+                                            .then(
+                                                rememberDragToQueueModifier(
+                                                    enabled = (playerState == PlayerInternalState.COVER && !isListenTogetherGuest),
+                                                    onOpenQueue = { playerState = PlayerInternalState.QUEUE },
+                                                )
+                                            )
                                     ) {
+                                    // Hero Blend is edge-to-edge and full-screen from the top --
+                                    // shrinking it on pause would tear it away from that fixed
+                                    // frame, so only Squared's floating card does the pause-shrink.
                                     val heroScale by animateFloatAsState(
-                                        targetValue = if (isPlaying) 1f else 0.94f,
+                                        targetValue = if (isPlaying || isHeroLook) 1f else 0.94f,
                                         animationSpec = spring(
                                             dampingRatio = Spring.DampingRatioLowBouncy,
                                             stiffness = Spring.StiffnessLow,
@@ -656,11 +704,11 @@ fun PlayerV2(
                                                 .fillMaxSize()
                                                 .customSoftShadow(
                                                     elevation = playerThumbnailShadowElevation.dp,
-                                                    cornerRadius = 12.dp,
-                                                    enabled = showPlayerThumbnailShadow
+                                                    cornerRadius = if (isHeroLook) 0.dp else 12.dp,
+                                                    enabled = showPlayerThumbnailShadow && !isHeroLook
                                                 )
-                                                .background(adaptiveSurface, RoundedCornerShape(12.dp))
-                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(adaptiveSurface, RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
+                                                .clip(RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
                                         ) {
                                             AsyncImage(
                                                 model = ImageRequest.Builder(context)
@@ -686,7 +734,7 @@ fun PlayerV2(
 
                                 // Track Meta Info (Left Aligned)
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 16.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -805,10 +853,25 @@ fun PlayerV2(
                         } else if (targetState == PlayerInternalState.LYRICS || targetState == PlayerInternalState.QUEUE) {
                             Column(modifier = Modifier.fillMaxSize()) {
                                 // Apple Music Morphing Mini Header
+                                //
+                                // Hero Blend skips the pane's own systemBarsTopPadding (its art
+                                // wants to bleed to the true top, under the floating handle) --
+                                // but this header, unlike the art, isn't meant to sit under
+                                // anything. Without its own top inset here it landed flush at y=0,
+                                // straight under the status bar and the handle floating over it.
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                                        .padding(
+                                            top = if (isHeroLook) {
+                                                systemBarsTopPadding + 32.dp
+                                            } else {
+                                                8.dp
+                                            },
+                                            start = 24.dp,
+                                            end = 24.dp,
+                                            bottom = 8.dp,
+                                        ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Box(
@@ -819,12 +882,22 @@ fun PlayerV2(
                                             )
                                             .size(64.dp)
                                             .customSoftShadow(
-                                                elevation = playerThumbnailShadowElevation.dp / 2f, 
-                                                cornerRadius = 8.dp, 
+                                                elevation = playerThumbnailShadowElevation.dp / 2f,
+                                                cornerRadius = 8.dp,
                                                 enabled = showPlayerThumbnailShadow
                                             )
                                             .background(adaptiveSurface, RoundedCornerShape(8.dp))
                                             .clip(RoundedCornerShape(8.dp))
+                                            // BitChord touch: the shrunk thumbnail is the way
+                                            // back -- tapping it during the queue puts the cover
+                                            // back full-size the same way opening it took it away.
+                                            .then(
+                                                if (targetState == PlayerInternalState.QUEUE) {
+                                                    Modifier.clickable { playerState = PlayerInternalState.COVER }
+                                                } else {
+                                                    Modifier
+                                                }
+                                            )
                                     ) {
                                         AsyncImage(
                                             model = mediaMetadata?.thumbnailUrl?.resize(1200, 1200),
@@ -990,27 +1063,65 @@ fun PlayerV2(
                                                 playerState = PlayerInternalState.COVER
                                             }
                                         }
-                                        Queue(
-                                            state = queueSheetState,
-                                            playerBottomSheetState = state,
-                                            navController = navController,
-                                            background = Color.Transparent,
-                                            onBackgroundColor = adaptivePrimary,
-                                            TextBackgroundColor = adaptivePrimary,
-                                            textButtonColor = adaptivePrimary,
-                                            iconButtonColor = adaptivePrimary,
-                                            pureBlack = false,
-                                            showInlineLyrics = false,
-                                            playerBackground = playerBackground,
-                                            // V17's own controls behind this sheet already show
-                                            // the thumbnail/title/like — the shared header row
-                                            // would just repeat them.
-                                            showHeaderRow = false,
-                                            // Drag-to-dismiss on this sheet was getting stuck —
-                                            // the queue toggle icon and back gesture still close it.
-                                            sheetDraggable = false,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
+                                        // Cover art fading in behind the queue list from fully
+                                        // transparent, anchored to the top like Hero Blend's own
+                                        // artwork -- Queue's own background stays transparent so
+                                        // the list sits on top of this rather than replacing it.
+                                        val queueBackdropAlpha = remember { Animatable(0f) }
+                                        LaunchedEffect(Unit) {
+                                            queueBackdropAlpha.animateTo(1f, animationSpec = Motion.appear())
+                                        }
+                                        Box(modifier = Modifier.fillMaxSize()) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(context)
+                                                    .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
+                                                    .size(CoilSize.ORIGINAL)
+                                                    .crossfade(true)
+                                                    .build(),
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .fillMaxHeight(0.4f)
+                                                    .align(Alignment.TopCenter)
+                                                    .alpha(queueBackdropAlpha.value)
+                                                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                                    .drawWithContent {
+                                                        drawContent()
+                                                        drawRect(
+                                                            brush = Brush.verticalGradient(
+                                                                colorStops = arrayOf(
+                                                                    0.00f to Color.Black,
+                                                                    0.60f to Color.Black,
+                                                                    1.00f to Color.Transparent,
+                                                                )
+                                                            ),
+                                                            blendMode = BlendMode.DstIn
+                                                        )
+                                                    }
+                                            )
+                                            Queue(
+                                                state = queueSheetState,
+                                                playerBottomSheetState = state,
+                                                navController = navController,
+                                                background = Color.Transparent,
+                                                onBackgroundColor = adaptivePrimary,
+                                                TextBackgroundColor = adaptivePrimary,
+                                                textButtonColor = adaptivePrimary,
+                                                iconButtonColor = adaptivePrimary,
+                                                pureBlack = false,
+                                                showInlineLyrics = false,
+                                                playerBackground = playerBackground,
+                                                // V17's own controls behind this sheet already show
+                                                // the thumbnail/title/like — the shared header row
+                                                // would just repeat them.
+                                                showHeaderRow = false,
+                                                // Drag-to-dismiss on this sheet was getting stuck —
+                                                // the queue toggle icon and back gesture still close it.
+                                                sheetDraggable = false,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1402,30 +1513,63 @@ private fun PlayerV2Frame(
     handle: @Composable ColumnScope.() -> Unit,
     pane: @Composable (Modifier) -> Unit,
     controls: @Composable ColumnScope.() -> Unit,
+    // Hero Blend: the handle floats over the pane's own top edge instead of pushing it
+    // down, so the artwork can bleed all the way to the true top of the screen.
+    overlayHandle: Boolean = false,
 ) {
-    Column(modifier = modifier) {
-        handle()
-        if (isWide) {
-            Row(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    contentAlignment = Alignment.Center,
+    if (overlayHandle) {
+        Box(modifier = modifier) {
+            if (isWide) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    pane(Modifier.fillMaxSize())
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        pane(Modifier.fillMaxSize())
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        content = controls,
+                    )
                 }
-                Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    content = controls,
-                )
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    pane(Modifier.weight(1f))
+                    controls()
+                }
             }
-        } else {
-            pane(Modifier.weight(1f))
-            controls()
+            Column(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(), content = handle)
+        }
+    } else {
+        Column(modifier = modifier) {
+            handle()
+            if (isWide) {
+                Row(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        pane(Modifier.fillMaxSize())
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        content = controls,
+                    )
+                }
+            } else {
+                pane(Modifier.weight(1f))
+                controls()
+            }
         }
     }
 }
@@ -1523,6 +1667,50 @@ private fun rememberSwipeCardModifier(
                 Modifier
             }
         )
+}
+
+/**
+ * BitChord touch, ported: dragging the cover artwork upward opens the queue --
+ * the shared-element transition (see the "coverArt" key above) then does the
+ * actual shrink-and-rise-to-the-header morph, same as the button-triggered
+ * open already did. This only decides *when* that morph fires.
+ *
+ * Coexists with [rememberSwipeCardModifier]'s horizontal drag as a second,
+ * independent `pointerInput` on the same node: `detectVerticalDragGestures`
+ * and `detectHorizontalDragGestures` each wait out their own axis's touch
+ * slop before consuming, so a horizontal swipe never trips this and a
+ * vertical drag never trips the skip gesture.
+ */
+@Composable
+private fun rememberDragToQueueModifier(
+    enabled: Boolean,
+    onOpenQueue: () -> Unit,
+): Modifier {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val openThresholdPx = remember(density) { with(density) { 80.dp.toPx() } }
+    var dragged by remember { mutableFloatStateOf(0f) }
+    return if (enabled) {
+        Modifier.pointerInput(Unit) {
+            detectVerticalDragGestures(
+                onDragStart = { dragged = 0f },
+                onDragCancel = { dragged = 0f },
+                onVerticalDrag = { change, dragAmount ->
+                    // Only upward drags are this gesture's; downward is left
+                    // unconsumed for the outer sheet's own drag-to-dismiss.
+                    if (dragAmount < 0f || dragged < 0f) {
+                        dragged += dragAmount
+                        change.consume()
+                    }
+                },
+                onDragEnd = {
+                    if (dragged <= -openThresholdPx) onOpenQueue()
+                    dragged = 0f
+                },
+            )
+        }
+    } else {
+        Modifier
+    }
 }
 
 /** Title stays white; the artist line sits well back. Flamingo's own value. */

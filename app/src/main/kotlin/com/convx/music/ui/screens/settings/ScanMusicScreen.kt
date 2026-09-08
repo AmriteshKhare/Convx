@@ -69,9 +69,10 @@ fun ScanMusicScreen(
         }
     }
 
-    LazyColumn(
-        contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
-        modifier = Modifier.fillMaxWidth(),
+    SettingsLazyPage(
+        navController = navController,
+        title = stringResource(R.string.scan_device),
+        pageColor = AppTheme.colorScheme.background,
     ) {
         item(key = "status") {
             Column(

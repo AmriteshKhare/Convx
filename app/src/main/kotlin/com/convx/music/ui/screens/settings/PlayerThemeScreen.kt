@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -82,6 +83,8 @@ import com.convx.music.constants.PlayerArtworkStyleKey
 import com.convx.music.constants.PlayerBackgroundStyle
 import com.convx.music.constants.PlayerBackgroundStyleKey
 import com.convx.music.constants.UseAppleMusicPlayerKey
+import com.convx.music.constants.PlayerLook
+import com.convx.music.constants.PlayerLookKey
 import com.convx.music.constants.ShowPlayerThumbnailShadowKey
 import com.convx.music.constants.ShowUpNextKey
 import com.convx.music.constants.PlayerThumbnailShadowElevationKey
@@ -146,6 +149,9 @@ fun PlayerThemeScreen(
     )
     val (useAppleMusicPlayer, onUseAppleMusicPlayerChange) = rememberPreference(
         UseAppleMusicPlayerKey, defaultValue = false
+    )
+    val (playerLook, onPlayerLookChange) = rememberEnumPreference(
+        PlayerLookKey, defaultValue = PlayerLook.SQUARED
     )
     val (showPlayerThumbnailShadow, onShowPlayerThumbnailShadowChange) = rememberPreference(
         ShowPlayerThumbnailShadowKey, defaultValue = false
@@ -274,6 +280,46 @@ fun PlayerThemeScreen(
         }
         if (useAppleMusicPlayer) {
             LockedNote(stringResource(R.string.apple_music_player_v17_description))
+            SectionTitle(stringResource(R.string.player_look))
+            PresetRow {
+                PlayerLook.entries.forEach { look ->
+                    PresetCard(
+                        label = stringResource(
+                            if (look == PlayerLook.HERO) R.string.player_look_hero else R.string.player_look_squared
+                        ),
+                        selected = playerLook == look,
+                        onClick = { onPlayerLookChange(look) },
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black),
+                        ) {
+                            if (look == PlayerLook.HERO) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .fillMaxHeight(0.65f)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(AppTheme.colorScheme.primary, Color.Transparent)
+                                            )
+                                        )
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .fillMaxWidth(0.6f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(AppTheme.colorScheme.primary)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             SwitchPreference(
                 title = { Text(stringResource(R.string.player_thumbnail_shadow)) },
                 checked = showPlayerThumbnailShadow,

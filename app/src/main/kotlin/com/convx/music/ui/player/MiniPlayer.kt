@@ -103,6 +103,16 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFAirplayAudio
+import com.composables.sfsymbols.monochrome.SFArrowCounterclockwise
+import com.composables.sfsymbols.monochrome.SFBackwardFill
+import com.composables.sfsymbols.monochrome.SFForwardFill
+import com.composables.sfsymbols.monochrome.SFInfoCircle
+import com.composables.sfsymbols.monochrome.SFPlayFill
+import com.composables.sfsymbols.monochrome.SFSpeakerSlashFill
+import com.composables.sfsymbols.monochrome.SFSpeakerWave2Fill
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -144,6 +154,7 @@ import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
+import com.convx.music.ui.component.elasticStretchLayerBlock
 import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.theme.PlayerColorExtractor
@@ -424,6 +435,12 @@ private fun NewMiniPlayer(
                 .then(if (isTablet) Modifier.width(500.dp).align(Alignment.Center) else Modifier.fillMaxWidth())
                 .height(64.dp)
                 .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
+                // Drag elastic — interactiveHighlight already drove the glow
+                // highlight below, but nothing ever applied the stretch/scale
+                // half of it, so the mini player never actually stretched.
+                // Before .clip(): the clipped pill scales as one unit, same
+                // fix as the nav bar's own glass surfaces.
+                .graphicsLayer(elasticStretchLayerBlock(interactiveHighlight))
                 .clip(RoundedCornerShape(32.dp))
                 .background(color = backgroundColor)
                 .border(1.dp, outlineColor.copy(alpha = 0.3f), RoundedCornerShape(32.dp))
@@ -522,7 +539,7 @@ private fun NewMiniPlayer(
                     enabled = canSkipNext
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.apple_skip_next),
+                        imageVector = SfSymbols.Monochrome.SFForwardFill,
                         contentDescription = null,
                         tint = if (canSkipNext) onSurfaceColor else onSurfaceColor.copy(alpha = 0.4f),
                     )
@@ -533,7 +550,7 @@ private fun NewMiniPlayer(
                 // Cast indicator
                 if (isCasting) {
                     Icon(
-                        painter = painterResource(R.drawable.cast_connected),
+                        imageVector = SfSymbols.Monochrome.SFAirplayAudio,
                         contentDescription = "Casting",
                         tint = primaryColor,
                         modifier = Modifier.size(20.dp)
@@ -669,14 +686,14 @@ private fun NewMiniPlayerPlayButton(
                 }
         ) {
             if (compact) {
-                val iconRes = when {
-                    isListenTogetherGuest -> if (isMuted) R.drawable.volume_off else R.drawable.volume_up
-                    playbackState == Player.STATE_ENDED -> R.drawable.replay
+                val iconVector = when {
+                    isListenTogetherGuest -> if (isMuted) SfSymbols.Monochrome.SFSpeakerSlashFill else SfSymbols.Monochrome.SFSpeakerWave2Fill
+                    playbackState == Player.STATE_ENDED -> SfSymbols.Monochrome.SFArrowCounterclockwise
                     else -> null
                 }
-                if (iconRes != null) {
+                if (iconVector != null) {
                     Icon(
-                        painter = painterResource(iconRes),
+                        imageVector = iconVector,
                         contentDescription = null,
                         tint = primaryColor,
                         modifier = Modifier.size(iconSize)
@@ -717,12 +734,12 @@ private fun NewMiniPlayerPlayButton(
                             playbackState == Player.STATE_ENDED -> PlayerIconSlot.REPLAY
                             else -> PlayerIconSlot.PLAY
                         },
-                        fallback = if (isListenTogetherGuest) {
-                            if (isMuted) R.drawable.volume_off else R.drawable.volume_up
+                        fallbackVector = if (isListenTogetherGuest) {
+                            if (isMuted) SfSymbols.Monochrome.SFSpeakerSlashFill else SfSymbols.Monochrome.SFSpeakerWave2Fill
                         } else if (playbackState == Player.STATE_ENDED) {
-                            R.drawable.replay
+                            SfSymbols.Monochrome.SFArrowCounterclockwise
                         } else {
-                            R.drawable.play
+                            SfSymbols.Monochrome.SFPlayFill
                         },
                         tint = Color.White,
                         modifier = Modifier.size(20.dp)
@@ -971,7 +988,7 @@ private fun LegacyMiniPlayer(
                     enabled = canSkipNext && !isListenTogetherGuest,
                     onClick = if (isListenTogetherGuest) ({}) else ({ playerConnection.seekToNext() }),
             ) {
-                Icon(painter = painterResource(R.drawable.apple_skip_next), contentDescription = null)
+                Icon(imageVector = SfSymbols.Monochrome.SFForwardFill, contentDescription = null)
             }
         }
 
@@ -983,9 +1000,7 @@ private fun LegacyMiniPlayer(
                     .padding(horizontal = 16.dp)
             ) {
                 Icon(
-                    painter = painterResource(
-                        if (offsetXAnimatable.value > 0) R.drawable.apple_skip_previous else R.drawable.apple_skip_next
-                    ),
+                    imageVector = if (offsetXAnimatable.value > 0) SfSymbols.Monochrome.SFBackwardFill else SfSymbols.Monochrome.SFForwardFill,
                     contentDescription = null,
                     tint = primaryColor.copy(
                         alpha = (offsetXAnimatable.value.absoluteValue / autoSwipeThreshold).coerceIn(0f, 1f)
@@ -1030,11 +1045,11 @@ private fun LegacyPlayPauseButton(
     ) {
         when {
             isListenTogetherGuest -> Icon(
-                painter = painterResource(if (isMuted) R.drawable.volume_off else R.drawable.volume_up),
+                imageVector = if (isMuted) SfSymbols.Monochrome.SFSpeakerSlashFill else SfSymbols.Monochrome.SFSpeakerWave2Fill,
                 contentDescription = null,
             )
             playbackState == Player.STATE_ENDED -> Icon(
-                painter = painterResource(R.drawable.replay),
+                imageVector = SfSymbols.Monochrome.SFArrowCounterclockwise,
                 contentDescription = null,
             )
             else -> AnimatedPlayPauseIcon(isPlaying = effectiveIsPlaying, size = 24.dp)
@@ -1092,7 +1107,7 @@ private fun LegacyMiniMediaInfo(
                         ),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.info),
+                        imageVector = SfSymbols.Monochrome.SFInfoCircle,
                         contentDescription = null,
                         tint = AppTheme.colorScheme.error,
                         modifier = Modifier.align(Alignment.Center),

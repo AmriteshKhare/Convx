@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import com.convx.music.ui.ios.compat.LoadingIndicator
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
@@ -365,9 +364,9 @@ fun ShowMediaInfo(videoId: String) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(100.dp),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = Alignment.CenterStart
                         ) {
-                            LoadingIndicator()
+                            com.convx.music.ui.component.TextBlockSkeleton(lines = 3)
                         }
                     } else {
                         Text(

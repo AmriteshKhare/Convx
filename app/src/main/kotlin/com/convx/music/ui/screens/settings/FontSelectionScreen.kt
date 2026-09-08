@@ -8,6 +8,7 @@ package com.convx.music.ui.screens.settings
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -25,16 +26,16 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.RadioButton
-import com.convx.music.ui.ios.compat.Scaffold
 import com.convx.music.ui.ios.compat.Switch
 import androidx.compose.material3.SwitchDefaults
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -123,37 +124,12 @@ fun FontSelectionScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                windowInsets = appTopBarWindowInsets(),
-                title = { Text(stringResource(R.string.app_font)) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = navController::navigateUp,
-                        onLongClick = navController::backToMain
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.arrow_back),
-                            contentDescription = null
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .windowInsetsPadding(
-                    LocalPlayerAwareWindowInsets.current.only(
-                        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                    )
-                )
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-        ) {
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.app_font),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
+    ) {
             // Typography Preview Card
             Card(
                 shape = AppTheme.shapes.large,
@@ -346,6 +322,6 @@ fun FontSelectionScreen(
                 )
             )
             Spacer(modifier = Modifier.height(36.dp))
-        }
+        
     }
 }

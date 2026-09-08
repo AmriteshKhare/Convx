@@ -83,6 +83,8 @@ import com.music.innertube.pages.BrowseResult
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.constants.ListItemHeight
 import com.convx.music.models.toMediaMetadata
 import com.convx.music.playback.PlayerConnection
@@ -487,7 +489,7 @@ fun ExploreScreen(
                                                         },
                                                     ) {
                                                         Icon(
-                                                            painter = painterResource(R.drawable.more_vert),
+                                                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                                                             contentDescription = null,
                                                         )
                                                     }

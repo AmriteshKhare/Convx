@@ -65,7 +65,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronLeft
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -285,7 +286,7 @@ fun ChangelogScreen(
                 title = { Text(stringResource(R.string.changelog_title)) },
                 navigationIcon = {
                     IconButton(onClick = navController::navigateUp) {
-                        Icon(painterResource(R.drawable.arrow_back), null)
+                        Icon(imageVector = SfSymbols.Monochrome.SFChevronLeft, null)
                     }
                 },
                 scrollBehavior = scrollBehavior

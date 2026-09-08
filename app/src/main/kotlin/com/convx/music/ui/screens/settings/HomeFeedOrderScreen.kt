@@ -47,6 +47,7 @@ import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.utils.rememberPreference
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import com.convx.music.ui.component.topBarContentPadding
 
 /**
  * One arrangeable row on Home, as the user sees it.
@@ -123,6 +124,15 @@ fun HomeFeedOrderScreen(
     // Explainer and reset sit outside the list on purpose. As LazyColumn items they
     // shifted every row's index by one against `rows`, so `from.index`/`to.index` moved
     // the wrong entry -- a drag appeared to grab one row and reorder another.
+    SettingsScaffold(
+        navController = navController,
+        title = stringResource(R.string.home_feed_order),
+        // The rows are drag-to-reorder, so they start below the bar instead of
+        // scrolling under it — a row half-hidden behind glass is a row you
+        // cannot aim a drag at.
+        titleAlpha = 1f,
+        pageColor = AppTheme.colorScheme.background,
+    ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             text = stringResource(R.string.home_feed_order_desc),
@@ -131,7 +141,7 @@ fun HomeFeedOrderScreen(
             modifier = Modifier.padding(
                 start = AppleTokens.Gutter,
                 end = AppleTokens.Gutter,
-                top = AppleTokens.Gutter,
+                top = topBarContentPadding(),
                 bottom = AppleTokens.ItemGap,
             ),
         )
@@ -217,5 +227,6 @@ fun HomeFeedOrderScreen(
         ) {
             Text(stringResource(R.string.home_feed_order_reset))
         }
+    }
     }
 }

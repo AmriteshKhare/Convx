@@ -16,10 +16,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFPauseFill
+import com.composables.sfsymbols.monochrome.SFPlayFill
+
+import androidx.compose.foundation.layout.offset
 
 @Composable
 fun AnimatedPlayPauseIcon(
@@ -42,14 +45,16 @@ fun AnimatedPlayPauseIcon(
             contentKey = { it },
             label = "play_pause",
         ) { playing ->
-            val res = if (playing) R.drawable.pause else R.drawable.play
             val iconSize = if (playing) size * 0.88f else size
+            val opticalOffset = if (!playing) 2.dp else 0.dp
 
             Icon(
-                painter = painterResource(res),
+                imageVector = if (playing) SfSymbols.Monochrome.SFPauseFill else SfSymbols.Monochrome.SFPlayFill,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(iconSize),
+                modifier = Modifier
+                    .size(iconSize)
+                    .offset(x = opticalOffset),
             )
         }
     }

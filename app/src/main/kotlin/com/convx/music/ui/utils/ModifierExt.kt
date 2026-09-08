@@ -26,16 +26,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Flamingo's player-chrome compositing: draw the content into its own layer and add that
- * layer to what is behind it (`BlendMode.Plus`).
+ * Flamingo's player-chrome compositing: draw the content into a single layer over what is
+ * behind it, blended with `BlendMode.Plus`.
  *
  * This is how a player takes its chrome colour off the artwork without extracting a palette
  * at all. The seek bar, the transport glyphs and the time text are drawn plain white at a
- * low alpha; added onto an artwork-derived background they come out tinted by whatever is
- * behind them, and they get *brighter* exactly where the background is dark, so they stay
- * legible on any sleeve. A palette pass answers the same question with a decode, a
- * quantiser and a frame of lag; this answers it per-pixel, for free, and never disagrees
- * with the pixels it is sitting on.
+ * low alpha; the Plus pass adds them on top so the chrome gets *brighter* exactly where the
+ * background is dark, letting the artwork's own vivid hue glow through. A palette pass
+ * answers the same question with a decode, a quantiser and a frame of lag; this answers it
+ * per-pixel, for free, and never disagrees with the pixels it is sitting on.
  *
  * Additive only makes sense over something dark and photographic. Over a flat light surface
  * every white it touches clips, so [enabled] is false on the plain themed background and the
@@ -44,15 +43,28 @@ import androidx.compose.ui.unit.dp
  * Set alpha *after* this modifier (or inside a `graphicsLayer`), never before: alpha applied
  * first is folded into the layer this saves, and the add then happens at full strength.
  */
+// A saturation/brightness colorFilter on the Plus paint is a no-op here: content
+// drawn under additiveChrome is a flat white/gray icon tint (R == G == B), and a
+// saturation matrix leaves any true-gray pixel unchanged by definition -- there is
+// no hue in the source layer to boost. What's actually visible after Plus is the
+// *backdrop's* hue, brightened; the only way to make that read stronger without
+// touching the backdrop itself is to add it again. Two Plus passes accumulate like
+// a second exposure: already-saturated (bright) pixels are already clipped and
+// don't move, but everything short of that ceiling gets pushed further, widening
+// the glow before it clips to white.
+private const val AdditiveChromePasses = 2
+
 fun Modifier.additiveChrome(enabled: Boolean = true): Modifier =
     if (!enabled) this else drawWithCache {
-        val layerPaint = Paint().apply { blendMode = BlendMode.Plus }
+        val plusPaint = Paint().apply { blendMode = BlendMode.Plus }
         val bounds = Rect(0f, 0f, size.width, size.height)
         onDrawWithContent {
             val canvas = drawContext.canvas
-            canvas.saveLayer(bounds, layerPaint)
-            drawContent()
-            canvas.restore()
+            repeat(AdditiveChromePasses) {
+                canvas.saveLayer(bounds, plusPaint)
+                drawContent()
+                canvas.restore()
+            }
         }
     }
 
@@ -157,7 +169,15 @@ fun Modifier.rimLight(
     )
     onDrawWithContent {
         drawContent()
-        drawOutline(outline = outline, brush = brush, style = stroke)
+        // Plus rather than the default alpha blend: same additiveChrome boost as the
+        // nav bar's icons, so the hairline takes its glow off the surface it sits on
+        // instead of just laying flat white over it.
+        drawOutline(
+            outline = outline,
+            brush = brush,
+            style = stroke,
+            blendMode = BlendMode.Plus,
+        )
     }
 }
 

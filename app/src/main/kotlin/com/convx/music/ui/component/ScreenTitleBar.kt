@@ -72,22 +72,41 @@ fun LargeScreenTitle(
 
 /**
  * How far the large title has scrolled away, 0..1. Drives [CollapsedTitleBar]'s
- * fade-in.
+ * (and [FrostedTopBar]'s) fade-in.
  *
- * Same shape as [rememberChromeScrimProgress], but keyed to the title's own
- * height rather than a hero image's, so the compact bar appears exactly as the
- * large one leaves.
+ * Reads the title item's own measured size off the list's layout info instead
+ * of guessing a fixed scroll distance: a flat `thresholdPx` reaches 1f (compact
+ * bar fully opaque) at a fixed pixel offset regardless of how tall the actual
+ * title item is, so on any screen whose title is shorter than that guess the
+ * compact bar finishes fading in *before* the large title has scrolled out
+ * from under it — both render at once, the large one still visible (blurred by
+ * [TopFadeBlur]'s haze band) behind the sharp compact one. That double render
+ * is the "ghosting" bug: two copies of the same title on screen together.
+ * Tying progress to the title item's real height (1f once it has fully
+ * scrolled past, whatever its height is) makes the handoff exact instead of a
+ * guess, on every screen and every font scale.
+ *
+ * @param titleItemKey the `key` the caller gave its title item, for a list
+ * that puts something ahead of the title (Settings has a `"top_spacer"` item
+ * before its `"title"` one). Left null when the title is item 0, as it is on
+ * Home/History/Stats.
  */
 @Composable
-fun rememberTitleCollapseProgress(state: LazyListState, thresholdPx: Float = 220f): Float {
-    val progress by remember(state) {
+fun rememberTitleCollapseProgress(state: LazyListState, titleItemKey: Any? = null): Float {
+    val progress by remember(state, titleItemKey) {
         derivedStateOf {
-            val scrolled = if (state.firstVisibleItemIndex == 0) {
-                state.firstVisibleItemScrollOffset.toFloat()
+            val visible = state.layoutInfo.visibleItemsInfo
+            val titleItem = if (titleItemKey != null) {
+                visible.firstOrNull { it.key == titleItemKey }
             } else {
-                thresholdPx
+                visible.firstOrNull { it.index == 0 }
             }
-            (scrolled / thresholdPx).coerceIn(0f, 1f)
+            if (titleItem == null) {
+                // Not in the visible range at all — scrolled fully past.
+                1f
+            } else {
+                (-titleItem.offset.toFloat() / titleItem.size.coerceAtLeast(1)).coerceIn(0f, 1f)
+            }
         }
     }
     return progress

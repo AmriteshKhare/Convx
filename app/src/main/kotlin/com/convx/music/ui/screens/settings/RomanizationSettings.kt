@@ -6,7 +6,7 @@
 package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
@@ -33,16 +33,16 @@ import androidx.compose.material3.SwitchDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
 import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalContext
@@ -94,6 +94,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
+import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -123,11 +124,11 @@ fun RomanizationSettings(
     val (lyricsRomanizeCyrillicByLine, onLyricsRomanizeCyrillicByLineChange) = rememberPreference(LyricsRomanizeCyrillicByLineKey, defaultValue = false)
     val (showDialog, setShowDialog) = remember { mutableStateOf(false) }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.lyrics_romanize_title),
+        pageColor = IosTheme.colors.systemGroupedBackground,
+        horizontalPadding = 16.dp,
     ) {
         IosSettingsGroup(
             title = stringResource(R.string.general),
@@ -323,21 +324,6 @@ fun RomanizationSettings(
                 }
             )
         }
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.lyrics_romanize_title)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        }
-    )
 }

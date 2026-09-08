@@ -6,7 +6,6 @@
 package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -29,7 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -42,14 +40,9 @@ import com.convx.music.constants.DisableScreenshotKey
 import com.convx.music.constants.PauseListenHistoryKey
 import com.convx.music.constants.PauseSearchHistoryKey
 import com.convx.music.ui.component.DefaultDialog
-import com.convx.music.ui.component.FrostedTopBar
 import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.component.TopFadeBlur
-import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.utils.rememberPreference
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,27 +134,12 @@ fun PrivacySettings(
         )
     }
 
-    val hazeState = remember { HazeState() }
-
-    Box(modifier = Modifier) {
-    Column(
-        Modifier
-            .hazeSource(hazeState)
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.privacy),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Top
-                )
-            )
-        )
 
         IosSettingsGroup(
             title = stringResource(R.string.listen_history),
@@ -229,19 +207,5 @@ fun PrivacySettings(
             )
         )
         Spacer(modifier = Modifier.height(16.dp))
-    }
-
-        TopFadeBlur(
-            hazeState = hazeState,
-            pageColor = IosTheme.colors.systemGroupedBackground,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
-
-        FrostedTopBar(
-            onBack = navController::navigateUp,
-            title = stringResource(R.string.privacy),
-            titleAlpha = 1f,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
     }
 }

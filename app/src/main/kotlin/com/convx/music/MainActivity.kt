@@ -292,6 +292,7 @@ import com.convx.music.ui.screens.SettingDialoge
 import com.convx.music.ui.screens.navigationBuilder
 import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.screens.settings.NavigationTab
+import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.BrandName
 import com.convx.music.ui.theme.DefaultThemeColor
 import com.convx.music.ui.theme.LocalAccentTextColor
@@ -2211,7 +2212,7 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .widthIn(max = 500.dp)
-                                        .padding(horizontal = 12.dp)
+                                        .padding(horizontal = AppleTokens.Gutter)
                                         .padding(bottom = bottomInset + 8.dp)
                                         .graphicsLayer {
                                             val hiddenOffset =

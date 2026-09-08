@@ -20,8 +20,11 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -29,13 +32,12 @@ import com.convx.music.ui.ios.compat.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.ios.compat.Scaffold
 import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.edit
 import androidx.navigation.NavController
+import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
 import com.convx.music.constants.PlayerIconsKey
 import com.convx.music.constants.UseAppleMusicPlayerKey
@@ -72,6 +75,7 @@ import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.convx.music.ui.screens.settings.SettingsPage
 
 /**
  * Swaps the player's control glyphs for the user's own artwork.
@@ -164,31 +168,12 @@ fun PlayerIconsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                windowInsets = appTopBarWindowInsets(),
-                title = { Text(stringResource(R.string.player_icons)) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = navController::navigateUp,
-                        onLongClick = navController::backToMain,
-                    ) {
-                        Icon(painterResource(R.drawable.arrow_back), contentDescription = null)
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-    ) { padding ->
-        Column(
-            Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.player_icons),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
+    ) {
             Text(
                 text = stringResource(R.string.player_icons_desc),
                 style = AppTheme.typography.bodySmall,
@@ -255,7 +240,7 @@ fun PlayerIconsScreen(
                 }
             }
             Spacer(Modifier.height(8.dp))
-        }
+        
     }
 }
 

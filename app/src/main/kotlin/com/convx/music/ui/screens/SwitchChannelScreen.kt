@@ -43,6 +43,7 @@ import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.launch
+import com.convx.music.ui.component.ScreenScaffold
 
 /**
  * Lets an already-logged-in user switch which YouTube channel on their Google
@@ -70,10 +71,18 @@ fun SwitchChannelScreen(navController: NavController) {
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
     var switched by remember { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
+    ScreenScaffold(
+        title = stringResource(if (switched) R.string.switch_channel_switched_title else R.string.switch_channel_title),
+        // A login WebView does not scroll under the bar, so there is no large
+        // title to hand off from — the compact one simply stays.
+        titleAlpha = 1f,
+        onBack = navController::navigateUp,
+        onBackLongClick = navController::backToMain,
     ) {
         AndroidView(
+            // Deliberately NOT the chrome's contentModifier: recording a
+            // hardware-accelerated WebView into a backdrop layer makes the page
+            // tear (see MainActivity's WebViewRoutes note).
             modifier = Modifier
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
                 .fillMaxSize(),
@@ -134,20 +143,6 @@ fun SwitchChannelScreen(navController: NavController) {
             }
         )
 
-        TopAppBar(
-            title = { Text(stringResource(if (switched) R.string.switch_channel_switched_title else R.string.switch_channel_title)) },
-            navigationIcon = {
-                IconButton(
-                    onClick = navController::navigateUp,
-                    onLongClick = navController::backToMain
-                ) {
-                    Icon(
-                        painterResource(R.drawable.arrow_back),
-                        contentDescription = null
-                    )
-                }
-            }
-        )
     }
 
     BackHandler(enabled = webViewRef.value?.canGoBack() == true) {

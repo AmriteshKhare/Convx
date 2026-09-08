@@ -28,13 +28,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowCounterclockwise
+import com.composables.sfsymbols.monochrome.SFForwardFill
+import com.composables.sfsymbols.monochrome.SFMinus
+import com.composables.sfsymbols.monochrome.SFPlus
 import com.convx.music.LocalDatabase
 import com.convx.music.R
 import com.convx.music.db.entities.SongEntity
@@ -74,7 +78,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
             .padding(horizontal = 24.dp, vertical = 20.dp)
     ) {
         Icon(
-            painter = painterResource(R.drawable.fast_forward),
+            imageVector = SfSymbols.Monochrome.SFForwardFill,
             contentDescription = null,
             modifier = Modifier.size(40.dp),
             tint = AppTheme.colorScheme.primary
@@ -175,7 +179,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                     }
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.replay),
+                        imageVector = SfSymbols.Monochrome.SFArrowCounterclockwise,
                         tint = AppTheme.colorScheme.primary,
                         contentDescription = "Reset"
                     )
@@ -196,7 +200,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                 }
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.remove),
+                    imageVector = SfSymbols.Monochrome.SFMinus,
                     contentDescription = "Decrease"
                 )
             }
@@ -220,7 +224,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                 }
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.add),
+                    imageVector = SfSymbols.Monochrome.SFPlus,
                     contentDescription = "Increase"
                 )
             }

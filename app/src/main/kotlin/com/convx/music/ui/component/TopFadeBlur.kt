@@ -117,6 +117,18 @@ fun TopFadeBlur(
                 // of the material instead.
                 style = HazeMaterials.ultraThin(pageColor),
             ) {
+                // NOTE: a screen-local hazeState nested inside the app's own
+                // outer hazeSource (MainActivity's NavHost content box) draws
+                // nothing by default — Haze's zIndex filter excludes its own
+                // only area (see glass-chrome-rendernode-cycle memory for the
+                // full story). `canDrawArea = { true }` looked like the fix but
+                // crashes instead ("Modifier.haze nodes can not draw
+                // Modifier.hazeChild nodes"): it also lets this consumer
+                // attempt to draw the OUTER app-level source's area, which
+                // Haze hard-rejects rather than silently skips. Needs a
+                // canDrawArea that accepts only this screen's own area, not a
+                // blanket true — not yet solved, so left at Haze's default
+                // (silently no-op) rather than crash-prone.
                 // Cubic rather than the default quadratic, and eased out
                 // rather than in: the ramp falls away quickly under the bar
                 // and then spends the rest of its run near nothing, which is

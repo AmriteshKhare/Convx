@@ -81,11 +81,10 @@ import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.LaunchedEffect
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -171,6 +170,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.ListenTogetherViewModel
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.flow.collectLatest
+import com.convx.music.ui.screens.settings.SettingsPage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -413,17 +413,11 @@ fun ListenTogetherSettings(
         )
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-            .verticalScroll(rememberScrollState())
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.listen_together),
+        pageColor = AppTheme.colorScheme.background,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-            )
-        )
-        
         // Settings section using IntegrationCard
         val selectedServer = remember(serverUrl) { ListenTogetherServers.findByUrl(serverUrl) }
         
@@ -549,23 +543,8 @@ fun ListenTogetherSettings(
         }
         
         Spacer(modifier = Modifier.height(16.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.listen_together)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        }
-    )
 }
 
 @Composable

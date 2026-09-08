@@ -26,10 +26,11 @@ import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.RadioButton
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -43,11 +44,9 @@ import com.convx.music.constants.ForceSelectedQualityKey
 import com.convx.music.constants.SaavnAudioQuality
 import com.convx.music.constants.SaavnAudioQualityKey
 import com.convx.music.constants.SaavnFallbackToYouTubeKey
-import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.component.ModernSwitch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
@@ -75,23 +74,12 @@ fun JioSettings(
         defaultValue = false
     )
 
-    Column(
-        Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.jiosaavn_settings),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 24.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Top
-                )
-            )
-        )
         // Description text
         Text(
             text = stringResource(R.string.enable_saavn_streaming_desc),
@@ -237,21 +225,6 @@ fun JioSettings(
         }
 
         Spacer(modifier = Modifier.height(36.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.jiosaavn_settings)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null
-                )
-            }
-        }
-    )
 }

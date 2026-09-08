@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp as lerpColor
@@ -60,6 +62,7 @@ import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
+import coil3.request.crossfade
 import coil3.toBitmap
 import com.convx.music.R
 import com.convx.music.constants.DynamicThemeKey
@@ -79,6 +82,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.convx.music.ui.theme.colorengine.textHierarchyOn
+import com.convx.music.ui.utils.Motion
+import com.convx.music.ui.utils.resize
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -394,6 +399,17 @@ fun Color.asRimPop(): Color {
     // the rim reads as subtle tinted glass, not a coloured glow.
     hsl[1] = hsl[1].coerceAtLeast(0.50f)
     hsl[2] = hsl[2].coerceIn(0.45f, 0.65f)
+    return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+}
+
+/** Punchier still than [asRimPop] — nav bar icon tint over an ambient colour, which
+ *  unlike a hairline rim is the whole glyph and needs to actually read as coloured
+ *  glass rather than white with a hint of tint. */
+fun Color.asIconPop(): Color {
+    val hsl = FloatArray(3)
+    androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[1] = hsl[1].coerceAtLeast(0.75f)
+    hsl[2] = hsl[2].coerceIn(0.50f, 0.72f)
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
@@ -823,7 +839,7 @@ fun HeroBackground(
                                 drawRect(
                                     brush = Brush.verticalGradient(
                                         colors = listOf(Color.Black, Color.Transparent),
-                                        startY = size.height * 0.4f,
+                                        startY = size.height * 0.55f,
                                         endY = size.height
                                     ),
                                     blendMode = BlendMode.DstIn
@@ -994,5 +1010,180 @@ fun HeroCardHeader(
             }
         },
         actions = actions,
+    )
+}
+
+/**
+ * Where the hero's blend zone starts, as a fraction of the photo height: above
+ * this the plate stays sharp, below it blur and colour fade ramp to full at the
+ * foot. Shared with the screen's header math so the title sits on the blend
+ * start rather than somewhere up the sharp photo or down the flat tint.
+ */
+const val ArtistBlendStart = 0.55f
+
+/**
+ * BitChord-style artist hero: the photo full-bleed, very slightly taller than
+ * wide, with a progressive blur running from zero at [ArtistBlendStart] to
+ * [blurRadius] at the foot — sharp where the face is, increasingly smeared
+ * where the page begins — so the picture dissolves into the page colour
+ * instead of meeting it at an edge. The ramp is three plates at growing radii
+ * over the same height (like the top bar's own progressive glass), not one
+ * mask, so no single gradient edge survives to read as a line. A
+ * full-strength foot wash in [pageColor] settles the join before
+ * [HeroMergeBand]'s glass goes over it (a blur averages what it is given and
+ * cannot invent agreement), and a static top shade keeps the floating
+ * back/share chrome legible while the hero is fully visible, before the
+ * scroll-driven scrim takes over.
+ *
+ * Below Android S RenderEffect blur is a no-op and the blurred plates simply
+ * stop contributing; the wash plus the band's own plain-gradient fallback
+ * still dissolve the edge, so the fallback is a fade, not a cut.
+ */
+@Composable
+fun ArtistHeroImage(
+    artworkUrl: String?,
+    pageColor: Color,
+    hazeState: HazeState?,
+    modifier: Modifier = Modifier,
+    heroRatio: Float = 0.95f,
+    blurRadius: Dp = 56.dp,
+    heroScale: Float = 1f,
+    overlay: @Composable BoxScope.() -> Unit = {},
+) {
+    val context = LocalContext.current
+    val heroRequest = remember(artworkUrl) {
+        artworkUrl?.takeIf { it.isNotBlank() }?.let {
+            ImageRequest.Builder(context)
+                .data(it.resize(1200, 1200))
+                .crossfade(Motion.MorphEnterMillis)
+                .build()
+        }
+    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(heroRatio)
+            .graphicsLayer {
+                scaleX = heroScale
+                scaleY = heroScale
+                compositingStrategy = CompositingStrategy.Offscreen
+            },
+    ) {
+        if (heroRequest != null) {
+            // Sharp plate, full-bleed.
+            AsyncImage(
+                model = heroRequest,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            // The same plate three times at growing radii, each masked in lower
+            // than the last: zero blur above [ArtistBlendStart], [blurRadius] at
+            // the foot, stepping up between — one mask alone always leaves its
+            // own gradient edge behind to read as a line.
+            ProgressBlurPlate(
+                model = heroRequest,
+                radius = blurRadius * 0.3f,
+                maskStart = ArtistBlendStart,
+            )
+            ProgressBlurPlate(
+                model = heroRequest,
+                radius = blurRadius * 0.6f,
+                maskStart = 0.70f,
+            )
+            ProgressBlurPlate(
+                model = heroRequest,
+                radius = blurRadius,
+                maskStart = 0.85f,
+            )
+            // Foot wash: the blurred foot lands fully on the page colour, not on
+            // raw mesh, so both sides of the join agree before the glass samples
+            // it — this plus the blur above is what erases the photo's edge.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.45f to Color.Transparent,
+                            1.00f to pageColor,
+                        ),
+                    ),
+            )
+        } else {
+            // Stand-in while there is no photo: a neutral wash, not flat tint,
+            // so the fade structure still reads in previews and offline.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color(0xFF6B5B73),
+                            1f to pageColor,
+                        ),
+                    ),
+            )
+            Image(
+                painter = painterResource(R.drawable.music_note),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize(0.3f)
+                    .align(Alignment.Center)
+                    .graphicsLayer { alpha = 0.3f },
+            )
+        }
+
+        // Static shade under the glass bar, BitChord's own: the scroll scrim
+        // only arrives once the list moves, and at rest the buttons sit on raw
+        // photo without it.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.28f)
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.35f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
+
+        overlay()
+
+        // The join itself: blurred colour centred on the foot, title/buttons
+        // hang onto what it leaves behind. Sibling of the plates above, never a
+        // parent — the glass must reach the join at full strength.
+        HeroMergeBand(
+            artworkUrl = artworkUrl,
+            heroRatio = heroRatio,
+            pageColor = pageColor,
+            hazeState = hazeState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = HeroMergeBandHeight / 2),
+        )
+    }
+}
+
+/** One step of [ArtistHeroImage]'s ramp: the plate blurred, visible only below [maskStart]. */
+@Composable
+private fun BoxScope.ProgressBlurPlate(model: Any?, radius: Dp, maskStart: Float) {
+    AsyncImage(
+        model = model,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .fillMaxSize()
+            .blur(radius)
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        maskStart to Color.Transparent,
+                        1.00f to Color.Black,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
     )
 }

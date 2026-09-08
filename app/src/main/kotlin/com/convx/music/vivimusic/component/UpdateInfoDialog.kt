@@ -23,10 +23,13 @@ import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronRight
+import com.composables.sfsymbols.monochrome.SFInfoCircle
+import com.composables.sfsymbols.monochrome.SFMagnifyingglass
 import com.convx.music.R
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 
@@ -86,7 +89,7 @@ fun UpdateInfoDialog(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Icon(
-                                        painter = painterResource(R.drawable.info),
+                                        imageVector = SfSymbols.Monochrome.SFInfoCircle,
                                         contentDescription = null,
                                         tint = AppTheme.colorScheme.onSecondaryContainer,
                                         modifier = Modifier.size(16.dp),
@@ -125,7 +128,7 @@ fun UpdateInfoDialog(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.manage_search),
+                            imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                             contentDescription = null,
                             tint = AppTheme.colorScheme.primary,
                             modifier = Modifier
@@ -160,7 +163,7 @@ fun UpdateInfoDialog(
                         shape = actionShape,
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.arrow_forward),
+                            imageVector = SfSymbols.Monochrome.SFChevronRight,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )

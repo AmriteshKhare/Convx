@@ -67,7 +67,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -76,16 +75,27 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowClockwise
+import com.composables.sfsymbols.monochrome.SFClock
+import com.composables.sfsymbols.monochrome.SFExclamationmarkTriangle
+import com.composables.sfsymbols.monochrome.SFMicrophone
+import com.composables.sfsymbols.monochrome.SFMusicNote
+import com.composables.sfsymbols.monochrome.SFPlayFill
+import com.composables.sfsymbols.monochrome.SFXmark
 import com.convx.music.LocalDatabase
 import com.convx.music.R
 import com.convx.music.db.entities.RecognitionHistory
 import com.convx.music.ui.component.IconButton
+import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.music.shazamkit.models.RecognitionResult
 import com.music.shazamkit.models.RecognitionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
+import com.convx.music.ui.component.ScreenScaffold
+import com.convx.music.ui.component.topBarContentPadding
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,36 +179,25 @@ fun RecognitionScreen(
         }
     }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.recognize_music)) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = { navController.navigateUp() },
-                        onLongClick = { navController.backToMain() }
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.arrow_back),
-                            contentDescription = null
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { navController.navigate("recognition_history") }) {
-                        Icon(
-                            painter = painterResource(R.drawable.history),
-                            contentDescription = stringResource(R.string.recognition_history)
-                        )
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
+    ScreenScaffold(
+        title = stringResource(R.string.recognize_music),
+        // A single centred listening view, nothing scrolls under the bar.
+        titleAlpha = 1f,
+        onBack = { navController.navigateUp() },
+        onBackLongClick = { navController.backToMain() },
+        actions = {
+            IconButton(onClick = { navController.navigate("recognition_history") }) {
+                Icon(
+                    imageVector = SfSymbols.Monochrome.SFClock,
+                    contentDescription = stringResource(R.string.recognition_history),
+                )
+            }
+        },
+    ) { chrome ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(top = topBarContentPadding())
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -290,12 +289,12 @@ private fun ReadyState(
                     .background(AppTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.mic),
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = AppTheme.colorScheme.onPrimary
-                )
+Icon(
+                imageVector = SfSymbols.Monochrome.SFMicrophone,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = AppTheme.colorScheme.onPrimary
+            )
             }
         }
         
@@ -358,12 +357,12 @@ private fun ListeningState(
                     .bounceClick { onCancel() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.mic),
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = AppTheme.colorScheme.onPrimary
-                )
+Icon(
+                imageVector = SfSymbols.Monochrome.SFMicrophone,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = AppTheme.colorScheme.onPrimary
+            )
             }
         }
         
@@ -419,7 +418,7 @@ private fun ProcessingState() {
             )
             
             Icon(
-                painter = painterResource(R.drawable.music_note),
+                imageVector = SfSymbols.Monochrome.SFMusicNote,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = AppTheme.colorScheme.primary
@@ -512,7 +511,7 @@ private fun SuccessState(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.play),
+                    imageVector = SfSymbols.Monochrome.SFPlayFill,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
@@ -525,7 +524,7 @@ private fun SuccessState(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.mic),
+                    imageVector = SfSymbols.Monochrome.SFMicrophone,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
@@ -539,7 +538,7 @@ private fun SuccessState(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.close),
+                    imageVector = SfSymbols.Monochrome.SFXmark,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
@@ -567,7 +566,7 @@ private fun NoMatchState(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                painter = painterResource(R.drawable.close),
+                imageVector = SfSymbols.Monochrome.SFXmark,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = AppTheme.colorScheme.onErrorContainer
@@ -590,7 +589,7 @@ private fun NoMatchState(
         
         Button(onClick = onTryAgain) {
             Icon(
-                painter = painterResource(R.drawable.refresh),
+                imageVector = SfSymbols.Monochrome.SFArrowClockwise,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
@@ -617,7 +616,7 @@ private fun ErrorState(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                painter = painterResource(R.drawable.error),
+                imageVector = SfSymbols.Monochrome.SFExclamationmarkTriangle,
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = AppTheme.colorScheme.onErrorContainer
@@ -640,7 +639,7 @@ private fun ErrorState(
         
         Button(onClick = onTryAgain) {
             Icon(
-                painter = painterResource(R.drawable.refresh),
+                imageVector = SfSymbols.Monochrome.SFArrowClockwise,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )

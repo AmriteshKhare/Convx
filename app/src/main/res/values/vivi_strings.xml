@@ -183,6 +183,9 @@
     <string name="apple_music_player_v17">Apple Music Player V17 (Beta)</string>
     <string name="apple_music_player_v17_description">Alternate full-screen player layout in the Apple Music style. DIY stickers are not shown while this is active.</string>
     <string name="apple_music_player_v17_options">Apple Music Player V17 options</string>
+    <string name="player_look">Player look</string>
+    <string name="player_look_squared">Squared (Classic)</string>
+    <string name="player_look_hero">Hero Blend</string>
     <string name="show_up_next">Show Up Next</string>
     <string name="show_up_next_desc">Show the upcoming song below the current track info</string>
     <string name="up_next">Up Next</string>
@@ -444,6 +447,11 @@
     <string name="audio_bit_perfect_description_hw">Turns off EQ and silence-skip so nothing touches the samples, and requests a true bit-perfect passthrough mixer for your connected USB DAC</string>
     <string name="audio_bit_perfect_description_sw">Turns off EQ and silence-skip so nothing touches the samples. True hardware bit-perfect passthrough needs Android 14+, a USB DAC, and OEM support — not available on this device right now</string>
     <string name="audio_bit_perfect_disabled_by_crossfade">Disabled because Crossfade is active</string>
+
+    <!-- Spatial audio -->
+    <string name="spatial_audio">Spatial audio</string>
+    <string name="spatial_audio_description">Widens stereo tracks for a more immersive, out-of-the-head feel on headphones</string>
+    <string name="spatial_audio_disabled_by_bit_perfect">Disabled because Bit Perfect is active</string>
 
     <!-- Google Cast -->
     <string name="google_cast">Google Cast</string>
@@ -1149,6 +1157,7 @@
     <string name="spotify_import_in_progress">Importing from Spotify</string>
     <string name="spotify_login_desc">Connecting to Spotify is completely local. Your session credentials are only saved on your device.</string>
     <string name="liquid_glass">Liquid Glass</string>
+    <string name="liquid_glass_simple_desc">Glass look for the nav bar and mini player</string>
     <string name="share_smart_link">Share smart link</string>
     <string name="playlist_description">Description</string>
     <string name="ios_overscroll">Bouncy scroll</string>
@@ -1296,4 +1305,7 @@
     <string name="font_sans_flex_desc">A modern versatile flexible sans-serif.</string>
     <string name="font_outfit_desc">A clean and modern geometric sans-serif.</string>
     <string name="font_plus_jakarta_sans_desc">A premium warm geometric sans-serif typeface.</string>
+    <!-- Album/playlist detail header -->
+    <string name="lossless">Lossless</string>
+    <string name="download">Download</string>
 </resources>

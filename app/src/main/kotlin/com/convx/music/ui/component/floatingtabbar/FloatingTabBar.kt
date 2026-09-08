@@ -241,6 +241,9 @@ fun FloatingTabBar(
     // springs in series, so the puck arrived roughly a full animation after the page
     // it marks -- the "selected icon puck comes after a second" report.
     tabPosition: (() -> Float?)? = null,
+    // Whole-bar snap thump, 0 at rest. The docked mini fires it on drag
+    // release (see onSnapRelease); read in the draw phase, no recomposition.
+    snapPulse: () -> Float = { 0f },
     searchMode: Boolean = false,
     searchBarContent: (@Composable (Modifier) -> Unit)? = null,
     // Vendored addition: caller-held width (from a previous onExpandedWidthChanged
@@ -327,8 +330,16 @@ fun FloatingTabBar(
                 Modifier
                     .gooey { if (meltTransitionEnabled) gooeyBlurPx * gooeyProgress else 0f }
                     // Unclipped so per-item elastic stretch can protrude past the
-                    // bar bounds instead of slicing at its edge.
-                    .graphicsLayer { clip = false }
+                    // bar bounds instead of slicing at its edge. Also carries the
+                    // whole-bar snap thump answering the mini's drag release.
+                    .graphicsLayer {
+                        clip = false
+                        val thump = snapPulse()
+                        if (thump != 0f) {
+                            scaleX = 1f + 0.02f * thump
+                            scaleY = 1f + 0.02f * thump
+                        }
+                    }
             ) {
                 transition.AnimatedContent(
                     transitionSpec = {

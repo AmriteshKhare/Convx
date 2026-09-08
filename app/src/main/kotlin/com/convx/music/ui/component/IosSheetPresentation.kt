@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -26,13 +27,13 @@ import androidx.compose.ui.util.lerp
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 
 /** How far back the presenting screen sits once a sheet is fully open. */
-private const val PresentedScale = 0.92f
+private const val PresentedScale = 0.91f
 
 /** The rounding the screen picks up as it detaches — roughly a device corner radius. */
-private val PresentedCornerRadius = 24.dp
+private val PresentedCornerRadius = 32.dp
 
 /** How much the screen darkens behind the sheet. */
-private const val PresentedDim = 0.18f
+private const val PresentedDim = 0.22f
 
 /**
  * The iOS sheet presentation, applied to the screen a sheet is covering: it scales back,
@@ -65,6 +66,36 @@ fun Modifier.iosSheetPresentation(progress: Float, topInset: Dp = 12.dp): Modifi
         .drawWithContent {
             drawContent()
             drawRect(Color.Black, alpha = PresentedDim * p)
+        }
+}
+
+/**
+ * Draw-phase overload of [iosSheetPresentation] driven by a live progress provider (e.g.
+ * bottom sheet drag). Evaluates during the draw/graphicsLayer phase for zero-recomposition
+ * 120Hz smoothness while tracking card gestures continuously.
+ */
+fun Modifier.iosSheetPresentation(progressProvider: () -> Float, topInset: Dp = 12.dp): Modifier {
+    return this.drawWithCache {
+        onDrawWithContent {
+            val p = progressProvider().coerceIn(0f, 1f)
+            if (p > 0.001f) {
+                drawRect(Color.Black)
+            }
+            drawContent()
+            if (p > 0.001f) {
+                drawRect(Color.Black, alpha = PresentedDim * p)
+            }
+        }
+    }
+        .graphicsLayer {
+            val p = progressProvider().coerceIn(0f, 1f)
+            val scale = lerp(1f, PresentedScale, p)
+            scaleX = scale
+            scaleY = scale
+            transformOrigin = TransformOrigin(0.5f, 0f)
+            translationY = topInset.toPx() * p
+            shape = ContinuousRoundedRectangle(PresentedCornerRadius * p)
+            clip = p > 0.001f
         }
 }
 

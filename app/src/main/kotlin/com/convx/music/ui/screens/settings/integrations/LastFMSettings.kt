@@ -9,6 +9,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
@@ -55,11 +56,10 @@ import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -138,6 +138,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.launch
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlin.math.roundToInt
+import com.convx.music.ui.screens.settings.SettingsPage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -339,20 +340,12 @@ fun LastFMSettings(
         )
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.lastfm_integration),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Top
-                )
-            )
-        )
-
         IosSettingsGroup(
             title = stringResource(R.string.account),
             items = listOf(
@@ -654,21 +647,6 @@ fun LastFMSettings(
         )
 
         Spacer(modifier = Modifier.height(50.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.lastfm_integration)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        }
-    )
 }

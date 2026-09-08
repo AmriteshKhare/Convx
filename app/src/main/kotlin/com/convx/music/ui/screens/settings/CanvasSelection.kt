@@ -55,13 +55,9 @@ import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.RadioButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.Scaffold
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -70,6 +66,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.graphics.Color
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -126,24 +123,12 @@ fun CanvasSelection(
         defaultValue = CanvasSource.AUTO
     )
 
-    Column(
-        Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.vivimusic_canvas),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 24.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Top
-                )
-            )
-        )
-
         // Description text
         Text(
             text = stringResource(R.string.vivimusic_canvas_desc),
@@ -267,21 +252,6 @@ fun CanvasSelection(
             )
         )
         Spacer(modifier = Modifier.height(36.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.vivimusic_canvas)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        }
-    )
 }

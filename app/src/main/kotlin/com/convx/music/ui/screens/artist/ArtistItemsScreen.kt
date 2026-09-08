@@ -43,12 +43,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronLeft
+import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
@@ -259,7 +261,7 @@ fun ArtistItemsScreen(
                                         },
                                     ) {
                                         Icon(
-                                            painter = painterResource(R.drawable.more_vert),
+                                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                                             contentDescription = null,
                                         )
                                     }
@@ -414,7 +416,7 @@ fun ArtistItemsScreen(
                         onLongClick = navController::backToMain,
                     ) {
                         Icon(
-                            painterResource(R.drawable.arrow_back),
+                            imageVector = SfSymbols.Monochrome.SFChevronLeft,
                             contentDescription = null,
                         )
                     }

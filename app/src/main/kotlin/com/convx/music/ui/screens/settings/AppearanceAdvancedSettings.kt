@@ -8,13 +8,26 @@ package com.convx.music.ui.screens.settings
 import android.app.Activity
 import android.content.Context
 import androidx.core.content.edit
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.Slider
@@ -36,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
+import com.convx.music.constants.AppBackgroundColorKey
+import com.convx.music.constants.AppTextColorKey
 import com.convx.music.constants.AppleMusicLyricsBlurKey
 import com.convx.music.constants.ChipSortTypeKey
 import com.convx.music.constants.DensityScale
@@ -55,11 +70,14 @@ import com.convx.music.constants.HomeHeroCardHeightOverrideKey
 import com.convx.music.constants.IosOverscrollKey
 import com.convx.music.constants.LibraryFilter
 import com.convx.music.constants.LibraryIconsOnlyKey
+import com.convx.music.constants.LocalAlbumsByYearKey
 import com.convx.music.constants.LyricsGlowEffectKey
 import com.convx.music.constants.LyricsStandardBlurKey
 import com.convx.music.constants.EnableLyricsThumbnailPlayPauseKey
 import com.convx.music.constants.MiniBarTabStyleKey
 import com.convx.music.constants.NavBarMeltTransitionKey
+import com.convx.music.constants.PureBlackKey
+import com.convx.music.constants.PureBlackMiniPlayerKey
 import com.convx.music.constants.ReduceDynamicBlurKey
 import com.convx.music.constants.ShowAudioQualityBadgeKey
 import com.convx.music.constants.ShowCommentButtonKey
@@ -68,6 +86,7 @@ import com.convx.music.constants.SpeedDialCardHeightOverrideKey
 import com.convx.music.constants.SpeedDialColumnsOverrideKey
 import com.convx.music.constants.SheetCornerRadiusKey
 import com.convx.music.constants.ThumbnailCornerRadiusKey
+import com.convx.music.ui.component.ColorPickerDialog
 import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.component.EnumDialog
 import com.convx.music.ui.component.IconButton
@@ -100,6 +119,17 @@ fun AppearanceAdvancedSettings(
     scrollBehavior: TopAppBarScrollBehavior,
     activity: Activity,
 ) {
+    // Pure Black (AMOLED) -- demoted from the simple Theme picker (task 011):
+    // still fully functional, just not a top-level choice for a beginner. The
+    // mini-player variant is kept linked to the main toggle, matching the
+    // behavior ThemeScreen.kt used to drive directly.
+    val (pureBlack, onPureBlackChangeRaw) = rememberPreference(PureBlackKey, defaultValue = false)
+    val (_, onPureBlackMiniPlayerChange) = rememberPreference(PureBlackMiniPlayerKey, defaultValue = false)
+    val onPureBlackChange: (Boolean) -> Unit = { enabled ->
+        onPureBlackChangeRaw(enabled)
+        onPureBlackMiniPlayerChange(enabled)
+    }
+
     val (iosOverscroll, onIosOverscrollChange) = rememberPreference(IosOverscrollKey, defaultValue = true)
     val (enableSettingsPopup, onEnableSettingsPopupChange) = rememberPreference(
         EnableSettingsPopupKey,
@@ -195,6 +225,44 @@ fun AppearanceAdvancedSettings(
     val (homeHeroCardHeightOverride, onHomeHeroCardHeightOverrideChange) = rememberPreference(HomeHeroCardHeightOverrideKey, 0)
     val (speedDialCardHeightOverride, onSpeedDialCardHeightOverrideChange) = rememberPreference(SpeedDialCardHeightOverrideKey, 0)
     val (homeCardCornerRadiusOverride, onHomeCardCornerRadiusOverrideChange) = rememberPreference(HomeCardCornerRadiusOverrideKey, 0)
+    // Moved from PlayerAdvancedSettings (task 011): a display/sort preference for
+    // the local Albums shelf, not a playback setting -- belongs with the rest of
+    // Appearance's niche display toggles.
+    val (localAlbumsByYear, onLocalAlbumsByYearChange) = rememberPreference(LocalAlbumsByYearKey, defaultValue = true)
+
+    // App-wide background/text color, moved here from ThemeScreen.kt (task 011):
+    // independent of Liquid Glass, and niche enough to belong with the rest of
+    // Advanced Appearance rather than the beginner-facing theme picker.
+    val (backgroundColorInt, onBackgroundColorChange) = rememberPreference(AppBackgroundColorKey, defaultValue = 0)
+    val (textColorInt, onTextColorChange) = rememberPreference(AppTextColorKey, defaultValue = 0)
+    val backgroundColor = if (backgroundColorInt == 0) AppTheme.colorScheme.surfaceContainerHigh else Color(backgroundColorInt)
+    val appTextColor = if (textColorInt == 0) AppTheme.colorScheme.onSurface else Color(textColorInt)
+    var showBackgroundColorPicker by rememberSaveable { mutableStateOf(false) }
+    var showAppTextColorPicker by rememberSaveable { mutableStateOf(false) }
+
+    if (showBackgroundColorPicker) {
+        ColorPickerDialog(
+            initialColor = backgroundColor,
+            title = stringResource(R.string.background_color),
+            onDismiss = { showBackgroundColorPicker = false },
+            onConfirm = {
+                onBackgroundColorChange(it.toArgb())
+                showBackgroundColorPicker = false
+            },
+        )
+    }
+
+    if (showAppTextColorPicker) {
+        ColorPickerDialog(
+            initialColor = appTextColor,
+            title = stringResource(R.string.text_color),
+            onDismiss = { showAppTextColorPicker = false },
+            onConfirm = {
+                onTextColorChange(it.toArgb())
+                showAppTextColorPicker = false
+            },
+        )
+    }
 
     if (showThumbnailCornerRadiusDialog) {
         ThumbnailCornerRadiusModal(
@@ -295,13 +363,52 @@ fun AppearanceAdvancedSettings(
         }
     }
 
-    LazyColumn(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .padding(horizontal = 16.dp),
+    SettingsLazyPage(
+        navController = navController,
+        title = stringResource(R.string.advanced),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
         item(key = "appearance_advanced_settings_content") {
             Column {
+                IosSettingsGroup(
+                    title = stringResource(R.string.theme_colors),
+                    items = listOf(
+                        IosSettingsItem(
+                            icon = painterResource(R.drawable.grid_view),
+                            title = { Text(stringResource(R.string.pure_black)) },
+                            description = { Text(stringResource(R.string.pure_black_desc)) },
+                            trailingContent = {
+                                Switch(checked = pureBlack, onCheckedChange = onPureBlackChange)
+                            },
+                            onClick = { onPureBlackChange(!pureBlack) }
+                        ),
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(27.dp))
+
+                IosSettingsGroup(
+                    title = stringResource(R.string.app_background_text_color),
+                    items = listOf(
+                        IosSettingsItem(
+                            icon = painterResource(R.drawable.palette),
+                            title = { Text(stringResource(R.string.background_color)) },
+                            description = { Text(stringResource(R.string.app_background_text_color_desc)) },
+                            trailingContent = { AdvancedColorSwatch(backgroundColor) },
+                            onClick = { showBackgroundColorPicker = true }
+                        ),
+                        IosSettingsItem(
+                            icon = painterResource(R.drawable.palette),
+                            title = { Text(stringResource(R.string.text_color)) },
+                            trailingContent = { AdvancedColorSwatch(appTextColor) },
+                            onClick = { showAppTextColorPicker = true }
+                        ),
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(27.dp))
+
                 IosSettingsGroup(
                     title = stringResource(R.string.appearance),
                     items = listOf(
@@ -529,6 +636,15 @@ fun AppearanceAdvancedSettings(
                             description = { Text(DensityScale.fromValue(densityScale).label) },
                             onClick = { showDensityScaleDialog = true }
                         ),
+                        IosSettingsItem(
+                            icon = painterResource(R.drawable.album),
+                            title = { Text(stringResource(R.string.local_albums_by_year)) },
+                            description = { Text(stringResource(R.string.local_albums_by_year_desc)) },
+                            trailingContent = {
+                                Switch(checked = localAlbumsByYear, onCheckedChange = onLocalAlbumsByYearChange)
+                            },
+                            onClick = { onLocalAlbumsByYearChange(!localAlbumsByYear) }
+                        ),
                     )
                 )
 
@@ -731,21 +847,18 @@ fun AppearanceAdvancedSettings(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    
     }
+}
 
-    TopAppBar(
-        windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.advanced)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null
-                )
-            }
-        }
+/** Small current-color preview for a color-picker settings row's trailing content. */
+@Composable
+private fun AdvancedColorSwatch(color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .background(color)
+            .border(1.dp, AppTheme.colorScheme.outline.copy(alpha = 0.4f), CircleShape)
     )
 }

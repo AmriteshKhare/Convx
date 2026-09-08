@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import com.convx.music.ui.ios.compat.LocalContentColor
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -41,8 +42,14 @@ object AppleTokens {
      * Metadata text — artist names, subtitles, durations. One step down from
      * on-surface, never full white: the hierarchy on Home is carried by this
      * contrast step rather than by size, since title and subtitle share a size.
+     *
+     * Reads [LocalMetadataColor] rather than being the constant itself, so a screen
+     * painted in its own colour (the artist page's artwork mesh) can hand this tier
+     * a colour derived from that background instead of leaving a foreign grey on it.
+     * Everywhere else the local carries the same fixed grey it always was.
      */
-    val Metadata = Color(0xFF8E8E93)
+    val Metadata: Color
+        @Composable get() = LocalMetadataColor.current
 
     // Spacing — the whole scale. Screens reference these, never a dp literal.
 
@@ -168,6 +175,13 @@ object AppleTokens {
         return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
     }
 }
+
+/**
+ * Backing local for [AppleTokens.Metadata]. Defaults to iOS `systemGray` — the value
+ * that token has always been — so only a screen that explicitly provides something
+ * else sees any change.
+ */
+val LocalMetadataColor = compositionLocalOf { Color(0xFF8E8E93) }
 
 /**
  * The M3 shape scale, bound to [AppleTokens]' four corners so that anything

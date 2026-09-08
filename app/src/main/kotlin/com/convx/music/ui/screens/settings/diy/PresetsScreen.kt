@@ -236,30 +236,23 @@ fun PresetsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                windowInsets = appTopBarWindowInsets(),
-                title = { Text(stringResource(R.string.presets)) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = navController::navigateUp,
-                        onLongClick = navController::backToMain,
-                    ) {
-                        Icon(painterResource(R.drawable.arrow_back), contentDescription = null)
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { importLauncher.launch(arrayOf("*/*")) },
-                        onLongClick = {},
-                    ) {
-                        Icon(painterResource(R.drawable.restore), contentDescription = null)
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
+    com.convx.music.ui.screens.settings.SettingsScaffold(
+        navController = navController,
+        title = stringResource(R.string.presets),
+        // A grid behind a Scaffold with its own FAB — no large title to hand off
+        // from, so the compact one stays put.
+        titleAlpha = 1f,
+        pageColor = AppTheme.colorScheme.background,
+        actions = {
+            com.convx.music.ui.component.GlassCircleButton(
+                onClick = { importLauncher.launch(arrayOf("*/*")) },
+                size = 36.dp,
+            ) {
+                Icon(painterResource(R.drawable.restore), contentDescription = null)
+            }
         },
+    ) { chrome ->
+    Scaffold(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showSaveSheet = true },
@@ -284,7 +277,7 @@ fun PresetsScreen(
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(150.dp),
-            modifier = Modifier.padding(padding).fillMaxSize(),
+            modifier = chrome.contentModifier().padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -297,6 +290,7 @@ fun PresetsScreen(
                 )
             }
         }
+    }
     }
 }
 

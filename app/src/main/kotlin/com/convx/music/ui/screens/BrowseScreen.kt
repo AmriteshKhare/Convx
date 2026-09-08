@@ -51,6 +51,11 @@ import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberEnumPreference
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import com.convx.music.ui.component.ScreenLargeTitle
+import com.convx.music.ui.component.ScreenScaffold
+import com.convx.music.ui.component.rememberTitleCollapseProgress
  import com.convx.music.viewmodels.BrowseViewModel
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -72,10 +77,24 @@ import com.convx.music.utils.rememberEnumPreference
      val coroutineScope = rememberCoroutineScope()
      val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
  
+     val gridState = rememberLazyGridState()
+
+     ScreenScaffold(
+         title = title ?: "",
+         titleAlpha = rememberTitleCollapseProgress(gridState),
+         onBack = navController::navigateUp,
+         onBackLongClick = navController::backToMain,
+     ) { chrome ->
      LazyVerticalGrid(
+         state = gridState,
          columns = rememberGridColumns(),
+         modifier = chrome.contentModifier(),
          contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues()
      ) {
+         item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
+             ScreenLargeTitle(title ?: "")
+         }
+
          items?.let { items ->
              items(
                  items = items.distinctBy { it.id },
@@ -143,19 +162,5 @@ import com.convx.music.utils.rememberEnumPreference
          }
      }
  
-     TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-         title = { Text(title ?: "") },
-         navigationIcon = {
-             IconButton(
-                 onClick = navController::navigateUp,
-                 onLongClick = navController::backToMain
-             ) {
-                 Icon(
-                     painterResource(R.drawable.arrow_back),
-                     contentDescription = null
-                 )
-             }
-         }
-     )
+     }
  }

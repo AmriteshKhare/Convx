@@ -51,7 +51,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -73,6 +72,11 @@ import com.convx.music.LocalDatabase
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronLeft
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFMagnifyingglass
+import com.composables.sfsymbols.monochrome.SFXmark
 import com.convx.music.constants.HistorySource
 import com.convx.music.constants.InnerTubeCookieKey
 import com.convx.music.extensions.metadata
@@ -328,7 +332,7 @@ fun HistoryScreen(
                                         }
                                     ) {
                                         Icon(
-                                            painter = painterResource(R.drawable.more_vert),
+                                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                                             contentDescription = null
                                         )
                                     }
@@ -415,7 +419,7 @@ fun HistoryScreen(
                                             }
                                         ) {
                                             Icon(
-                                                painter = painterResource(R.drawable.more_vert),
+                                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                                 contentDescription = null
                                             )
                                         }
@@ -512,7 +516,7 @@ fun HistoryScreen(
                 if (inSelectMode) {
                     GlassCircleButton(onClick = onExitSelectionMode) {
                         Icon(
-                            painter = painterResource(R.drawable.close),
+                            imageVector = SfSymbols.Monochrome.SFXmark,
                             contentDescription = null,
                         )
                     }
@@ -561,7 +565,7 @@ fun HistoryScreen(
                             }
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.more_vert),
+                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = null
                             )
                         }
@@ -574,7 +578,7 @@ fun HistoryScreen(
                         },
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.arrow_back),
+                            imageVector = SfSymbols.Monochrome.SFChevronLeft,
                             contentDescription = null
                         )
                     }
@@ -631,7 +635,7 @@ fun HistoryScreen(
                         }
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.arrow_back),
+                            imageVector = SfSymbols.Monochrome.SFChevronLeft,
                             contentDescription = null
                         )
                     }
@@ -640,7 +644,7 @@ fun HistoryScreen(
 
                     GlassCircleButton(onClick = { isSearching = true }) {
                         Icon(
-                            painter = painterResource(R.drawable.search),
+                            imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                             contentDescription = null
                         )
                     }

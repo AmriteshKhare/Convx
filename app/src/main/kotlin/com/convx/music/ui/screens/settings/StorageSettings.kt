@@ -131,8 +131,6 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.component.FrostedTopBar
-import com.convx.music.ui.component.TopFadeBlur
 import com.convx.music.ui.ios.foundation.IosTheme
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -345,27 +343,12 @@ fun StorageSettings(
         )
     }
 
-    val hazeState = remember { HazeState() }
-
-    Box(modifier = Modifier) {
-    Column(
-        Modifier
-            .hazeSource(hazeState)
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.storage),
+        pageColor = IosTheme.colors.systemGroupedBackground,
+        horizontalPadding = 16.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Top
-                )
-            )
-        )
         IosSettingsGroup(
             title = stringResource(R.string.storage),
             items = listOf(
@@ -517,19 +500,6 @@ fun StorageSettings(
             )
         )
         Spacer(Modifier.padding(bottom = 30.dp))
-    }
-
-        TopFadeBlur(
-            hazeState = hazeState,
-            pageColor = IosTheme.colors.systemGroupedBackground,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
-
-        FrostedTopBar(
-            onBack = navController::navigateUp,
-            title = stringResource(R.string.storage),
-            titleAlpha = 1f,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+    
     }
 }

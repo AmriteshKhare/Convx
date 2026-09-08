@@ -9,6 +9,12 @@ import android.content.Context
 import android.content.res.Configuration
 import android.widget.Toast
 import androidx.annotation.DrawableRes
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFGaugeWithNeedle
+import com.composables.sfsymbols.monochrome.SFSliderHorizontal3
+import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
+import com.composables.sfsymbols.monochrome.SFBellFill
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -303,7 +309,6 @@ fun PlayerMenu(
                                     painter = painterResource(R.drawable.radio),
                                     contentDescription = null,
                                     modifier = Modifier.size(32.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
                                 )
                             },
                             text = stringResource(R.string.start_an_radio),
@@ -320,7 +325,6 @@ fun PlayerMenu(
                                 painter = painterResource(R.drawable.playlist_add),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.add_to_an_playlist),
@@ -329,10 +333,9 @@ fun PlayerMenu(
                     NewAction(
                         icon = {
                             Icon(
-                                painter = painterResource(R.drawable.share),
+                                imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         text = stringResource(R.string.share),
@@ -683,7 +686,7 @@ fun PlayerMenu(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
                                 Icon(
-                                    painter = painterResource(R.drawable.notification),
+                                    imageVector = SfSymbols.Monochrome.SFBellFill,
                                     contentDescription = null,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -770,7 +773,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
             Column {
                 if (!isInRoom) {
                     ValueAdjuster(
-                        icon = R.drawable.speed,
+                        icon = SfSymbols.Monochrome.SFGaugeWithNeedle,
                         currentValue = tempo,
                         values = (0..35).map { round((0.25f + it * 0.05f) * 100) / 100 },
                         onValueUpdate = {
@@ -782,7 +785,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
                     )
                 }
                 ValueAdjuster(
-                    icon = R.drawable.discover_tune,
+                    icon = SfSymbols.Monochrome.SFSliderHorizontal3,
                     currentValue = transposeValue,
                     values = (-12..12).toList(),
                     onValueUpdate = {
@@ -798,7 +801,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
 
 @Composable
 fun <T> ValueAdjuster(
-    @DrawableRes icon: Int,
+    icon: ImageVector,
     currentValue: T,
     values: List<T>,
     onValueUpdate: (T) -> Unit,
@@ -811,7 +814,7 @@ fun <T> ValueAdjuster(
         modifier = modifier,
     ) {
         Icon(
-            painter = painterResource(icon),
+            imageVector = icon,
             contentDescription = null,
             modifier = Modifier.size(28.dp),
         )

@@ -41,6 +41,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFAirplayAudio
+import com.composables.sfsymbols.monochrome.SFArrowCounterclockwise
+import com.composables.sfsymbols.monochrome.SFForwardFill
+import com.composables.sfsymbols.monochrome.SFPauseFill
+import com.composables.sfsymbols.monochrome.SFPlayFill
+import com.composables.sfsymbols.monochrome.SFSpeakerSlashFill
+import com.composables.sfsymbols.monochrome.SFSpeakerWave2Fill
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -320,7 +328,7 @@ fun AppleMiniPlayer(
                 // Cast indicator
                 if (isCasting) {
                     Icon(
-                        painter = painterResource(R.drawable.cast_connected),
+                        imageVector = SfSymbols.Monochrome.SFAirplayAudio,
                         contentDescription = "Casting",
                         tint = primaryColor,
                         modifier = Modifier.size(20.dp)
@@ -356,14 +364,12 @@ fun AppleMiniPlayer(
                     val isMuted by playerConnection.isMuted.collectAsState()
 
                     Icon(
-                        painter = painterResource(
-                            when {
-                                isListenTogetherGuest -> if (isMuted) R.drawable.volume_off else R.drawable.volume_up
-                                playbackState == Player.STATE_ENDED -> R.drawable.replay
-                                effectiveIsPlaying -> R.drawable.pause_applemusic
-                                else -> R.drawable.play_applemusic
-                            }
-                        ),
+                        imageVector = when {
+                            isListenTogetherGuest -> if (isMuted) SfSymbols.Monochrome.SFSpeakerSlashFill else SfSymbols.Monochrome.SFSpeakerWave2Fill
+                            playbackState == Player.STATE_ENDED -> SfSymbols.Monochrome.SFArrowCounterclockwise
+                            effectiveIsPlaying -> SfSymbols.Monochrome.SFPauseFill
+                            else -> SfSymbols.Monochrome.SFPlayFill
+                        },
                         contentDescription = null,
                         tint = onSurfaceColor,
                         modifier = Modifier.size(28.dp)
@@ -383,7 +389,7 @@ fun AppleMiniPlayer(
                         }
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.apple_skip_next),
+                        imageVector = SfSymbols.Monochrome.SFForwardFill,
                         contentDescription = "Next",
                         tint = if (canSkipNext && !isListenTogetherGuest) onSurfaceColor else onSurfaceColor.copy(alpha = 0.3f),
                         modifier = Modifier.size(28.dp)

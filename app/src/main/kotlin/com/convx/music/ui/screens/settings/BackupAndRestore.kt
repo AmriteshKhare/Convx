@@ -27,17 +27,19 @@ import androidx.compose.foundation.rememberScrollState
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
 import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.layout.Box
+import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
+import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.runtime.CompositionLocalProvider
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.LaunchedEffect
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -56,6 +58,8 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
+import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.ui.Alignment
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -76,8 +80,6 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.db.entities.Song
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -172,20 +174,12 @@ fun BackupAndRestore(
         }
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.backup_restore),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Top
-                )
-            )
-        )
-
         IosSettingsGroup(
             items = listOf(
                 IosSettingsItem(
@@ -230,23 +224,8 @@ fun BackupAndRestore(
                 )
             )
         )
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.backup_restore)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        }
-    )
 
     AddToPlaylistDialogOnline(
         isVisible = showChoosePlaylistDialogOnline,

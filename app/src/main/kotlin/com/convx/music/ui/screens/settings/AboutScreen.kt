@@ -32,16 +32,14 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.ios.compat.IconButton
 import androidx.compose.material3.MaterialShapes
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +50,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowDownApp
+import com.composables.sfsymbols.monochrome.SFChevronLeftForwardslashChevronRight
+import com.composables.sfsymbols.monochrome.SFEllipsisBubble
+import com.composables.sfsymbols.monochrome.SFHeart
+import com.composables.sfsymbols.monochrome.SFInfoCircle
+import com.composables.sfsymbols.monochrome.SFPersonCropCircleBadgeExclamationmark
+import com.composables.sfsymbols.monochrome.SFTextDocument
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,10 +70,8 @@ import com.convx.music.constants.DonationKofiUrl
 import com.convx.music.constants.DonationUpiId
 import com.convx.music.constants.DonationUpiUri
 import com.convx.music.R
-import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.ui.utils.safeOpenUri
 import java.text.SimpleDateFormat
@@ -96,11 +101,12 @@ fun AboutScreen(
         }
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.about),
+        onBack = { onBack?.invoke() ?: navController.navigateUp() },
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
         // Header
         Column(
@@ -152,7 +158,7 @@ fun AboutScreen(
             title = stringResource(R.string.developer_section),
             items = listOf(
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.dev),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFPersonCropCircleBadgeExclamationmark),
                     title = { Text(stringResource(R.string.developer_name)) },
                     description = { Text(stringResource(R.string.app_developer), color = AppTheme.colorScheme.primary) },
                     tintIcon = false,
@@ -168,13 +174,13 @@ fun AboutScreen(
             title = stringResource(R.string.community_section),
             items = listOf(
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.github),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFChevronLeftForwardslashChevronRight),
                     title = { Text(stringResource(R.string.github_repository)) },
                     description = { Text(stringResource(R.string.view_source_code)) },
                     onClick = { uriHandler.safeOpenUri(context, "https://github.com/cosmictaserdev-creator/Convx") }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.discord),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFEllipsisBubble),
                     title = { Text(stringResource(R.string.discord_channel)) },
                     description = { Text(stringResource(R.string.join_discord)) },
                     onClick = { uriHandler.safeOpenUri(context, "https://discord.gg/Ejeb4cmzfd") }
@@ -189,13 +195,13 @@ fun AboutScreen(
             title = stringResource(R.string.support_section),
             items = listOf(
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.favorite),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFHeart),
                     title = { Text(stringResource(R.string.support_upi)) },
                     description = { Text(DonationUpiId) },
                     onClick = { uriHandler.safeOpenUri(context, DonationUpiUri) }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.favorite),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFHeart),
                     title = { Text(stringResource(R.string.support_kofi)) },
                     description = { Text(stringResource(R.string.support_kofi_desc)) },
                     onClick = { uriHandler.safeOpenUri(context, DonationKofiUrl) }
@@ -209,17 +215,17 @@ fun AboutScreen(
             title = stringResource(R.string.app_info_section),
             items = listOf(
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.deployed_app_update),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFArrowDownApp),
                     title = { Text(stringResource(R.string.installed_date_title)) },
                     description = { Text(installedDate) }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.info),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFInfoCircle),
                     title = { Text(stringResource(R.string.version_code)) },
                     description = { Text(BuildConfig.VERSION_CODE.toString()) }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.license_vivi),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFTextDocument),
                     title = { Text(stringResource(R.string.license)) },
                     description = { Text("GPL-3.0 • Free Open Source Software") },
                     onClick = { uriHandler.safeOpenUri(context, "https://github.com/cosmictaserdev-creator/Convx/blob/main/LICENSE") }
@@ -227,22 +233,6 @@ fun AboutScreen(
             )
         )
         Spacer(modifier = Modifier.height(20.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.about)) },
-        navigationIcon = {
-            IconButton(
-                onClick = { onBack?.invoke() ?: navController.navigateUp() },
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        },
-        scrollBehavior = scrollBehavior
-    )
 }

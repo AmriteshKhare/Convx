@@ -135,21 +135,12 @@ fun LocalFoldersSettingsScreen(
         uri?.let { treeUriToScannerPath(it) }?.let { setExcluded(it, true) }
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.excluded_folders),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 24.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-            )
-        )
 
         Text(
             text = stringResource(R.string.excluded_folders_desc),
@@ -180,7 +171,7 @@ fun LocalFoldersSettingsScreen(
                 }
             }
             Spacer(Modifier.height(24.dp))
-            return@Column
+            return@SettingsPage
         }
 
         Row(

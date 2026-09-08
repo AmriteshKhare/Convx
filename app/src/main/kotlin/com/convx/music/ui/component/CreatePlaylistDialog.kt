@@ -23,10 +23,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFPlus
 import com.music.innertube.YouTube
 import com.convx.music.LocalDatabase
 import com.convx.music.R
@@ -56,7 +57,7 @@ fun CreatePlaylistDialog(
     val isSignedIn = innerTubeCookie.isNotEmpty()
 
     TextFieldDialog(
-        icon = { Icon(painter = painterResource(R.drawable.add), contentDescription = null) },
+        icon = { Icon(imageVector = SfSymbols.Monochrome.SFPlus, contentDescription = null) },
         title = { Text(text = stringResource(R.string.create_playlist)) },
         initialTextFieldValue = TextFieldValue(initialTextFieldValue ?: ""),
         onDismiss = onDismiss,

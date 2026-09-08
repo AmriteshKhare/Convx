@@ -67,6 +67,7 @@ import com.convx.music.constants.SliderStyleKey
 import com.convx.music.constants.ThumbnailCornerRadiusKey
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.PLAYER_BLUR_MULTIPLIER
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.isGlassAllowed
@@ -114,7 +115,9 @@ fun DiyPlayerMockup(
     topOverlay: @Composable BoxScope.(scale: Float) -> Unit = {},
 ) {
     val style = rememberMockupStyle()
-    val glassConfig = LocalGlassEffectConfig.current
+    // Glass Effect setting only drives the nav bar/mini player now — the DIY
+    // editor preview keeps glass but pinned to the fixed style.
+    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val glassActive = isGlassAllowed()
 
     // Same frosted-chrome trick as ArtistScreen/AlbumScreen: this editor is a NavHost

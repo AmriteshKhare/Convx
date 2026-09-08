@@ -142,6 +142,7 @@ import com.convx.music.constants.PreventDuplicateTracksInQueueKey
 import com.convx.music.constants.SimilarContent
 import com.convx.music.constants.SkipSilenceInstantKey
 import com.convx.music.constants.BitPerfectKey
+import com.convx.music.constants.SpatialAudioKey
 import com.convx.music.constants.SkipSilenceKey
 import com.convx.music.constants.IpVersionKey
 import com.music.innertube.models.IpVersion
@@ -188,6 +189,7 @@ import com.convx.music.playback.audio.DjMixPlan
 import com.convx.music.playback.audio.DjMixTier
 import com.convx.music.playback.audio.LosslessStallWatchdogAudioProcessor
 import com.convx.music.playback.audio.SilenceDetectorAudioProcessor
+import com.convx.music.playback.audio.SpatialAudioProcessor
 import com.convx.music.playback.queues.EmptyQueue
 import com.convx.music.playback.queues.Queue
 import com.convx.music.playback.queues.YouTubeQueue
@@ -300,6 +302,7 @@ class MusicService :
     private var cachedSkipSilenceInstant = false
     private var cachedBitPerfect = false
     private var cachedOffloadEnabled = false
+    private var cachedSpatialAudio = false
 
     private var crossfade: CrossfadeController? = null
     private var trackAnalyzer: TrackAnalyzer? = null
@@ -405,6 +408,7 @@ class MusicService :
 
     private val playerSilenceProcessors = HashMap<Player, SilenceDetectorAudioProcessor>()
     private val playerStallWatchdogs = HashMap<Player, LosslessStallWatchdogAudioProcessor>()
+    private val playerSpatialProcessors = HashMap<Player, SpatialAudioProcessor>()
 
 
 
@@ -878,6 +882,10 @@ class MusicService :
             .collectLatest(scope) { bitPerfect ->
                 cachedBitPerfect = bitPerfect
                 equalizerService.setBitPerfectBypass(bitPerfect)
+                // Spatial widening rewrites every sample, so it bypasses under Bit
+                // Perfect for the same reason the EQ does — the toggle's own value is
+                // left alone and restores when Bit Perfect goes back off.
+                applySpatialAudio()
 
                 if (bitPerfect) {
                     player.skipSilenceEnabled = false
@@ -887,6 +895,14 @@ class MusicService :
                     sparePlayer?.skipSilenceEnabled = cachedSkipSilence
                     BitPerfectAudio.clearBitPerfectMixer(this@MusicService)
                 }
+            }
+
+        dataStore.data
+            .map { it[SpatialAudioKey] ?: false }
+            .distinctUntilChanged()
+            .collectLatest(scope) { spatial ->
+                cachedSpatialAudio = spatial
+                applySpatialAudio()
             }
 
         combine(
@@ -1136,6 +1152,16 @@ class MusicService :
         }
     }
 
+    /**
+     * Push the effective spatial state onto every live player's processor. Bit
+     * Perfect wins over the user's own toggle, exactly like `skipSilenceEnabled`
+     * does — the preference itself is untouched, so it comes back on its own.
+     */
+    private fun applySpatialAudio() {
+        val on = cachedSpatialAudio && !cachedBitPerfect
+        playerSpatialProcessors.values.forEach { it.enabled = on }
+    }
+
     private fun createExoPlayer(publishAsActive: Boolean = true): ExoPlayer {
         val eqProcessor = CustomEqualizerAudioProcessor()
         equalizerService.addAudioProcessor(eqProcessor)
@@ -1160,18 +1186,21 @@ class MusicService :
         val djFilter = DjFilterAudioProcessor()
         val djTail = DjTailAudioProcessor()
         val djDelay = DelayAudioProcessor()
+        val spatialProcessor = SpatialAudioProcessor()
 
         // Set initial state from the cached mirrors (kept fresh by the
         // dataStore.data collectors in onCreate) rather than blocking here â€”
         // this runs on the crossfade path too, where a blocking DataStore read
         // would stall audio right as the next track needs to start.
         silenceProcessor.instantModeEnabled = cachedSkipSilence && cachedSkipSilenceInstant
+        spatialProcessor.enabled = cachedSpatialAudio && !cachedBitPerfect
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(createMediaSourceFactory())
             .setRenderersFactory(
                 createRenderersFactory(
-                    eqProcessor, silenceProcessor, stallWatchdog, bpmAnalyzer, djFilter, djTail, djDelay,
+                    eqProcessor, silenceProcessor, stallWatchdog, bpmAnalyzer, spatialProcessor,
+                    djFilter, djTail, djDelay,
                 )
             )
             .setLoadControl(
@@ -1200,6 +1229,7 @@ class MusicService :
 
         playerSilenceProcessors[player] = silenceProcessor
         playerStallWatchdogs[player] = stallWatchdog
+        playerSpatialProcessors[player] = spatialProcessor
         djEngine.registerPlayer(player, bpmAnalyzer, djFilter, djTail, djDelay)
 
         player.apply {
@@ -3467,6 +3497,7 @@ class MusicService :
         silenceProcessor: SilenceDetectorAudioProcessor,
         stallWatchdog: LosslessStallWatchdogAudioProcessor,
         bpmAnalyzer: TrackAnalyzerAudioProcessor,
+        spatialProcessor: SpatialAudioProcessor,
         djFilter: DjFilterAudioProcessor,
         djTail: DjTailAudioProcessor,
         djDelay: DelayAudioProcessor,
@@ -3488,6 +3519,10 @@ class MusicService :
                             silenceProcessor,
                             stallWatchdog,
                             bpmAnalyzer,
+                            // After the analyzer so BPM/key detection still sees the
+                            // untouched mix, before the DJ chain so a transition's own
+                            // low end isn't fed back in by the widener's crossfeed.
+                            spatialProcessor,
                             djFilter,
                             djTail,
                             djDelay,
@@ -3696,6 +3731,7 @@ class MusicService :
         player.removeListener(this)
         player.removeListener(sleepTimer)
         playerSilenceProcessors.remove(player)
+        playerSpatialProcessors.remove(player)
         // Note: equalizerService audio processors are cleared in equalizerService.release() if needed,
         // or we can't easily reference the specific processor created in createExoPlayer here without storing it.
         // But since we are destroying the service, it's fine.

@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,6 +46,11 @@ import com.music.innertube.YouTube
 import com.music.innertube.models.comment.CommentRenderer
 import com.music.innertube.models.comment.CommentThreadRenderer
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFBubbleLeftAndBubbleRight
+import com.composables.sfsymbols.monochrome.SFExclamationmarkTriangle
+import com.composables.sfsymbols.monochrome.SFHandThumbsup
+import com.composables.sfsymbols.monochrome.SFXmark
 import kotlinx.coroutines.launch
 
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
@@ -125,7 +129,7 @@ fun CommentSheet(
                     }
                 }) {
                     Icon(
-                        painter = painterResource(R.drawable.close),
+                        imageVector = SfSymbols.Monochrome.SFXmark,
                         contentDescription = stringResource(R.string.close)
                     )
                 }
@@ -153,7 +157,7 @@ fun CommentSheet(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
-                                painter = painterResource(R.drawable.error),
+                                imageVector = SfSymbols.Monochrome.SFExclamationmarkTriangle,
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
                                 tint = AppTheme.colorScheme.error
@@ -288,7 +292,7 @@ fun CommentItem(
                 val voteCount = renderer.voteCount
                 if (voteCount != null) {
                     Icon(
-                        painter = painterResource(R.drawable.thumb_up_like),
+                        imageVector = SfSymbols.Monochrome.SFHandThumbsup,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
                         tint = AppTheme.colorScheme.onSurfaceVariant
@@ -312,7 +316,7 @@ fun CommentItem(
                         ) { onShowReplies() }
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.chat_msg),
+                            imageVector = SfSymbols.Monochrome.SFBubbleLeftAndBubbleRight,
                             contentDescription = "Replies",
                             modifier = Modifier.size(14.dp),
                             tint = AppTheme.colorScheme.onSurfaceVariant

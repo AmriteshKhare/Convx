@@ -7,6 +7,8 @@ package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.layout.Box
+import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
@@ -41,11 +43,12 @@ import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TopAppBar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
+import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.runtime.CompositionLocalProvider
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -54,6 +57,8 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
+import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.ui.Alignment
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -418,24 +423,12 @@ fun AiSettings(
         )
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
-                )
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.ai_lyrics_translation),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Top
-                )
-            )
-        )
-        
         IosSettingsGroup(
             title = stringResource(R.string.ai_provider),
             items = listOf(
@@ -579,18 +572,6 @@ fun AiSettings(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.ai_lyrics_translation)) },
-        navigationIcon = {
-            IconButton(onClick = { navController.navigateUp() }) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null
-                )
-            }
-        }
-    )
 }

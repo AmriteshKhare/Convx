@@ -116,6 +116,9 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.ArtistAlbumsViewModel
+import com.convx.music.ui.component.ScreenLargeTitle
+import com.convx.music.ui.component.ScreenScaffold
+import com.convx.music.ui.component.rememberTitleCollapseProgress
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -155,14 +158,27 @@ fun ArtistAlbumsScreen(
 
     val visibleAlbums = remember(albums) { albums.distinctBy { it.id } }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    ScreenScaffold(
+        title = artist?.artist?.name.orEmpty(),
+        // A grid has no title item to measure against, so this rides the grid's
+        // own scroll offset — see the LazyGridState overload.
+        titleAlpha = rememberTitleCollapseProgress(lazyGridState),
+        onBack = navController::navigateUp,
+        onBackLongClick = navController::backToMain,
+    ) { chrome ->
         LazyVerticalGrid(
             state = lazyGridState,
             columns = rememberGridColumns(),
+            modifier = chrome.contentModifier(),
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues()
         ) {
+            item(
+                key = "title",
+                span = { GridItemSpan(maxLineSpan) },
+            ) {
+                ScreenLargeTitle(artist?.artist?.name.orEmpty())
+            }
+
             item(
                 key = "header",
                 span = { GridItemSpan(maxLineSpan) },
@@ -205,23 +221,6 @@ fun ArtistAlbumsScreen(
             lazyGridState = lazyGridState,
             itemCount = visibleAlbums.size,
             sectionIndexMap = null,
-        )
-
-        TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-            title = { Text(artist?.artist?.name.orEmpty()) },
-            navigationIcon = {
-                IconButton(
-                    onClick = navController::navigateUp,
-                    onLongClick = navController::backToMain
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.arrow_back),
-                        contentDescription = null
-                    )
-                }
-            },
-            scrollBehavior = scrollBehavior
         )
 
         SnackbarHost(

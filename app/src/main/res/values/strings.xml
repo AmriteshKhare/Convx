@@ -317,7 +317,6 @@
     <string name="dark_theme_on">On</string>
     <string name="dark_theme_off">Off</string>
     <string name="dark_theme_follow_system">Follow system</string>
-    <string name="pure_black">Pure black</string>
     <string name="customize_navigation_tabs">Customize navigation tabs</string>
     <string name="player">Player</string>
     <string name="player_text_alignment">Player text alignment</string>
@@ -348,6 +347,8 @@
     <string name="speed_dial_card_height">Speed Dial card height</string>
     <string name="home_card_corner_radius">Home card corner radius</string>
     <string name="auto">Auto</string>
+    <string name="pure_black">Pure Black (AMOLED)</string>
+    <string name="pure_black_desc">True black backgrounds instead of dark grey, best on OLED screens</string>
     <string name="pure_black_hero_background">Pure black backgrounds</string>
     <string name="pure_black_hero_background_desc">Flat black instead of blurred artwork on Artist, Album, Playlist and Search</string>
     <string name="reduce_dynamic_blur">Reduce live blur</string>
@@ -521,6 +522,7 @@
     <string name="liquid_glass_highlight_opacity">Highlight opacity</string>
     <string name="liquid_glass_highlight_opacity_desc">How bright the specular rim appears</string>
     <string name="liquid_glass_style">Glass style</string>
+    <string name="liquid_glass_style_scope_desc">Applies to the nav bar and mini player only. Other glass surfaces (top bars, sheets, buttons) keep glass at a fixed style.</string>
     <string name="liquid_glass_style_liquid">Liquid</string>
     <string name="liquid_glass_style_liquid_desc">Blur, refraction and a lit edge. The full effect, and the most expensive.</string>
     <string name="liquid_glass_style_blur">Blur</string>

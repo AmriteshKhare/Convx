@@ -381,8 +381,10 @@ fun UpdateScreen(navController: NavHostController) {
                     ) {
                         when (val currentStatus = status) {
                             is ViviUpdateStatus.Checking -> {
-                                androidx.compose.material3.ContainedLoadingIndicator(
-                                    modifier = Modifier.size(64.dp)
+                                com.convx.music.ui.component.ShimmerBox(
+                                    modifier = Modifier
+                                        .size(width = 160.dp, height = 64.dp),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                                 )
                             }
 

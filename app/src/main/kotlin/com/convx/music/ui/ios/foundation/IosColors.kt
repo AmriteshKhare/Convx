@@ -145,7 +145,7 @@ fun darkIosColors(accent: Color = Color(0xFF0A84FF)): IosColors = IosColors(
     quaternarySystemFill = Color(0x2E767680),
     separator = Color(0x99545458),
     opaqueSeparator = Color(0xFF38383A),
-    systemBackground = Color(0xFF000000),
+    systemBackground = Color(0xFF121212),
     secondarySystemBackground = Color(0xFF1C1C1E),
     tertiarySystemBackground = Color(0xFF2C2C2E),
     systemGroupedBackground = Color(0xFF000000),

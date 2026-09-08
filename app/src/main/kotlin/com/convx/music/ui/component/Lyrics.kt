@@ -866,95 +866,95 @@ fun Lyrics(
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
+            val lyricsOffset = currentSong?.song?.lyricsOffset?.toLong() ?: 0L
+            val effectivePlaybackPosition = currentPlaybackPosition + lyricsOffset
+
+            val singerNames = remember(lines, mediaMetadata?.artists) {
+                resolveSingerNames(lines, mediaMetadata?.artists?.map { it.name } ?: emptyList())
+            }
+
             LazyColumn(
-            state = lazyListState,
-            contentPadding = WindowInsets.systemBars
-                .only(WindowInsetsSides.Top)
-                .add(WindowInsets(top = maxHeight / 3, bottom = maxHeight / 2))
-                .asPaddingValues(),
-            modifier = Modifier
-                .fadingEdge(vertical = 64.dp)
-                .nestedScroll(remember {
-                    object : NestedScrollConnection {
-                        override fun onPostScroll(
-                            consumed: Offset,
-                            available: Offset,
-                            source: NestedScrollSource
-                        ): Offset {
-                            if (source == NestedScrollSource.UserInput) {
+                state = lazyListState,
+                contentPadding = WindowInsets.systemBars
+                    .only(WindowInsetsSides.Top)
+                    .add(WindowInsets(top = maxHeight / 3, bottom = maxHeight / 2))
+                    .asPaddingValues(),
+                modifier = Modifier
+                    .fadingEdge(vertical = 64.dp)
+                    .nestedScroll(remember {
+                        object : NestedScrollConnection {
+                            override fun onPostScroll(
+                                consumed: Offset,
+                                available: Offset,
+                                source: NestedScrollSource
+                            ): Offset {
+                                if (source == NestedScrollSource.UserInput) {
+                                    isAutoScrollEnabled = false
+                                }
+                                if (!isSelectionModeActive) { // Only update preview time if not selecting
+                                    lastPreviewTime = System.currentTimeMillis()
+                                }
+                                return super.onPostScroll(consumed, available, source)
+                            }
+
+                            override suspend fun onPostFling(
+                                consumed: Velocity,
+                                available: Velocity
+                            ): Velocity {
                                 isAutoScrollEnabled = false
+                                if (!isSelectionModeActive) { // Only update preview time if not selecting
+                                    lastPreviewTime = System.currentTimeMillis()
+                                }
+                                return super.onPostFling(consumed, available)
                             }
-                            if (!isSelectionModeActive) { // Only update preview time if not selecting
-                                lastPreviewTime = System.currentTimeMillis()
-                            }
-                            return super.onPostScroll(consumed, available, source)
                         }
-
-                        override suspend fun onPostFling(
-                            consumed: Velocity,
-                            available: Velocity
-                        ): Velocity {
-                            isAutoScrollEnabled = false
-                            if (!isSelectionModeActive) { // Only update preview time if not selecting
-                                lastPreviewTime = System.currentTimeMillis()
-                            }
-                            return super.onPostFling(consumed, available)
-                        }
-                    }
-                })
-        ) {
-            val displayedCurrentLineIndex = if (!isAutoScrollEnabled) {
-                currentLineIndex
-            } else {
-                if (isSeeking || isSelectionModeActive) deferredCurrentLineIndex else currentLineIndex
-            }
-
-            // Show lyrics provider at the top, scrolling with content
-            if (isLyricsProviderShown) {
-                item {
-                    Text(
-                        text = "Lyrics from ${lyricsEntity?.provider}",
-                        fontSize = 12.sp,
-                        color = AppTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
+                    })
+            ) {
+                val displayedCurrentLineIndex = if (!isAutoScrollEnabled) {
+                    currentLineIndex
+                } else {
+                    if (isSeeking || isSelectionModeActive) deferredCurrentLineIndex else currentLineIndex
                 }
-            }
 
-            if (lyrics == null) {
-                item {
-                    ShimmerHost {
-                        repeat(10) {
-                            Box(
-                                contentAlignment = when (lyricsTextPosition) {
-                                    LyricsPosition.LEFT -> Alignment.CenterStart
-                                    LyricsPosition.CENTER -> Alignment.Center
-                                    LyricsPosition.RIGHT -> Alignment.CenterEnd
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 24.dp, vertical = 4.dp)
-                            ) {
-                                TextPlaceholder()
+                // Show lyrics provider at the top, scrolling with content
+                if (isLyricsProviderShown) {
+                    item {
+                        Text(
+                            text = "Lyrics from ${lyricsEntity?.provider}",
+                            fontSize = 12.sp,
+                            color = AppTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+
+                if (lyrics == null) {
+                    item {
+                        ShimmerHost {
+                            repeat(10) {
+                                Box(
+                                    contentAlignment = when (lyricsTextPosition) {
+                                        LyricsPosition.LEFT -> Alignment.CenterStart
+                                        LyricsPosition.CENTER -> Alignment.Center
+                                        LyricsPosition.RIGHT -> Alignment.CenterEnd
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 24.dp, vertical = 4.dp)
+                                ) {
+                                    TextPlaceholder()
+                                }
                             }
                         }
                     }
-                }
-            } else {
-                val lyricsOffset = currentSong?.song?.lyricsOffset?.toLong() ?: 0L
-                val effectivePlaybackPosition = currentPlaybackPosition + lyricsOffset
-
-                val singerNames = remember(lines, mediaMetadata?.artists) {
-                    resolveSingerNames(lines, mediaMetadata?.artists?.map { it.name } ?: emptyList())
-                }
-
-                itemsIndexed(
-                    items = lines,
-                    key = { index, item -> "$index-${item.time}" } // Add stable key
-                ) { index, item ->
+                } else {
+                    itemsIndexed(
+                        items = lines,
+                        key = { index, item -> "$index-${item.time}" } // Add stable key
+                    ) { index, item ->
                     val isSelected = selectedIndices.contains(index)
                     if (lyricsAnimationStyle == LyricsAnimationStyle.VIVIMUSIC_1 && item.words?.isNotEmpty() == true) {
                         val currentLineTime = if (displayedCurrentLineIndex >= 0 && displayedCurrentLineIndex < lines.size) {
@@ -1436,13 +1436,13 @@ fun Lyrics(
                                     val wordDuration = wordEndMs - wordStartMs
 
                                     val isWordActive = isActiveLine && effectivePlaybackPosition >= wordStartMs && effectivePlaybackPosition < wordEndMs
-                                    val hasWordPassed = (isActiveLine && effectivePlaybackPosition >= wordEndMs) || (!isActiveLine && item.time < currentLineTime)
+                                    val hasWordPassed = (isActiveLine && effectivePlaybackPosition >= wordEndMs) || (!isActiveLine && index < displayedCurrentLineIndex)
 
                                     if (isWordActive && wordDuration > 0) {
                                         val timeElapsed = effectivePlaybackPosition - wordStartMs
                                         val fillProgress = (timeElapsed.toFloat() / wordDuration.toFloat()).coerceIn(0f, 1f)
-                                        val breatheValue = (timeElapsed % 3000) / 3000f
-                                        val breatheEffect = (kotlin.math.sin(breatheValue * Math.PI.toFloat() * 2f) * 0.03f).coerceIn(0f, 0.03f)
+                                        val breatheValue = (timeElapsed % 3000) / 3000.0
+                                        val breatheEffect = (kotlin.math.sin(breatheValue * Math.PI * 2.0) * 0.03).toFloat().coerceIn(0f, 0.03f)
                                         val glowIntensity = (0.3f + fillProgress * 0.7f + breatheEffect).coerceIn(0f, 1.1f)
 
                                         val slideBrush = Brush.horizontalGradient(
@@ -1457,7 +1457,7 @@ fun Lyrics(
                                         withStyle(style = SpanStyle(
                                             brush = slideBrush,
                                             fontWeight = FontWeight.ExtraBold,
-                                            shadow = Shadow(color = expressiveAccent.copy(alpha = 0.4f * glowIntensity), offset = Offset(0f, 0f), blurRadius = 14f + (4f * fillProgress))
+                                            shadow = Shadow(color = expressiveAccent.copy(alpha = (0.4f * glowIntensity).coerceIn(0f, 1f)), offset = Offset(0f, 0f), blurRadius = 14f + (4f * fillProgress))
                                         )) {
                                             append(word.text)
                                         }
@@ -1487,7 +1487,7 @@ fun Lyrics(
                                     val wordDuration = wordEndMs - wordStartMs
 
                                     val isWordActive = isActiveLine && effectivePlaybackPosition >= wordStartMs && effectivePlaybackPosition < wordEndMs
-                                    val hasWordPassed = (isActiveLine && effectivePlaybackPosition >= wordEndMs) || (!isActiveLine && item.time < currentLineTime)
+                                    val hasWordPassed = (isActiveLine && effectivePlaybackPosition >= wordEndMs) || (!isActiveLine && index < displayedCurrentLineIndex)
 
                                     if (isWordActive && wordDuration > 0) {
                                         val timeElapsed = effectivePlaybackPosition - wordStartMs
@@ -1554,7 +1554,7 @@ fun Lyrics(
                                     val wordDuration = wordEndMs - wordStartMs
 
                                     val isWordActive = isActiveLine && effectivePlaybackPosition >= wordStartMs && effectivePlaybackPosition < wordEndMs
-                                    val hasWordPassed = (isActiveLine && effectivePlaybackPosition >= wordEndMs) || (!isActiveLine && item.time < currentLineTime)
+                                    val hasWordPassed = (isActiveLine && effectivePlaybackPosition >= wordEndMs) || (!isActiveLine && index < displayedCurrentLineIndex)
 
                                     val rawProgress = if (isWordActive && wordDuration > 0) {
                                         val elapsed = effectivePlaybackPosition - wordStartMs

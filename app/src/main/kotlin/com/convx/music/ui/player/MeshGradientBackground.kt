@@ -53,11 +53,13 @@ import kotlin.math.sin
  * or a sleeve whose every swatch is filtered out even with the filters cleared.
  */
 private val FallbackColors = listOf(
-    Color(0xFF3A1C71),
-    Color(0xFFD76D77),
-    Color(0xFF2B5876),
-    Color(0xFFFFAF7B),
+    Color(0xFF141416),
+    Color(0xFF1E1E22),
+    Color(0xFF16161A),
+    Color(0xFF101012),
 )
+
+private val meshPaletteCache = android.util.LruCache<String, List<Color>>(64)
 
 /** The four mesh colours, wrapped so the backdrop can skip recomposition. */
 @Immutable
@@ -175,10 +177,17 @@ fun MeshGradientBackground(
 @Composable
 fun rememberArtworkMeshPalette(imageUrl: String?, canvasFrame: Bitmap? = null): MeshPalette {
     val context = LocalContext.current
-    var palette by remember(imageUrl) { mutableStateOf(MeshPalette(FallbackColors)) }
+    val cached = remember(imageUrl) { imageUrl?.let(meshPaletteCache::get) }
+    var palette by remember(imageUrl) { 
+        mutableStateOf(MeshPalette(cached ?: FallbackColors)) 
+    }
 
     LaunchedEffect(imageUrl) {
         if (imageUrl == null) return@LaunchedEffect
+        if (cached != null) {
+            palette = MeshPalette(cached)
+            return@LaunchedEffect
+        }
         val request = ImageRequest.Builder(context)
             .data(imageUrl)
             .size(128) // Palette quality is fine at thumbnail size, and it is fast.
@@ -186,12 +195,15 @@ fun rememberArtworkMeshPalette(imageUrl: String?, canvasFrame: Bitmap? = null): 
             .build()
         val result = SingletonImageLoader.get(context).execute(request)
         val bitmap = (result as? SuccessResult)?.image?.toBitmap() ?: return@LaunchedEffect
-        palette = MeshPalette(withContext(Dispatchers.Default) { paletteOf(bitmap) })
+        val extracted = withContext(Dispatchers.Default) { paletteOf(bitmap) }
+        meshPaletteCache.put(imageUrl, extracted)
+        palette = MeshPalette(extracted)
     }
 
     LaunchedEffect(canvasFrame) {
         val frame = canvasFrame ?: return@LaunchedEffect
-        palette = MeshPalette(withContext(Dispatchers.Default) { paletteOf(frame) })
+        val extracted = withContext(Dispatchers.Default) { paletteOf(frame) }
+        palette = MeshPalette(extracted)
     }
     return palette
 }

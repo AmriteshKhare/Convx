@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Person
 import com.convx.music.ui.ios.compat.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,6 +38,7 @@ import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,6 +106,9 @@ fun topBarContentPadding(): Dp = topBarHeight() + TopBarContentGap
 fun FrostedTopBar(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    // Long-press-to-home on the back button — many settings screens jump
+    // straight back to the root instead of walking the stack one push at a time.
+    onBackLongClick: (() -> Unit)? = null,
     title: String = "",
     titleAlpha: Float = 0f,
     // Lets an artwork-tinted screen (History, Stats) keep its whole chrome in
@@ -174,11 +177,12 @@ fun FrostedTopBar(
             if (onBack != null) {
                 GlassCircleButton(
                     onClick = onBack,
+                    onLongClick = onBackLongClick,
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp),
                     size = 36.dp,
                 ) {
                     Icon(
-                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        painterResource(com.convx.music.R.drawable.arrow_back_ios),
                         contentDescription = "Back",
                         tint = AppTheme.colorScheme.onSurface,
                     )

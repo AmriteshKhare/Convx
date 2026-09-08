@@ -11,6 +11,8 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.layout.Box
+import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
@@ -61,6 +63,14 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalUriHandler
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowClockwise
+import com.composables.sfsymbols.monochrome.SFKey
+import com.composables.sfsymbols.monochrome.SFPencil
+import com.composables.sfsymbols.monochrome.SFPlusCircle
+import com.composables.sfsymbols.monochrome.SFRectanglePortraitAndArrowRight
+import com.composables.sfsymbols.monochrome.SFWrenchAdjustable
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -139,41 +149,18 @@ fun AccountSettingsScreen(
     var showTokenEditor by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-                title = { Text(stringResource(R.string.account)) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = navController::navigateUp,
-                        onLongClick = navController::backToMain
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.arrow_back),
-                            contentDescription = null
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .windowInsetsPadding(
-                    LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-                )
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-        ) {
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.account),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
+    ) {
             // Account Profile Section
             IosSettingsGroup(
                 title = stringResource(R.string.settings),
                 items = listOf(
                     IosSettingsItem(
-                        icon = if (isLoggedIn && !accountImageUrl.isNullOrBlank()) null else painterResource(R.drawable.login),
+                        icon = if (isLoggedIn && !accountImageUrl.isNullOrBlank()) null else rememberVectorPainter(SfSymbols.Monochrome.SFRectanglePortraitAndArrowRight),
                         title = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (isLoggedIn && !accountImageUrl.isNullOrBlank()) {
@@ -253,7 +240,7 @@ fun AccountSettingsScreen(
                 IosSettingsGroup(
                     items = listOf(
                         IosSettingsItem(
-                            icon = painterResource(R.drawable.sync),
+                            icon = rememberVectorPainter(SfSymbols.Monochrome.SFArrowClockwise),
                             title = { Text(stringResource(R.string.switch_channel_action)) },
                             description = { Text(stringResource(R.string.switch_channel_action_desc)) },
                             onClick = { navController.navigate("switch_channel") }
@@ -269,7 +256,7 @@ fun AccountSettingsScreen(
                 title = stringResource(R.string.advanced_login),
                 items = listOf(
                     IosSettingsItem(
-                        icon = painterResource(R.drawable.token),
+                        icon = rememberVectorPainter(SfSymbols.Monochrome.SFKey),
                         title = {
                             Text(
                                 when {
@@ -296,7 +283,7 @@ fun AccountSettingsScreen(
                     title = stringResource(R.string.settings_section_player_content),
                     items = listOf(
                         IosSettingsItem(
-                            icon = painterResource(R.drawable.add_circle),
+                            icon = rememberVectorPainter(SfSymbols.Monochrome.SFPlusCircle),
                             title = { Text(stringResource(R.string.more_content)) },
                             trailingContent = {
                                 Switch(
@@ -314,7 +301,7 @@ fun AccountSettingsScreen(
                             }
                         ),
                         IosSettingsItem(
-                            icon = painterResource(R.drawable.cached),
+                            icon = rememberVectorPainter(SfSymbols.Monochrome.SFArrowClockwise),
                             title = { Text(stringResource(R.string.yt_sync)) },
                             trailingContent = {
                                 Switch(
@@ -335,7 +322,7 @@ fun AccountSettingsScreen(
                 title = stringResource(R.string.listenbrainz_scrobbling),
                 items = listOf(
                     IosSettingsItem(
-                        icon = painterResource(R.drawable.edit),
+                        icon = rememberVectorPainter(SfSymbols.Monochrome.SFPencil),
                         title = { Text(stringResource(R.string.listenbrainz_scrobbling)) },
                         description = { Text(stringResource(R.string.listenbrainz_scrobbling_desc)) },
                         trailingContent = {
@@ -347,7 +334,7 @@ fun AccountSettingsScreen(
                         onClick = { onListenBrainzEnabledChange(!listenBrainzEnabled) }
                     ),
                     IosSettingsItem(
-                        icon = painterResource(R.drawable.edit),
+                        icon = rememberVectorPainter(SfSymbols.Monochrome.SFPencil),
                         title = {
                             Text(
                                 if (listenBrainzToken.isBlank()) {
@@ -370,7 +357,7 @@ fun AccountSettingsScreen(
                 items = buildList {
                     add(
                         IosSettingsItem(
-                            icon = painterResource(R.drawable.integration),
+                            icon = rememberVectorPainter(SfSymbols.Monochrome.SFWrenchAdjustable),
                             title = { Text(stringResource(R.string.integrations)) },
                             onClick = { navController.navigate("settings/integrations") }
                         )
@@ -379,7 +366,8 @@ fun AccountSettingsScreen(
             )
 
             Spacer(modifier = Modifier.height(16.dp))
-        }
+
+
 
         if (showTokenEditor) {
             val text = """
@@ -511,5 +499,6 @@ fun AccountSettingsScreen(
                 )
             }
         }
+
     }
 }

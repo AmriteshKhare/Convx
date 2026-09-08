@@ -61,8 +61,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.pluralStringResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
@@ -71,6 +69,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
 import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerConnection
@@ -118,6 +118,9 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.ArtistSongsViewModel
+import com.convx.music.ui.component.ScreenLargeTitle
+import com.convx.music.ui.component.ScreenScaffold
+import com.convx.music.ui.component.rememberTitleCollapseProgress
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -146,13 +149,21 @@ fun ArtistSongsScreen(
     val songs by viewModel.songs.collectAsState()
     val lazyListState = rememberLazyListState()
 
-    Box(
-        modifier = Modifier.fillMaxSize(),
-    ) {
+    ScreenScaffold(
+        title = artist?.artist?.name.orEmpty(),
+        titleAlpha = rememberTitleCollapseProgress(lazyListState, titleItemKey = "title"),
+        onBack = navController::navigateUp,
+        onBackLongClick = navController::backToMain,
+    ) { chrome ->
         LazyColumn(
             state = lazyListState,
+            modifier = chrome.contentModifier(),
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
+            item(key = "title") {
+                ScreenLargeTitle(artist?.artist?.name.orEmpty())
+            }
+
             item(
                 key = "header",
                 contentType = CONTENT_TYPE_HEADER,
@@ -208,7 +219,7 @@ fun ArtistSongsScreen(
                             },
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.more_vert),
+                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = null,
                             )
                         }
@@ -245,22 +256,6 @@ fun ArtistSongsScreen(
                 )
             }
         }
-
-        TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-            title = { Text(artist?.artist?.name.orEmpty()) },
-            navigationIcon = {
-                IconButton(
-                    onClick = navController::navigateUp,
-                    onLongClick = navController::backToMain,
-                ) {
-                    Icon(
-                        painterResource(R.drawable.arrow_back),
-                        contentDescription = null,
-                    )
-                }
-            },
-        )
 
         ListScrollRail(
             lazyListState = lazyListState,

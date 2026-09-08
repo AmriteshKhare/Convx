@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.component
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -19,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
@@ -58,6 +61,7 @@ fun BottomSheetPage(
 ) {
     val focusManager = LocalFocusManager.current
     val iosColors = IosTheme.colors
+    val isDark = isSystemInDarkTheme()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val (sheetCornerRadius) = rememberPreference(SheetCornerRadiusKey, MenuSheetCornerRadius.value)
     val sheetShape = remember(sheetCornerRadius) {
@@ -69,6 +73,12 @@ fun BottomSheetPage(
         )
     }
 
+    val resolvedContainerColor = when {
+        background.isSpecified -> background
+        isDark -> Color(0xFF141416)
+        else -> iosColors.systemGroupedBackground
+    }
+
     AnimatedBottomSheet(
         isVisible = state.isVisible,
         onDismissRequest = {
@@ -77,10 +87,19 @@ fun BottomSheetPage(
         },
         sheetState = sheetState,
         shape = sheetShape,
-        containerColor = if (background.isSpecified) background else iosColors.systemGroupedBackground,
+        containerColor = resolvedContainerColor,
         contentColor = iosColors.label,
         scrimColor = Color.Black.copy(alpha = 0.12f),
-        dragHandle = { IosGrabber() },
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                IosGrabber()
+            }
+        },
         modifier = modifier.fillMaxHeight()
     ) {
         Column(

@@ -51,6 +51,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import com.convx.music.ui.component.ScreenScaffold
 
 /**
  * Holds the cookie/visitorData/channel-list from a completed WebView login while
@@ -92,10 +93,18 @@ fun LoginScreen(
     // leaving the user to back out.
     val validationAttempts = remember { AtomicInteger(0) }
 
-    Box(
-        modifier = Modifier.fillMaxSize()
+    ScreenScaffold(
+        title = stringResource(R.string.login),
+        // A login WebView does not scroll under the bar, so there is no large
+        // title to hand off from — the compact one simply stays.
+        titleAlpha = 1f,
+        onBack = navController::navigateUp,
+        onBackLongClick = navController::backToMain,
     ) {
         AndroidView(
+            // Deliberately NOT the chrome's contentModifier: recording a
+            // hardware-accelerated WebView into a backdrop layer makes the page
+            // tear (see MainActivity's WebViewRoutes note).
             modifier = Modifier
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
                 .fillMaxSize(),
@@ -269,20 +278,6 @@ fun LoginScreen(
             }
         )
 
-        TopAppBar(
-            title = { Text(stringResource(R.string.login)) },
-            navigationIcon = {
-                IconButton(
-                    onClick = navController::navigateUp,
-                    onLongClick = navController::backToMain
-                ) {
-                    Icon(
-                        painterResource(R.drawable.arrow_back),
-                        contentDescription = null
-                    )
-                }
-            }
-        )
     }
 
     BackHandler(enabled = webViewRef.value?.canGoBack() == true) {

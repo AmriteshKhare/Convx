@@ -17,6 +17,7 @@ object LyricsProviderRegistry {
         "YouLyPlus"       to YouLyPlusLyricsProvider,
         "Paxsenix"        to PaxSenixLyricsProvider,
         "Musixmatch"      to MusixmatchLyricsProvider,
+        "Unison"          to UnisonLyricsProvider,
         "BetterLyrics"    to BetterLyricsProvider,
         "SimpMusic"       to SimpMusicLyricsProvider,
         "LrcLib"          to LrcLibLyricsProvider,
@@ -47,6 +48,7 @@ object LyricsProviderRegistry {
         "YouLyPlus",
         "Paxsenix",
         "Musixmatch",
+        "Unison",
         "BetterLyrics",
         "SimpMusic",
         "YouTubeSubtitle",
@@ -71,6 +73,7 @@ object LyricsProviderRegistry {
         "YouLyPlus"       -> "YouLyPlus"
         "Paxsenix"        -> "PaxSenix"
         "Musixmatch"      -> "Musixmatch"
+        "Unison"          -> "Unison"
         "BetterLyrics"    -> "Better Lyrics"
         "SimpMusic"       -> "SimpMusic"
         "LrcLib"          -> "LrcLib"

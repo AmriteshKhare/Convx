@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -36,6 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.HttpDataSource
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowCounterclockwise
+import com.composables.sfsymbols.monochrome.SFExclamationmarkTriangle
+import com.composables.sfsymbols.monochrome.SFSquareOnSquare
 import com.convx.music.R
 
 @Composable
@@ -114,7 +117,7 @@ fun PlaybackError(
     ) {
         // Error icon
         Icon(
-            painter = painterResource(R.drawable.error),
+            imageVector = SfSymbols.Monochrome.SFExclamationmarkTriangle,
             contentDescription = null,
             tint = AppTheme.colorScheme.error,
             modifier = Modifier.size(48.dp)
@@ -170,7 +173,7 @@ fun PlaybackError(
                 )
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.replay),
+                    imageVector = SfSymbols.Monochrome.SFArrowCounterclockwise,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
@@ -185,7 +188,7 @@ fun PlaybackError(
                 shape = RoundedCornerShape(20.dp),
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.content_copy),
+                    imageVector = SfSymbols.Monochrome.SFSquareOnSquare,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )

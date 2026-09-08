@@ -57,7 +57,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -67,6 +66,9 @@ import com.music.innertube.models.WatchEndpoint
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronLeft
+import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.constants.ListItemHeight
 import com.convx.music.models.toMediaMetadata
 import com.convx.music.playback.queues.YouTubeQueue
@@ -315,7 +317,7 @@ fun ChartsScreen(
                                                     },
                                                 ) {
                                                     Icon(
-                                                        painter = painterResource(R.drawable.more_vert),
+                                                        imageVector = SfSymbols.Monochrome.SFEllipsis,
                                                         contentDescription = null,
                                                     )
                                                 }
@@ -428,7 +430,7 @@ fun ChartsScreen(
                     onLongClick = { navController.backToMain() },
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.arrow_back),
+                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
                         contentDescription = null,
                     )
                 }

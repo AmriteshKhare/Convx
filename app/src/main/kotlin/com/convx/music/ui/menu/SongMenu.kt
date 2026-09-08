@@ -805,14 +805,14 @@ fun SongMenu(
                             }
                         )
                     )
-                    if (song.song.albumId != null) {
+                    val albumId = song.song.albumId?.takeIf { it.isNotBlank() } ?: song.album?.id?.takeIf { it.isNotBlank() }
+                    val albumName = song.song.albumName ?: song.album?.title
+                    if (!albumId.isNullOrBlank()) {
                         add(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.view_album)) },
-                                description = {
-                                    song.song.albumName?.let {
-                                        Text(text = it)
-                                    }
+                                description = albumName?.let { name ->
+                                    { Text(text = name) }
                                 },
                                 icon = {
                                     Icon(
@@ -822,7 +822,7 @@ fun SongMenu(
                                 },
                                 onClick = {
                                     onDismiss()
-                                    navController.navigate("album/${song.song.albumId}")
+                                    navController.navigate("album/$albumId")
                                 }
                             )
                         )

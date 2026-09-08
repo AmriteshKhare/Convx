@@ -50,6 +50,9 @@ import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.SegmentedButton
 import com.convx.music.ui.ios.compat.SingleChoiceSegmentedButtonRow
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFListBullet
+import com.composables.sfsymbols.monochrome.SFSquareGrid2x2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -299,12 +302,10 @@ fun LibraryPlaylistsScreen(
                         onClick = { viewType = type },
                         icon = {
                             Icon(
-                                painter = painterResource(
-                                    when (type) {
-                                        LibraryViewType.LIST -> R.drawable.list
-                                        LibraryViewType.GRID -> R.drawable.grid_view
-                                    }
-                                ),
+                                imageVector = when (type) {
+                                    LibraryViewType.LIST -> SfSymbols.Monochrome.SFListBullet
+                                    LibraryViewType.GRID -> SfSymbols.Monochrome.SFSquareGrid2x2
+                                },
                                 contentDescription = null,
                             )
                         },

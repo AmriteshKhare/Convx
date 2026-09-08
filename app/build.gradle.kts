@@ -364,6 +364,8 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.core.splashscreen)
 
+    implementation(libs.jetpackSfSymbols)
+
     // Smart analysis ONNX models (Beat This + Open-Unmix vocal separator)
     implementation(libs.onnxruntime)
 

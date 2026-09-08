@@ -43,6 +43,13 @@ import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowClockwise
+import com.composables.sfsymbols.monochrome.SFChevronLeft
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFMagnifyingglass
+import com.composables.sfsymbols.monochrome.SFShuffle
+import com.composables.sfsymbols.monochrome.SFXmark
 import androidx.compose.material3.TextFieldDefaults
 import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -121,15 +128,17 @@ import com.convx.music.utils.makeTimeString
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
 import com.convx.music.viewmodels.CachePlaylistViewModel
-import com.convx.music.ui.component.HeroBackground
-import com.convx.music.ui.component.rememberHeroTopBlur
-import com.convx.music.ui.component.rememberHeroSource
 import com.convx.music.ui.component.rememberHeroTint
-import com.convx.music.ui.component.rememberHeroPalette
+import com.convx.music.ui.player.MeshGradientBackground
+import com.convx.music.ui.player.dimmed
+import com.convx.music.ui.player.rememberArtworkMeshPalette
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -229,23 +238,22 @@ fun CachePlaylistScreen(
         }
     }
 
+    // Same mesh backdrop as ArtistScreen/AlbumScreen/OnlinePlaylistScreen/the player's
+    // BITCHORD_MESH style, not the blurred-photo HeroBackground that used to paint here.
     val heroUrl = filteredSongs.firstOrNull()?.thumbnailUrl
-    val heroSource = rememberHeroSource(
-        staticArt = heroUrl,
-        songs = filteredSongs.map { it.thumbnailUrl to false },
-    )
-    val heroPalette = rememberHeroPalette(heroUrl)
-    val tint = heroPalette.background
+    val meshPalette = rememberArtworkMeshPalette(heroUrl)
+    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
-    // now the colour engine's own primary text tier for THIS artwork -- derived against
-    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
-    // a fixed shift of the background.
-    val onTint = heroPalette.primaryText
+    // Same flat white every icon/text reads in the player on a mesh background,
+    // rather than a per-artwork computed contrast colour.
+    val onTint = Color.White
 
-    val glassConfig = LocalGlassEffectConfig.current
+    // Glass Effect setting only drives the nav bar/mini player now — this
+    // screen's top-bar chrome keeps glass but pinned to the fixed style.
+    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val heroBackdrop = rememberLayerBackdrop()
+    val hazeState = remember { HazeState() }
 
     // Attached capture of the list, sampled by the floating chrome below. The
     // chrome is a *sibling* of the capture, never inside it, so there is no
@@ -264,18 +272,17 @@ fun CachePlaylistScreen(
     val backdropFreeze = rememberBackdropFreeze()
     val heroZoom = rememberHeroZoom()
 
-    HeroBackground(
-        tint = tint,
-        heroSource = heroSource,
-        blurArtwork = true,
-        fullBlur = true,
-        meshWash = heroPalette,
-        // Progressive top blur: the artwork dissolves under the status bar as it
-        // scrolls up (Haze on 13+, plain scrim below).
-        topBlurProgress = rememberHeroTopBlur(lazyListState),
-        heroScale = heroZoom.scale,
-        modifier = Modifier.fillMaxSize(),
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(tint)
+            .hazeSource(hazeState)
     ) {
+      MeshGradientBackground(
+          palette = meshPalette,
+          trackKey = heroUrl,
+          modifier = Modifier.matchParentSize(),
+      )
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeShape = ContinuousRoundedRectangle(percent = 50)
         
@@ -411,7 +418,7 @@ fun CachePlaylistScreen(
                                         }
                                     }) {
                                         Icon(
-                                            painter = painterResource(R.drawable.more_vert),
+                                            imageVector = SfSymbols.Monochrome.SFEllipsis,
                                             contentDescription = null
                                         )
                                     }
@@ -505,7 +512,7 @@ fun CachePlaylistScreen(
                 if (inSelectMode) {
                     GlassCircleButton(onClick = onExitSelectionMode) {
                         Icon(
-                            painter = painterResource(R.drawable.close),
+                            imageVector = SfSymbols.Monochrome.SFXmark,
                             contentDescription = null,
                         )
                     }
@@ -551,7 +558,7 @@ fun CachePlaylistScreen(
                             }
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.more_vert),
+                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = null
                             )
                         }
@@ -565,7 +572,7 @@ fun CachePlaylistScreen(
                         },
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.arrow_back),
+                            imageVector = SfSymbols.Monochrome.SFChevronLeft,
                             contentDescription = null
                         )
                     }
@@ -611,7 +618,7 @@ fun CachePlaylistScreen(
                         onLongClick = { navController.backToMain() },
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.arrow_back),
+                            imageVector = SfSymbols.Monochrome.SFChevronLeft,
                             contentDescription = null
                         )
                     }
@@ -620,7 +627,7 @@ fun CachePlaylistScreen(
 
                     GlassCircleButton(onClick = { isSearching = true }) {
                         Icon(
-                            painter = painterResource(R.drawable.search),
+                            imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                             contentDescription = null
                         )
                     }
@@ -646,19 +653,13 @@ private fun CachePlaylistHeader(
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val cacheLength = remember(songs) { songs.fastSumBy { it.song.duration ?: 0 } }
 
+    // The enclosing screen already paints the mesh background; this header only needs
+    // the same flat white text/icons plus the raw artwork colour for the play glyph
+    // (drawn on the white button fill, same reverse-contrast pairing AlbumScreen uses).
     val heroUrl = songs.firstOrNull()?.thumbnailUrl
-    val heroSource = com.convx.music.ui.component.rememberHeroSource(
-        staticArt = heroUrl,
-        songs = songs.map { it.thumbnailUrl to false },
-    )
-    val heroPalette = com.convx.music.ui.component.rememberHeroPalette(heroUrl)
-    val tint = heroPalette.background
-    com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Titles, icons and the play/shuffle buttons all read in this one colour, and it is
-    // now the colour engine's own primary text tier for THIS artwork -- derived against
-    // the tint the screen actually paints and pushed until it clears 4.5:1 -- rather than
-    // a fixed shift of the background.
-    val onTint = heroPalette.primaryText
+    val meshPalette = rememberArtworkMeshPalette(heroUrl)
+    val tint = remember(meshPalette) { meshPalette.colors.first() }
+    val onTint = Color.White
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -679,7 +680,7 @@ private fun CachePlaylistHeader(
             modifier = Modifier.padding(horizontal = 24.dp)
         ) {
             Icon(
-                painter = painterResource(R.drawable.cached),
+                imageVector = SfSymbols.Monochrome.SFArrowClockwise,
                 contentDescription = null,
                 modifier = Modifier.size(28.dp),
                 tint = onTint
@@ -791,7 +792,7 @@ private fun CachePlaylistHeader(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.shuffle),
+                        imageVector = SfSymbols.Monochrome.SFShuffle,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
                         tint = LocalContentColor.current
@@ -837,7 +838,7 @@ private fun CachePlaylistHeader(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.more_vert),
+                        imageVector = SfSymbols.Monochrome.SFEllipsis,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
                         tint = LocalContentColor.current
@@ -870,7 +871,7 @@ private fun CachePlaylistHeader(
             )
 
             androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.material3.LocalContentColor provides heroPalette.secondaryText,
+                androidx.compose.material3.LocalContentColor provides onTint.copy(alpha = 0.7f),
             ) {
                 ExpandableText(
                     text = staticDescription,

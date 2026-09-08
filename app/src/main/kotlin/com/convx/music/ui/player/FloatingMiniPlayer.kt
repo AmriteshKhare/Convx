@@ -11,7 +11,8 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -131,6 +132,9 @@ fun FloatingMiniPlayer(
     useGlass: Boolean = true,
     onLyricsClick: (() -> Unit)? = null,
     onQueueClick: (() -> Unit)? = null,
+    // Fires on release after a real drag (never a tap) so the host bar can
+    // answer the snap with its own motion.
+    onSnapRelease: () -> Unit = {},
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     // Transport glyphs are solid (filled) shapes; at full source alpha their
@@ -165,9 +169,11 @@ fun FloatingMiniPlayer(
     val densityScale = density.density
 
     val offsetXAnimatable = remember { Animatable(0f) }
-    // Raw finger travel for the pill stretch. Updated on every drag event,
-    // skip allowed or not, so the pill always follows the finger.
+    // Raw finger travel for the pill stretch, both axes. Fed by a passive
+    // observer below (never consumes), so it tracks from the first pixel
+    // and can never lose the drag to the skip detector.
     val stretchDragX = remember { Animatable(0f) }
+    val stretchDragY = remember { Animatable(0f) }
     var dragStartTime by remember { mutableLongStateOf(0L) }
     var totalDragDistance by remember { mutableFloatStateOf(0f) }
     // Underdamped on purpose: releasing the pill (drag-cancel, or after a skip
@@ -232,17 +238,19 @@ fun FloatingMiniPlayer(
         contentAlignment = Alignment.CenterStart,
         modifier = Modifier
             // Whole-pill stretch outside the caller's pill clip/glass below:
-            // trails the drag and deforms along it, unclipped. Driven by the
-            // same finger that drives skip, so it never loses the drag.
+            // trails the finger and deforms along it, on both axes, unclipped.
             .graphicsLayer {
                 clip = false
                 val h = size.height
                 if (h > 0f) {
-                    val pull = (stretchDragX.value / size.width.coerceAtLeast(1f)).fastCoerceIn(-1f, 1f)
+                    val w = size.width.coerceAtLeast(1f)
+                    val pullX = (stretchDragX.value / w).fastCoerceIn(-1f, 1f)
+                    val pullY = (stretchDragY.value / h).fastCoerceIn(-1f, 1f)
                     val unit = 4.dp.toPx() / h
-                    scaleX = 1f + unit * stretchPress + unit * abs(pull)
-                    scaleY = 1f + unit * stretchPress - 0.5f * unit * abs(pull)
+                    scaleX = 1f + unit * stretchPress + unit * abs(pullX) - 0.5f * unit * abs(pullY)
+                    scaleY = 1f + unit * stretchPress + unit * abs(pullY) - 0.5f * unit * abs(pullX)
                     translationX = stretchDragX.value * 0.2f
+                    translationY = stretchDragY.value * 0.2f
                 }
             }
             .then(modifier)
@@ -260,83 +268,88 @@ fun FloatingMiniPlayer(
                 drawInPlace = { !PlayerMorph.active },
             )
             .onSizeChanged { measuredHeightPx = it.height }
-            .then(
-                if (swipeEnabled) {
-                    Modifier.pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragStart = {
-                                dragStartTime = System.currentTimeMillis()
-                                totalDragDistance = 0f
-                                coroutineScope.launch { stretchDragX.snapTo(0f) }
-                            },
-                            onDragCancel = {
-                                coroutineScope.launch {
-                                    launch { offsetXAnimatable.animateTo(0f, animationSpec) }
-                                    launch { stretchDragX.animateTo(0f, animationSpec) }
-                                }
-                            },
-                            onHorizontalDrag = { _, dragAmount ->
-                                val adjustedDragAmount =
-                                    if (layoutDirection == LayoutDirection.Rtl) -dragAmount else dragAmount
-                                // Always tracks, skip allowed or not.
-                                coroutineScope.launch {
-                                    stretchDragX.snapTo(stretchDragX.value + adjustedDragAmount)
-                                }
-                                val canSkipPrevious = playerConnection.player.previousMediaItemIndex != -1
-                                val canSkipNext = playerConnection.player.nextMediaItemIndex != -1
-                                val tryingToSwipeRight = adjustedDragAmount > 0
-                                val tryingToSwipeLeft = adjustedDragAmount < 0
-                                val allowLeft = tryingToSwipeLeft && canSkipNext
-                                val allowRight = tryingToSwipeRight && canSkipPrevious
-
-                                val canReturnToCenter =
-                                    (tryingToSwipeRight && !canSkipPrevious && offsetXAnimatable.value < 0) ||
-                                        (tryingToSwipeLeft && !canSkipNext && offsetXAnimatable.value > 0)
-
-                                if (allowLeft || allowRight || canReturnToCenter) {
-                                    totalDragDistance += abs(adjustedDragAmount)
-                                    coroutineScope.launch {
-                                        offsetXAnimatable.snapTo(offsetXAnimatable.value + adjustedDragAmount)
-                                    }
-                                }
-                            },
-                            onDragEnd = {
-                                val dragDuration = System.currentTimeMillis() - dragStartTime
-                                // Mean velocity over the gesture, px/ms. The old gate wanted
-                                // ~7.4px/ms against a mean of 1-3 for a real swipe, so that
-                                // branch never fired either.
-                                val velocity = if (dragDuration > 0) totalDragDistance / dragDuration else 0f
-                                val currentOffset = offsetXAnimatable.value
-                                val dragged = abs(currentOffset)
-                                val canSkipPrevious = playerConnection.player.previousMediaItemIndex != -1
-                                val canSkipNext = playerConnection.player.nextMediaItemIndex != -1
-
-                                // Drag past the commit distance, or flick: a short fast throw
-                                // should not have to cross the whole distance.
-                                val shouldChangeSong = dragged > autoSwipeThreshold ||
-                                    (velocity > 0.55f && dragged > autoSwipeThreshold * 0.25f)
-
-                                if (shouldChangeSong) {
-                                    // Through the connection, not the raw player: the wrapper
-                                    // routes to Cast while casting, re-prepares an ENDED
-                                    // player, and fires the skip callbacks.
-                                    if (currentOffset > 0 && canSkipPrevious) {
-                                        playerConnection.seekToPrevious()
-                                    } else if (currentOffset <= 0 && canSkipNext) {
-                                        playerConnection.seekToNext()
-                                    }
-                                }
-                                coroutineScope.launch {
-                                    launch { offsetXAnimatable.animateTo(0f, animationSpec) }
-                                    launch { stretchDragX.animateTo(0f, animationSpec) }
-                                }
-                            },
-                        )
+            // The mini's only gesture. Tracks the finger from the first pixel
+            // on both axes for the stretch (reads only, never consumes, so the
+            // list behind still scrolls); slides content for skip; commits
+            // skip on release for a quick swipe only — a hold-and-drag
+            // stretches but never skips.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val pid = down.id
+                    val start = down.position
+                    dragStartTime = System.currentTimeMillis()
+                    totalDragDistance = 0f
+                    var lastAdjustedX = 0f
+                    coroutineScope.launch {
+                        launch { stretchDragX.snapTo(0f) }
+                        launch { stretchDragY.snapTo(0f) }
                     }
-                } else {
-                    Modifier
+                    while (true) {
+                        val change = awaitPointerEvent().changes.firstOrNull { it.id == pid }
+                        if (change == null || !change.pressed) break
+                        val raw = change.position - start
+                        val adjustedX =
+                            if (layoutDirection == LayoutDirection.Rtl) -raw.x else raw.x
+                        val delta = adjustedX - lastAdjustedX
+                        lastAdjustedX = adjustedX
+                        totalDragDistance += abs(delta)
+                        coroutineScope.launch {
+                            launch { stretchDragX.snapTo(raw.x) }
+                            launch { stretchDragY.snapTo(raw.y) }
+                        }
+                        if (swipeEnabled) {
+                            val canSkipPrevious =
+                                playerConnection.player.previousMediaItemIndex != -1
+                            val canSkipNext =
+                                playerConnection.player.nextMediaItemIndex != -1
+                            val allowLeft = delta < 0 && canSkipNext
+                            val allowRight = delta > 0 && canSkipPrevious
+                            val canReturnToCenter =
+                                (delta > 0 && !canSkipPrevious && offsetXAnimatable.value < 0) ||
+                                    (delta < 0 && !canSkipNext && offsetXAnimatable.value > 0)
+                            if (allowLeft || allowRight || canReturnToCenter) {
+                                coroutineScope.launch {
+                                    offsetXAnimatable.snapTo(offsetXAnimatable.value + delta)
+                                }
+                            }
+                        }
+                    }
+                    val duration = System.currentTimeMillis() - dragStartTime
+                    // Mean velocity over the gesture, px/ms. The old gate wanted
+                    // ~7.4px/ms against a mean of 1-3 for a real swipe, so that
+                    // branch never fired either.
+                    val velocity = if (duration > 0) totalDragDistance / duration else 0f
+                    val currentOffset = offsetXAnimatable.value
+                    val dragged = abs(currentOffset)
+                    val canSkipPrevious =
+                        playerConnection.player.previousMediaItemIndex != -1
+                    val canSkipNext =
+                        playerConnection.player.nextMediaItemIndex != -1
+                    // Quick swipe only: past the commit distance, or a flick.
+                    // A hold-and-drag fails the duration gate by definition.
+                    val shouldChangeSong = swipeEnabled &&
+                        duration < viewConfig.longPressTimeoutMillis &&
+                        (dragged > autoSwipeThreshold ||
+                            (velocity > 0.55f && dragged > autoSwipeThreshold * 0.25f))
+                    if (shouldChangeSong) {
+                        // Through the connection, not the raw player: the wrapper
+                        // routes to Cast while casting, re-prepares an ENDED
+                        // player, and fires the skip callbacks.
+                        if (currentOffset > 0 && canSkipPrevious) {
+                            playerConnection.seekToPrevious()
+                        } else if (currentOffset <= 0 && canSkipNext) {
+                            playerConnection.seekToNext()
+                        }
+                    }
+                    if (totalDragDistance > viewConfig.touchSlop) onSnapRelease()
+                    coroutineScope.launch {
+                        launch { offsetXAnimatable.animateTo(0f, animationSpec) }
+                        launch { stretchDragX.animateTo(0f, animationSpec) }
+                        launch { stretchDragY.animateTo(0f, animationSpec) }
+                    }
                 }
-            )
+            }
             // Tap opens the full player via the inner clickable below.
     ) {
         // Fixed sizes for both phone accessory strips (isInline and the default

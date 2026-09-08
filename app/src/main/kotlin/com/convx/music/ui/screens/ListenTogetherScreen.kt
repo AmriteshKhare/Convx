@@ -87,6 +87,21 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.convx.music.LocalListenTogetherManager
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFBubbleLeftAndBubbleRight
+import com.composables.sfsymbols.monochrome.SFCheckmark
+import com.composables.sfsymbols.monochrome.SFChevronRight
+import com.composables.sfsymbols.monochrome.SFCrown
+import com.composables.sfsymbols.monochrome.SFGearshape
+import com.composables.sfsymbols.monochrome.SFLink
+import com.composables.sfsymbols.monochrome.SFListBullet
+import com.composables.sfsymbols.monochrome.SFPerson2
+import com.composables.sfsymbols.monochrome.SFRectanglePortraitAndArrowRight
+import com.composables.sfsymbols.monochrome.SFSquareOnSquare
+import com.composables.sfsymbols.monochrome.SFStar
+import com.composables.sfsymbols.monochrome.SFTimer
+import com.composables.sfsymbols.monochrome.SFXmark
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.convx.music.constants.AppBarHeight
 import com.convx.music.constants.ListenTogetherInTopBarKey
 import com.convx.music.constants.ListenTogetherUsernameKey
@@ -102,6 +117,7 @@ import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.launch
+import com.convx.music.ui.component.ScreenScaffold
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -232,9 +248,17 @@ fun ListenTogetherScreen(
         }
     }
 
+    ScreenScaffold(
+        title = stringResource(R.string.together),
+        // Shown as a pushed page it needs the bar; as a tab it is one of the
+        // top-level screens and carries no chrome at all.
+        titleAlpha = if (shouldShowTopBar) 1f else 0f,
+        onBack = if (shouldShowTopBar) { { navController.navigateUp() } } else null,
+        onBackLongClick = if (shouldShowTopBar) { { navController.backToMain() } } else null,
+    ) { chrome ->
     LazyColumn(
         state = lazyListState,
-        modifier = Modifier
+        modifier = chrome.contentModifier()
             .fillMaxSize()
             .background(AppTheme.colorScheme.background)
             .imePadding(),
@@ -445,21 +469,6 @@ fun ListenTogetherScreen(
         }
     }
 
-    if (shouldShowTopBar) {
-        TopAppBar(
-            title = { Text(stringResource(R.string.together)) },
-            navigationIcon = {
-                IconButton(
-                    onClick = navController::navigateUp,
-                    onLongClick = navController::backToMain
-                ) {
-                    Icon(
-                        painterResource(R.drawable.arrow_back),
-                        contentDescription = null
-                    )
-                }
-            }
-        )
     }
 }
 
@@ -676,18 +685,18 @@ private fun RoomStatusCard(
         Spacer(Modifier.height(18.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            RoomAction(
+            ListenTogetherRoomAction(
                 icon = R.drawable.chat_msg,
                 label = stringResource(R.string.comments),
                 onClick = { navController.navigate("listen_together/chat") }
             )
-            RoomAction(
+            ListenTogetherRoomAction(
                 icon = R.drawable.content_copy,
                 label = stringResource(R.string.copy_code),
                 onClick = { copy("Room Code", roomCode) }
             )
             if (isHost) {
-                RoomAction(
+                ListenTogetherRoomAction(
                     icon = R.drawable.link,
                     label = stringResource(R.string.copy_link),
                     onClick = {
@@ -704,7 +713,7 @@ private fun RoomStatusCard(
 
 /** Square glass-ish action tile used by the room header. */
 @Composable
-private fun RoomAction(icon: Int, label: String, onClick: () -> Unit) {
+private fun ListenTogetherRoomAction(icon: Int, label: String, onClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -714,7 +723,7 @@ private fun RoomAction(icon: Int, label: String, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 11.dp)
     ) {
         Icon(
-            painter = painterResource(icon),
+            painter = painterResource(id = icon),
             contentDescription = label,
             modifier = Modifier.size(19.dp),
             tint = AppTheme.colorScheme.onSurface
@@ -902,14 +911,14 @@ private fun PendingJoinRequestsSection(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                RowAction(
+                ListenTogetherRowAction(
                     icon = R.drawable.close,
                     tint = AppTheme.colorScheme.onSurfaceVariant,
                     description = stringResource(R.string.reject),
                     onClick = { onReject(request.userId) }
                 )
                 Spacer(Modifier.width(6.dp))
-                RowAction(
+                ListenTogetherRowAction(
                     icon = R.drawable.check,
                     tint = AppTheme.colorScheme.primary,
                     description = stringResource(R.string.approve),
@@ -922,7 +931,7 @@ private fun PendingJoinRequestsSection(
 
 /** Circular icon button sized to sit level with a 46dp avatar row. */
 @Composable
-private fun RowAction(
+private fun ListenTogetherRowAction(
     icon: Int,
     tint: Color,
     description: String?,
@@ -937,7 +946,7 @@ private fun RowAction(
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            painter = painterResource(icon),
+            painter = painterResource(id = icon),
             contentDescription = description,
             tint = tint,
             modifier = Modifier.size(19.dp)
@@ -999,14 +1008,14 @@ private fun PendingSuggestionsSection(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                RowAction(
+                ListenTogetherRowAction(
                     icon = R.drawable.close,
                     tint = AppTheme.colorScheme.onSurfaceVariant,
                     description = stringResource(R.string.reject),
                     onClick = { onReject(suggestion.suggestionId) }
                 )
                 Spacer(Modifier.width(6.dp))
-                RowAction(
+                ListenTogetherRowAction(
                     icon = R.drawable.check,
                     tint = AppTheme.colorScheme.primary,
                     description = stringResource(R.string.approve),
@@ -1048,7 +1057,7 @@ private fun JoinCreateRoomSection(
             onFieldFocused = onFieldFocused,
             trailing = {
                 if (usernameInput.isNotBlank()) {
-                    RowAction(
+                    ListenTogetherRowAction(
                         icon = R.drawable.close,
                         tint = AppTheme.colorScheme.onSurfaceVariant,
                         description = null,

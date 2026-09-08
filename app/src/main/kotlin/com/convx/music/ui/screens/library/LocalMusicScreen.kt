@@ -39,6 +39,13 @@ import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.OutlinedButton
 import com.convx.music.ui.ios.compat.OutlinedTextField
 import com.convx.music.ui.ios.compat.Text
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowClockwise
+import com.composables.sfsymbols.monochrome.SFListBullet
+import com.composables.sfsymbols.monochrome.SFMagnifyingglass
+import com.composables.sfsymbols.monochrome.SFPlayFill
+import com.composables.sfsymbols.monochrome.SFShuffle
+import com.composables.sfsymbols.monochrome.SFXmark
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -186,7 +193,7 @@ fun LocalMusicScreen(
                             },
                         ) {
                             Icon(
-                                painter = painterResource(if (showSearch) R.drawable.close else R.drawable.search),
+                                imageVector = if (showSearch) SfSymbols.Monochrome.SFXmark else SfSymbols.Monochrome.SFMagnifyingglass,
                                 contentDescription = "Search",
                             )
                         }
@@ -194,7 +201,7 @@ fun LocalMusicScreen(
                         Box {
                             IconButton(onClick = { showSortMenu = true }) {
                                 Icon(
-                                    painter = painterResource(R.drawable.list),
+                                    imageVector = SfSymbols.Monochrome.SFListBullet,
                                     contentDescription = "Sort",
                                 )
                             }
@@ -228,7 +235,7 @@ fun LocalMusicScreen(
                                 )
                             } else {
                                 Icon(
-                                    painter = painterResource(R.drawable.refresh),
+                                    imageVector = SfSymbols.Monochrome.SFArrowClockwise,
                                     contentDescription = "Rescan",
                                 )
                             }
@@ -382,7 +389,7 @@ fun LocalMusicScreen(
                         ),
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.play),
+                            imageVector = SfSymbols.Monochrome.SFPlayFill,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -403,7 +410,7 @@ fun LocalMusicScreen(
                         ),
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.shuffle),
+                            imageVector = SfSymbols.Monochrome.SFShuffle,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )

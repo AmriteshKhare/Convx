@@ -135,29 +135,12 @@ fun SpotifyScreen(
         remember { mutableStateOf(0f) }
     }
 
-    Column(
-        modifier = Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-            )
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp)
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.spotify),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 24.dp,
     ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-            )
-        )
-
-        Text(
-            text = stringResource(R.string.spotify),
-            style = AppTheme.typography.displaySmall.copy(
-                fontWeight = FontWeight.SemiBold
-            ),
-            color = AppTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(start = 8.dp, top = 24.dp, bottom = 16.dp)
-        )
-
         // Connection Card/Group
         IosSettingsGroup(
             title = stringResource(R.string.spotify_account),
@@ -284,28 +267,8 @@ fun SpotifyScreen(
         }
 
         Spacer(modifier = Modifier.height(36.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = {},
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        },
-        scrollBehavior = scrollBehavior,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = Color.Transparent
-        )
-    )
 
     if (showSpotifyLogin) {
         SpotifyLoginSheet(
@@ -428,7 +391,6 @@ private fun SpotifyLoginSheet(
     }
 
     ModalBottomSheet(
-        modifier = Modifier.fillMaxHeight(),
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
@@ -437,7 +399,7 @@ private fun SpotifyLoginSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight()
+                .fillMaxHeight(0.9f)
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -459,6 +421,10 @@ private fun SpotifyLoginSheet(
                     .clip(AppTheme.shapes.large),
                 factory = { context ->
                     WebView(context).apply {
+                        layoutParams = android.view.ViewGroup.LayoutParams(
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                        )
                         val cookieManager = CookieManager.getInstance()
                         cookieManager.setAcceptCookie(true)
                         cookieManager.setAcceptThirdPartyCookies(this, true)
@@ -471,18 +437,29 @@ private fun SpotifyLoginSheet(
                             private fun captureCookies(url: String?): Boolean {
                                 if (captured) return true
                                 cookieManager.flush()
-                                val cookiesStr = cookieManager.getCookie("https://open.spotify.com") ?: ""
-                                val cookies = cookiesStr.split(";").associate {
-                                    val parts = it.split("=")
-                                    val key = parts.firstOrNull()?.trim().orEmpty()
-                                    val valStr = parts.drop(1).joinToString("=").trim()
-                                    key to valStr
+                                val domainsToCheck = listOfNotNull(
+                                    url,
+                                    "https://open.spotify.com",
+                                    "https://accounts.spotify.com",
+                                    "https://spotify.com",
+                                    ".spotify.com"
+                                )
+                                for (domain in domainsToCheck) {
+                                    val cookiesStr = cookieManager.getCookie(domain) ?: continue
+                                    val cookies = cookiesStr.split(";").associate {
+                                        val parts = it.split("=")
+                                        val key = parts.firstOrNull()?.trim().orEmpty()
+                                        val valStr = parts.drop(1).joinToString("=").trim()
+                                        key to valStr
+                                    }
+                                    val spDc = cookies["sp_dc"].orEmpty()
+                                    if (spDc.isNotBlank()) {
+                                        captured = true
+                                        onCookiesCaptured(spDc, cookies["sp_key"].orEmpty())
+                                        return true
+                                    }
                                 }
-                                val spDc = cookies["sp_dc"].orEmpty()
-                                if (spDc.isBlank()) return false
-                                captured = true
-                                onCookiesCaptured(spDc, cookies["sp_key"].orEmpty())
-                                return true
+                                return false
                             }
 
                             override fun shouldOverrideUrlLoading(
@@ -502,6 +479,7 @@ private fun SpotifyLoginSheet(
                                 captureCookies(url)
                             }
                         }
+                        webChromeClient = android.webkit.WebChromeClient()
                         webView = this
                         cookieManager.removeAllCookies(null)
                         cookieManager.flush()

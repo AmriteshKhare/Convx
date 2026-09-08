@@ -67,7 +67,7 @@ val LocalAccentTextColor = androidx.compose.runtime.compositionLocalOf { Default
 @Composable
 fun vivimusicTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    pureBlack: Boolean = true,
+    pureBlack: Boolean = false,
     themeColor: Color = DefaultThemeColor,
     content: @Composable () -> Unit,
 ) {

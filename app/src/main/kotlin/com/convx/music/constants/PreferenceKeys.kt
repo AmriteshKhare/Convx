@@ -45,6 +45,15 @@ val PureBlackKey = booleanPreferencesKey("pureBlack")
 val PureBlackMiniPlayerKey = booleanPreferencesKey("pureBlackMiniPlayer")
 val MiniPlayerOutlineKey = booleanPreferencesKey("miniPlayerOutline")
 val UseAppleMusicPlayerKey = booleanPreferencesKey("useAppleMusicPlayer")
+
+/** Only applies inside the Apple Music player (V2): the classic big-square cover, or a
+ *  full-bleed top-blend hero background behind the chrome. */
+//enum class PlayerLook {
+//    SQUARED,
+//    HERO,
+//}
+//val PlayerLookKey = stringPreferencesKey("playerLook")
+
 val ShowPlayerThumbnailShadowKey = booleanPreferencesKey("showPlayerThumbnailShadow")
 val PlayerThumbnailShadowElevationKey = floatPreferencesKey("playerThumbnailShadowElevation")
 val SelectedFontKey = stringPreferencesKey("selected_font")
@@ -98,6 +107,13 @@ val SwipeToSongKey = booleanPreferencesKey("SwipeToSong")
 val SwipeToRemoveSongKey = booleanPreferencesKey("SwipeToRemoveSong")
 val UseNewPlayerDesignKey= booleanPreferencesKey("useNewPlayerDesign")
 val UseNewMiniPlayerDesignKey = booleanPreferencesKey("useNewMiniPlayerDesign")
+
+enum class PlayerLook {
+    SQUARED,
+    HERO,
+}
+
+val PlayerLookKey = stringPreferencesKey("playerLook")
 val ShowUpNextKey = booleanPreferencesKey("showUpNext")
 /** Tab view only: caps the expanded player to a phone-like width instead of stretching
  *  it across the wide screen. The mini player stays full-width either way. */
@@ -134,6 +150,7 @@ val EnableSimpMusicKey = booleanPreferencesKey("enableSimpMusic")
 val EnableYouLyPlusKey = booleanPreferencesKey("enableYouLyPlus")
 val EnablePaxsenixKey = booleanPreferencesKey("enablePaxsenix")
 val EnableMusixmatchKey = booleanPreferencesKey("enableMusixmatch")
+val EnableUnisonKey = booleanPreferencesKey("enableUnison")
 val HideExplicitKey = booleanPreferencesKey("hideExplicit")
 val HideVideoSongsKey = booleanPreferencesKey("hideVideoSongs")
 val DataSaverEnabledKey = booleanPreferencesKey("dataSaverEnabled")
@@ -181,6 +198,11 @@ val AudioOffload = booleanPreferencesKey("enableOffload")
  *  decoded samples reach the sink unmodified, and forces audio offload on. Master
  *  switch — wins over those other settings' own toggles while it's active. */
 val BitPerfectKey = booleanPreferencesKey("bitPerfect")
+
+/** Spatial audio: stereo widening + cross-feed inside the player's own processor
+ *  chain ([com.convx.music.playback.audio.SpatialAudioProcessor]). Bypassed while
+ *  Bit Perfect is on — it rewrites every sample, same as the EQ. */
+val SpatialAudioKey = booleanPreferencesKey("spatialAudio")
 
 // JioSaavn streaming
 val EnableSaavnStreamingKey = booleanPreferencesKey("enableSaavnStreaming")

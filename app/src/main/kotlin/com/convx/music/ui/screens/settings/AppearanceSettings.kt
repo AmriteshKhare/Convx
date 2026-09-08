@@ -6,8 +6,6 @@
 package com.convx.music.ui.screens.settings
 
 import androidx.compose.foundation.layout.Box
-import com.convx.music.ui.component.FrostedTopBar
-import com.convx.music.ui.component.TopFadeBlur
 import com.convx.music.ui.ios.foundation.IosTheme
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -15,11 +13,15 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.app.Activity
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import android.content.Context
+import android.os.Build
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.Intent
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import android.os.Build
+import android.provider.Settings
+import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.core.net.toUri
+import com.convx.music.ui.utils.appTopBarWindowInsets
+import android.content.Context
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.core.content.edit
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -86,6 +88,12 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFGaugeWithNeedle
+import com.composables.sfsymbols.monochrome.SFIcloudAndArrowDownFill
+import com.composables.sfsymbols.monochrome.SFSliderHorizontal3
+import com.composables.sfsymbols.monochrome.SFStar
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -122,6 +130,11 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.HomeHeroCardEnabledKey
 import com.convx.music.constants.PureBlackHeroBackgroundKey
+import com.convx.music.constants.LiquidGlassGlobalEnabledKey
+import com.convx.music.constants.AlbumCanvasEnabledKey
+import com.convx.music.constants.AppLanguageKey
+import com.convx.music.constants.LanguageCodeToName
+import com.convx.music.constants.SYSTEM_DEFAULT
 import com.convx.music.ui.ios.compat.Slider
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -267,6 +280,21 @@ fun AppearanceSettings(
         defaultValue = CanvasSource.AUTO
     )
     val (pureBlackHeroBackground, onPureBlackHeroBackgroundChange) = rememberPreference(PureBlackHeroBackgroundKey, false)
+    val (liquidGlassEnabled, onLiquidGlassEnabledChange) = rememberPreference(
+        LiquidGlassGlobalEnabledKey,
+        defaultValue = true
+    )
+    // Moved from Content settings (task 011): this is an album-display option,
+    // so it belongs next to the other canvas/player-display toggles here.
+    val (albumCanvasEnabled, onAlbumCanvasEnabledChange) = rememberPreference(
+        AlbumCanvasEnabledKey,
+        defaultValue = false
+    )
+    // Moved from Content settings (task 011): app language is a general/system
+    // setting, not content filtering -- there's no dedicated "General" screen,
+    // so it lives in this screen's existing catch-all "misc" group instead.
+    val (appLanguage, onAppLanguageChange) = rememberPreference(key = AppLanguageKey, defaultValue = SYSTEM_DEFAULT)
+    var showAppLanguageDialog by rememberSaveable { mutableStateOf(false) }
     val (homeHeroCardEnabled, onHomeHeroCardEnabledChange) = rememberPreference(HomeHeroCardEnabledKey, true)
 
     val (listenTogetherInTopBar, onListenTogetherInTopBarChange) = rememberPreference(
@@ -389,13 +417,27 @@ fun AppearanceSettings(
         )
     }
 
-    val hazeState = remember { HazeState() }
-    Box(modifier = Modifier) {
-    androidx.compose.foundation.lazy.LazyColumn(
-        Modifier
-            .hazeSource(hazeState)
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .padding(horizontal = 16.dp),
+    if (showAppLanguageDialog) {
+        EnumDialog(
+            onDismiss = { showAppLanguageDialog = false },
+            onSelect = {
+                onAppLanguageChange(it)
+                showAppLanguageDialog = false
+            },
+            title = stringResource(R.string.app_language),
+            current = appLanguage,
+            values = (listOf(SYSTEM_DEFAULT) + LanguageCodeToName.keys.toList()),
+            valueText = {
+                LanguageCodeToName.getOrElse(it) { stringResource(R.string.system_default) }
+            }
+        )
+    }
+
+    SettingsLazyPage(
+        navController = navController,
+        title = stringResource(R.string.appearance),
+        pageColor = IosTheme.colors.systemGroupedBackground,
+        horizontalPadding = 16.dp,
     ) {
         item(key = "all_appearance_settings") {
             Column {
@@ -461,6 +503,19 @@ fun AppearanceSettings(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.liquid_glass)) },
+                    description = { Text(stringResource(R.string.liquid_glass_simple_desc)) },
+                    trailingContent = {
+                        Switch(
+                            checked = liquidGlassEnabled,
+                            onCheckedChange = onLiquidGlassEnabledChange
+                        )
+                    },
+                    onClick = { onLiquidGlassEnabledChange(!liquidGlassEnabled) }
+                ),
+                IosSettingsItem(
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFSliderHorizontal3),
+                    title = { Text(stringResource(R.string.advanced)) },
+                    description = { Text(stringResource(R.string.advanced_settings_desc)) },
                     onClick = { navController.navigate("settings/appearance/liquidglass") }
                 )
             )
@@ -473,7 +528,7 @@ fun AppearanceSettings(
             items = buildList {
                 add(
                     IosSettingsItem(
-                        icon = painterResource(R.drawable.speed),
+                        icon = rememberVectorPainter(SfSymbols.Monochrome.SFGaugeWithNeedle),
                         title = { Text(stringResource(R.string.enable_high_refresh_rate)) },
                         description = { Text(stringResource(R.string.enable_high_refresh_rate_desc)) },
                         trailingContent = {
@@ -540,6 +595,18 @@ fun AppearanceSettings(
                         Text(summary)
                     },
                     onClick = { navController.navigate("settings/appearance/canvas") }
+                ),
+                IosSettingsItem(
+                    icon = painterResource(R.drawable.slow_motion_video),
+                    title = { Text(stringResource(R.string.show_album_canvas)) },
+                    description = { Text(stringResource(R.string.show_album_canvas_desc)) },
+                    trailingContent = {
+                        Switch(
+                            checked = albumCanvasEnabled,
+                            onCheckedChange = onAlbumCanvasEnabledChange
+                        )
+                    },
+                    onClick = { onAlbumCanvasEnabledChange(!albumCanvasEnabled) }
                 )
             )
         )
@@ -663,7 +730,32 @@ fun AppearanceSettings(
                         )
                     },
                     onClick = { onSwipeToRemoveSongChange(!swipeToRemoveSong) }
-                )
+                ),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    IosSettingsItem(
+                        icon = painterResource(R.drawable.language),
+                        title = { Text(stringResource(R.string.app_language)) },
+                        onClick = {
+                            activity.startActivity(
+                                Intent(
+                                    Settings.ACTION_APP_LOCALE_SETTINGS,
+                                    "package:${activity.packageName}".toUri()
+                                )
+                            )
+                        }
+                    )
+                } else {
+                    IosSettingsItem(
+                        icon = painterResource(R.drawable.language),
+                        title = { Text(stringResource(R.string.app_language)) },
+                        description = {
+                            Text(
+                                LanguageCodeToName.getOrElse(appLanguage) { stringResource(R.string.system_default) }
+                            )
+                        },
+                        onClick = { showAppLanguageDialog = true }
+                    )
+                }
             )
         )
 
@@ -705,7 +797,7 @@ fun AppearanceSettings(
             title = stringResource(R.string.auto_playlists),
             items = listOf(
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.favorite),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFStar),
                     title = { Text(stringResource(R.string.show_liked_playlist)) },
                     trailingContent = {
                         Switch(
@@ -716,7 +808,7 @@ fun AppearanceSettings(
                     onClick = { onShowLikedPlaylistChange(!showLikedPlaylist) }
                 ),
                 IosSettingsItem(
-                    icon = painterResource(R.drawable.offline),
+                    icon = rememberVectorPainter(SfSymbols.Monochrome.SFIcloudAndArrowDownFill),
                     title = { Text(stringResource(R.string.show_downloaded_playlist)) },
                     trailingContent = {
                         Switch(
@@ -778,20 +870,7 @@ fun AppearanceSettings(
         Spacer(modifier = Modifier.height(16.dp))
             }
         }
-    }
-
-        TopFadeBlur(
-            hazeState = hazeState,
-            pageColor = IosTheme.colors.systemGroupedBackground,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
-
-        FrostedTopBar(
-            onBack = { navController.navigateUp() },
-            title = stringResource(R.string.appearance),
-            titleAlpha = 1f,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+    
     }
 }
 

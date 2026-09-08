@@ -36,6 +36,10 @@ import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.SegmentedButton
 import com.convx.music.ui.ios.compat.SingleChoiceSegmentedButtonRow
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFListBullet
+import com.composables.sfsymbols.monochrome.SFSquareGrid2x2
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -354,12 +358,10 @@ fun LibraryMixScreen(
                         onClick = { viewType = type },
                         icon = {
                             Icon(
-                                painter = painterResource(
-                                    when (type) {
-                                        LibraryViewType.LIST -> R.drawable.list
-                                        LibraryViewType.GRID -> R.drawable.grid_view
-                                    }
-                                ),
+                                imageVector = when (type) {
+                                    LibraryViewType.LIST -> SfSymbols.Monochrome.SFListBullet
+                                    LibraryViewType.GRID -> SfSymbols.Monochrome.SFSquareGrid2x2
+                                },
                                 contentDescription = null,
                             )
                         },
@@ -709,7 +711,7 @@ fun LibraryMixScreen(
                                             },
                                         ) {
                                             Icon(
-                                                painter = painterResource(R.drawable.more_vert),
+                                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                                 contentDescription = null,
                                             )
                                         }
@@ -754,7 +756,7 @@ fun LibraryMixScreen(
                                             },
                                         ) {
                                             Icon(
-                                                painter = painterResource(R.drawable.more_vert),
+                                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                                 contentDescription = null,
                                             )
                                         }
@@ -801,7 +803,7 @@ fun LibraryMixScreen(
                                             },
                                         ) {
                                             Icon(
-                                                painter = painterResource(R.drawable.more_vert),
+                                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                                 contentDescription = null,
                                             )
                                         }

@@ -9,6 +9,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -65,6 +66,7 @@ import com.convx.music.constants.EnableLrcLibKey
 import com.convx.music.constants.EnableMusixmatchKey
 import com.convx.music.constants.EnablePaxsenixKey
 import com.convx.music.constants.EnableSimpMusicKey
+import com.convx.music.constants.EnableUnisonKey
 import com.convx.music.constants.EnableYouLyPlusKey
 import com.convx.music.constants.IpVersionKey
 import com.convx.music.constants.LyricsProviderOrderKey
@@ -135,6 +137,7 @@ fun ContentAdvancedSettings(
     val (enableYouLyPlus, onEnableYouLyPlusChange) = rememberPreference(key = EnableYouLyPlusKey, defaultValue = true)
     val (enablePaxsenix, onEnablePaxsenixChange) = rememberPreference(key = EnablePaxsenixKey, defaultValue = true)
     val (enableMusixmatch, onEnableMusixmatchChange) = rememberPreference(key = EnableMusixmatchKey, defaultValue = true)
+    val (enableUnison, onEnableUnisonChange) = rememberPreference(key = EnableUnisonKey, defaultValue = true)
     val (lyricsProviderOrder, onLyricsProviderOrderChange) = rememberPreference(key = LyricsProviderOrderKey, defaultValue = "")
 
     val (lengthTop, onLengthTopChange) = rememberPreference(key = TopSize, defaultValue = "50")
@@ -293,14 +296,27 @@ fun ContentAdvancedSettings(
 
     if (showProviderPriorityDialog) {
         val defaultOrder = LyricsProviderRegistry.getDefaultProviderOrder()
-        val enabledProviders = setOfNotNull(
-            "LrcLib".takeIf { enableLrclib },
-            "Kugou".takeIf { enableKugou },
-            "BetterLyrics".takeIf { enableBetterLyrics },
-            "SimpMusic".takeIf { enableSimpMusic },
-            "YouLyPlus".takeIf { enableYouLyPlus },
-            "Paxsenix".takeIf { enablePaxsenix },
-            "Musixmatch".takeIf { enableMusixmatch },
+        // Task 011: presence/order in this single list is now the only control --
+        // the 7 separate enable switches were removed from the settings list above.
+        val enabledSetters = mapOf(
+            "LrcLib" to onEnableLrclibChange,
+            "Kugou" to onEnableKugouChange,
+            "BetterLyrics" to onEnableBetterLyricsChange,
+            "SimpMusic" to onEnableSimpMusicChange,
+            "YouLyPlus" to onEnableYouLyPlusChange,
+            "Paxsenix" to onEnablePaxsenixChange,
+            "Musixmatch" to onEnableMusixmatchChange,
+            "Unison" to onEnableUnisonChange,
+        )
+        val enabledStates = mapOf(
+            "LrcLib" to enableLrclib,
+            "Kugou" to enableKugou,
+            "BetterLyrics" to enableBetterLyrics,
+            "SimpMusic" to enableSimpMusic,
+            "YouLyPlus" to enableYouLyPlus,
+            "Paxsenix" to enablePaxsenix,
+            "Musixmatch" to enableMusixmatch,
+            "Unison" to enableUnison,
         )
 
         val savedOrder = LyricsProviderRegistry.deserializeProviderOrder(lyricsProviderOrder)
@@ -309,15 +325,15 @@ fun ContentAdvancedSettings(
         val lyricsIcon = painterResource(R.drawable.lyrics)
         val draggableItems = remember { mutableStateListOf<DraggableLyricsProviderItem>() }
 
-        LaunchedEffect(normalizedOrder, enabledProviders) {
-            val orderedEnabled = normalizedOrder.filter { it in enabledProviders }
+        LaunchedEffect(normalizedOrder, enabledStates) {
             draggableItems.clear()
             draggableItems.addAll(
-                orderedEnabled.map { name ->
+                normalizedOrder.map { name ->
                     DraggableLyricsProviderItem(
                         id = name,
                         name = LyricsProviderRegistry.getDisplayName(name),
                         icon = lyricsIcon,
+                        enabled = enabledStates[name] ?: true,
                     )
                 }
             )
@@ -397,11 +413,12 @@ fun ContentAdvancedSettings(
                         DraggableLyricsProviderList(
                             items = draggableItems,
                             onItemsReordered = { reordered ->
-                                val enabledOrder = reordered.map { it.id }
-                                val rest = normalizedOrder.filter { it !in enabledProviders }
                                 onLyricsProviderOrderChange(
-                                    LyricsProviderRegistry.serializeProviderOrder(enabledOrder + rest)
+                                    LyricsProviderRegistry.serializeProviderOrder(reordered.map { it.id })
                                 )
+                            },
+                            onToggleEnabled = { id ->
+                                enabledSetters[id]?.invoke(!(enabledStates[id] ?: true))
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -537,11 +554,11 @@ fun ContentAdvancedSettings(
         )
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.advanced),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
         IosSettingsGroup(
             title = stringResource(R.string.artist_page_settings),
@@ -645,67 +662,6 @@ fun ContentAdvancedSettings(
             items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.lyrics),
-                    title = { Text(stringResource(R.string.enable_lrclib)) },
-                    trailingContent = {
-                        Switch(checked = enableLrclib, onCheckedChange = onEnableLrclibChange)
-                    },
-                    onClick = { onEnableLrclibChange(!enableLrclib) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.lyrics),
-                    title = { Text(stringResource(R.string.enable_kugou)) },
-                    trailingContent = {
-                        Switch(checked = enableKugou, onCheckedChange = onEnableKugouChange)
-                    },
-                    onClick = { onEnableKugouChange(!enableKugou) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.lyrics),
-                    title = { Text(stringResource(R.string.enable_better_lyrics)) },
-                    description = { Text(stringResource(R.string.enable_better_lyrics_desc)) },
-                    trailingContent = {
-                        Switch(checked = enableBetterLyrics, onCheckedChange = onEnableBetterLyricsChange)
-                    },
-                    onClick = { onEnableBetterLyricsChange(!enableBetterLyrics) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.lyrics),
-                    title = { Text(stringResource(R.string.enable_simpmusic)) },
-                    description = { Text(stringResource(R.string.enable_simpmusic_desc)) },
-                    trailingContent = {
-                        Switch(checked = enableSimpMusic, onCheckedChange = onEnableSimpMusicChange)
-                    },
-                    onClick = { onEnableSimpMusicChange(!enableSimpMusic) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.lyrics),
-                    title = { Text("YouLyPlus") },
-                    description = { Text("LyricsPlus multi-server provider (YouLy+ extension backend)") },
-                    trailingContent = {
-                        Switch(checked = enableYouLyPlus, onCheckedChange = onEnableYouLyPlusChange)
-                    },
-                    onClick = { onEnableYouLyPlusChange(!enableYouLyPlus) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.lyrics),
-                    title = { Text("PaxSenix") },
-                    description = { Text("Apple Music quality synced lyrics with syllable-level timing") },
-                    trailingContent = {
-                        Switch(checked = enablePaxsenix, onCheckedChange = onEnablePaxsenixChange)
-                    },
-                    onClick = { onEnablePaxsenixChange(!enablePaxsenix) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.lyrics),
-                    title = { Text("Musixmatch") },
-                    description = { Text("Widely used synced lyrics catalog") },
-                    trailingContent = {
-                        Switch(checked = enableMusixmatch, onCheckedChange = onEnableMusixmatchChange)
-                    },
-                    onClick = { onEnableMusixmatchChange(!enableMusixmatch) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.lyrics),
                     title = { Text(stringResource(R.string.lyrics_provider_priority)) },
                     description = { Text(stringResource(R.string.lyrics_provider_priority_desc)) },
                     onClick = { showProviderPriorityDialog = true },
@@ -768,23 +724,8 @@ fun ContentAdvancedSettings(
             )
         )
         Spacer(modifier = Modifier.height(16.dp))
+    
     }
-
-    TopAppBar(
-        windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.advanced)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null
-                )
-            }
-        }
-    )
 }
 
 /**

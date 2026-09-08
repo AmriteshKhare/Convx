@@ -2,6 +2,8 @@
 
 package com.convx.music.vivimusic
 
+import com.convx.music.ui.ios.foundation.IosTheme
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
@@ -160,7 +162,8 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
     var audioDevices by remember { mutableStateOf<List<AudioDevice>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Opens to the partial detent first (readable half-sheet); swipe up for full.
+    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
     var currentVolume by remember {
@@ -304,13 +307,25 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = bottomSheetState,
+        containerColor = IosTheme.colors.secondarySystemGroupedBackground,
+        contentColor = IosTheme.colors.label,
+        shape = ContinuousRoundedRectangle(24.dp),
+        dragHandle = {
+            Surface(
+                modifier = Modifier.padding(top = 10.dp, bottom = 6.dp),
+                color = IosTheme.colors.systemGray3,
+                shape = CircleShape
+            ) {
+                Box(Modifier.size(width = 36.dp, height = 5.dp))
+            }
+        },
         modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
+                .padding(horizontal = 20.dp)
+                .padding(top = 8.dp, bottom = 24.dp)
                 .animateContentSize()
         ) {
             when {
@@ -798,7 +813,6 @@ fun AudioQualitySelector(context: Context) {
 
         SingleChoiceSegmentedButtonRow(
             modifier = Modifier
-                .padding(horizontal = 16.dp)
                 .padding(vertical = 8.dp)
                 .fillMaxWidth(),
         ) {

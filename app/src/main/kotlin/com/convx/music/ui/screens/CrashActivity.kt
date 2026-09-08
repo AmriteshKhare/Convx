@@ -36,13 +36,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
+import com.composables.sfsymbols.monochrome.SFSquareOnSquare
+import com.composables.sfsymbols.monochrome.SFXmark
 import com.convx.music.ui.theme.vivimusicTheme
 import com.convx.music.utils.CrashHandler
 import java.io.File
@@ -136,20 +139,21 @@ fun CrashScreen(
                 actions = {
                     IconButton(onClick = onCopy) {
                         Icon(
-                            painter = painterResource(R.drawable.content_copy),
+                            imageVector = SfSymbols.Monochrome.SFSquareOnSquare,
                             contentDescription = stringResource(R.string.copy_logs)
                         )
                     }
                     IconButton(onClick = onClose) {
                         Icon(
-                            painter = painterResource(R.drawable.close),
+                            imageVector = SfSymbols.Monochrome.SFXmark,
                             contentDescription = stringResource(R.string.crash_close)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = AppTheme.colorScheme.surface
-                )
+                ),
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
             )
         },
         floatingActionButton = {
@@ -157,7 +161,7 @@ fun CrashScreen(
                 onClick = onShare,
                 icon = {
                     Icon(
-                        painter = painterResource(R.drawable.share),
+                        imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                         contentDescription = null
                     )
                 },
@@ -172,7 +176,7 @@ fun CrashScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             Text(

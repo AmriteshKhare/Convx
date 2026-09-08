@@ -128,16 +128,27 @@ object MusixmatchClient {
         return body.message.body?.trackList?.map { it.track } ?: emptyList()
     }
 
+    /** Strips parenthetical/bracket tags and punctuation so remix/feat. tags and
+     * "A, B & C" artist lists don't defeat title/artist matching. */
+    private fun cleanText(text: String): String =
+        text.replace(",", " ").replace("&", " ")
+            .replace(Regex("\\(.*?\\)"), "")
+            .replace(Regex("\\[.*?\\]"), "")
+            .lowercase(Locale.US)
+            .replace(Regex("[^a-z0-9 ]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
     private fun scoreTrack(track: MxmTrack, title: String, artist: String, duration: Int): Double {
         var score = 0.0
-        val trackName = track.trackName.trim().lowercase()
-        val targetTitle = title.trim().lowercase()
+        val trackName = cleanText(track.trackName)
+        val targetTitle = cleanText(title)
         score += when {
             trackName == targetTitle -> 80.0
             trackName.contains(targetTitle) || targetTitle.contains(trackName) -> 40.0
             else -> 0.0
         }
-        if (track.artistName.trim().lowercase().contains(artist.trim().lowercase())) score += 40.0
+        if (cleanText(track.artistName).contains(cleanText(artist))) score += 40.0
 
         track.trackLength?.let { len ->
             val diff = abs(len - duration)

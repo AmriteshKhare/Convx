@@ -478,13 +478,14 @@ class CupertinoSheetState(
         val targetValue =
             when (presentationStyle) {
                 is PresentationStyle.Fullscreen -> CupertinoSheetValue.Expanded
-                is PresentationStyle.Modal ->
-                    if (presentationStyle.detents.size == 1) {
-                        CupertinoSheetValue.Expanded
+                is PresentationStyle.Modal -> {
+                    val partialDetent = presentationStyle.detents.firstOrNull { it !is PresentationDetent.Large }
+                    if (partialDetent != null) {
+                        CupertinoSheetValue.PartiallyExpanded(partialDetent)
                     } else {
-                        swipeableState.anchors.keys.firstOrNull { it is CupertinoSheetValue.PartiallyExpanded }
-                            ?: CupertinoSheetValue.Expanded
+                        CupertinoSheetValue.Expanded
                     }
+                }
             }
         animateTo(targetValue)
     }

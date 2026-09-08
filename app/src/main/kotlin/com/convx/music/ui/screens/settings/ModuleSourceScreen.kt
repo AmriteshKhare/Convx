@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,9 +35,9 @@ import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.OutlinedTextField
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,7 +65,6 @@ import com.convx.music.constants.ModuleSourcesKey
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.ModernSwitch
 import com.convx.music.ui.theme.AppleTokens
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.rememberPreference
 import com.music.spine.ModuleManager
@@ -143,33 +143,11 @@ fun ModuleSourceScreen(
         saveSources(sourceUrls.filter { it != url })
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal)
-            )
-            .fillMaxSize()
+    SettingsLazyPage(
+        navController = navController,
+        title = stringResource(R.string.module_sources),
+        pageColor = AppTheme.colorScheme.background,
     ) {
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .windowInsetsPadding(
-                    LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom)
-                )
-        ) {
-            item {
-                Spacer(
-                    Modifier.windowInsetsPadding(
-                        LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)
-                    )
-                )
-                Text(
-                    text = stringResource(R.string.module_sources),
-                    style = AppTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = AppTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(start = 20.dp, top = 24.dp, bottom = 8.dp)
-                )
-            }
 
             item {
                 Text(
@@ -354,7 +332,6 @@ fun ModuleSourceScreen(
             item {
                 Spacer(Modifier.height(80.dp))
             }
-        }
     }
 
     if (showAddDialog) {
@@ -400,22 +377,6 @@ fun ModuleSourceScreen(
             },
         )
     }
-
-    TopAppBar(
-        windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.module_sources)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain,
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
-            }
-        },
-    )
 }
 
 /**

@@ -7,6 +7,7 @@ import android.media.session.PlaybackState
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.res.painterResource
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +50,10 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFPlus
+import com.composables.sfsymbols.monochrome.SFSliderHorizontal3
+import com.composables.sfsymbols.monochrome.SFTrash
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.convx.music.eq.data.SavedEQProfile
@@ -239,19 +243,19 @@ private fun EqScreenContent(
                 Row {
                     IconButton(onClick = onNavigateToAxion) {
                         Icon(
-                            painter = painterResource(R.drawable.tune),
+                            imageVector = SfSymbols.Monochrome.SFSliderHorizontal3,
                             contentDescription = stringResource(R.string.vivi_equalizer)
                         )
                     }
                     IconButton(onClick = onImportCustomEQ) {
                         Icon(
-                            painter = painterResource(R.drawable.add),
+                            imageVector = SfSymbols.Monochrome.SFPlus,
                             contentDescription = stringResource(R.string.import_profile)
                         )
                     }
                     IconButton(onClick = onOpenSystemEqualizer) {
                         Icon(
-                            painter = painterResource(R.drawable.equalizer),
+                            imageVector = SfSymbols.Monochrome.SFSliderHorizontal3,
                             contentDescription = stringResource(R.string.system_equalizer)
                         )
                     }

@@ -38,6 +38,7 @@ import com.convx.music.ui.component.IosSettingsItem
 import com.convx.music.ui.utils.backToMain
 import kotlin.math.abs
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
+import com.convx.music.ui.component.ScreenPage
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -49,32 +50,12 @@ fun AxionEqScreen(
     val bandGains by viewModel.bandGains.collectAsState()
     val mode by viewModel.mode.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.vivi_equalizer)) },
-                navigationIcon = {
-                    com.convx.music.ui.component.IconButton(
-                        onClick = onBackClick,
-                        onLongClick = {}
-                    ) {
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(R.drawable.arrow_back),
-                            contentDescription = null
-                        )
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+    ScreenPage(
+        title = stringResource(R.string.vivi_equalizer),
+        onBack = onBackClick,
+        horizontalPadding = 16.dp,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
             IosSettingsGroup(
                 items = listOf(
                     IosSettingsItem(
@@ -158,7 +139,6 @@ fun AxionEqScreen(
             }
 
             Spacer(modifier = Modifier.height(60.dp))
-        }
     }
 }
 

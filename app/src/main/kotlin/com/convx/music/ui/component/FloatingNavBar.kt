@@ -19,6 +19,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -85,6 +86,7 @@ import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.additiveChrome
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // Kyant0/Capsule's continuous (superellipse) capsule instead of a circular-arc
 // RoundedCornerShape — smoother corners, and lerp-able for the puck's
@@ -321,6 +323,23 @@ private fun AppFloatingNavBarChrome(
         pureBlack -> Color.White
         else -> AppTheme.colorScheme.onSurface
     }
+    // Whole-bar snap thump: the mini fires onSnapRelease on drag release and
+    // the bar answers with one small bouncy scale, so the snap reads as
+    // shared between accessory and bar rather than the pill alone.
+    val chromeScope = rememberCoroutineScope()
+    val snapPulse = remember { Animatable(0f) }
+    val onMiniSnapRelease: () -> Unit = {
+        chromeScope.launch {
+            snapPulse.snapTo(1f)
+            snapPulse.animateTo(
+                0f,
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+        }
+    }
     val inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? =
         if (showPlayerAccessory) {
             { accessoryModifier, _ ->
@@ -335,6 +354,7 @@ private fun AppFloatingNavBarChrome(
                     // fell back to a plain expand instead of opening the queue.
                     onLyricsClick = onAccessoryLyricsClick,
                     onQueueClick = onAccessoryQueueClick,
+                    onSnapRelease = onMiniSnapRelease,
                     modifier = accessoryModifier.then(tabBarContentModifier),
                 )
             }
@@ -350,6 +370,7 @@ private fun AppFloatingNavBarChrome(
                     onClick = onAccessoryClick,
                     onLyricsClick = onAccessoryLyricsClick,
                     onQueueClick = onAccessoryQueueClick,
+                    onSnapRelease = onMiniSnapRelease,
                     modifier = accessoryModifier.fillMaxWidth().then(tabBarContentModifier),
                 )
             }
@@ -376,6 +397,7 @@ private fun AppFloatingNavBarChrome(
             selectedTabKey = selectedTabKey,
             tabPosition = tabPosition,
             scrollConnection = scrollConnection,
+            snapPulse = { snapPulse.value },
             modifier = Modifier.fillMaxWidth(),
             tabBarContentModifier = tabBarContentModifier,
             inlineAccessory = inlineAccessory,

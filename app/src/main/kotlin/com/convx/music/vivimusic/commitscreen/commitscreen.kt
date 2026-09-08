@@ -52,7 +52,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFChevronLeft
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -177,7 +178,7 @@ fun CommitScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = navController::navigateUp) {
-                        Icon(painterResource(R.drawable.arrow_back), null)
+                        Icon(imageVector = SfSymbols.Monochrome.SFChevronLeft, null)
                     }
                 },
                 scrollBehavior = scrollBehavior

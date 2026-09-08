@@ -38,6 +38,10 @@ import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowClockwise
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFXmark
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -202,7 +206,7 @@ fun LibrarySongsScreen(
                 contentType = CONTENT_TYPE_HEADER,
             ) {
                 Row {
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(AppleTokens.Gutter))
                     FilterChip(
                         label = { Text(stringResource(R.string.songs)) },
                         selected = true,
@@ -211,7 +215,7 @@ fun LibrarySongsScreen(
                         shape = RoundedCornerShape(16.dp),
                         leadingIcon = {
                             Icon(
-                                painter = painterResource(R.drawable.close),
+                                imageVector = SfSymbols.Monochrome.SFXmark,
                                 contentDescription = ""
                             )
                         },
@@ -341,7 +345,7 @@ fun LibrarySongsScreen(
                         Spacer(Modifier.weight(1f))
                         Button(onClick = { viewModel.scanLocalFiles() }) {
                             Icon(
-                                painter = painterResource(R.drawable.refresh),
+                                imageVector = SfSymbols.Monochrome.SFArrowClockwise,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -427,7 +431,7 @@ fun LibrarySongsScreen(
                             },
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.more_vert),
+                                imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = null,
                             )
                         }

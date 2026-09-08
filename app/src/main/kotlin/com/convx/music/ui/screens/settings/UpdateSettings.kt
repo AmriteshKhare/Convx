@@ -1,7 +1,7 @@
 package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
@@ -28,11 +28,10 @@ import androidx.compose.material3.SwitchDefaults
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.LaunchedEffect
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -44,6 +43,7 @@ import androidx.compose.runtime.remember
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
 import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalContext
@@ -137,11 +137,11 @@ fun UpdateSettings(
         UpdateInfoDialog(onDismiss = { showInfoDialog = false })
     }
 
-    Column(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+    SettingsPage(
+        navController = navController,
+        title = stringResource(R.string.update_settings_title),
+        pageColor = AppTheme.colorScheme.background,
+        horizontalPadding = 16.dp,
     ) {
         IosSettingsGroup(
             title = stringResource(R.string.app_updates_title),
@@ -314,21 +314,6 @@ fun UpdateSettings(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+    
     }
-
-    TopAppBar(
-            windowInsets = appTopBarWindowInsets(),
-        title = { Text(stringResource(R.string.update_settings_title)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null
-                )
-            }
-        }
-    )
 }

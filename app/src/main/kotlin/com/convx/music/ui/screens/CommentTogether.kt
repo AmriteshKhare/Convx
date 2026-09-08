@@ -26,7 +26,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -40,6 +39,11 @@ import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFBubbleLeftAndBubbleRight
+import com.composables.sfsymbols.monochrome.SFChevronLeft
+import com.composables.sfsymbols.monochrome.SFPaperplane
+import com.composables.sfsymbols.monochrome.SFXmark
 import com.convx.music.listentogether.ChatMessagePayload
 import com.convx.music.listentogether.RepliedMessage
 import androidx.compose.ui.text.*
@@ -94,7 +98,7 @@ fun CommentTogetherScreen(navController: NavController) {
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(painterResource(R.drawable.arrow_back), contentDescription = null)
+                        Icon(imageVector = SfSymbols.Monochrome.SFChevronLeft, contentDescription = null)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -157,7 +161,7 @@ fun CommentTogetherScreen(navController: NavController) {
                                 }
                                 IconButton(onClick = { replyingTo = null }) {
                                     Icon(
-                                        painter = painterResource(R.drawable.close),
+                                        imageVector = SfSymbols.Monochrome.SFXmark,
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -366,7 +370,7 @@ private fun ChatInputArea(
                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.send_chat),
+                    imageVector = SfSymbols.Monochrome.SFPaperplane,
                     contentDescription = stringResource(R.string.send),
                     modifier = Modifier.size(24.dp)
                 )
@@ -397,7 +401,7 @@ private fun EmptyChatPlaceholder() {
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                painter = painterResource(R.drawable.chat_msg),
+                imageVector = SfSymbols.Monochrome.SFBubbleLeftAndBubbleRight,
                 contentDescription = null,
                 tint = AppTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(56.dp)

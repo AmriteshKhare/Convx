@@ -37,6 +37,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
+import com.composables.sfsymbols.monochrome.SFBellFill
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -272,7 +275,7 @@ fun OldPlayerMenu(
                     NewAction(
                         icon = {
                             Icon(
-                                painter = painterResource(R.drawable.share),
+                                imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
                                 tint = AppTheme.colorScheme.onSurfaceVariant
@@ -663,7 +666,7 @@ fun OldPlayerMenu(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
                                 Icon(
-                                    painter = painterResource(R.drawable.notification),
+                                    imageVector = SfSymbols.Monochrome.SFBellFill,
                                     contentDescription = null,
                                     modifier = Modifier.size(24.dp)
                                 )

@@ -28,6 +28,8 @@ import com.convx.music.ui.ios.compat.ProvideTextStyle
 import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Color
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.ios.foundation.IosTheme
@@ -68,9 +70,15 @@ fun DefaultDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier
+                .padding(24.dp)
+                .border(
+                    width = 0.5.dp,
+                    color = Color.White.copy(alpha = 0.15f),
+                    shape = ContinuousRoundedRectangle(30.dp)
+                ),
             shape = ContinuousRoundedRectangle(30.dp),
-            color = IosTheme.colors.systemBackground,
+            color = IosTheme.colors.secondarySystemGroupedBackground,
         ) {
             Column(
                 horizontalAlignment = horizontalAlignment,
@@ -193,7 +201,13 @@ fun ListDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier
+                .padding(24.dp)
+                .border(
+                    width = 0.5.dp,
+                    color = Color.White.copy(alpha = 0.15f),
+                    shape = ContinuousRoundedRectangle(30.dp)
+                ),
             shape = ContinuousRoundedRectangle(30.dp),
             color = IosTheme.colors.systemBackground,
         ) {
