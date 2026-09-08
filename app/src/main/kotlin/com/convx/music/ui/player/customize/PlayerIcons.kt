@@ -25,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -225,6 +227,34 @@ fun PlayerGlyph(
 }
 
 /**
+ * [PlayerGlyph] variant rendering an SF Symbol ([ImageVector]) as the stock glyph instead of a
+ * [androidx.annotation.DrawableRes]. Custom-image overrides for [slot] still win; only the default
+ * glyph source differs.
+ */
+@Composable
+fun PlayerGlyph(
+    slot: PlayerIconSlot?,
+    fallbackVector: ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+) {
+    val resolved = if (slot != null) rememberPlayerIcon(slot) else null
+    val painter = resolved?.painter ?: rememberVectorPainter(fallbackVector)
+    val filter = when {
+        resolved == null -> ColorFilter.tint(tint)
+        else -> resolved.colorFilterFor(tint)
+    }
+    Image(
+        painter = painter,
+        contentDescription = contentDescription,
+        contentScale = ContentScale.Fit,
+        colorFilter = filter,
+        modifier = modifier,
+    )
+}
+
+/**
  * [PlayerGlyph] for the play/pause button, popping between the two states instead of cutting.
  *
  * Flamingo's transport: the outgoing glyph shrinks to a third of its size as it fades, and
@@ -270,6 +300,49 @@ fun AnimatedPlayerGlyph(
         PlayerGlyph(
             slot = if (playing) pauseSlot else playSlot,
             fallback = if (playing) pauseFallback else playFallback,
+            tint = tint,
+            contentDescription = if (playing) pauseDescription else playDescription,
+            modifier = if (explicitSize != null) Modifier.size(explicitSize) else Modifier.fillMaxSize(),
+        )
+    }
+}
+
+/**
+ * [AnimatedPlayerGlyph] vector-fallback variant — see the [ImageVector] overload of [PlayerGlyph].
+ */
+@Composable
+fun AnimatedPlayerGlyph(
+    isPlaying: Boolean,
+    playSlot: PlayerIconSlot?,
+    pauseSlot: PlayerIconSlot?,
+    playFallbackVector: ImageVector,
+    pauseFallbackVector: ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+    playDescription: String? = null,
+    pauseDescription: String? = null,
+    playSize: androidx.compose.ui.unit.Dp? = null,
+    pauseSize: androidx.compose.ui.unit.Dp? = null,
+) {
+    AnimatedContent(
+        targetState = isPlaying,
+        transitionSpec = {
+            // 0.3 rather than a polite 0.85: at this scale the pop is the whole gesture, and
+            // a small one is indistinguishable from a plain cut.
+            (scaleIn(tween(200, easing = FastOutSlowInEasing), initialScale = 0.3f) + fadeIn(tween(200)))
+                .togetherWith(
+                    scaleOut(tween(160, easing = FastOutSlowInEasing), targetScale = 0.3f) + fadeOut(tween(160)),
+                )
+                .using(SizeTransform(clip = false))
+        },
+        contentKey = { it },
+        label = "player_play_pause",
+        modifier = modifier,
+    ) { playing ->
+        val explicitSize = if (playing) pauseSize else playSize
+        PlayerGlyph(
+            slot = if (playing) pauseSlot else playSlot,
+            fallbackVector = if (playing) pauseFallbackVector else playFallbackVector,
             tint = tint,
             contentDescription = if (playing) pauseDescription else playDescription,
             modifier = if (explicitSize != null) Modifier.size(explicitSize) else Modifier.fillMaxSize(),
