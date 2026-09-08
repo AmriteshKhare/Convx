@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -72,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import com.convx.music.R
 import com.convx.music.constants.SearchSource
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
+import com.convx.music.ui.component.elasticStretchLayerBlock
 import com.convx.music.ui.player.FloatingMiniPlayer
 import com.convx.music.ui.screens.Screens
 import com.convx.music.ui.screens.search.DynamicSearchPlaceholder
@@ -81,6 +83,7 @@ import com.convx.music.ui.component.floatingtabbar.FloatingTabBarDefaults
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBarScrollConnection
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.utils.bounceClick
+import com.convx.music.ui.utils.additiveChrome
 import kotlinx.coroutines.delay
 
 // Kyant0/Capsule's continuous (superellipse) capsule instead of a circular-arc
@@ -407,6 +410,7 @@ private fun AppFloatingNavBarChrome(
                         state = navSearch,
                         contentColor = accessoryContentColor,
                         modifier = contentModifier,
+                        useGlass = useGlass,
                     )
                 }
             } else {
@@ -426,6 +430,7 @@ private fun AppFloatingNavBarChrome(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 12.sp,
+                            modifier = Modifier.additiveChrome(useGlass && !isSelected),
                         )
                     },
                     icon = {
@@ -435,7 +440,7 @@ private fun AppFloatingNavBarChrome(
                             ),
                             contentDescription = stringResource(screen.titleId),
                             tint = if (isSelected) selectedContentColor else unselectedContentColor,
-                            modifier = Modifier.size(34.dp),
+                            modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected),
                         )
                     },
                     onClick = {
@@ -463,6 +468,7 @@ private fun AppFloatingNavBarChrome(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 12.sp,
+                            modifier = Modifier.additiveChrome(useGlass && !isSelected),
                         )
                     },
                     icon = {
@@ -472,7 +478,7 @@ private fun AppFloatingNavBarChrome(
                             ),
                             contentDescription = stringResource(screen.titleId),
                             tint = if (isSelected) selectedContentColor else unselectedContentColor,
-                            modifier = Modifier.size(34.dp),
+                            modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected),
                         )
                     },
                     onClick = {
@@ -502,6 +508,7 @@ private fun SearchBarPlaceholder(
     state: NavSearchState,
     contentColor: Color,
     modifier: Modifier,
+    useGlass: Boolean = true,
 ) {
     // Same finger-tracking glow as the keyboard-active pill (NavBarSearchInputBar)
     // and the normal search circle (ExpandedStandaloneTab/InlineStandaloneTab).
@@ -526,7 +533,7 @@ private fun SearchBarPlaceholder(
                 painter = painterResource(R.drawable.arrow_back),
                 contentDescription = stringResource(R.string.dismiss),
                 tint = contentColor,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
             )
         }
         Box(Modifier.weight(1f)) {
@@ -551,7 +558,7 @@ private fun SearchBarPlaceholder(
                     ),
                     contentDescription = null,
                     tint = contentColor,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
                 )
             }
         }
@@ -609,6 +616,7 @@ fun NavBarSearchInputBar(
             .padding(horizontal = 16.dp)
             .padding(top = 6.dp, bottom = 2.dp)
             .height(NavBarSearchBarHeight)
+            .graphicsLayer(elasticStretchLayerBlock(pillGlow))
             .clip(pillShape)
             .then(
                 if (useGlass) {
@@ -635,7 +643,7 @@ fun NavBarSearchInputBar(
                 painter = painterResource(R.drawable.arrow_back),
                 contentDescription = stringResource(R.string.dismiss),
                 tint = onTint,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
             )
         }
         Box(modifier = Modifier.weight(1f)) {
@@ -688,7 +696,7 @@ fun NavBarSearchInputBar(
                     painter = painterResource(R.drawable.close),
                     contentDescription = null,
                     tint = onTint,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
                 )
             }
         }
@@ -708,7 +716,7 @@ fun NavBarSearchInputBar(
                     ),
                     contentDescription = null,
                     tint = onTint,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
                 )
             }
         }

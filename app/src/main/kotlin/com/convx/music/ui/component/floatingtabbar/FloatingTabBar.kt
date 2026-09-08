@@ -41,6 +41,7 @@ import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
@@ -133,10 +134,7 @@ import com.convx.music.ui.component.backdrop.shadow.Shadow
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.sign
-import kotlin.math.tanh
 
 
 
@@ -166,17 +164,12 @@ private const val PuckRestShadowAlpha = 0.35f
  *  actually settles. */
 private const val ScrollFreezeTailNs = 120_000_000L
 
-// Tuning for FloatingTabBarScrollConnection.momentumStretch(). Deliberately decoupled
-// from ScrollFreezeTailNs above (that one's about how long the glass backdrop stays
-// unrecaptured, a cost concern; this is about how long the spring visually takes to
-// settle, a feel concern -- tying them together is what made the original version
-// too short-lived to read as anything).
+// EMA weight for the scroll-velocity estimate the collapse/expand size
+// morph reads to pick its spring. Plain value, no recomposition.
 private const val MomentumVelocityEmaAlpha = 0.35f
-private const val MomentumVelocityDivisor = 60f
-private const val MomentumLiveWindowNs = 48_000_000L
-private const val MomentumSpringWindowNs = 450_000_000L
-private const val MomentumSpringZeta = 0.22f
-private const val MomentumSpringOmega = 14f
+
+// Per-event scroll speed above which the collapse morph goes loose/bouncy.
+private const val FastScrollSpeedPx = 120f
 
 // Vendored addition: the three shapes the bar can render. INLINE is the
 // scroll-collapsed row (unchanged by search mode); EXPANDED is the normal
@@ -187,16 +180,15 @@ private enum class FloatingTabBarVisual { INLINE, EXPANDED, SEARCH_EXPANDED }
 // Matches the established inline-row height (InlineStandaloneTab's own
 // defaultMinSize floor at the FloatingNavBar call site, and the inline mini
 // player's own ~48dp content height) so the search-expanded row doesn't read
-// shorter than the bar's own shrunk state.
-private val SearchBarRowHeight = 48.dp
+// shorter than the bar's own shrunk state. Also the shrunk mini player's
+// pinned height (see FloatingMiniPlayer) — one constant, same row height.
+internal val SearchBarRowHeight = 48.dp
 
-// The standalone tab's outer size is fixed by the row's aspectRatio, and the
-// parent AnimatedContent(SizeTransform(clip = true)) clips to exactly that
-// box — so elasticStretchLayerBlock's press/drag overshoot (a draw-only
-// graphicsLayer transform, doesn't grow the layout box) got sliced at the
-// bar's edge instead of protruding. Insetting the circle by this much before
-// it sizes/clips itself reserves the room to grow into without touching the
-// outer bounds AnimatedContent actually clips.
+// The standalone tab's outer size is fixed by the row's aspectRatio. Insetting
+// the circle by this much before it sizes itself reserves room for
+// elasticStretchLayerBlock's press/drag overshoot (a draw-only graphicsLayer
+// transform) to grow into; anything past that paints outside the bar, which is
+// unclipped on purpose.
 private val StandaloneTabOvershootInset = 3.dp
 
 /**
@@ -324,10 +316,9 @@ fun FloatingTabBar(
         }
         CompositionLocalProvider(LocalTabBarBackdropFrozen provides frozenWhileAnimating) {
             // Shape morph, not a crossfade: SizeTransform makes the container itself
-            // grow/shrink between the inline and expanded bounds (clip = true, so
-            // each bar is actually cropped by the animating rect, not just faded in
-            // place at its own full size) — that continuous resize is what reads as
-            // one pill becoming the other instead of two static shapes dissolving.
+            // grow/shrink between the inline and expanded bounds (clip = false, so
+            // per-item elastic stretch can protrude past the animating rect) — that
+            // continuous resize is what reads as one pill becoming the other.
             // gooey() then wraps the whole resizing container in one offscreen
             // layer (see GooeyTransition.kt), so the outgoing/incoming edges bleed
             // together through the blur and snap back to a crisp, molten seam
@@ -335,19 +326,9 @@ fun FloatingTabBar(
             Box(
                 Modifier
                     .gooey { if (meltTransitionEnabled) gooeyBlurPx * gooeyProgress else 0f }
-                    // Momentum squash/stretch: the whole bar reacts to scroll speed of
-                    // the content under it, like it's being tugged along and springing
-                    // back -- not a drag on the bar itself. Draw-phase only (graphicsLayer
-                    // block), reads the connection's plain-array momentumStretch(), same
-                    // no-recomposition contract as LocalTabBarBackdropFrozen above.
-                    .graphicsLayer {
-                        val stretch = scrollConnection.momentumStretch()
-                        // Fast scroll DOWN (bar collapsing, available.y negative) squashes
-                        // height and widens; fast scroll UP stretches taller and narrows --
-                        // matches the rubber-band read of "being pulled by the list".
-                        scaleY = 1f + stretch * 0.14f
-                        scaleX = 1f - stretch * 0.09f
-                    }
+                    // Unclipped so per-item elastic stretch can protrude past the
+                    // bar bounds instead of slicing at its edge.
+                    .graphicsLayer { clip = false }
             ) {
                 transition.AnimatedContent(
                     transitionSpec = {
@@ -355,8 +336,14 @@ fun FloatingTabBar(
                             (fadeIn(tween(GooeyDurationMs, easing = FastOutSlowInEasing)) togetherWith
                                 fadeOut(tween(GooeyDurationMs, easing = FastOutSlowInEasing)))
                                 .using(
-                                    SizeTransform(clip = true) { _, _ ->
-                                        tween(GooeyDurationMs, easing = FastOutSlowInEasing)
+                                    SizeTransform(clip = false) { _, _ ->
+                                        // Velocity-aware: a fast fling collapses on a
+                                        // loose spring, a slow drag on a stiff one.
+                                        // Return trip always settles bouncy.
+                                        spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = if (scrollConnection.scrollSpeed() > FastScrollSpeedPx) Spring.StiffnessLow else Spring.StiffnessMediumLow,
+                                        )
                                     }
                                 )
                         } else {
@@ -455,38 +442,16 @@ class FloatingTabBarScrollConnection(
     // re-invalidate the frame forever.
     private val scrollClockNs = longArrayOf(0L)
 
-    // Same plain-array technique for the bar's momentum stretch: an EMA'd scroll
-    // velocity plus the timestamp of the last event. Read only from a graphicsLayer
-    // block (draw phase), never from composition, so writing it every scroll event
-    // costs no recomposition.
+    // Same plain-array technique for scroll velocity: an EMA'd scroll delta
+    // plus the timestamp of the last event. Read only from a graphicsLayer
+    // block or transition spec (never composition), so writing it every
+    // scroll event costs no recomposition.
     private val smoothedVelocityPx = floatArrayOf(0f)
     private val lastDeltaClockNs = longArrayOf(0L)
 
-    /**
-     * How much the bar should squash/stretch right now, roughly -1f..1f.
-     *
-     * Two phases, both driven off the same [smoothedVelocityPx] value so there's no
-     * seam between them: while events are still arriving (mid-scroll/mid-fling) this
-     * live-tracks scroll speed directly; once they stop it free-decays as a damped
-     * spring released from wherever the live value left off -- `cos` rather than
-     * `sin` so the decay curve starts exactly at that value instead of jumping to
-     * it, and crossing zero on the way down is what reads as the actual "magnetic
-     * snap-back" overshoot instead of a flat relax to identity.
-     *
-     * The original version fed a single instantaneous [NestedScrollConnection]
-     * delta (typically well under 100px per event) through `tanh(delta / 260f)` and
-     * a linear decay -- both the divisor and a monotonic decay meant it never got
-     * anywhere near saturating or oscillating, so it was there but unfeelable.
-     */
-    fun momentumStretch(): Float {
-        val ageNs = System.nanoTime() - lastDeltaClockNs[0]
-        if (lastDeltaClockNs[0] == 0L || ageNs > MomentumLiveWindowNs + MomentumSpringWindowNs) return 0f
-        val seed = tanh(smoothedVelocityPx[0] / MomentumVelocityDivisor)
-        if (ageNs <= MomentumLiveWindowNs) return seed
-        val t = (ageNs - MomentumLiveWindowNs) / 1_000_000_000f
-        val envelope = exp(-MomentumSpringZeta * MomentumSpringOmega * t)
-        return seed * envelope * cos(MomentumSpringOmega * t)
-    }
+    // Magnitude of the current scroll velocity, px per scroll event. Drives
+    // only the collapse/expand morph spring stiffness, never any squash.
+    fun scrollSpeed(): Float = abs(smoothedVelocityPx[0])
 
     /**
      * True while the list under the bar is scrolling, and for [ScrollFreezeTailNs] after the
@@ -730,6 +695,7 @@ private fun SharedTransitionScope.InlineBar(
                 elevations = elevations,
                 animatedVisibilityScope = animatedVisibilityScope,
                 tabBarContentModifier = tabBarContentModifier,
+                // Shrunk home hugs its content; the row equalizes the rest.
                 modifier = Modifier
             )
         }
@@ -787,8 +753,16 @@ private fun SharedTransitionScope.InlineTab(
     modifier: Modifier,
     tabBarContentModifier: Modifier
 ) {
+    // Same finger-tracking stretch as the standalone circle, so the shrunk
+    // group tab distorts under the finger instead of sitting dead.
+    val glowScope = rememberCoroutineScope()
+    val glow = remember(glowScope) { InteractiveHighlight(animationScope = glowScope) }
+
     Box(
         modifier = modifier
+            // Outside sharedElement: draw-only, so bounds tracking is
+            // unaffected, and no overlay clipping can cut the stretch.
+            .graphicsLayer(elasticStretchLayerBlock(glow))
             .sharedElement(
                 sharedContentState = rememberSharedContentState("tabGroup"),
                 animatedVisibilityScope = animatedVisibilityScope,
@@ -802,8 +776,11 @@ private fun SharedTransitionScope.InlineTab(
                 color = colors.backgroundColor,
                 shape = shapes.tabBarShape
             )
-            .clip(shapes.tabBarShape)
+            // No clip: the background above already draws the pill shape, and
+            // any clip here would cut the outer elastic stretch back to bounds.
             .then(tabBarContentModifier)
+            .then(glow.gestureModifier)
+            .then(glow.modifier)
             .tapClickable(
                 indication = inlineTab.indication?.invoke(),
                 onClick = {
@@ -854,6 +831,9 @@ private fun SharedTransitionScope.InlineStandaloneTab(
         isStandalone = true,
         modifier = modifier
             .padding(StandaloneTabOvershootInset)
+            // Outside sharedElement: draw-only, so bounds tracking is
+            // unaffected, and no overlay clipping can cut the stretch.
+            .graphicsLayer(elasticStretchLayerBlock(glow))
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
                 animatedVisibilityScope = animatedVisibilityScope,
@@ -863,12 +843,12 @@ private fun SharedTransitionScope.InlineStandaloneTab(
                 shape = shapes.standaloneTabShape,
                 elevation = elevations.inlineElevation
             )
-            .graphicsLayer(elasticStretchLayerBlock(glow))
             .background(
                 color = colors.backgroundColor,
                 shape = shapes.standaloneTabShape
             )
-            .clip(shapes.standaloneTabShape)
+            // No clip: the background above already draws the circle, and
+            // any clip here would cut the outer elastic stretch back to bounds.
             .then(tabBarContentModifier)
             .then(glow.gestureModifier)
             .then(glow.modifier)
@@ -894,6 +874,7 @@ private fun SharedTransitionScope.InlineAccessory(
 ) {
     accessory?.let { accessory ->
         Box(
+            contentAlignment = Alignment.Center,
             modifier = modifier
                 .then(
                     if (isAccessoryShared) {
@@ -1065,6 +1046,10 @@ private fun SharedTransitionScope.SearchExpandedBar(
 ) {
     val inlineTab = scope.getInlineTab(selectedTabKey)
     val density = LocalDensity.current
+    // Stretch tracker for the search pill itself. Only the layer + gesture
+    // here, no glow draw — the placeholder inside paints its own light.
+    val searchStretchScope = rememberCoroutineScope()
+    val searchStretch = remember(searchStretchScope) { InteractiveHighlight(animationScope = searchStretchScope) }
     val targetWidthModifier = if (targetWidthPx != null && targetWidthPx > 0) {
         Modifier.width(with(density) { targetWidthPx.toDp() })
     } else {
@@ -1123,14 +1108,19 @@ private fun SharedTransitionScope.SearchExpandedBar(
                     // pill; this is what makes the tab-group icon side already morph
                     // smoothly, and lets the search-inline (scrolled) state morph back
                     // down to a circle too.
+                    // Elastic sits outside sharedElement: draw-only, so bounds
+                    // tracking is unaffected, and no overlay clipping cuts it.
+                    .graphicsLayer(elasticStretchLayerBlock(searchStretch))
                     .sharedElement(
                         sharedContentState = rememberSharedContentState("standaloneTab"),
                         animatedVisibilityScope = animatedVisibilityScope,
                         zIndexInOverlay = 1f
                     )
+                    .then(searchStretch.gestureModifier)
                     .shadow(shape = shapes.tabBarShape, elevation = elevations.expandedElevation)
                     .background(color = colors.backgroundColor, shape = shapes.tabBarShape)
-                    .clip(shapes.tabBarShape)
+                    // No clip: the background above already draws the pill, and
+                    // any clip here would cut the outer elastic stretch to bounds.
                     .then(tabBarContentModifier)
             )
         }
@@ -1160,6 +1150,9 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
         isStandalone = true,
         modifier = modifier
             .padding(StandaloneTabOvershootInset)
+            // Outside sharedElement: draw-only, so bounds tracking is
+            // unaffected, and no overlay clipping can cut the stretch.
+            .graphicsLayer(elasticStretchLayerBlock(glow))
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
                 animatedVisibilityScope = animatedVisibilityScope,
@@ -1169,12 +1162,12 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
                 shape = shapes.standaloneTabShape,
                 elevation = elevations.expandedElevation
             )
-            .graphicsLayer(elasticStretchLayerBlock(glow))
             .background(
                 color = colors.backgroundColor,
                 shape = shapes.standaloneTabShape
             )
-            .clip(shapes.standaloneTabShape)
+            // No clip: the background above already draws the circle, and
+            // any clip here would cut the outer elastic stretch back to bounds.
             .then(tabBarContentModifier)
             .then(glow.gestureModifier)
             .then(glow.modifier)
@@ -1703,9 +1696,6 @@ private fun SharedTransitionScope.ExpandedTabs(
                             layerBlock = {
                                 scaleX = dampedDragAnimation.scaleX
                                 scaleY = dampedDragAnimation.scaleY
-                                val velocity = dampedDragAnimation.velocity / 10f
-                                scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
-                                scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
                             },
                             onDrawSurface = {
                                 // What shows inside the puck is the hidden tinted tab

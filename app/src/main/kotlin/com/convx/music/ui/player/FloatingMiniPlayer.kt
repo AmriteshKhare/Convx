@@ -12,8 +12,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,7 +44,6 @@ import kotlinx.coroutines.isActive
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -55,13 +54,23 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFBackwardFill
+import com.composables.sfsymbols.monochrome.SFForwardFill
+import com.composables.sfsymbols.monochrome.SFListBullet
+import com.composables.sfsymbols.monochrome.SFQuoteBubble
+import com.composables.sfsymbols.monochrome.SFRepeat
+import com.composables.sfsymbols.monochrome.SFRepeat1
+import com.composables.sfsymbols.monochrome.SFShuffle
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastCoerceIn
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -82,8 +91,9 @@ import com.convx.music.extensions.togglePlayPause
 import com.convx.music.extensions.toggleRepeatMode
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.ui.component.ScrollingWaveformSeekBar
+import com.convx.music.ui.component.floatingtabbar.SearchBarRowHeight
 import com.convx.music.ui.component.rememberPlaybackFraction
-import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
+import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.utils.resize
 import com.convx.music.utils.rememberPreference
 import kotlin.math.abs
@@ -116,10 +126,19 @@ fun FloatingMiniPlayer(
     contentColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    // Gates additiveChrome on every icon here the same way the nav bar's own tab
+    // icons are gated -- additive only reads right over glass, not a flat surface.
+    useGlass: Boolean = true,
     onLyricsClick: (() -> Unit)? = null,
     onQueueClick: (() -> Unit)? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    // Transport glyphs are solid (filled) shapes; at full source alpha their
+    // double Plus pass clips every covered pixel to pure white (see FloatingNavBar
+    // tab icons -- hollow strokes leave backdrop hue to read through). Cut the
+    // additive source so the second pass stays under the clip ceiling and the
+    // ambient tint survives like the tab icons do.
+    val transportTint = if (useGlass) contentColor.copy(alpha = 0.45f) else contentColor
     val context = LocalContext.current
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
@@ -146,6 +165,9 @@ fun FloatingMiniPlayer(
     val densityScale = density.density
 
     val offsetXAnimatable = remember { Animatable(0f) }
+    // Raw finger travel for the pill stretch. Updated on every drag event,
+    // skip allowed or not, so the pill always follows the finger.
+    val stretchDragX = remember { Animatable(0f) }
     var dragStartTime by remember { mutableLongStateOf(0L) }
     var totalDragDistance by remember { mutableFloatStateOf(0f) }
     // Underdamped on purpose: releasing the pill (drag-cancel, or after a skip
@@ -164,19 +186,28 @@ fun FloatingMiniPlayer(
         (screenWidthPx * (0.45f - 0.33f * swipeSensitivity.coerceIn(0f, 1f))).roundToInt()
     }
 
-    // iOS 26 style press response: the whole glass pill grows slightly while touched.
+    // Pill press state. One scale path only (the stretch below): a second
+    // press scale on top of it beat at a different spring and read as fighting.
     val pressInteractionSource = remember { MutableInteractionSource() }
     val isPressed by pressInteractionSource.collectIsPressedAsState()
-    val pressScale by animateFloatAsState(
-        targetValue = if (isPressed) 1.04f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "accessoryPressScale",
+    // Hold ramp for the pill stretch below. Same curve the nav pills use.
+    val stretchPress by animateFloatAsState(
+        targetValue = if (isPressed) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f),
+        label = "miniStretchPress",
     )
-
-    // Same finger-tracking glow as the nav bar's drag puck (ported from Kyant0's
-    // catalog). Its gesture tracking never consumes pointer events, so it's safe
-    // stacked alongside the swipe-to-skip drag detector and the click below.
-    val interactiveHighlight = remember(coroutineScope) { InteractiveHighlight(animationScope = coroutineScope) }
+    // Single tap opens; a hold does not. The row click below fires on any
+    // release, so gate it on press duration here.
+    val viewConfig = LocalViewConfiguration.current
+    var pressStartMs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(pressInteractionSource) {
+        pressInteractionSource.interactions.collect {
+            if (it is PressInteraction.Press) pressStartMs = System.currentTimeMillis()
+        }
+    }
+    val tapOpen = {
+        if (System.currentTimeMillis() - pressStartMs < viewConfig.longPressTimeoutMillis) onClick()
+    }
 
     // Same structure as MiniPlayer: the drag detector sits on the outermost
     // container so the whole accessory is swipeable, and the entire content row
@@ -200,15 +231,23 @@ fun FloatingMiniPlayer(
     Box(
         contentAlignment = Alignment.CenterStart,
         modifier = Modifier
+            // Whole-pill stretch outside the caller's pill clip/glass below:
+            // trails the drag and deforms along it, unclipped. Driven by the
+            // same finger that drives skip, so it never loses the drag.
             .graphicsLayer {
-                scaleX = pressScale
-                scaleY = pressScale
+                clip = false
+                val h = size.height
+                if (h > 0f) {
+                    val pull = (stretchDragX.value / size.width.coerceAtLeast(1f)).fastCoerceIn(-1f, 1f)
+                    val unit = 4.dp.toPx() / h
+                    scaleX = 1f + unit * stretchPress + unit * abs(pull)
+                    scaleY = 1f + unit * stretchPress - 0.5f * unit * abs(pull)
+                    translationX = stretchDragX.value * 0.2f
+                }
             }
             .then(modifier)
             // Source end of the mini-to-full container morph. Outside .then(modifier)
-            // so it measures the pill as the nav bar actually places it, and after
-            // the press-scale layer so a half-pressed pill still reports its real
-            // resting bounds rather than the squashed ones.
+            // so it measures the pill as the nav bar actually places it.
             .registerMiniContainerRect()
             // Source end of the shared container morph. Recorded here and drawn by the
             // overlay instead of in place, so the pill does not sit in the nav bar while
@@ -221,9 +260,6 @@ fun FloatingMiniPlayer(
                 drawInPlace = { !PlayerMorph.active },
             )
             .onSizeChanged { measuredHeightPx = it.height }
-            .then(interactiveHighlight.modifier)
-            .clipToBounds()
-            .then(interactiveHighlight.gestureModifier)
             .then(
                 if (swipeEnabled) {
                     Modifier.pointerInput(Unit) {
@@ -231,15 +267,21 @@ fun FloatingMiniPlayer(
                             onDragStart = {
                                 dragStartTime = System.currentTimeMillis()
                                 totalDragDistance = 0f
+                                coroutineScope.launch { stretchDragX.snapTo(0f) }
                             },
                             onDragCancel = {
                                 coroutineScope.launch {
-                                    offsetXAnimatable.animateTo(0f, animationSpec)
+                                    launch { offsetXAnimatable.animateTo(0f, animationSpec) }
+                                    launch { stretchDragX.animateTo(0f, animationSpec) }
                                 }
                             },
                             onHorizontalDrag = { _, dragAmount ->
                                 val adjustedDragAmount =
                                     if (layoutDirection == LayoutDirection.Rtl) -dragAmount else dragAmount
+                                // Always tracks, skip allowed or not.
+                                coroutineScope.launch {
+                                    stretchDragX.snapTo(stretchDragX.value + adjustedDragAmount)
+                                }
                                 val canSkipPrevious = playerConnection.player.previousMediaItemIndex != -1
                                 val canSkipNext = playerConnection.player.nextMediaItemIndex != -1
                                 val tryingToSwipeRight = adjustedDragAmount > 0
@@ -285,7 +327,8 @@ fun FloatingMiniPlayer(
                                     }
                                 }
                                 coroutineScope.launch {
-                                    offsetXAnimatable.animateTo(0f, animationSpec)
+                                    launch { offsetXAnimatable.animateTo(0f, animationSpec) }
+                                    launch { stretchDragX.animateTo(0f, animationSpec) }
                                 }
                             },
                         )
@@ -293,7 +336,8 @@ fun FloatingMiniPlayer(
                 } else {
                     Modifier
                 }
-            ),
+            )
+            // Tap opens the full player via the inner clickable below.
     ) {
         // Fixed sizes for both phone accessory strips (isInline and the default
         // !tabStyle wave bar) — neither's resting height ever changes, so there is
@@ -325,11 +369,14 @@ fun FloatingMiniPlayer(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
+                // Shrunk height pinned to the search pill's row height, so the
+                // mini and search pills always sit at the same height.
+                .then(if (isInline) Modifier.height(SearchBarRowHeight) else Modifier)
                 .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
                 .clickable(
                     interactionSource = pressInteractionSource,
                     indication = null,
-                    onClick = onClick,
+                    onClick = tapOpen,
                 )
                 .padding(
                     horizontal = if (isInline) 10.dp else 12.dp,
@@ -374,6 +421,7 @@ fun FloatingMiniPlayer(
                         color = contentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.additiveChrome(useGlass),
                     )
                     Text(
                         text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -381,6 +429,7 @@ fun FloatingMiniPlayer(
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.additiveChrome(useGlass),
                     )
                 }
 
@@ -388,9 +437,14 @@ fun FloatingMiniPlayer(
                     onClick = { playerConnection.player.togglePlayPause() },
                     modifier = Modifier.size(controlSize),
                 ) {
+                    // No additiveChrome here: its saveLayer clips to the Box's measured
+                    // size, and this content cross-fades between two different sizes
+                    // (SizeTransform(clip = false) -- play/pause deliberately overlap
+                    // uncropped during the swap), so the layer bounds cut the icon off
+                    // mid-transition.
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlaying,
-                        tint = contentColor,
+                        tint = transportTint,
                         size = 20.dp,
                     )
                 }
@@ -443,6 +497,7 @@ fun FloatingMiniPlayer(
                         color = contentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.additiveChrome(useGlass),
                     )
                     Text(
                         text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -450,6 +505,7 @@ fun FloatingMiniPlayer(
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.additiveChrome(useGlass),
                     )
                 }
 
@@ -469,7 +525,8 @@ fun FloatingMiniPlayer(
                         visibleBars = 14,
                         modifier = Modifier
                             .width(64.dp)
-                            .height(22.dp),
+                            .height(22.dp)
+                            .additiveChrome(useGlass),
                     )
                 }
 
@@ -481,7 +538,7 @@ fun FloatingMiniPlayer(
                 ) {
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlaying,
-                        tint = contentColor,
+                        tint = transportTint,
                         size = playIconSize,
                     )
                 }
@@ -492,9 +549,9 @@ fun FloatingMiniPlayer(
                 ) {
                     PlayerGlyph(
                         slot = PlayerIconSlot.NEXT,
-                        fallback = R.drawable.fast_forward,
-                        tint = if (canSkipNext) contentColor else contentColor.copy(alpha = 0.4f),
-                        modifier = Modifier.size(playIconSize),
+                        fallbackVector = SfSymbols.Monochrome.SFForwardFill,
+                        tint = if (canSkipNext) transportTint else transportTint.copy(alpha = 0.4f),
+                        modifier = Modifier.size(playIconSize).additiveChrome(useGlass),
                     )
                 }
             } else {
@@ -511,10 +568,10 @@ fun FloatingMiniPlayer(
                     modifier = Modifier.size(controlSize),
                 ) {
                     Icon(
-                        painter = painterResource(if (shuffleModeEnabled) R.drawable.shuffle_on else R.drawable.shuffle),
+                        imageVector = SfSymbols.Monochrome.SFShuffle,
                         contentDescription = null,
-                        tint = contentColor,
-                        modifier = Modifier.size(iconSize),
+                        tint = transportTint,
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
                     )
                 }
                 IconButton(
@@ -524,9 +581,9 @@ fun FloatingMiniPlayer(
                 ) {
                     PlayerGlyph(
                         slot = PlayerIconSlot.PREVIOUS,
-                        fallback = R.drawable.skip_previous_legacy,
-                        tint = if (canSkipPrevious) contentColor else contentColor.copy(alpha = 0.4f),
-                        modifier = Modifier.size(iconSize),
+                        fallbackVector = SfSymbols.Monochrome.SFBackwardFill,
+                        tint = if (canSkipPrevious) transportTint else transportTint.copy(alpha = 0.4f),
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
                     )
                 }
                 IconButton(
@@ -535,7 +592,7 @@ fun FloatingMiniPlayer(
                 ) {
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlaying,
-                        tint = contentColor,
+                        tint = transportTint,
                         size = playIconSize,
                     )
                 }
@@ -546,9 +603,9 @@ fun FloatingMiniPlayer(
                 ) {
                     PlayerGlyph(
                         slot = PlayerIconSlot.NEXT,
-                        fallback = R.drawable.fast_forward,
-                        tint = if (canSkipNext) contentColor else contentColor.copy(alpha = 0.4f),
-                        modifier = Modifier.size(iconSize),
+                        fallbackVector = SfSymbols.Monochrome.SFForwardFill,
+                        tint = if (canSkipNext) transportTint else transportTint.copy(alpha = 0.4f),
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
                     )
                 }
                 IconButton(
@@ -556,12 +613,10 @@ fun FloatingMiniPlayer(
                     modifier = Modifier.size(controlSize),
                 ) {
                     Icon(
-                        painter = painterResource(
-                            if (repeatMode == Player.REPEAT_MODE_ONE) R.drawable.repeat_one else R.drawable.repeat
-                        ),
+                        imageVector = if (repeatMode == Player.REPEAT_MODE_ONE) SfSymbols.Monochrome.SFRepeat1 else SfSymbols.Monochrome.SFRepeat,
                         contentDescription = null,
-                        tint = if (repeatMode != Player.REPEAT_MODE_OFF) contentColor else contentColor.copy(alpha = 0.4f),
-                        modifier = Modifier.size(iconSize),
+                        tint = if (repeatMode != Player.REPEAT_MODE_OFF) transportTint else transportTint.copy(alpha = 0.4f),
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
                     )
                 }
 
@@ -604,6 +659,7 @@ fun FloatingMiniPlayer(
                         color = contentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.additiveChrome(useGlass),
                     )
                     Text(
                         text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -611,6 +667,7 @@ fun FloatingMiniPlayer(
                         color = contentColor.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.additiveChrome(useGlass),
                     )
                 }
 
@@ -621,10 +678,10 @@ fun FloatingMiniPlayer(
                     modifier = Modifier.size(controlSize),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.lyrics),
+                        imageVector = SfSymbols.Monochrome.SFQuoteBubble,
                         contentDescription = stringResource(R.string.lyrics),
-                        tint = contentColor,
-                        modifier = Modifier.size(iconSize * LyricsIconScale),
+                        tint = transportTint,
+                        modifier = Modifier.size(iconSize * LyricsIconScale).additiveChrome(useGlass),
                     )
                 }
                 IconButton(
@@ -632,10 +689,10 @@ fun FloatingMiniPlayer(
                     modifier = Modifier.size(controlSize),
                 ) {
                     Icon(
-                        painter = painterResource(R.drawable.queue_music),
+                        imageVector = SfSymbols.Monochrome.SFListBullet,
                         contentDescription = stringResource(R.string.queue),
-                        tint = contentColor,
-                        modifier = Modifier.size(iconSize),
+                        tint = transportTint,
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
                     )
                 }
             }

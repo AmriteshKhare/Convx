@@ -31,6 +31,7 @@ import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.lerp
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.utils.additiveChrome
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -49,20 +50,24 @@ private val GlassCircleShape = ContinuousRoundedRectangle(percent = 50)
  * search, selection-mode exit — gets the same "elastic stretch" liquid feel on
  * press. Cheap: a per-frame graphicsLayer transform, no extra backdrop re-capture.
  */
-internal fun elasticStretchLayerBlock(interactiveHighlight: InteractiveHighlight): GraphicsLayerScope.() -> Unit = {
+internal fun elasticStretchLayerBlock(
+    interactiveHighlight: InteractiveHighlight,
+    // Bar pills pass 2x: same feel, larger travel so the stretch reads at pill size.
+    magnitude: Float = 1f,
+): GraphicsLayerScope.() -> Unit = {
     val width = size.width
     val height = size.height
 
     val progress = interactiveHighlight.pressProgress
-    val scale = lerp(1f, 1f + 4f.dp.toPx() / size.height, progress)
+    val scale = lerp(1f, 1f + magnitude * 4f.dp.toPx() / size.height, progress)
 
     val maxOffset = size.minDimension
     val initialDerivative = 0.05f
     val offset = interactiveHighlight.offset
-    translationX = maxOffset * tanh(initialDerivative * offset.x / maxOffset)
-    translationY = maxOffset * tanh(initialDerivative * offset.y / maxOffset)
+    translationX = magnitude * maxOffset * tanh(initialDerivative * offset.x / maxOffset)
+    translationY = magnitude * maxOffset * tanh(initialDerivative * offset.y / maxOffset)
 
-    val maxDragScale = 4f.dp.toPx() / size.height
+    val maxDragScale = magnitude * 4f.dp.toPx() / size.height
     val offsetAngle = atan2(offset.y, offset.x)
     scaleX = scale +
         maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) *
@@ -97,7 +102,9 @@ fun GlassCircleButton(
     rimTintColor: Color = Color.Unspecified,
     content: @Composable () -> Unit,
 ) {
-    val glassConfig = LocalGlassEffectConfig.current
+    // Glass Effect setting only drives the nav bar/mini player now — this button
+    // keeps glass but pinned to the fixed style.
+    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     // These float over content the same way the nav bar does and are meant to
     // read as the same material, so they follow the nav bar's own on/off switch
     // and its effect values rather than only the global one.
@@ -142,7 +149,9 @@ fun GlassCircleButton(
             .then(elasticStretch.gestureModifier)
     ) {
         CompositionLocalProvider(LocalContentColor provides contentColor) {
-            content()
+            Box(modifier = Modifier.additiveChrome(useGlass)) {
+                content()
+            }
         }
     }
 }
@@ -166,10 +175,18 @@ fun ContrastCircleButton(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     size: Dp = 44.dp,
+    filled: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val elasticStretch = rememberElasticStretch()
+
+    val bg = if (filled) onTint else onTint.copy(alpha = 0.16f)
+    val contentColor = if (filled) {
+        if (onTint == Color.White) Color.Black else Color.White
+    } else {
+        onTint
+    }
 
     Box(
         contentAlignment = Alignment.Center,
@@ -177,7 +194,7 @@ fun ContrastCircleButton(
             .graphicsLayer(elasticStretchLayerBlock(elasticStretch))
             .size(size)
             .clip(GlassCircleShape)
-            .background(onTint.copy(alpha = 0.16f))
+            .background(bg)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
@@ -188,7 +205,7 @@ fun ContrastCircleButton(
             .then(elasticStretch.modifier)
             .then(elasticStretch.gestureModifier)
     ) {
-        CompositionLocalProvider(LocalContentColor provides onTint) {
+        CompositionLocalProvider(LocalContentColor provides contentColor) {
             content()
         }
     }
