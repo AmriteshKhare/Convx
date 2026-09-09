@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.lerp as lerpColor
@@ -155,18 +154,27 @@ fun HeroMergeBand(
     val useHaze = hazeState != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !reduceBlur
 
     if (!useHaze || hazeState == null) {
-        // A plain vertical crossfade into [pageColor] — the same footprint as the
-        // Haze band below (fillMaxWidth/bandHeight), so callers' own .align/.offset
-        // on `modifier` line the fallback up on the same join.
+        // Baked join: plain eased crossfade into [pageColor], peak centred on
+        // the join, transparent at both edges so list rows below are never
+        // covered. Same footprint as the Haze band so callers' align/offset
+        // line up on the same join.
         Box(
             modifier
                 .fillMaxWidth()
                 .height(bandHeight)
                 .background(
                     Brush.verticalGradient(
-                        0.00f to Color.Transparent,
-                        0.50f to pageColor,
-                        1.00f to Color.Transparent,
+                        colorStops = Array(12) { i ->
+                            val t = i / 11f
+                            val window = when {
+                                t < 0.85f -> t / 0.85f
+                                else -> 1f - (t - 0.85f) / 0.15f
+                            }
+                            val eased = androidx.compose.animation.core.EaseOutCubic.transform(
+                                window.coerceIn(0f, 1f),
+                            )
+                            t to pageColor.copy(alpha = eased)
+                        },
                     ),
                 ),
         )
@@ -296,18 +304,31 @@ fun HeroScrollBlur(
     val p = progress.coerceIn(0f, 1f)
     if (reduceBlur || artworkUrl.isNullOrBlank() || p <= 0.01f) return
 
-    // Sequential cross-fade windows: the mid plate arrives first, peaks, and
-    // hands over to the full plate, so the ramp reads as growing blur rather
-    // than one hard sharp-to-blurred cut.
-    val midAlpha = heroBlurBand(p, start = 0.02f, peak = 0.45f, end = 0.90f)
-    val fullAlpha = ((p - 0.45f) / 0.55f).coerceIn(0f, 1f)
-    if (midAlpha <= 0f && fullAlpha <= 0f) return
+    // Three-step eased crossfade: soft arrives first, hands to mid, hands to
+    // full — reads as growing blur (iOS-style) while scroll drives alpha only,
+    // no per-frame RenderEffect. Same foot mask as the hero so blur never
+    // invents a new edge.
+    val eased = androidx.compose.animation.core.EaseOutCubic.transform(p)
+    val softAlpha = heroBlurBand(eased, start = 0.02f, peak = 0.30f, end = 0.70f)
+    val midAlpha = heroBlurBand(eased, start = 0.25f, peak = 0.60f, end = 0.90f)
+    val fullAlpha = ((eased - 0.55f) / 0.45f).coerceIn(0f, 1f)
+    if (softAlpha <= 0f && midAlpha <= 0f && fullAlpha <= 0f) return
 
     Box(modifier.fillMaxSize()) {
+        if (softAlpha > 0f) {
+            BlurredBackdropImage(
+                model = artworkUrl,
+                screenBlurRadiusDp = (blurRadius * 0.3f).value,
+                decodeSize = decodeSize,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = softAlpha },
+            )
+        }
         if (midAlpha > 0f) {
             BlurredBackdropImage(
                 model = artworkUrl,
-                screenBlurRadiusDp = (blurRadius * 0.5f).value,
+                screenBlurRadiusDp = (blurRadius * 0.6f).value,
                 decodeSize = decodeSize,
                 modifier = Modifier
                     .fillMaxSize()
@@ -465,13 +486,51 @@ fun Color.asGlassSurfaceTint(isDark: Boolean = true): Color {
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
-/** Specular highlight / rim light ("pluck") tint: saturated color of the ambient tint,
- *  bright and light enough to be seen and felt as a clear, glistening highlight edge. */
+/** Specular highlight / rim light ("pluck") tint: the ambient hue, muted enough
+ *  to read as lit glass rather than neon — saturated enough to see the color,
+ *  never colorful. Shared by every glass surface on the screen (see
+ *  [Modifier.liquidGlass]'s default rim), so all rims match. */
 fun Color.asRimPop(): Color {
     val hsl = FloatArray(3)
     androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
-    hsl[1] = hsl[1].coerceAtLeast(0.68f) // saturated color of the same tint
-    hsl[2] = hsl[2].coerceIn(0.60f, 0.78f) // light enough to be seen and felt as highlight
+    hsl[1] = hsl[1].coerceIn(0.40f, 0.55f) // visible hue, not neon
+    hsl[2] = hsl[2].coerceIn(0.62f, 0.74f) // light enough to read as highlight
+    return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+}
+
+/** Muted icon tint for deselected nav items and floating chrome (back, share,
+ *  menu) on ambient screens: same hue as the mesh background, just enough
+ *  saturation to see the color, drawn under additiveChrome (BlendMode.Plus)
+ *  for its glow. Replaces [asIconPop]'s vivid floor (0.80) which turned
+ *  Library blue. */
+fun Color.asSoftIconTint(): Color {
+    val hsl = FloatArray(3)
+    androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[1] = hsl[1].coerceIn(0.32f, 0.45f) // hue visible, never colorful
+    hsl[2] = hsl[2].coerceIn(0.66f, 0.76f) // bright enough to glow through Plus
+    return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+}
+
+/** Glass surface fill for ambient screens: the neutral frost grey carried
+ *  20% toward the mesh hue, so the surface feels tinted without going
+ *  colorful. Painted at ~0.36 opacity by [Modifier.liquidGlass]. */
+fun Color.asAmbientSurfaceTint(isDark: Boolean = true): Color {
+    val frosted = asGlassSurfaceTint(isDark)
+    return lerpColor(frosted, this, 0.20f)
+}
+
+/** Selection-pill wash: lighter than the ambient surface with a hint more of
+ *  the mesh hue. Alpha is picked at the call site by contrast (0.70 on light
+ *  ambient, 0.80 on dark). */
+fun Color.asPuckTint(isDark: Boolean = true): Color {
+    val hsl = FloatArray(3)
+    androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[1] = hsl[1].coerceIn(0.15f, 0.25f) // a hint of the hue
+    hsl[2] = if (isDark) {
+        hsl[2].coerceIn(0.32f, 0.42f) // lighter than the 0.20..0.28 surface
+    } else {
+        hsl[2].coerceIn(0.80f, 0.88f)
+    }
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
@@ -1199,7 +1258,7 @@ fun HeroCardHeader(
  * foot. Shared with the screen's header math so the title sits on the blend
  * start rather than somewhere up the sharp photo or down the flat tint.
  */
-const val ArtistBlendStart = 0.55f
+const val ArtistBlendStart = 0.85f
 
 /**
  * BitChord-style artist hero: the photo full-bleed, very slightly taller than
@@ -1260,35 +1319,22 @@ fun ArtistHeroImage(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-            // The same plate three times at growing radii, each masked in lower
-            // than the last: zero blur above [ArtistBlendStart], [blurRadius] at
-            // the foot, stepping up between — one mask alone always leaves its
-            // own gradient edge behind to read as a line.
-            ProgressBlurPlate(
-                model = heroRequest,
-                radius = blurRadius * 0.3f,
-                maskStart = ArtistBlendStart,
-            )
-            ProgressBlurPlate(
-                model = heroRequest,
-                radius = blurRadius * 0.6f,
-                maskStart = 0.70f,
-            )
-            ProgressBlurPlate(
-                model = heroRequest,
-                radius = blurRadius,
-                maskStart = 0.85f,
-            )
-            // Foot wash: the blurred foot lands fully on the page colour, not on
-            // raw mesh, so both sides of the join agree before the glass samples
-            // it — this plus the blur above is what erases the photo's edge.
+            // Foot wash: the photo stays fully sharp to its foot — the eased
+            // wash alone dissolves the edge into the page colour. Edge only
+            // (from 0.85): eased stops so no single gradient edge survives
+            // to read as a line.
             Box(
                 Modifier
                     .matchParentSize()
                     .background(
                         Brush.verticalGradient(
-                            0.45f to Color.Transparent,
-                            1.00f to pageColor,
+                            colorStops = Array(12) { i ->
+                                val t = i / 11f
+                                val eased = androidx.compose.animation.core.EaseOutCubic.transform(
+                                    ((t - 0.85f) / 0.15f).coerceIn(0f, 1f),
+                                )
+                                t to pageColor.copy(alpha = eased)
+                            },
                         ),
                     ),
             )
@@ -1354,27 +1400,4 @@ fun ArtistHeroImage(
                 .offset(y = HeroMergeBandHeight / 2),
         )
     }
-}
-
-/** One step of [ArtistHeroImage]'s ramp: the plate blurred, visible only below [maskStart]. */
-@Composable
-private fun BoxScope.ProgressBlurPlate(model: Any?, radius: Dp, maskStart: Float) {
-    AsyncImage(
-        model = model,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .fillMaxSize()
-            .blur(radius)
-            .drawWithContent {
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        maskStart to Color.Transparent,
-                        1.00f to Color.Black,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            },
-    )
 }

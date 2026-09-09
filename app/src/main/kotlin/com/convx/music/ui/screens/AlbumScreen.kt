@@ -155,7 +155,7 @@ import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.isGlassAllowed
 import androidx.compose.ui.graphics.isSpecified
 import com.convx.music.LocalAmbientBackgroundColor
-import com.convx.music.ui.component.asIconPop
+import com.convx.music.ui.component.asSoftIconTint
 import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
@@ -1150,7 +1150,7 @@ fun AlbumScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
             val ambientColor = LocalAmbientBackgroundColor.current.value
-            val pillIconTint = if (useGlass && ambientColor.isSpecified) ambientColor.asIconPop() else chromeContentColor
+            val pillIconTint = if (useGlass && ambientColor.isSpecified) ambientColor.asSoftIconTint() else chromeContentColor
             if (inSelectMode) {
                 GlassCircleButton(onClick = onExitSelectionMode) {
                     Icon(

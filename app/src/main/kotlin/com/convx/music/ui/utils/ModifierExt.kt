@@ -182,6 +182,34 @@ fun Modifier.rimLight(
 }
 
 /**
+ * Dark counterpart to the specular rim: a thin black outline traced on the
+ * surface's own edge, drawn WITHOUT clipping so half the stroke sits outside
+ * the bounds — the outermost layer, wider than the light rim, at 180° to it
+ * in spirit (dark where the light isn't). Reads as an outline that keeps
+ * glass legible on any surface, light or photographic.
+ *
+ * Normal alpha blend, not Plus: Plus adds zero for black, so a Plus black rim
+ * would be a no-op. Applied by [Modifier.liquidGlass] itself; do not stack
+ * manually on glass surfaces.
+ */
+fun Modifier.outerDarkRim(
+    shape: Shape,
+    width: Dp = 1.6.dp,
+    alpha: Float = 0.32f,
+): Modifier = drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val stroke = Stroke(width = width.toPx())
+    val color = Color.Black.copy(alpha = alpha)
+    onDrawWithContent {
+        drawContent()
+        drawOutline(
+            outline = outline,
+            color = color,
+            style = stroke,
+        )
+    }
+}
+/**
  * The radius an inner element needs for its curve to stay concentric with the [outer]
  * one it sits [inset] inside. Apple's rule, and the reason a card inside a sheet looks
  * wrong at the same radius as the sheet: parallel curves must differ by the gap between

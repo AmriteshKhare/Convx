@@ -112,6 +112,9 @@ import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.luminance
+import com.convx.music.LocalAmbientBackgroundColor
+import com.convx.music.ui.component.asPuckTint
 import com.convx.music.constants.NavBarMeltTransitionKey
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.elasticStretchLayerBlock
@@ -177,11 +180,12 @@ private const val FastScrollSpeedPx = 120f
 // active (see SearchExpandedBar).
 private enum class FloatingTabBarVisual { INLINE, EXPANDED, SEARCH_EXPANDED }
 
-// Matches the established inline-row height (InlineStandaloneTab's own
+// Height of the scroll-collapsed inline row (InlineStandaloneTab's own
 // defaultMinSize floor at the FloatingNavBar call site, and the inline mini
-// player's own ~48dp content height) so the search-expanded row doesn't read
-// shorter than the bar's own shrunk state. Also the shrunk mini player's
-// pinned height (see FloatingMiniPlayer) — one constant, same row height.
+// player's own ~48dp content height). The search-expanded row and the
+// keyboard-active input bar no longer use this — they hold the measured
+// expanded-row height instead so the search pill is exactly as tall as the
+// nav bar (see expandedContentHeightPx).
 internal val SearchBarRowHeight = 48.dp
 
 // The standalone tab's outer size is fixed by the row's aspectRatio. Insetting
@@ -252,6 +256,11 @@ fun FloatingTabBar(
     // to filling available space (e.g. first-ever composition in search mode).
     expandedContentWidthPx: Int? = null,
     onExpandedWidthChanged: ((Int) -> Unit)? = null,
+    // Same idea for height: ExpandedBar's last-measured row height, which
+    // SearchExpandedBar holds its row to so the search pill is exactly as tall
+    // as the nav bar. Null/0 falls back to IntrinsicSize.Max (tallest child).
+    expandedContentHeightPx: Int? = null,
+    onExpandedHeightChanged: ((Int) -> Unit)? = null,
     content: FloatingTabBarScope.() -> Unit
 ) {
     // Rebuilt every composition, deliberately not remembered. The tabs hold
@@ -392,7 +401,8 @@ fun FloatingTabBar(
                     animatedVisibilityScope = this@AnimatedContent,
                     backdrop = backdrop,
                     accentColor = accentColor,
-                    onWidthMeasured = onExpandedWidthChanged
+                    onWidthMeasured = onExpandedWidthChanged,
+                    onHeightMeasured = onExpandedHeightChanged
                 )
                 FloatingTabBarVisual.SEARCH_EXPANDED -> SearchExpandedBar(
                     scope = scope,
@@ -406,7 +416,8 @@ fun FloatingTabBar(
                     tabBarContentModifier = tabBarContentModifier,
                     animatedVisibilityScope = this@AnimatedContent,
                     searchBarContent = searchBarContent ?: {},
-                    targetWidthPx = expandedContentWidthPx
+                    targetWidthPx = expandedContentWidthPx,
+                    targetHeightPx = expandedContentHeightPx
                 )
             }
             }
@@ -694,7 +705,7 @@ private fun SharedTransitionScope.InlineBar(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (accessory == null) Modifier.wrapContentWidth() else Modifier)
-            .height(IntrinsicSize.Max)
+            .height(SearchBarRowHeight)
     ) {
         if (hasInlineTab) {
             InlineTab(
@@ -706,8 +717,9 @@ private fun SharedTransitionScope.InlineBar(
                 elevations = elevations,
                 animatedVisibilityScope = animatedVisibilityScope,
                 tabBarContentModifier = tabBarContentModifier,
-                // Shrunk home hugs its content; the row equalizes the rest.
-                modifier = Modifier
+                // Pinned to the row height so the shrunk tab pill always
+                // matches the mini + search pills at 48dp.
+                modifier = Modifier.fillMaxHeight()
             )
         }
 
@@ -935,6 +947,10 @@ private fun SharedTransitionScope.ExpandedBar(
     // SearchExpandedBar can hold the bar at the exact same overall width
     // instead of expanding to fill all available space in search mode.
     onWidthMeasured: ((Int) -> Unit)? = null,
+    // Same for height: SearchExpandedBar and the keyboard-active input bar
+    // hold this row's height so the search pill is exactly as tall as the
+    // nav bar.
+    onHeightMeasured: ((Int) -> Unit)? = null,
 ) {
     val hasTabGroup = scope.tabs.isNotEmpty()
     val standaloneTab = scope.standaloneTab
@@ -981,6 +997,7 @@ private fun SharedTransitionScope.ExpandedBar(
                 .onSizeChanged {
                     tabRowWidthPx = it.width
                     onWidthMeasured?.invoke(it.width)
+                    onHeightMeasured?.invoke(it.height)
                 }
         ) {
             if (hasTabGroup) {
@@ -1054,6 +1071,10 @@ private fun SharedTransitionScope.SearchExpandedBar(
     // space. Null/0 (nothing measured yet) falls back to filling available
     // width.
     targetWidthPx: Int?,
+    // Same for height (see ExpandedBar's onHeightMeasured): holds the row to
+    // the nav bar's own height so the search pill never reads shorter than
+    // the bar. Null/0 falls back to the tallest child's intrinsic height.
+    targetHeightPx: Int?,
 ) {
     val inlineTab = scope.getInlineTab(selectedTabKey)
     val density = LocalDensity.current
@@ -1087,10 +1108,14 @@ private fun SharedTransitionScope.SearchExpandedBar(
         Row(
             horizontalArrangement = Arrangement.spacedBy(sizes.componentSpacing),
             verticalAlignment = Alignment.CenterVertically,
-            // Fixed rather than IntrinsicSize.Max: matches the mini player's own
-            // inline (shrunk) height exactly instead of letting a short
-            // searchBarContent under-report its intrinsic height and shrink the row.
-            modifier = Modifier.height(SearchBarRowHeight).then(targetWidthModifier)
+            // Measured expanded-row height when known (same height as the nav
+            // bar); otherwise the tallest child's intrinsic height so a short
+            // searchBarContent can't shrink the row below its content.
+            modifier = if (targetHeightPx != null && targetHeightPx > 0) {
+                Modifier.height(with(density) { targetHeightPx.toDp() }).then(targetWidthModifier)
+            } else {
+                Modifier.height(IntrinsicSize.Max).then(targetWidthModifier)
+            }
         ) {
             if (inlineTab != null) {
                 InlineTab(
@@ -1263,15 +1288,25 @@ private fun SharedTransitionScope.ExpandedTabs(
     val isLtr = layoutDirection == LayoutDirection.Ltr
     val animationScope = rememberCoroutineScope()
     val glassConfig = LocalGlassEffectConfig.current
-    // Puck wash. Unset follows the app's current accent (the same colour the
-    // hero/nav chrome derives from the background) so the pill tracks whatever is
-    // playing instead of a flat grey.
+    // Puck wash. Explicit user color wins; on hero-art screens the pill takes
+    // the mesh hue lighter than the surface with just a hint of tint; unset
+    // elsewhere follows the app accent so the pill tracks whatever is playing.
+    val ambientPuckColor = LocalAmbientBackgroundColor.current.value
+    val themeDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     val puckWash = if (glassConfig.puckColor.isSpecified) {
         glassConfig.puckColor
+    } else if (ambientPuckColor.isSpecified) {
+        ambientPuckColor.asPuckTint(themeDark)
     } else {
         LocalAccentColor.current
     }
-    val puckRestAlpha = glassConfig.puckOpacity.coerceIn(0f, 1f)
+    // Contrast-picked rest opacity on ambient screens (0.80 dark, 0.70 light);
+    // the user setting still rules everywhere else.
+    val puckRestAlpha = if (!glassConfig.puckColor.isSpecified && ambientPuckColor.isSpecified) {
+        if (themeDark) 0.80f else 0.70f
+    } else {
+        glassConfig.puckOpacity.coerceIn(0f, 1f)
+    }
 
     val tabWidthPx = with(density) { sizes.tabWidth.toPx() }
     // The row's own content padding insets the tabs from the pill's edges, so
@@ -1600,7 +1635,15 @@ private fun SharedTransitionScope.ExpandedTabs(
             ) {
                 allTabs.forEachIndexed { index, tab ->
                     Tab(
-                        icon = tab.icon,
+                        // Behind copy hides at rest (press=0) so only the crisp
+                        // overlay shows; fades in on drag as that overlay fades.
+                        icon = {
+                            Box(
+                                Modifier.graphicsLayer {
+                                    alpha = dampedDragAnimation.pressProgress
+                                }
+                            ) { tab.icon() }
+                        },
                         title = tab.title,
                         isInline = false,
                         isStandalone = false,

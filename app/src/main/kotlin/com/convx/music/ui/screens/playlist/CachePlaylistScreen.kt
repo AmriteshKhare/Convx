@@ -141,7 +141,7 @@ import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.isGlassAllowed
 import androidx.compose.ui.graphics.isSpecified
 import com.convx.music.LocalAmbientBackgroundColor
-import com.convx.music.ui.component.asIconPop
+import com.convx.music.ui.component.asSoftIconTint
 import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -564,7 +564,7 @@ fun CachePlaylistScreen(
                             Icon(
                                 imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = null,
-                                tint = if (useGlass && ambientColor.isSpecified) ambientColor.asIconPop() else onTint,
+                                tint = if (useGlass && ambientColor.isSpecified) ambientColor.asSoftIconTint() else onTint,
                                 modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
                             )
                         }

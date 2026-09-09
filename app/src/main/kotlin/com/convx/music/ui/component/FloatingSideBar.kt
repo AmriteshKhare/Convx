@@ -44,6 +44,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.luminance
+import com.convx.music.LocalAmbientBackgroundColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -346,15 +348,23 @@ private fun SideNavTabs(
     val selectedContentColor = glassConfig.textColor
     val unselectedContentColor = glassConfig.textColor.copy(alpha = 0.75f)
 
-    // Same wash the phone puck uses: the configured colour, or the app's current
-    // accent (the same colour the hero/nav chrome derives from the background) so
-    // an unset puck still tracks whatever is playing instead of a flat grey.
+    // Same wash the phone puck uses: the configured colour, ambient mesh tint
+    // (lighter than the surface, hint of hue) on hero-art screens, or the
+    // app's current accent so an unset puck still tracks whatever is playing.
+    val sideAmbient = LocalAmbientBackgroundColor.current.value
+    val sideThemeDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     val puckWash = if (glassConfig.puckColor.isSpecified) {
         glassConfig.puckColor
+    } else if (sideAmbient.isSpecified) {
+        sideAmbient.asPuckTint(sideThemeDark)
     } else {
         LocalAccentColor.current
     }
-    val puckRestAlpha = glassConfig.puckOpacity.coerceIn(0f, 1f)
+    val puckRestAlpha = if (!glassConfig.puckColor.isSpecified && sideAmbient.isSpecified) {
+        if (sideThemeDark) 0.80f else 0.70f
+    } else {
+        glassConfig.puckOpacity.coerceIn(0f, 1f)
+    }
 
     // Puck + tint follow the sticky selection so a non-tab destination holds the
     // last tab instead of snapping to Home; the click passes the REAL route state

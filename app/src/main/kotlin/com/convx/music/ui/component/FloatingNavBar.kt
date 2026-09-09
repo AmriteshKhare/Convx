@@ -69,6 +69,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.convx.music.R
@@ -93,9 +95,10 @@ import kotlinx.coroutines.launch
 // drag-to-search morph (see FloatingTabBar's ExpandedTabs).
 private val NavBarShape = ContinuousRoundedRectangle(percent = 50)
 
-// Matches FloatingTabBar's own SearchBarRowHeight (the search-expanded row's
-// height, itself matched to the inline mini player's shrunk height) so the
-// bar doesn't visibly resize the moment the keyboard opens.
+// Fallback height for the keyboard-active search pill before the expanded
+// nav-bar row has ever been measured (e.g. first-ever composition straight
+// into search mode). Once measured, the pill holds that exact height so it
+// is as tall as the nav bar.
 private val NavBarSearchBarHeight = 48.dp
 
 // Width the expanded row needs for everything that is NOT a tab slot: the
@@ -157,6 +160,19 @@ fun AppFloatingNavBar(
 ) {
     val navSearch = LocalNavSearchState.current
 
+    // Last measured size of the normal (all-tabs) expanded row, held across
+    // the switch into search mode so the bar doesn't visibly resize — search
+    // mode's row targets this same size instead of filling available space
+    // (width) or shrinking to its icon-only content (height). Hoisted here
+    // (not in the chrome below) so the keyboard-active input bar replacing
+    // the whole chrome can hold the same height too.
+    var expandedContentWidthPx by remember { mutableStateOf<Int?>(null) }
+    var expandedContentHeightPx by remember { mutableStateOf<Int?>(null) }
+    val density = LocalDensity.current
+    val searchPillHeight: Dp? = expandedContentHeightPx
+        ?.takeIf { it > 0 }
+        ?.let { with(density) { it.toDp() } }
+
     // Slide + spring bounce instead of a flat Crossfade: the mini player/current-
     // screen icon side drops down and out, the keyboard pill rises up and in
     // (and reverses on the way back). Bouncier (Medium) coming in, no-bounce
@@ -188,6 +204,7 @@ fun AppFloatingNavBar(
             NavBarSearchInputBar(
                 state = navSearch,
                 pureBlack = pureBlack,
+                targetHeight = searchPillHeight,
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
@@ -204,6 +221,10 @@ fun AppFloatingNavBar(
                 searchModeActive = navSearch.visualActive,
                 navSearch = navSearch,
                 tabPosition = tabPosition,
+                expandedContentWidthPx = expandedContentWidthPx,
+                onExpandedWidthChanged = { expandedContentWidthPx = it },
+                expandedContentHeightPx = expandedContentHeightPx,
+                onExpandedHeightChanged = { expandedContentHeightPx = it },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -224,17 +245,16 @@ private fun AppFloatingNavBarChrome(
     searchModeActive: Boolean,
     navSearch: NavSearchState,
     tabPosition: (() -> Float?)?,
+    expandedContentWidthPx: Int?,
+    onExpandedWidthChanged: ((Int) -> Unit)?,
+    expandedContentHeightPx: Int?,
+    onExpandedHeightChanged: ((Int) -> Unit)?,
     modifier: Modifier,
 ) {
     // System back while search-expanded/search-inline (keyboard not active yet,
     // that state has its own BackHandler in NavBarSearchInputBar) -> same
     // animate-then-navigate exit as the bar's own back arrow / icon tap.
     BackHandler(enabled = searchModeActive, onBack = navSearch.onExit)
-
-    // Last measured width of the normal (all-tabs) expanded row, held across
-    // the switch into search mode so the bar doesn't visibly widen — search
-    // mode's row targets this same width instead of filling all available space.
-    var expandedContentWidthPx by remember { mutableStateOf<Int?>(null) }
 
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
@@ -268,7 +288,7 @@ private fun AppFloatingNavBarChrome(
         animationSpec = Motion.appear(),
         label = "navBarTextColor",
     )
-    val selectedContentColor = tabTextColor
+    val selectedContentColor = Color(0xFFFF3B30).copy(alpha = 0.93f)
     val unselectedContentColor = tabTextColor.copy(alpha = 0.6f)
 
     // The rim's own tint: whatever the current screen published as its background/hero
@@ -282,20 +302,24 @@ private fun AppFloatingNavBarChrome(
     // has one is exactly the kind of change that should fade, not cut.
     val ambientColor = LocalAmbientBackgroundColor.current.value
     val defaultRimColor = if (glassConfig.highlightColor.isSpecified) glassConfig.highlightColor else Color.White
+    val targetRimColor = if (ambientColor.isSpecified) ambientColor.asRimPop() else defaultRimColor
     val rimTintColor by animateColorAsState(
-        targetValue = if (ambientColor.isSpecified) ambientColor.asRimPop() else defaultRimColor,
+        targetValue = targetRimColor,
         animationSpec = Motion.appear(),
         label = "navBarRimTint",
     )
+    val navHighlightAlpha = if (ambientColor.isSpecified) 0.48f else 0.30f
+    val unselectedIconTint = if (ambientColor.isSpecified) {
+        ambientColor.asSoftIconTint()
+    } else {
+        unselectedContentColor
+    }
 
     val tabBarContentModifier = if (useGlass) {
         Modifier.liquidGlass(
             config = glassConfig,
             shape = NavBarShape,
-            // Dialed back after "way too much" feedback on the 0.65f pass — a
-            // tinted rim still wants a bit more than the plain-glass default
-            // (0.3f) to read at all, but not by much.
-            highlightAlpha = 0.4f,
+            highlightAlpha = navHighlightAlpha,
             // The bar's own surface is the largest of its glass layers, and its
             // bounds animate across the whole inline/expanded/search transition —
             // freezing its capture for those frames is most of the win.
@@ -417,14 +441,11 @@ private fun AppFloatingNavBarChrome(
             backdrop = if (useGlass) LocalAppBackdrop.current else null,
             // The puck tints its whole sampled icon row with this one colour, and a
             // second crisp copy of the icon (below, "the selected icon drawn a second
-            // time") is redrawn on top in tabTextColor as the drag settles. The two
+            // time") is redrawn on top in selectedContentColor as the drag settles. The two
             // must match exactly — the lens warp offsets this sampled copy slightly
             // from the crisp one, so any color mismatch between them reads as a
-            // doubled/ghosted icon, not just a subtle glow. tabTextColor is already
-            // the contrast-correct choice (global text color when set, else the
-            // glass system's own computed contrast) — reuse it instead of deriving
-            // a second, different "correct" color.
-            accentColor = tabTextColor,
+            // doubled/ghosted icon, not just a subtle glow.
+            accentColor = selectedContentColor,
             searchMode = searchModeActive,
             searchBarContent = if (searchModeActive) {
                 { contentModifier ->
@@ -439,7 +460,9 @@ private fun AppFloatingNavBarChrome(
                 null
             },
             expandedContentWidthPx = expandedContentWidthPx,
-            onExpandedWidthChanged = { expandedContentWidthPx = it },
+            onExpandedWidthChanged = onExpandedWidthChanged,
+            expandedContentHeightPx = expandedContentHeightPx,
+            onExpandedHeightChanged = onExpandedHeightChanged,
         ) {
             tabScreens.forEach { screen ->
                 val isSelected = screen.route == selectedTabKey
@@ -448,11 +471,11 @@ private fun AppFloatingNavBarChrome(
                     title = {
                         Text(
                             text = stringResource(screen.titleId),
-                            color = if (isSelected) selectedContentColor else unselectedContentColor,
+                            color = if (isSelected) selectedContentColor else unselectedIconTint,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 12.sp,
-                            modifier = Modifier.additiveChrome(useGlass && !isSelected),
+                            modifier = Modifier.additiveChrome(useGlass && !isSelected && ambientColor.isSpecified),
                         )
                     },
                     icon = {
@@ -461,7 +484,7 @@ private fun AppFloatingNavBarChrome(
                                 screen.icon(appleMusicUi)
                             ),
                             contentDescription = stringResource(screen.titleId),
-                            tint = if (isSelected) selectedContentColor else unselectedContentColor,
+                            tint = if (isSelected) selectedContentColor else unselectedIconTint,
                             modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected),
                         )
                     },
@@ -486,11 +509,11 @@ private fun AppFloatingNavBarChrome(
                     title = {
                         Text(
                             text = stringResource(screen.titleId),
-                            color = if (isSelected) selectedContentColor else unselectedContentColor,
+                            color = if (isSelected) selectedContentColor else unselectedIconTint,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 12.sp,
-                            modifier = Modifier.additiveChrome(useGlass && !isSelected),
+                            modifier = Modifier.additiveChrome(useGlass && !isSelected && ambientColor.isSpecified),
                         )
                     },
                     icon = {
@@ -499,7 +522,7 @@ private fun AppFloatingNavBarChrome(
                                 screen.icon(appleMusicUi)
                             ),
                             contentDescription = stringResource(screen.titleId),
-                            tint = if (isSelected) selectedContentColor else unselectedContentColor,
+                            tint = if (isSelected) selectedContentColor else unselectedIconTint,
                             modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected),
                         )
                     },
@@ -599,9 +622,14 @@ fun NavBarSearchInputBar(
     state: NavSearchState,
     pureBlack: Boolean,
     modifier: Modifier,
+    // Measured expanded nav-bar row height when known — the pill holds it so
+    // it is exactly as tall as the nav bar. Null falls back to
+    // NavBarSearchBarHeight (first-ever composition straight into search).
+    targetHeight: Dp? = null,
 ) {
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
+    val ambientColor = LocalAmbientBackgroundColor.current.value
     // On glass, take the adaptive glass content colour rather than a flat white —
     // the search field is the one piece of chrome the user is actively reading.
     val onTint = when {
@@ -609,6 +637,12 @@ fun NavBarSearchInputBar(
         pureBlack -> Color.White
         else -> AppTheme.colorScheme.onSurface
     }
+    val searchIconTint = when {
+        useGlass && ambientColor.isSpecified -> ambientColor.asSoftIconTint()
+        else -> onTint
+    }
+    val searchRimTint = if (ambientColor.isSpecified) ambientColor.asRimPop() else Color.White
+    val searchHighlightAlpha = if (ambientColor.isSpecified) 0.48f else 0.30f
     val pillShape = ContinuousRoundedRectangle(percent = 50)
     val coroutineScope = rememberCoroutineScope()
     // Finger-tracking glow, same as the nav bar puck's InteractiveHighlight: a
@@ -637,15 +671,18 @@ fun NavBarSearchInputBar(
             // not floating with a gap above it.
             .padding(horizontal = 16.dp)
             .padding(top = 6.dp, bottom = 2.dp)
-            .height(NavBarSearchBarHeight)
+            .height(targetHeight ?: NavBarSearchBarHeight)
             .graphicsLayer(elasticStretchLayerBlock(pillGlow))
             .clip(pillShape)
             .then(
                 if (useGlass) {
                     Modifier.liquidGlass(
-                        config = glassConfig.copy(surfaceOpacity = 0.12f),
+                        config = glassConfig.copy(
+                            surfaceOpacity = if (ambientColor.isSpecified) 0.36f else 0.12f,
+                        ),
                         shape = pillShape,
-                        highlightAlpha = 0.3f,
+                        highlightAlpha = searchHighlightAlpha,
+                        rimTintColor = searchRimTint,
                     )
                 } else {
                     Modifier.background(onTint.copy(alpha = 0.15f))
@@ -664,7 +701,7 @@ fun NavBarSearchInputBar(
             Icon(
                 painter = painterResource(R.drawable.arrow_back),
                 contentDescription = stringResource(R.string.dismiss),
-                tint = onTint,
+                tint = searchIconTint,
                 modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
             )
         }
@@ -717,7 +754,7 @@ fun NavBarSearchInputBar(
                 Icon(
                     painter = painterResource(R.drawable.close),
                     contentDescription = null,
-                    tint = onTint,
+                    tint = searchIconTint,
                     modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
                 )
             }
@@ -737,7 +774,7 @@ fun NavBarSearchInputBar(
                         }
                     ),
                     contentDescription = null,
-                    tint = onTint,
+                    tint = searchIconTint,
                     modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
                 )
             }

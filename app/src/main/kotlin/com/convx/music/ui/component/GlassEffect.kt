@@ -7,6 +7,7 @@ package com.convx.music.ui.component
 
 import android.app.ActivityManager
 import android.os.Build
+import com.convx.music.LocalAmbientBackgroundColor
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.ios.compat.AppTheme
@@ -36,8 +37,7 @@ import com.convx.music.ui.component.backdrop.effects.lens
 import com.convx.music.ui.component.backdrop.highlight.Highlight
 import com.convx.music.ui.component.backdrop.highlight.HighlightStyle
 import com.convx.music.ui.component.backdrop.shadow.Shadow
-import com.convx.music.ui.component.backdrop.highlight.HighlightElement
-import com.convx.music.ui.component.backdrop.internal.ShapeProvider
+import com.convx.music.ui.utils.outerDarkRim
 
 /**
  * User-configurable parameters of the liquid glass effect, sourced from DataStore
@@ -416,17 +416,25 @@ fun Modifier.liquidGlass(
     val saturation = glassSaturation(config.vibrancy)
     val lensHeightPx = with(density) { (config.lensHeight * LENS_MAX_DP).dp.toPx() } * resolutionScale
     val lensAmountPx = with(density) { (config.lensAmount * LENS_MAX_DP).dp.toPx() } * resolutionScale
+    val ambientColor = LocalAmbientBackgroundColor.current.value
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     // Apple's Liquid Glass is a bright, reflective material: even in dark mode it
     // reads as a distinctly lighter "frosted" surface, not a near-black rectangle
     // that blends into an OLED-black background. Honor an explicit user color,
-    // otherwise use a proper adaptive glass gray rather than matching the theme
-    // surface color 1:1 (which made the bar invisible over pure-black content).
-    val surfaceTintColor = if (config.surfaceTintColor.isSpecified) {
-        config.surfaceTintColor
-    } else if (AppTheme.colorScheme.surface.luminance() > 0.5f) {
-        Color(0xFFFAFAFA)
-    } else {
-        Color(0xFF4A4A4E)
+    // otherwise carry the screen's mesh hue at 20% into the neutral frost so the
+    // surface feels tinted without going colorful, falling back to adaptive
+    // glass gray when no hero ambient is active.
+    val surfaceTintColor = when {
+        config.surfaceTintColor.isSpecified -> config.surfaceTintColor
+        ambientColor.isSpecified -> ambientColor.asAmbientSurfaceTint(isDark)
+        isDark -> Color(0xFF4A4A4E)
+        else -> Color(0xFFFAFAFA)
+    }
+    // Hero-art screens use the pre-defined ambient treatment (0.36) instead of
+    // the user's global surfaceOpacity — the normal bar's own values land later.
+    val effectiveSurfaceOpacity = when {
+        ambientColor.isSpecified && !config.surfaceTintColor.isSpecified -> 0.36f
+        else -> config.surfaceOpacity.coerceIn(0f, 1f)
     }
 
     // Translucent style short-circuits everything below: no backdrop is sampled and
@@ -446,7 +454,7 @@ fun Modifier.liquidGlass(
     if (shouldUseTranslucentGlassFallback(config.style, isRenderEffectSupported())) {
         return this
             .clip(shape)
-            .background(surfaceTintColor.copy(alpha = config.surfaceOpacity.coerceIn(0f, 1f)))
+            .background(surfaceTintColor.copy(alpha = effectiveSurfaceOpacity))
     }
 
     // ponytail: frozen mid-sweep. The drift described at [HighlightAngleMin] was a
@@ -528,12 +536,20 @@ fun Modifier.liquidGlass(
     val rimColor = when {
         config.highlightColor.isSpecified -> config.highlightColor
         rimTintColor.isSpecified -> rimTintColor
+        ambientColor.isSpecified -> ambientColor.asRimPop()
         else -> Color.White
+    }
+    // On Home / default screens, highlight alpha is minimal (0.30f off-white).
+    // On hero-tinted screens, the opacity slightly increases (0.48f) so the saturated rim highlight is felt.
+    val baseHighlightAlpha = when {
+        highlightAlpha != EdgeHighlightAlpha -> highlightAlpha
+        ambientColor.isSpecified || rimTintColor.isSpecified -> 0.48f
+        else -> 0.30f
     }
     // Call sites pass a per-component alpha (the nav bar wants a dimmer rim than a
     // button). Scale the user's setting by it rather than replacing it, so both the
     // per-component tuning and the preference still mean something.
-    val rimAlpha = (highlightAlpha * (config.highlightOpacity / EdgeHighlightAlpha)).coerceIn(0f, 1f)
+    val rimAlpha = (baseHighlightAlpha * (config.highlightOpacity / EdgeHighlightAlpha)).coerceIn(0f, 1f)
 
     val highlightBlock: (() -> Highlight?)? = remember(applyEdgeEffects, plainBlur, rimColor, rimAlpha, rimTintColor, animatedHighlightAngle) {
         if (applyEdgeEffects && !plainBlur) {
@@ -555,37 +571,22 @@ fun Modifier.liquidGlass(
         if (applyEdgeEffects) ({ Shadow.Default }) else null
     }
 
-    // The light rim reads as lit glass on a dark background but disappears on a light
-    // one. A second rim stroke on the exact opposite edge — same width, fade and
-    // alpha as the light rim, just angled 180° around and colour-locked to black
-    // instead of adaptive — is what keeps the glass edge visible either way, the
-    // way a real glass sliver's underside catches a dark line regardless of what's
-    // behind it. Same Highlight mechanism as the light rim (not a blurred inner
-    // shadow), so the two fades match exactly and only mirror in direction.
-    val darkRimBlock: (() -> Highlight?)? = remember(applyEdgeEffects, plainBlur, rimAlpha, animatedHighlightAngle) {
-        if (applyEdgeEffects && !plainBlur) {
-            {
-                Highlight(
-                    width = EdgeHighlightWidth,
-                    style = HighlightStyle.Default(
-                        color = Color.Black.copy(alpha = rimAlpha),
-                        angle = animatedHighlightAngle + 180f,
-                    ),
-                )
-            }
-        } else {
-            null
-        }
-    }
-    val darkRimShapeProvider = remember(shapeBlock) { ShapeProvider(shapeBlock) }
+    // Dark outer outline, the counterpart to the light rim: a thin black ring
+    // drawn unclipped so it sits OUTSIDE the light rim as the outermost layer
+    // (wider stroke, opposite side emphasized by pairing, dimmer alpha). What
+    // keeps a glass edge visible on light or busy surfaces, the way a real
+    // glass sliver's underside catches a dark line regardless of what's
+    // behind it. Must be a normal-blend stroke (see outerDarkRim): the old
+    // Plus-blend black Highlight added zero and was a no-op.
+    val darkRimAlpha = (DarkRimAlpha * (config.highlightOpacity / EdgeHighlightAlpha)).coerceIn(0f, 1f)
 
     // RenderEffect is guaranteed supported past this point — the unsupported
     // case already returned the translucent-tint fallback above.
-    val surfaceBlock: DrawScope.() -> Unit = remember(surfaceTintColor, config.surfaceOpacity) {
+    val surfaceBlock: DrawScope.() -> Unit = remember(surfaceTintColor, effectiveSurfaceOpacity) {
         {
-            if (config.surfaceOpacity > 0f) {
+            if (effectiveSurfaceOpacity > 0f) {
                 drawRect(
-                    color = surfaceTintColor.copy(alpha = config.surfaceOpacity),
+                    color = surfaceTintColor.copy(alpha = effectiveSurfaceOpacity),
                     size = size,
                 )
             }
@@ -603,10 +604,16 @@ fun Modifier.liquidGlass(
         frozen = frozen,
         loopBucket = loopBucket,
     ).then(
-        if (darkRimBlock != null) {
-            HighlightElement(shapeProvider = darkRimShapeProvider, highlight = darkRimBlock)
+        if (applyEdgeEffects && !plainBlur && darkRimAlpha > 0f) {
+            Modifier.outerDarkRim(shape = shape, width = DarkRimWidth, alpha = darkRimAlpha)
         } else {
             Modifier
         }
     )
 }
+
+/** Dark outer outline paired with [EdgeHighlightWidth]'s light rim: wider so
+ *  it extends past it as the outermost layer, dimmer so it outlines without
+ *  dirtying the glass. */
+private val DarkRimWidth = 1.6.dp
+private const val DarkRimAlpha = 0.32f

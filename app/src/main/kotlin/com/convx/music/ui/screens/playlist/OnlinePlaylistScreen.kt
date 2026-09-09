@@ -160,7 +160,7 @@ import com.convx.music.ui.component.YouTubeListItem
 import com.convx.music.ui.component.isGlassAllowed
 import androidx.compose.ui.graphics.isSpecified
 import com.convx.music.LocalAmbientBackgroundColor
-import com.convx.music.ui.component.asIconPop
+import com.convx.music.ui.component.asSoftIconTint
 import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -796,7 +796,7 @@ fun OnlinePlaylistScreen(
                 }
 
                 val ambientColor = LocalAmbientBackgroundColor.current.value
-                val pillIconTint = if (useGlass && ambientColor.isSpecified) ambientColor.asIconPop() else chromeContentColor
+                val pillIconTint = if (useGlass && ambientColor.isSpecified) ambientColor.asSoftIconTint() else chromeContentColor
                 Row(
                     modifier = Modifier
                         .height(48.dp)

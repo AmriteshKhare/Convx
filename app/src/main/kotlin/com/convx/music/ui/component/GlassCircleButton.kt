@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
@@ -110,11 +111,17 @@ fun GlassCircleButton(
     // and its effect values rather than only the global one.
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
 
+    val ambientColor = com.convx.music.LocalAmbientBackgroundColor.current.value
+    // Single limelight: no local rim computation — pass an explicit caller tint
+    // through, otherwise Unspecified so liquidGlass derives the same shared
+    // ambient rim every other glass surface on this screen uses.
+    val highlightAlpha = if (ambientColor.isSpecified || rimTintColor.isSpecified) 0.48f else 0.30f
+
     val backgroundModifier = if (useGlass) {
         Modifier.liquidGlass(
             config = glassConfig,
             shape = GlassCircleShape,
-            highlightAlpha = 0.3f,
+            highlightAlpha = highlightAlpha,
             rimTintColor = rimTintColor,
             // backdropScale is left at liquidGlass's default
             // (glassResolutionScale of the blur radius) so these record their
@@ -126,7 +133,11 @@ fun GlassCircleButton(
             .clip(GlassCircleShape)
             .background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f))
     }
-    val contentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface
+    val contentColor = when {
+        useGlass && ambientColor.isSpecified -> ambientColor.asSoftIconTint()
+        useGlass -> glassConfig.textColor
+        else -> AppTheme.colorScheme.onSurface
+    }
 
     val interactionSource = remember { MutableInteractionSource() }
     val elasticStretch = rememberElasticStretch()

@@ -8,14 +8,12 @@ package com.convx.music.ui.player
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -71,7 +69,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.util.fastCoerceIn
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -94,6 +91,11 @@ import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.ui.component.ScrollingWaveformSeekBar
 import com.convx.music.ui.component.floatingtabbar.SearchBarRowHeight
 import com.convx.music.ui.component.rememberPlaybackFraction
+import androidx.compose.ui.graphics.isSpecified
+import com.convx.music.LocalAmbientBackgroundColor
+import com.convx.music.ui.component.asSoftIconTint
+import com.convx.music.ui.component.elasticStretchLayerBlock
+import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.utils.resize
 import com.convx.music.utils.rememberPreference
@@ -137,12 +139,17 @@ fun FloatingMiniPlayer(
     onSnapRelease: () -> Unit = {},
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
-    // Transport glyphs are solid (filled) shapes; at full source alpha their
-    // double Plus pass clips every covered pixel to pure white (see FloatingNavBar
-    // tab icons -- hollow strokes leave backdrop hue to read through). Cut the
-    // additive source so the second pass stays under the clip ceiling and the
-    // ambient tint survives like the tab icons do.
-    val transportTint = if (useGlass) contentColor.copy(alpha = 0.45f) else contentColor
+    val ambientColor = LocalAmbientBackgroundColor.current.value
+    // Play/pause stays fully opaque; secondary transport keeps its dim.
+    val playTint = when {
+        useGlass && ambientColor.isSpecified -> ambientColor
+        else -> contentColor
+    }
+    val transportTint = when {
+        useGlass && ambientColor.isSpecified -> ambientColor.asSoftIconTint().copy(alpha = 0.65f)
+        useGlass -> contentColor.copy(alpha = 0.45f)
+        else -> contentColor
+    }
     val context = LocalContext.current
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
@@ -169,18 +176,16 @@ fun FloatingMiniPlayer(
     val densityScale = density.density
 
     val offsetXAnimatable = remember { Animatable(0f) }
-    // Raw finger travel for the pill stretch, both axes. Fed by a passive
-    // observer below (never consumes), so it tracks from the first pixel
-    // and can never lose the drag to the skip detector.
-    val stretchDragX = remember { Animatable(0f) }
-    val stretchDragY = remember { Animatable(0f) }
+    // Stretch visual comes from the shared search-pill elastic formula
+    // (elasticStretchLayerBlock + glow); skip slide stays on offsetX below.
+    // Center drag stretches only, edge flick skips -- see pointerInput.
+    val glowScope = rememberCoroutineScope()
+    val glow = remember(glowScope) { InteractiveHighlight(animationScope = glowScope) }
     var dragStartTime by remember { mutableLongStateOf(0L) }
     var totalDragDistance by remember { mutableFloatStateOf(0f) }
-    // Underdamped on purpose: releasing the pill (drag-cancel, or after a skip
-    // commits) should overshoot past center and settle back with one visible
-    // bounce -- a rubber-band snap, not a flat glide to rest.
+    // Tight return: settles without overshoot past center.
     val animationSpec = remember {
-        spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+        spring<Float>(dampingRatio = 0.85f, stiffness = 700f)
     }
     // Commit distance for the swipe. The logistic curve this replaces produced
     // ~400dp — about 1200px at 3x, on a screen 1080px wide — so releasing the pill
@@ -192,16 +197,8 @@ fun FloatingMiniPlayer(
         (screenWidthPx * (0.45f - 0.33f * swipeSensitivity.coerceIn(0f, 1f))).roundToInt()
     }
 
-    // Pill press state. One scale path only (the stretch below): a second
-    // press scale on top of it beat at a different spring and read as fighting.
+    // Pill press state for tap animations below.
     val pressInteractionSource = remember { MutableInteractionSource() }
-    val isPressed by pressInteractionSource.collectIsPressedAsState()
-    // Hold ramp for the pill stretch below. Same curve the nav pills use.
-    val stretchPress by animateFloatAsState(
-        targetValue = if (isPressed) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = 300f),
-        label = "miniStretchPress",
-    )
     // Single tap opens; a hold does not. The row click below fires on any
     // release, so gate it on press duration here.
     val viewConfig = LocalViewConfiguration.current
@@ -237,22 +234,10 @@ fun FloatingMiniPlayer(
     Box(
         contentAlignment = Alignment.CenterStart,
         modifier = Modifier
-            // Whole-pill stretch outside the caller's pill clip/glass below:
-            // trails the finger and deforms along it, on both axes, unclipped.
-            .graphicsLayer {
-                clip = false
-                val h = size.height
-                if (h > 0f) {
-                    val w = size.width.coerceAtLeast(1f)
-                    val pullX = (stretchDragX.value / w).fastCoerceIn(-1f, 1f)
-                    val pullY = (stretchDragY.value / h).fastCoerceIn(-1f, 1f)
-                    val unit = 4.dp.toPx() / h
-                    scaleX = 1f + unit * stretchPress + unit * abs(pullX) - 0.5f * unit * abs(pullY)
-                    scaleY = 1f + unit * stretchPress + unit * abs(pullY) - 0.5f * unit * abs(pullX)
-                    translationX = stretchDragX.value * 0.2f
-                    translationY = stretchDragY.value * 0.2f
-                }
-            }
+            // Same tanh-damped stretch as the search pill, draw-only.
+            // Wide pills (expanded accessory, tab-view pill) run 2x so the
+            // travel reads at pill size -- same as bar pills elsewhere.
+            .graphicsLayer(elasticStretchLayerBlock(glow, magnitude = if (isInline) 1f else 2f))
             .then(modifier)
             // Source end of the mini-to-full container morph. Outside .then(modifier)
             // so it measures the pill as the nav bar actually places it.
@@ -268,37 +253,38 @@ fun FloatingMiniPlayer(
                 drawInPlace = { !PlayerMorph.active },
             )
             .onSizeChanged { measuredHeightPx = it.height }
-            // The mini's only gesture. Tracks the finger from the first pixel
-            // on both axes for the stretch (reads only, never consumes, so the
-            // list behind still scrolls); slides content for skip; commits
-            // skip on release for a quick swipe only — a hold-and-drag
-            // stretches but never skips.
+            // Finger-following glow, same as the search pill.
+            .then(glow.gestureModifier)
+            .then(glow.modifier)
+            // Edge-flick skip only: center drag stretches (via glow above)
+            // but never slides or commits. Snaps hop to the card scope.
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val pid = down.id
                     val start = down.position
+                    val edgePx = with(density) { 24.dp.toPx() }
+                    val verticalCapPx = with(density) { 12.dp.toPx() }
+                    val isEdgeZone = start.x < edgePx || start.x > size.width - edgePx
+                    val allowSwipe = swipeEnabled && isEdgeZone
                     dragStartTime = System.currentTimeMillis()
                     totalDragDistance = 0f
                     var lastAdjustedX = 0f
-                    coroutineScope.launch {
-                        launch { stretchDragX.snapTo(0f) }
-                        launch { stretchDragY.snapTo(0f) }
-                    }
+                    var maxAbsY = 0f
+                    // Local slide accumulator: the async snap below can't be
+                    // read back for the commit gate without racing it.
+                    var slideX = offsetXAnimatable.value
                     while (true) {
                         val change = awaitPointerEvent().changes.firstOrNull { it.id == pid }
                         if (change == null || !change.pressed) break
                         val raw = change.position - start
+                        maxAbsY = maxOf(maxAbsY, abs(raw.y))
                         val adjustedX =
                             if (layoutDirection == LayoutDirection.Rtl) -raw.x else raw.x
                         val delta = adjustedX - lastAdjustedX
                         lastAdjustedX = adjustedX
                         totalDragDistance += abs(delta)
-                        coroutineScope.launch {
-                            launch { stretchDragX.snapTo(raw.x) }
-                            launch { stretchDragY.snapTo(raw.y) }
-                        }
-                        if (swipeEnabled) {
+                        if (allowSwipe) {
                             val canSkipPrevious =
                                 playerConnection.player.previousMediaItemIndex != -1
                             val canSkipNext =
@@ -306,12 +292,14 @@ fun FloatingMiniPlayer(
                             val allowLeft = delta < 0 && canSkipNext
                             val allowRight = delta > 0 && canSkipPrevious
                             val canReturnToCenter =
-                                (delta > 0 && !canSkipPrevious && offsetXAnimatable.value < 0) ||
-                                    (delta < 0 && !canSkipNext && offsetXAnimatable.value > 0)
+                                (delta > 0 && !canSkipPrevious && slideX < 0) ||
+                                    (delta < 0 && !canSkipNext && slideX > 0)
                             if (allowLeft || allowRight || canReturnToCenter) {
-                                coroutineScope.launch {
-                                    offsetXAnimatable.snapTo(offsetXAnimatable.value + delta)
-                                }
+                                // snapTo can't run in this restricted pointer
+                                // scope, so hop to the card scope (one cheap
+                                // snap, down from three launches per move).
+                                slideX += delta
+                                coroutineScope.launch { offsetXAnimatable.snapTo(slideX) }
                             }
                         }
                     }
@@ -320,15 +308,16 @@ fun FloatingMiniPlayer(
                     // ~7.4px/ms against a mean of 1-3 for a real swipe, so that
                     // branch never fired either.
                     val velocity = if (duration > 0) totalDragDistance / duration else 0f
-                    val currentOffset = offsetXAnimatable.value
+                    val currentOffset = slideX
                     val dragged = abs(currentOffset)
                     val canSkipPrevious =
                         playerConnection.player.previousMediaItemIndex != -1
                     val canSkipNext =
                         playerConnection.player.nextMediaItemIndex != -1
-                    // Quick swipe only: past the commit distance, or a flick.
-                    // A hold-and-drag fails the duration gate by definition.
-                    val shouldChangeSong = swipeEnabled &&
+                    // Quick edge flick only, flat: hold-drag and vertical
+                    // travel fail the gates by definition.
+                    val shouldChangeSong = allowSwipe &&
+                        maxAbsY < verticalCapPx &&
                         duration < viewConfig.longPressTimeoutMillis &&
                         (dragged > autoSwipeThreshold ||
                             (velocity > 0.55f && dragged > autoSwipeThreshold * 0.25f))
@@ -344,13 +333,11 @@ fun FloatingMiniPlayer(
                     }
                     if (totalDragDistance > viewConfig.touchSlop) onSnapRelease()
                     coroutineScope.launch {
-                        launch { offsetXAnimatable.animateTo(0f, animationSpec) }
-                        launch { stretchDragX.animateTo(0f, animationSpec) }
-                        launch { stretchDragY.animateTo(0f, animationSpec) }
+                        offsetXAnimatable.animateTo(0f, animationSpec)
                     }
                 }
             }
-            // Tap opens the full player via the inner clickable below.
+            // Tap opens only via thumbnail below; the row click is anim-only.
     ) {
         // Fixed sizes for both phone accessory strips (isInline and the default
         // !tabStyle wave bar) — neither's resting height ever changes, so there is
@@ -369,7 +356,10 @@ fun FloatingMiniPlayer(
         // measuredHeight for tabStyle removes the self-reference entirely for
         // the wave bar, the case most phones actually see.
         val animatedHeightPx by animateIntAsState(
-            targetValue = measuredHeightPx,
+            // Phone strips are fixed height after Q1; only the tablet pill
+            // scales off the measurement. Constant target breaks the
+            // content->measure->content feedback loop for phones.
+            targetValue = if (tabStyle) measuredHeightPx else with(density) { 64.dp.roundToPx() },
             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
             label = "miniPlayerMeasuredHeight",
         )
@@ -389,7 +379,8 @@ fun FloatingMiniPlayer(
                 .clickable(
                     interactionSource = pressInteractionSource,
                     indication = null,
-                    onClick = tapOpen,
+                    // Thumb opens (see artwork below); middle tap animates only.
+                    onClick = {},
                 )
                 .padding(
                     horizontal = if (isInline) 10.dp else 12.dp,
@@ -412,6 +403,11 @@ fun FloatingMiniPlayer(
                     error = rememberNoArtworkPainter(),
                     modifier = Modifier
                         .size(artSize)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = tapOpen,
+                        )
                         // Registers this box's on-screen bounds for
                         // PlayerArtworkMorphOverlay -- this is the real, visible mini
                         // player (docked in the floating nav bar); MiniPlayer.kt's own
@@ -457,7 +453,7 @@ fun FloatingMiniPlayer(
                     // mid-transition.
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlaying,
-                        tint = transportTint,
+                        tint = playTint,
                         size = 20.dp,
                     )
                 }
@@ -488,6 +484,11 @@ fun FloatingMiniPlayer(
                     error = rememberNoArtworkPainter(),
                     modifier = Modifier
                         .size(artSize)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = tapOpen,
+                        )
                         // Registers this box's on-screen bounds for
                         // PlayerArtworkMorphOverlay -- this is the real, visible mini
                         // player (docked in the floating nav bar); MiniPlayer.kt's own
@@ -551,7 +552,7 @@ fun FloatingMiniPlayer(
                 ) {
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlaying,
-                        tint = transportTint,
+                        tint = playTint,
                         size = playIconSize,
                     )
                 }
@@ -605,7 +606,7 @@ fun FloatingMiniPlayer(
                 ) {
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlaying,
-                        tint = transportTint,
+                        tint = playTint,
                         size = playIconSize,
                     )
                 }
@@ -650,6 +651,11 @@ fun FloatingMiniPlayer(
                     error = rememberNoArtworkPainter(),
                     modifier = Modifier
                         .size(artSize)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = tapOpen,
+                        )
                         // Registers this box's on-screen bounds for
                         // PlayerArtworkMorphOverlay -- this is the real, visible mini
                         // player (docked in the floating nav bar); MiniPlayer.kt's own
