@@ -188,6 +188,14 @@ private enum class FloatingTabBarVisual { INLINE, EXPANDED, SEARCH_EXPANDED }
 // nav bar (see expandedContentHeightPx).
 internal val SearchBarRowHeight = 48.dp
 
+// Fallback expanded-row height until ExpandedBar has measured itself once
+// (e.g. first-ever composition straight into search mode, where there is no
+// measurement to hold). Mirrors the expanded row's content math at fontScale
+// 1 — 34dp icon + 2dp gap + ~16dp title + 8dp tab padding + 8dp bar padding —
+// so the search pill never renders at the short icon-only height. Replaced by
+// the exact measured value as soon as one exists.
+internal val NavBarRowFallbackHeight = 68.dp
+
 // The standalone tab's outer size is fixed by the row's aspectRatio. Insetting
 // the circle by this much before it sizes itself reserves room for
 // elasticStretchLayerBlock's press/drag overshoot (a draw-only graphicsLayer
@@ -1109,12 +1117,12 @@ private fun SharedTransitionScope.SearchExpandedBar(
             horizontalArrangement = Arrangement.spacedBy(sizes.componentSpacing),
             verticalAlignment = Alignment.CenterVertically,
             // Measured expanded-row height when known (same height as the nav
-            // bar); otherwise the tallest child's intrinsic height so a short
-            // searchBarContent can't shrink the row below its content.
+            // bar); otherwise the shared fallback estimate so the pill never
+            // renders at its short icon-only intrinsic height.
             modifier = if (targetHeightPx != null && targetHeightPx > 0) {
                 Modifier.height(with(density) { targetHeightPx.toDp() }).then(targetWidthModifier)
             } else {
-                Modifier.height(IntrinsicSize.Max).then(targetWidthModifier)
+                Modifier.height(NavBarRowFallbackHeight).then(targetWidthModifier)
             }
         ) {
             if (inlineTab != null) {

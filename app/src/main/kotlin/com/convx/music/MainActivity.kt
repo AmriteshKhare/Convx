@@ -110,6 +110,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -311,6 +312,7 @@ import com.convx.music.utils.reportException
 import com.convx.music.utils.setAppLocale
 import com.convx.music.viewmodels.HistoryViewModel
 import com.convx.music.ui.component.floatingtabbar.rememberFloatingTabBarScrollConnection
+import com.convx.music.ui.component.floatingtabbar.NavBarRowFallbackHeight
 import com.convx.music.viewmodels.HomeViewModel
 import com.convx.music.vivimusic.UpdateNotificationHelper
 import com.convx.music.vivimusic.updater.checkForUpdate
@@ -2100,6 +2102,15 @@ class MainActivity : ComponentActivity() {
                                             .padding(start = sideBarContentInset),
                                     ) {
                                         val pillWidth = maxWidth * FloatingMiniPlayerWidthFraction
+                                        // Last measured height of the tab-view Now Playing
+                                        // pill, held so the search input bar replacing
+                                        // it renders at the same height.
+                                        var tabViewPillHeightPx by remember { mutableStateOf<Int?>(null) }
+                                        val tabViewDensity = LocalDensity.current
+                                        val tabViewPillHeight = tabViewPillHeightPx
+                                            ?.takeIf { it > 0 }
+                                            ?.let { with(tabViewDensity) { it.toDp() } }
+                                            ?: NavBarRowFallbackHeight
                                         AnimatedContent(
                                             targetState = inSearchScreen,
                                             transitionSpec = {
@@ -2131,11 +2142,15 @@ class MainActivity : ComponentActivity() {
                                                 NavBarSearchInputBar(
                                                     state = navSearchState,
                                                     pureBlack = pureBlack,
+                                                    // Holds the Now Playing pill's own measured
+                                                    // height so the swap doesn't shrink the bar.
+                                                    targetHeight = tabViewPillHeight,
                                                     modifier = Modifier.width(pillWidth),
                                                 )
                                             } else if (playerMediaMetadata != null) {
                                                 AppFloatingNowPlayingPill(
                                                     onClick = { playerBottomSheetState.expandSoft() },
+                                                    modifier = Modifier.onSizeChanged { tabViewPillHeightPx = it.height },
                                                     onLyricsClick = {
                                                         playerBottomSheetState.expandSoft()
                                                         playerConnection?.requestShowLyrics?.value = true

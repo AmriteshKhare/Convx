@@ -82,6 +82,7 @@ import com.convx.music.ui.screens.Screens
 import com.convx.music.ui.screens.search.DynamicSearchPlaceholder
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBar
 import com.convx.music.ui.component.floatingtabbar.LocalTabBarBackdropFrozen
+import com.convx.music.ui.component.floatingtabbar.NavBarRowFallbackHeight
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBarDefaults
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBarScrollConnection
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -97,9 +98,8 @@ private val NavBarShape = ContinuousRoundedRectangle(percent = 50)
 
 // Fallback height for the keyboard-active search pill before the expanded
 // nav-bar row has ever been measured (e.g. first-ever composition straight
-// into search mode). Once measured, the pill holds that exact height so it
-// is as tall as the nav bar.
-private val NavBarSearchBarHeight = 48.dp
+// into search mode) — the shared estimate in floatingtabbar. Once measured,
+// the pill holds that exact height so it is as tall as the nav bar.
 
 // Width the expanded row needs for everything that is NOT a tab slot: the
 // standalone search circle (a square as tall as the row — ~57dp at fontScale 1,
@@ -624,7 +624,7 @@ fun NavBarSearchInputBar(
     modifier: Modifier,
     // Measured expanded nav-bar row height when known — the pill holds it so
     // it is exactly as tall as the nav bar. Null falls back to
-    // NavBarSearchBarHeight (first-ever composition straight into search).
+    // NavBarRowFallbackHeight (first-ever composition straight into search).
     targetHeight: Dp? = null,
 ) {
     val glassConfig = LocalGlassEffectConfig.current
@@ -671,7 +671,7 @@ fun NavBarSearchInputBar(
             // not floating with a gap above it.
             .padding(horizontal = 16.dp)
             .padding(top = 6.dp, bottom = 2.dp)
-            .height(targetHeight ?: NavBarSearchBarHeight)
+            .height(targetHeight ?: NavBarRowFallbackHeight)
             .graphicsLayer(elasticStretchLayerBlock(pillGlow))
             .clip(pillShape)
             .then(
