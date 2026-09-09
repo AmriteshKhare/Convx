@@ -69,8 +69,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.convx.music.R
@@ -82,7 +80,6 @@ import com.convx.music.ui.screens.Screens
 import com.convx.music.ui.screens.search.DynamicSearchPlaceholder
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBar
 import com.convx.music.ui.component.floatingtabbar.LocalTabBarBackdropFrozen
-import com.convx.music.ui.component.floatingtabbar.NavBarRowFallbackHeight
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBarDefaults
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBarScrollConnection
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -96,10 +93,10 @@ import kotlinx.coroutines.launch
 // drag-to-search morph (see FloatingTabBar's ExpandedTabs).
 private val NavBarShape = ContinuousRoundedRectangle(percent = 50)
 
-// Fallback height for the keyboard-active search pill before the expanded
-// nav-bar row has ever been measured (e.g. first-ever composition straight
-// into search mode) — the shared estimate in floatingtabbar. Once measured,
-// the pill holds that exact height so it is as tall as the nav bar.
+// Matches FloatingTabBar's own SearchBarRowHeight (the search-expanded row's
+// height, itself matched to the inline mini player's shrunk height) so the
+// bar doesn't visibly resize the moment the keyboard opens.
+private val NavBarSearchBarHeight = 48.dp
 
 // Width the expanded row needs for everything that is NOT a tab slot: the
 // standalone search circle (a square as tall as the row — ~57dp at fontScale 1,
@@ -160,19 +157,6 @@ fun AppFloatingNavBar(
 ) {
     val navSearch = LocalNavSearchState.current
 
-    // Last measured size of the normal (all-tabs) expanded row, held across
-    // the switch into search mode so the bar doesn't visibly resize — search
-    // mode's row targets this same size instead of filling available space
-    // (width) or shrinking to its icon-only content (height). Hoisted here
-    // (not in the chrome below) so the keyboard-active input bar replacing
-    // the whole chrome can hold the same height too.
-    var expandedContentWidthPx by remember { mutableStateOf<Int?>(null) }
-    var expandedContentHeightPx by remember { mutableStateOf<Int?>(null) }
-    val density = LocalDensity.current
-    val searchPillHeight: Dp? = expandedContentHeightPx
-        ?.takeIf { it > 0 }
-        ?.let { with(density) { it.toDp() } }
-
     // Slide + spring bounce instead of a flat Crossfade: the mini player/current-
     // screen icon side drops down and out, the keyboard pill rises up and in
     // (and reverses on the way back). Bouncier (Medium) coming in, no-bounce
@@ -204,7 +188,6 @@ fun AppFloatingNavBar(
             NavBarSearchInputBar(
                 state = navSearch,
                 pureBlack = pureBlack,
-                targetHeight = searchPillHeight,
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
@@ -221,10 +204,6 @@ fun AppFloatingNavBar(
                 searchModeActive = navSearch.visualActive,
                 navSearch = navSearch,
                 tabPosition = tabPosition,
-                expandedContentWidthPx = expandedContentWidthPx,
-                onExpandedWidthChanged = { expandedContentWidthPx = it },
-                expandedContentHeightPx = expandedContentHeightPx,
-                onExpandedHeightChanged = { expandedContentHeightPx = it },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -245,16 +224,17 @@ private fun AppFloatingNavBarChrome(
     searchModeActive: Boolean,
     navSearch: NavSearchState,
     tabPosition: (() -> Float?)?,
-    expandedContentWidthPx: Int?,
-    onExpandedWidthChanged: ((Int) -> Unit)?,
-    expandedContentHeightPx: Int?,
-    onExpandedHeightChanged: ((Int) -> Unit)?,
     modifier: Modifier,
 ) {
     // System back while search-expanded/search-inline (keyboard not active yet,
     // that state has its own BackHandler in NavBarSearchInputBar) -> same
     // animate-then-navigate exit as the bar's own back arrow / icon tap.
     BackHandler(enabled = searchModeActive, onBack = navSearch.onExit)
+
+    // Last measured width of the normal (all-tabs) expanded row, held across
+    // the switch into search mode so the bar doesn't visibly widen — search
+    // mode's row targets this same width instead of filling all available space.
+    var expandedContentWidthPx by remember { mutableStateOf<Int?>(null) }
 
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
@@ -460,9 +440,7 @@ private fun AppFloatingNavBarChrome(
                 null
             },
             expandedContentWidthPx = expandedContentWidthPx,
-            onExpandedWidthChanged = onExpandedWidthChanged,
-            expandedContentHeightPx = expandedContentHeightPx,
-            onExpandedHeightChanged = onExpandedHeightChanged,
+            onExpandedWidthChanged = { expandedContentWidthPx = it },
         ) {
             tabScreens.forEach { screen ->
                 val isSelected = screen.route == selectedTabKey
@@ -622,10 +600,6 @@ fun NavBarSearchInputBar(
     state: NavSearchState,
     pureBlack: Boolean,
     modifier: Modifier,
-    // Measured expanded nav-bar row height when known — the pill holds it so
-    // it is exactly as tall as the nav bar. Null falls back to
-    // NavBarRowFallbackHeight (first-ever composition straight into search).
-    targetHeight: Dp? = null,
 ) {
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
@@ -671,7 +645,7 @@ fun NavBarSearchInputBar(
             // not floating with a gap above it.
             .padding(horizontal = 16.dp)
             .padding(top = 6.dp, bottom = 2.dp)
-            .height(targetHeight ?: NavBarRowFallbackHeight)
+            .height(NavBarSearchBarHeight)
             .graphicsLayer(elasticStretchLayerBlock(pillGlow))
             .clip(pillShape)
             .then(

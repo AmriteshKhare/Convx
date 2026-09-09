@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Paint
@@ -24,6 +25,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * Flamingo's player-chrome compositing: draw the content into a single layer over what is
@@ -184,9 +189,12 @@ fun Modifier.rimLight(
 /**
  * Dark counterpart to the specular rim: a thin black outline traced on the
  * surface's own edge, drawn WITHOUT clipping so half the stroke sits outside
- * the bounds — the outermost layer, wider than the light rim, at 180° to it
- * in spirit (dark where the light isn't). Reads as an outline that keeps
- * glass legible on any surface, light or photographic.
+ * the bounds — the outermost layer, wider than the light rim.
+ *
+ * Mirrors the light rim's wide-on-edge / slim-at-ends read on TWO sides: the
+ * ring is drawn twice, once per diagonal axis, each pass black at both ends
+ * fading to nothing at its middle — so every side gets a dark outer edge
+ * that swells and slims around the shape instead of a flat uniform line.
  *
  * Normal alpha blend, not Plus: Plus adds zero for black, so a Plus black rim
  * would be a no-op. Applied by [Modifier.liquidGlass] itself; do not stack
@@ -196,17 +204,34 @@ fun Modifier.outerDarkRim(
     shape: Shape,
     width: Dp = 1.6.dp,
     alpha: Float = 0.32f,
+    /** Light rim's angle, degrees — the dark axis is derived from it. */
+    angle: Float = 45f,
 ): Modifier = drawWithCache {
     val outline = shape.createOutline(size, layoutDirection, this)
     val stroke = Stroke(width = width.toPx())
-    val color = Color.Black.copy(alpha = alpha)
+    // One gradient per diagonal axis (canvas coords, y down — same convention
+    // as the highlight shader's cos/sin normal). Each is black at both ends
+    // fading out at its middle, so the two passes swell on opposite sides.
+    val center = Offset(size.width / 2f, size.height / 2f)
+    fun flankBrush(axisDeg: Float): Brush {
+        val a = axisDeg * (PI / 180f).toFloat()
+        val dir = Offset(cos(a), sin(a))
+        // Matched so the shape's own corners land on the black ends.
+        val reach = dir * (abs(dir.x) * size.width + abs(dir.y) * size.height) / 2f
+        return Brush.linearGradient(
+            0f to Color.Black.copy(alpha = alpha),
+            0.5f to Color.Transparent,
+            1f to Color.Black.copy(alpha = alpha),
+            start = center - reach,
+            end = center + reach,
+        )
+    }
+    val firstBrush = flankBrush(angle)
+    val secondBrush = flankBrush(angle + 90f)
     onDrawWithContent {
         drawContent()
-        drawOutline(
-            outline = outline,
-            color = color,
-            style = stroke,
-        )
+        drawOutline(outline = outline, brush = firstBrush, style = stroke)
+        drawOutline(outline = outline, brush = secondBrush, style = stroke)
     }
 }
 /**

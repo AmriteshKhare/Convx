@@ -180,28 +180,12 @@ private const val FastScrollSpeedPx = 120f
 // active (see SearchExpandedBar).
 private enum class FloatingTabBarVisual { INLINE, EXPANDED, SEARCH_EXPANDED }
 
-// Height of the scroll-collapsed inline row (InlineStandaloneTab's own
+// Matches the established inline-row height (InlineStandaloneTab's own
 // defaultMinSize floor at the FloatingNavBar call site, and the inline mini
-// player's own ~48dp content height). The search-expanded row and the
-// keyboard-active input bar no longer use this — they hold the measured
-// expanded-row height instead so the search pill is exactly as tall as the
-// nav bar (see expandedContentHeightPx).
+// player's own ~48dp content height) so the search-expanded row doesn't read
+// shorter than the bar's own shrunk state. Also the shrunk mini player's
+// pinned height (see FloatingMiniPlayer) — one constant, same row height.
 internal val SearchBarRowHeight = 48.dp
-
-// Fallback expanded-row height until ExpandedBar has measured itself once
-// (e.g. first-ever composition straight into search mode, where there is no
-// measurement to hold). Mirrors the expanded row's content math at fontScale
-// 1 — 34dp icon + 2dp gap + ~16dp title + 8dp tab padding + 8dp bar padding —
-// so the search pill never renders at the short icon-only height. Replaced by
-// the exact measured value as soon as one exists.
-internal val NavBarRowFallbackHeight = 68.dp
-
-// The standalone tab's outer size is fixed by the row's aspectRatio. Insetting
-// the circle by this much before it sizes itself reserves room for
-// elasticStretchLayerBlock's press/drag overshoot (a draw-only graphicsLayer
-// transform) to grow into; anything past that paints outside the bar, which is
-// unclipped on purpose.
-private val StandaloneTabOvershootInset = 3.dp
 
 /**
  * A floating tab bar that transitions between inline and expanded states based on scroll behavior.
@@ -264,11 +248,6 @@ fun FloatingTabBar(
     // to filling available space (e.g. first-ever composition in search mode).
     expandedContentWidthPx: Int? = null,
     onExpandedWidthChanged: ((Int) -> Unit)? = null,
-    // Same idea for height: ExpandedBar's last-measured row height, which
-    // SearchExpandedBar holds its row to so the search pill is exactly as tall
-    // as the nav bar. Null/0 falls back to IntrinsicSize.Max (tallest child).
-    expandedContentHeightPx: Int? = null,
-    onExpandedHeightChanged: ((Int) -> Unit)? = null,
     content: FloatingTabBarScope.() -> Unit
 ) {
     // Rebuilt every composition, deliberately not remembered. The tabs hold
@@ -409,8 +388,7 @@ fun FloatingTabBar(
                     animatedVisibilityScope = this@AnimatedContent,
                     backdrop = backdrop,
                     accentColor = accentColor,
-                    onWidthMeasured = onExpandedWidthChanged,
-                    onHeightMeasured = onExpandedHeightChanged
+                    onWidthMeasured = onExpandedWidthChanged
                 )
                 FloatingTabBarVisual.SEARCH_EXPANDED -> SearchExpandedBar(
                     scope = scope,
@@ -424,8 +402,7 @@ fun FloatingTabBar(
                     tabBarContentModifier = tabBarContentModifier,
                     animatedVisibilityScope = this@AnimatedContent,
                     searchBarContent = searchBarContent ?: {},
-                    targetWidthPx = expandedContentWidthPx,
-                    targetHeightPx = expandedContentHeightPx
+                    targetWidthPx = expandedContentWidthPx
                 )
             }
             }
@@ -861,7 +838,10 @@ private fun SharedTransitionScope.InlineStandaloneTab(
         isInline = true,
         isStandalone = true,
         modifier = modifier
-            .padding(StandaloneTabOvershootInset)
+            // No outer inset: the circle holds the full row height so it is
+            // exactly as tall as the nav bar. The elastic stretch below is
+            // draw-only and protrudes past bounds momentarily, which the
+            // unclipped bar shows on purpose.
             // Outside sharedElement: draw-only, so bounds tracking is
             // unaffected, and no overlay clipping can cut the stretch.
             .graphicsLayer(elasticStretchLayerBlock(glow))
@@ -955,10 +935,6 @@ private fun SharedTransitionScope.ExpandedBar(
     // SearchExpandedBar can hold the bar at the exact same overall width
     // instead of expanding to fill all available space in search mode.
     onWidthMeasured: ((Int) -> Unit)? = null,
-    // Same for height: SearchExpandedBar and the keyboard-active input bar
-    // hold this row's height so the search pill is exactly as tall as the
-    // nav bar.
-    onHeightMeasured: ((Int) -> Unit)? = null,
 ) {
     val hasTabGroup = scope.tabs.isNotEmpty()
     val standaloneTab = scope.standaloneTab
@@ -1005,7 +981,6 @@ private fun SharedTransitionScope.ExpandedBar(
                 .onSizeChanged {
                     tabRowWidthPx = it.width
                     onWidthMeasured?.invoke(it.width)
-                    onHeightMeasured?.invoke(it.height)
                 }
         ) {
             if (hasTabGroup) {
@@ -1079,10 +1054,6 @@ private fun SharedTransitionScope.SearchExpandedBar(
     // space. Null/0 (nothing measured yet) falls back to filling available
     // width.
     targetWidthPx: Int?,
-    // Same for height (see ExpandedBar's onHeightMeasured): holds the row to
-    // the nav bar's own height so the search pill never reads shorter than
-    // the bar. Null/0 falls back to the tallest child's intrinsic height.
-    targetHeightPx: Int?,
 ) {
     val inlineTab = scope.getInlineTab(selectedTabKey)
     val density = LocalDensity.current
@@ -1116,14 +1087,10 @@ private fun SharedTransitionScope.SearchExpandedBar(
         Row(
             horizontalArrangement = Arrangement.spacedBy(sizes.componentSpacing),
             verticalAlignment = Alignment.CenterVertically,
-            // Measured expanded-row height when known (same height as the nav
-            // bar); otherwise the shared fallback estimate so the pill never
-            // renders at its short icon-only intrinsic height.
-            modifier = if (targetHeightPx != null && targetHeightPx > 0) {
-                Modifier.height(with(density) { targetHeightPx.toDp() }).then(targetWidthModifier)
-            } else {
-                Modifier.height(NavBarRowFallbackHeight).then(targetWidthModifier)
-            }
+            // Fixed rather than IntrinsicSize.Max: matches the mini player's own
+            // inline (shrunk) height exactly instead of letting a short
+            // searchBarContent under-report its intrinsic height and shrink the row.
+            modifier = Modifier.height(SearchBarRowHeight).then(targetWidthModifier)
         ) {
             if (inlineTab != null) {
                 InlineTab(
@@ -1193,7 +1160,8 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
         isInline = true,
         isStandalone = true,
         modifier = modifier
-            .padding(StandaloneTabOvershootInset)
+            // No outer inset: the circle holds the full row height so it is
+            // exactly as tall as the nav bar (see InlineStandaloneTab).
             // Outside sharedElement: draw-only, so bounds tracking is
             // unaffected, and no overlay clipping can cut the stretch.
             .graphicsLayer(elasticStretchLayerBlock(glow))

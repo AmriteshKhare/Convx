@@ -605,7 +605,12 @@ fun Modifier.liquidGlass(
         loopBucket = loopBucket,
     ).then(
         if (applyEdgeEffects && !plainBlur && darkRimAlpha > 0f) {
-            Modifier.outerDarkRim(shape = shape, width = DarkRimWidth, alpha = darkRimAlpha)
+            Modifier.outerDarkRim(
+                shape = shape,
+                width = DarkRimWidth,
+                alpha = darkRimAlpha,
+                angle = animatedHighlightAngle,
+            )
         } else {
             Modifier
         }
