@@ -27,7 +27,6 @@ import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import com.composables.sfsymbols.SfSymbols
 import com.composables.sfsymbols.monochrome.SFArrowDownCircle
 import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
-import com.composables.sfsymbols.monochrome.SFChevronLeft
 import com.composables.sfsymbols.monochrome.SFECircle
 import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFHeart
@@ -159,6 +158,10 @@ import com.convx.music.ui.component.NavigationTitle
 import com.convx.music.ui.component.YouTubeGridItem
 import com.convx.music.ui.component.YouTubeListItem
 import com.convx.music.ui.component.isGlassAllowed
+import androidx.compose.ui.graphics.isSpecified
+import com.convx.music.LocalAmbientBackgroundColor
+import com.convx.music.ui.component.asIconPop
+import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.component.HeroBackground
@@ -395,7 +398,7 @@ fun OnlinePlaylistScreen(
         // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
         // root appBackdrop — sampling appBackdrop here is the RenderNode cycle.
         val chromeBackgroundModifier = if (useGlass) {
-            Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
+            Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
         } else {
             Modifier.background(LocalContentColor.current.copy(alpha = 0.15f), chromeShape)
         }
@@ -465,6 +468,7 @@ fun OnlinePlaylistScreen(
                                 heroScale = heroZoom.scale,
                                 hazeState = hazeState,
                                 pageColor = tint,
+                                scrollBlurProgress = rememberHeroTopBlur(lazyListState),
                             )
                         }
                     }
@@ -720,7 +724,7 @@ fun OnlinePlaylistScreen(
                     },
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                        painter = painterResource(R.drawable.arrow_back_ios),
                         contentDescription = null
                     )
                 }
@@ -766,7 +770,7 @@ fun OnlinePlaylistScreen(
                     onLongClick = { navController.backToMain() },
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                        painter = painterResource(R.drawable.arrow_back_ios),
                         contentDescription = null
                     )
                 }
@@ -791,6 +795,8 @@ fun OnlinePlaylistScreen(
                     }
                 }
 
+                val ambientColor = LocalAmbientBackgroundColor.current.value
+                val pillIconTint = if (useGlass && ambientColor.isSpecified) ambientColor.asIconPop() else chromeContentColor
                 Row(
                     modifier = Modifier
                         .height(48.dp)
@@ -807,8 +813,10 @@ fun OnlinePlaylistScreen(
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                             contentDescription = stringResource(R.string.search),
-                            modifier = Modifier.size(20.dp),
-                            tint = chromeContentColor
+                            modifier = Modifier
+                                .size(20.dp)
+                                .additiveChrome(useGlass && ambientColor.isSpecified),
+                            tint = pillIconTint
                         )
                     }
 
@@ -828,8 +836,10 @@ fun OnlinePlaylistScreen(
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                             contentDescription = stringResource(R.string.share),
-                            modifier = Modifier.size(20.dp),
-                            tint = chromeContentColor
+                            modifier = Modifier
+                                .size(20.dp)
+                                .additiveChrome(useGlass && ambientColor.isSpecified),
+                            tint = pillIconTint
                         )
                     }
 
@@ -851,8 +861,10 @@ fun OnlinePlaylistScreen(
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFEllipsis,
                             contentDescription = stringResource(R.string.more_options),
-                            modifier = Modifier.size(20.dp),
-                            tint = chromeContentColor
+                            modifier = Modifier
+                                .size(20.dp)
+                                .additiveChrome(useGlass && ambientColor.isSpecified),
+                            tint = pillIconTint
                         )
                     }
                 }
@@ -884,6 +896,7 @@ private fun OnlinePlaylistHeader(
     heroScale: Float = 1f,
     hazeState: HazeState? = null,
     pageColor: Color = Color.Black,
+    scrollBlurProgress: Float = 0f,
 ) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -907,7 +920,7 @@ private fun OnlinePlaylistHeader(
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
     val chromeContentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface
     val chromeBackgroundModifier = if (useGlass) {
-        Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
+        Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
     } else {
         Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
     }
@@ -964,6 +977,7 @@ private fun OnlinePlaylistHeader(
                     heroScale = heroScale,
                     hazeState = hazeState,
                     pageColor = pageColor,
+                    scrollBlurProgress = scrollBlurProgress,
                 )
 
                 Spacer(Modifier.height(16.dp))

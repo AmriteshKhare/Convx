@@ -73,7 +73,7 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFChevronLeft
+import androidx.compose.ui.res.painterResource
 import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFMagnifyingglass
 import com.composables.sfsymbols.monochrome.SFXmark
@@ -578,7 +578,7 @@ fun HistoryScreen(
                         },
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                            painter = painterResource(R.drawable.arrow_back_ios),
                             contentDescription = null
                         )
                     }
@@ -635,7 +635,7 @@ fun HistoryScreen(
                         }
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                            painter = painterResource(R.drawable.arrow_back_ios),
                             contentDescription = null
                         )
                     }

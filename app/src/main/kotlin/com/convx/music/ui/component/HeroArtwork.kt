@@ -275,6 +275,67 @@ fun HeroTopBlur(
 }
 
 /**
+ * Scroll-driven progressive blur for a hero artwork: two pre-baked blur plates
+ * cross-faded in sequence by [progress], so the picture reads as progressively
+ * smearing as it scrolls under the top bar — reaching [blurRadius] at full
+ * scroll — and sharpening back on the way down.
+ *
+ * Each plate is baked once on a tiny decode (see [BlurredBackdropImage]) and
+ * cross-faded by alpha, so no RenderEffect re-runs per frame — the scroll only
+ * drives two alpha writes. Inert (draws nothing) at [progress] 0.
+ */
+@Composable
+fun HeroScrollBlur(
+    artworkUrl: String?,
+    progress: Float,
+    modifier: Modifier = Modifier,
+    blurRadius: Dp = HeroBlurRadius,
+    decodeSize: Int = 160,
+) {
+    val reduceBlur by rememberPreference(ReduceDynamicBlurKey, false)
+    val p = progress.coerceIn(0f, 1f)
+    if (reduceBlur || artworkUrl.isNullOrBlank() || p <= 0.01f) return
+
+    // Sequential cross-fade windows: the mid plate arrives first, peaks, and
+    // hands over to the full plate, so the ramp reads as growing blur rather
+    // than one hard sharp-to-blurred cut.
+    val midAlpha = heroBlurBand(p, start = 0.02f, peak = 0.45f, end = 0.90f)
+    val fullAlpha = ((p - 0.45f) / 0.55f).coerceIn(0f, 1f)
+    if (midAlpha <= 0f && fullAlpha <= 0f) return
+
+    Box(modifier.fillMaxSize()) {
+        if (midAlpha > 0f) {
+            BlurredBackdropImage(
+                model = artworkUrl,
+                screenBlurRadiusDp = (blurRadius * 0.5f).value,
+                decodeSize = decodeSize,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = midAlpha },
+            )
+        }
+        if (fullAlpha > 0f) {
+            BlurredBackdropImage(
+                model = artworkUrl,
+                screenBlurRadiusDp = blurRadius.value,
+                decodeSize = decodeSize,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = fullAlpha },
+            )
+        }
+    }
+}
+
+/** Triangular 0→1→0 window: full at [peak], gone at [start]/[end]. */
+private fun heroBlurBand(p: Float, start: Float, peak: Float, end: Float): Float =
+    when {
+        p <= start || p >= end -> 0f
+        p < peak -> (p - start) / (peak - start)
+        else -> 1f - (p - peak) / (end - peak)
+    }
+
+/**
  * Hero palettes keyed by artwork URL (the image's stable id): the Coil decode +
  * palette extraction is expensive, so the same artwork never recomputes on
  * revisit or recomposition. Bounded for a long session.
@@ -387,29 +448,40 @@ fun Color.asVividAccent(): Color {
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
-/** A punchier boost than [asVividAccent] for a thin specular rim stroke, where
- *  a text-safe accent reads as barely-there: pushes saturation and lightness
- *  harder so the edge actually pops against the glass instead of disappearing
- *  into it. */
-fun Color.asRimPop(): Color {
+/**
+ * Transforms an ambient / hero background color into a refined, desaturated liquid glass surface tint:
+ * greyish on the colored side (low saturation 0.12f..0.22f), contrast-adjusted for dark or light surfaces
+ * so it remains subtle, felt without overpowering, and maintains perfect legibility.
+ */
+fun Color.asGlassSurfaceTint(isDark: Boolean = true): Color {
     val hsl = FloatArray(3)
     androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
-    // Two rounds of "still too much" feedback in: this is now only a touch past
-    // asVividAccent's own baseline (0.45f / 0.45f..0.68f), not a real boost —
-    // the rim reads as subtle tinted glass, not a coloured glow.
-    hsl[1] = hsl[1].coerceAtLeast(0.50f)
-    hsl[2] = hsl[2].coerceIn(0.45f, 0.65f)
+    hsl[1] = hsl[1].coerceIn(0.12f, 0.22f) // low saturation: greyish with ambient color whisper
+    hsl[2] = if (isDark) {
+        hsl[2].coerceIn(0.20f, 0.28f) // deep glass slate
+    } else {
+        hsl[2].coerceIn(0.88f, 0.94f) // frosted light glass
+    }
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
-/** Punchier still than [asRimPop] — nav bar icon tint over an ambient colour, which
- *  unlike a hairline rim is the whole glyph and needs to actually read as coloured
- *  glass rather than white with a hint of tint. */
+/** Specular highlight / rim light ("pluck") tint: saturated color of the ambient tint,
+ *  bright and light enough to be seen and felt as a clear, glistening highlight edge. */
+fun Color.asRimPop(): Color {
+    val hsl = FloatArray(3)
+    androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[1] = hsl[1].coerceAtLeast(0.68f) // saturated color of the same tint
+    hsl[2] = hsl[2].coerceIn(0.60f, 0.78f) // light enough to be seen and felt as highlight
+    return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+}
+
+/** Bright and saturated icon tint for additive chrome (BlendMode.Plus) over glass:
+ *  vibrant hue with high saturation and sufficient brightness so it glows vividly. */
 fun Color.asIconPop(): Color {
     val hsl = FloatArray(3)
     androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
-    hsl[1] = hsl[1].coerceAtLeast(0.75f)
-    hsl[2] = hsl[2].coerceIn(0.50f, 0.72f)
+    hsl[1] = hsl[1].coerceAtLeast(0.80f) // bright and saturated
+    hsl[2] = hsl[2].coerceIn(0.58f, 0.76f) // light and vivid for additive chroma glow
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
@@ -621,6 +693,9 @@ fun AlbumStyleHeroImage(
     hazeState: HazeState? = null,
     // The colour under the join, for the band's pre-13 / reduced-blur fallback.
     pageColor: Color = Color.Black,
+    // 0..1 scroll progress (e.g. from rememberHeroTopBlur): the artwork blurs
+    // progressively as it scrolls up, sharpening back on the way down.
+    scrollBlurProgress: Float = 0f,
 ) {
     val topInset = androidx.compose.foundation.layout.WindowInsets.systemBars
         .asPaddingValues().calculateTopPadding()
@@ -677,6 +752,24 @@ fun AlbumStyleHeroImage(
                     .graphicsLayer { alpha = 0.3f },
             )
         }
+
+        // Scroll-driven progressive blur over the artwork, same foot fade so the
+        // plates dissolve where the art does. Inert at rest.
+        HeroScrollBlur(
+            artworkUrl = artworkUrl,
+            progress = scrollBlurProgress,
+            modifier = Modifier.drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Black, Color.Transparent),
+                        startY = size.height * 0.55f,
+                        endY = size.height,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
+        )
 
         // BitChord-style join: a blurred copy of the artwork centred on the
         // foot, so picture and page colour smear into one another instead of
@@ -750,6 +843,7 @@ fun HeroBackground(
                 )
 
                 if (blurArtwork) {
+                    val blurP = topBlurProgress.coerceIn(0f, 1f)
                     // Blurred lower layer: fills behind the list and dissolves
                     // into the tint (the primary-color gradient) toward the
                     // bottom. Decoded at low resolution — a 48dp blur erases all
@@ -787,6 +881,69 @@ fun HeroBackground(
                             },
                         onReady = { visible = true },
                     )
+                    // The ramp's middle step between the sharp layer below and the
+                    // heavy base above: arrives as the sharp layer leaves and
+                    // departs as the heavy base takes over, so the scroll blur
+                    // reads as growing rather than one hard sharp-to-blurred cut.
+                    // Same footprint (scale, foot fade) as the base it blends into.
+                    val midAlpha = alpha * heroBlurBand(blurP, start = 0.05f, peak = 0.50f, end = 0.95f)
+                    if (midAlpha > 0.01f) {
+                        BlurredBackdropImage(
+                            model = heroSource.url,
+                            screenBlurRadiusDp = (HeroBlurRadius * 0.45f).value,
+                            decodeSize = 160,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    this.alpha = midAlpha
+                                    scaleX = heroScale
+                                    scaleY = heroScale
+                                    compositingStrategy = CompositingStrategy.Offscreen
+                                }
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(Color.Black, Color.Transparent),
+                                            startY = size.height * 0.5f,
+                                            endY = size.height,
+                                        ),
+                                        blendMode = BlendMode.DstIn,
+                                    )
+                                },
+                        )
+                    }
+                    // Past-the-base push at the top of the scroll, so full scroll
+                    // reads as very blurred rather than settling at the base radius.
+                    val heavyAlpha = alpha * ((blurP - 0.60f) / 0.40f).coerceIn(0f, 1f)
+                    if (heavyAlpha > 0.01f) {
+                        BlurredBackdropImage(
+                            model = heroSource.url,
+                            screenBlurRadiusDp = (HeroBlurRadius * 1.5f).value,
+                            decodeSize = 160,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    this.alpha = heavyAlpha
+                                    scaleX = heroScale
+                                    scaleY = heroScale
+                                    compositingStrategy = CompositingStrategy.Offscreen
+                                }
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(Color.Black, Color.Transparent),
+                                            startY = size.height * 0.5f,
+                                            endY = size.height,
+                                        ),
+                                        blendMode = BlendMode.DstIn,
+                                    )
+                                },
+                        )
+                    }
                     // Sharp upper layer: the top half stays crisp, then dissolves
                     // so the blur takes over from roughly where the list begins.
                     // Skipped entirely in fullBlur mode (uniformly blurred background).
@@ -803,9 +960,10 @@ fun HeroBackground(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                // Cross-fade to the pre-blurred layer underneath as you
-                                // scroll — no per-frame RenderEffect, so it stays smooth.
-                                this.alpha = alpha * (1f - topBlurProgress.coerceIn(0f, 1f))
+                                // Hands over to the mid plate above (gone by mid
+                                // scroll) rather than straight to the heavy base —
+                                // no per-frame RenderEffect, so it stays smooth.
+                                this.alpha = alpha * (1f - ((blurP - 0.05f) / 0.45f).coerceIn(0f, 1f))
                                 scaleX = heroScale
                                 scaleY = heroScale
                                 compositingStrategy = CompositingStrategy.Offscreen
@@ -846,6 +1004,28 @@ fun HeroBackground(
                                 )
                             },
                         onSuccess = { visible = true },
+                    )
+                    // Scroll-driven progressive blur over the sharp art, same foot
+                    // fade so the plates dissolve where the art does. Inert at
+                    // rest; fully blurred plate over the art at full scroll.
+                    HeroScrollBlur(
+                        artworkUrl = heroSource.url,
+                        progress = topBlurProgress,
+                        modifier = Modifier
+                            .graphicsLayer {
+                                compositingStrategy = CompositingStrategy.Offscreen
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(Color.Black, Color.Transparent),
+                                        startY = size.height * 0.55f,
+                                        endY = size.height
+                                    ),
+                                    blendMode = BlendMode.DstIn
+                                )
+                            },
                     )
                 }
             }
@@ -1049,6 +1229,9 @@ fun ArtistHeroImage(
     blurRadius: Dp = 56.dp,
     heroScale: Float = 1f,
     overlay: @Composable BoxScope.() -> Unit = {},
+    // 0..1 scroll progress (e.g. from rememberHeroTopBlur): the photo blurs
+    // progressively as it scrolls up, sharpening back on the way down.
+    scrollBlurProgress: Float = 0f,
 ) {
     val context = LocalContext.current
     val heroRequest = remember(artworkUrl) {
@@ -1108,6 +1291,14 @@ fun ArtistHeroImage(
                             1.00f to pageColor,
                         ),
                     ),
+            )
+
+            // Scroll-driven progressive blur over the photo. The outer box already
+            // renders offscreen, so the plates blend cleanly. Inert at rest.
+            HeroScrollBlur(
+                artworkUrl = artworkUrl,
+                progress = scrollBlurProgress,
+                blurRadius = blurRadius,
             )
         } else {
             // Stand-in while there is no photo: a neutral wash, not flat tint,

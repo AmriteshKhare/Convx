@@ -65,7 +65,6 @@ import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFChevronLeft
 import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFLine3Horizontal
 import com.composables.sfsymbols.monochrome.SFLock
@@ -179,6 +178,10 @@ import com.convx.music.ui.component.rememberPlaylistCoverPicker
 import com.convx.music.ui.component.SongListItem
 import com.convx.music.ui.component.SortHeader
 import com.convx.music.ui.component.isGlassAllowed
+import androidx.compose.ui.graphics.isSpecified
+import com.convx.music.LocalAmbientBackgroundColor
+import com.convx.music.ui.component.asIconPop
+import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.menu.CustomThumbnailMenu
@@ -660,7 +663,7 @@ fun LocalPlaylistScreen(
     )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeBackgroundModifier = if (useGlass) {
-            Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
+            Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
         } else {
             Modifier.background(LocalContentColor.current.copy(alpha = 0.15f), chromeShape)
         }
@@ -724,6 +727,7 @@ fun LocalPlaylistScreen(
                                 snackbarHostState = snackbarHostState,
                                 heroScale = heroZoom.scale,
                                 hazeState = hazeState,
+                                scrollBlurProgress = rememberHeroTopBlur(lazyListState),
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -980,7 +984,7 @@ fun LocalPlaylistScreen(
         // this chrome actually shows blurred list/hero content, not just a
         // flat tinted fallback.
         val chromeBackgroundModifier = if (useGlass) {
-            Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
+            Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
         } else {
             Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
         }
@@ -1046,6 +1050,7 @@ fun LocalPlaylistScreen(
                             }
                         }
                     )
+                    val ambientColor = LocalAmbientBackgroundColor.current.value
                     IconButton(
                         enabled = selection.isNotEmpty(),
                         onClick = {
@@ -1065,7 +1070,9 @@ fun LocalPlaylistScreen(
                     ) {
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFEllipsis,
-                            contentDescription = null
+                            contentDescription = null,
+                            tint = if (useGlass && ambientColor.isSpecified) ambientColor.asIconPop() else chromeContentColor,
+                            modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
                         )
                     }
                 }
@@ -1077,7 +1084,7 @@ fun LocalPlaylistScreen(
                     },
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                        painter = painterResource(R.drawable.arrow_back_ios),
                         contentDescription = null
                     )
                 }
@@ -1123,7 +1130,7 @@ fun LocalPlaylistScreen(
                     onLongClick = { navController.backToMain() },
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                        painter = painterResource(R.drawable.arrow_back_ios),
                         contentDescription = null
                     )
                 }
@@ -1179,6 +1186,7 @@ fun LocalPlaylistHeader(
     modifier: Modifier,
     heroScale: Float = 1f,
     hazeState: HazeState? = null,
+    scrollBlurProgress: Float = 0f,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
@@ -1344,6 +1352,7 @@ fun LocalPlaylistHeader(
                     heroScale = heroScale,
                     hazeState = hazeState,
                     pageColor = tint,
+                    scrollBlurProgress = scrollBlurProgress,
                 )
                 if (editable) {
                     Box(

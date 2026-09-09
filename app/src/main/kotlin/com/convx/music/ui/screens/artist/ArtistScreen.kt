@@ -102,7 +102,6 @@ import androidx.compose.ui.util.fastForEach
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFChevronLeft
 import com.composables.sfsymbols.monochrome.SFHeart
 import com.composables.sfsymbols.monochrome.SFHeartFill
 import com.composables.sfsymbols.monochrome.SFInfoCircle
@@ -255,6 +254,10 @@ fun ArtistScreen(
     val showArtistBackgroundVideo = if (dataSaverEnabled) false else showArtistBackgroundVideoPref
 
     val lazyListState = rememberLazyListState()
+
+    // Scroll progress driving the hero photo's progressive blur + the top blur
+    // strip: hoisted so the hero and the floating chrome share one value.
+    val heroTopBlurProgress = rememberHeroTopBlur(lazyListState)
 
     // Per-screen Haze source (see AlbumScreen): the artwork head + tint plane become
     // the backdrop that the hero merge band / HeroTopBlur blur through.
@@ -545,6 +548,7 @@ fun ArtistScreen(
                                 pageColor = tint,
                                 hazeState = hazeState,
                                 heroScale = heroZoom.scale,
+                                scrollBlurProgress = heroTopBlurProgress,
                                 modifier = Modifier.offset {
                                     IntOffset(x = 0, y = headerOffset)
                                 },
@@ -1255,7 +1259,7 @@ fun ArtistScreen(
         // already-dark scrim, and hid the hero-dissolve effect this exists for.
         HeroTopBlur(
             hazeState = hazeState,
-            progress = rememberHeroTopBlur(lazyListState),
+            progress = heroTopBlurProgress,
             pageColor = screenBackground,
             modifier = Modifier.align(Alignment.TopCenter),
         )
@@ -1289,12 +1293,10 @@ fun ArtistScreen(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
             ) {
-                CompositionLocalProvider(LocalContentColor provides chromeIconColor) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
-                        contentDescription = null,
-                    )
-                }
+                Icon(
+                    painter = painterResource(R.drawable.arrow_back_ios),
+                    contentDescription = null,
+                )
             }
 
             GlassCircleButton(
@@ -1307,12 +1309,10 @@ fun ArtistScreen(
                     }
                 },
             ) {
-                CompositionLocalProvider(LocalContentColor provides chromeIconColor) {
-                    Icon(
-                        painter = painterResource(R.drawable.link),
-                        contentDescription = null,
-                    )
-                }
+                Icon(
+                    painter = painterResource(R.drawable.link),
+                    contentDescription = null,
+                )
             }
             }
         }

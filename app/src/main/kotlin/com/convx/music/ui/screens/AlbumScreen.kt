@@ -123,7 +123,7 @@ import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.composables.sfsymbols.SfSymbols
 import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
-import com.composables.sfsymbols.monochrome.SFChevronLeft
+import androidx.compose.ui.res.painterResource
 import com.composables.sfsymbols.monochrome.SFECircle
 import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFXmark
@@ -153,6 +153,10 @@ import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.isGlassAllowed
+import androidx.compose.ui.graphics.isSpecified
+import com.convx.music.LocalAmbientBackgroundColor
+import com.convx.music.ui.component.asIconPop
+import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
@@ -184,6 +188,7 @@ import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.viewmodels.AlbumViewModel
 import com.convx.music.ui.component.HeroMergeBand
 import com.convx.music.ui.component.HeroMergeBandHeight
+import com.convx.music.ui.component.HeroScrollBlur
 import com.convx.music.ui.component.HeroTopBlur
 import com.music.innertube.models.SongItem
 import dev.chrisbanes.haze.HazeState
@@ -318,6 +323,10 @@ fun AlbumScreen(
         }
     }
 
+    // Scroll progress driving the heroart progressive blur + the top blur strip:
+    // hoisted so the header artwork and the floating chrome share one value.
+    val heroTopBlurProgress = rememberHeroTopBlur(lazyListState)
+
     // Same mesh backdrop as ArtistScreen/OnlinePlaylistScreen/the player's BITCHORD_MESH
     // style, not the flat single-swatch wash rememberHeroPalette+HeroMeshWash used to
     // paint here.
@@ -383,7 +392,7 @@ fun AlbumScreen(
     // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
     // root appBackdrop — sampling appBackdrop here is the RenderNode cycle.
     val chromeBackgroundModifier = if (useGlass) {
-        Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
+        Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
     } else {
         Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
     }
@@ -531,6 +540,14 @@ fun AlbumScreen(
                                 )
                             }
                         }
+                        // Scroll-driven progressive blur over the artwork: very
+                        // blurred at full scroll, sharp again on the way down.
+                        // Lives inside the masked container, so it inherits the
+                        // foot fade. Inert (draws nothing) at rest.
+                        HeroScrollBlur(
+                            artworkUrl = albumWithSongs.album.thumbnailUrl,
+                            progress = heroTopBlurProgress,
+                        )
                     }
 
                     // BitChord-style join: on Android 13+ a Haze pane blurs the whole
@@ -1101,15 +1118,10 @@ fun AlbumScreen(
         // already-dark scrim, and hid the hero-dissolve effect this exists for.
         HeroTopBlur(
             hazeState = hazeState,
-            progress = rememberHeroTopBlur(lazyListState),
+            progress = heroTopBlurProgress,
             pageColor = screenBackground,
             modifier = Modifier.align(Alignment.TopCenter),
         )
-        val chromeBackgroundModifier = if (useGlass) {
-            Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
-        } else {
-            Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
-        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1137,6 +1149,8 @@ fun AlbumScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+            val ambientColor = LocalAmbientBackgroundColor.current.value
+            val pillIconTint = if (useGlass && ambientColor.isSpecified) ambientColor.asIconPop() else chromeContentColor
             if (inSelectMode) {
                 GlassCircleButton(onClick = onExitSelectionMode) {
                     Icon(
@@ -1189,7 +1203,9 @@ fun AlbumScreen(
                     ) {
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFEllipsis,
-                            contentDescription = null
+                            contentDescription = null,
+                            tint = pillIconTint,
+                            modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
                         )
                     }
                 }
@@ -1199,7 +1215,7 @@ fun AlbumScreen(
                     onLongClick = { navController.backToMain() },
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                        painter = painterResource(R.drawable.arrow_back_ios),
                         contentDescription = null
                     )
                 }
@@ -1237,7 +1253,10 @@ fun AlbumScreen(
                             Icon(
                                 imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                                 contentDescription = stringResource(R.string.share),
-                                modifier = Modifier.size(20.dp)
+                                tint = pillIconTint,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .additiveChrome(useGlass && ambientColor.isSpecified)
                             )
                         }
 
@@ -1259,7 +1278,10 @@ fun AlbumScreen(
                             Icon(
                                 imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = stringResource(R.string.more_options),
-                                modifier = Modifier.size(20.dp)
+                                tint = pillIconTint,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .additiveChrome(useGlass && ambientColor.isSpecified)
                             )
                         }
                     }

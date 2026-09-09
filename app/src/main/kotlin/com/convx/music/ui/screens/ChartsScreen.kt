@@ -67,7 +67,7 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFChevronLeft
+import androidx.compose.ui.res.painterResource
 import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.constants.ListItemHeight
 import com.convx.music.models.toMediaMetadata
@@ -430,7 +430,7 @@ fun ChartsScreen(
                     onLongClick = { navController.backToMain() },
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                        painter = painterResource(R.drawable.arrow_back_ios),
                         contentDescription = null,
                     )
                 }

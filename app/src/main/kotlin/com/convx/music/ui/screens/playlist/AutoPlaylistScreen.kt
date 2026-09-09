@@ -53,7 +53,6 @@ import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import com.composables.sfsymbols.SfSymbols
 import com.composables.sfsymbols.monochrome.SFArrowClockwise
-import com.composables.sfsymbols.monochrome.SFChevronLeft
 import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFMagnifyingglass
 import com.composables.sfsymbols.monochrome.SFShuffle
@@ -133,6 +132,10 @@ import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.isGlassAllowed
+import androidx.compose.ui.graphics.isSpecified
+import com.convx.music.LocalAmbientBackgroundColor
+import com.convx.music.ui.component.asIconPop
+import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
@@ -540,7 +543,7 @@ fun AutoPlaylistScreen(
                 val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
                 val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
                 val chromeBackgroundModifier = if (useGlass) {
-                    Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
+                    Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
                 } else {
                     Modifier.background(onTint.copy(alpha = 0.15f), chromeShape)
                 }
@@ -594,6 +597,7 @@ fun AutoPlaylistScreen(
                                     }
                                 },
                             )
+                            val ambientColor = LocalAmbientBackgroundColor.current.value
                             IconButton(
                                 enabled = selection.isNotEmpty(),
                                 onClick = {
@@ -606,10 +610,12 @@ fun AutoPlaylistScreen(
                                     }
                                 },
                             ) {
-Icon(
-                                imageVector = SfSymbols.Monochrome.SFEllipsis,
-                                contentDescription = null,
-                            )
+                                Icon(
+                                    imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                    contentDescription = null,
+                                    tint = if (useGlass && ambientColor.isSpecified) ambientColor.asIconPop() else onTint,
+                                    modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
+                                )
                             }
                         }
                     } else if (isSearching) {
@@ -621,7 +627,7 @@ Icon(
                             },
                         ) {
                             Icon(
-                                imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                                painter = painterResource(R.drawable.arrow_back_ios),
                                 contentDescription = null,
                             )
                         }
@@ -667,7 +673,7 @@ Icon(
                             onLongClick = { navController.backToMain() },
                         ) {
                             Icon(
-                                imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                                painter = painterResource(R.drawable.arrow_back_ios),
                                 contentDescription = null,
                             )
                         }

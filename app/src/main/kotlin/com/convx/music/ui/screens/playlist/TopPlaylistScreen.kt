@@ -46,7 +46,6 @@ import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFChevronLeft
 import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFMagnifyingglass
 import com.composables.sfsymbols.monochrome.SFShuffle
@@ -134,6 +133,10 @@ import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.isGlassAllowed
+import androidx.compose.ui.graphics.isSpecified
+import com.convx.music.LocalAmbientBackgroundColor
+import com.convx.music.ui.component.asIconPop
+import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.component.LocalAppBackdrop
@@ -338,7 +341,7 @@ fun TopPlaylistScreen(
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeShape = ContinuousRoundedRectangle(percent = 50)
         val chromeBackgroundModifier = if (useGlass) {
-            Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
+            Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
         } else {
             Modifier.background(LocalContentColor.current.copy(alpha = 0.15f), chromeShape)
         }
@@ -541,7 +544,7 @@ fun TopPlaylistScreen(
             // was built before this provider, so liquidGlass captured the
             // unattached heroBackdrop at composition time and rendered flat.
             val chromeBackgroundModifier = if (useGlass) {
-                Modifier.liquidGlass(config = glassConfig, shape = chromeShape, highlightAlpha = 0.3f)
+                Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
             } else {
                 Modifier.background(LocalContentColor.current.copy(alpha = 0.15f), chromeShape)
             }
@@ -595,6 +598,7 @@ fun TopPlaylistScreen(
                                 }
                             }
                         )
+                        val ambientColor = LocalAmbientBackgroundColor.current.value
                         IconButton(
                             enabled = selection.isNotEmpty(),
                             onClick = {
@@ -609,7 +613,9 @@ fun TopPlaylistScreen(
                         ) {
                             Icon(
                                 imageVector = SfSymbols.Monochrome.SFEllipsis,
-                                contentDescription = null
+                                contentDescription = null,
+                                tint = if (useGlass && ambientColor.isSpecified) ambientColor.asIconPop() else onTint,
+                                modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
                             )
                         }
                     }
@@ -622,7 +628,7 @@ fun TopPlaylistScreen(
                         },
                     ) {
 Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                        painter = painterResource(R.drawable.arrow_back_ios),
                         contentDescription = null
                     )
                     }
@@ -668,7 +674,7 @@ Icon(
                         onLongClick = { navController.backToMain() },
                     ) {
 Icon(
-                        imageVector = SfSymbols.Monochrome.SFChevronLeft,
+                        painter = painterResource(R.drawable.arrow_back_ios),
                         contentDescription = null
                     )
                     }
