@@ -5,6 +5,13 @@
 
 package com.convx.music.ui.component
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import com.convx.music.ui.ios.compat.AppTheme
@@ -56,13 +63,26 @@ fun DjReadout(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = text,
-            style = AppTheme.typography.labelSmall,
-            color = color.takeOrElse { AppTheme.colorScheme.onSurfaceVariant },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        AnimatedContent(
+            targetState = text,
+            transitionSpec = {
+                (fadeIn(spring(dampingRatio = 0.8f, stiffness = 550f)) +
+                    slideInVertically(spring(dampingRatio = 0.76f, stiffness = 550f)) { it / 3 })
+                    .togetherWith(
+                        fadeOut(spring(dampingRatio = 1.0f, stiffness = 650f)) +
+                        slideOutVertically(spring(dampingRatio = 1.0f, stiffness = 650f)) { -it / 3 }
+                    )
+            },
+            label = "DjReadoutTransition"
+        ) { currentText ->
+            Text(
+                text = currentText,
+                style = AppTheme.typography.labelSmall,
+                color = color.takeOrElse { AppTheme.colorScheme.onSurfaceVariant },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

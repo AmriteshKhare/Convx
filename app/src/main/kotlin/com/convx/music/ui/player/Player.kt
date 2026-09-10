@@ -38,6 +38,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -1960,7 +1962,7 @@ fun BottomSheetPlayer(
         val controlsContent: @Composable ColumnScope.(MediaMetadata) -> Unit = { mediaMetadata ->
             val playPauseRoundness by animateDpAsState(
                 targetValue = if (isPlaying) 24.dp else 36.dp,
-                animationSpec = tween(durationMillis = 90, easing = LinearEasing),
+                animationSpec = spring(dampingRatio = 0.75f, stiffness = 1100f),
                 label = "playPauseRoundness",
             )
 
@@ -3418,7 +3420,14 @@ fun BottomSheetPlayer(
                         AnimatedContent(
                             targetState = showInlineLyrics,
                             label = "Lyrics",
-                            transitionSpec = { fadeIn() togetherWith fadeOut() }
+                            transitionSpec = {
+                                (fadeIn(spring(dampingRatio = 0.82f, stiffness = 550f)) +
+                                    scaleIn(initialScale = 0.96f, animationSpec = spring(dampingRatio = 0.78f, stiffness = 550f)))
+                                    .togetherWith(
+                                        fadeOut(spring(dampingRatio = 1.0f, stiffness = 650f)) +
+                                        scaleOut(targetScale = 0.96f, animationSpec = spring(dampingRatio = 1.0f, stiffness = 650f))
+                                    )
+                            }
                         ) { showLyrics ->
                             if (showLyrics) {
                                 InlineLyricsView(
@@ -3497,7 +3506,14 @@ fun BottomSheetPlayer(
                         AnimatedContent(
                             targetState = showInlineLyrics,
                             label = "Lyrics",
-                            transitionSpec = { fadeIn() togetherWith fadeOut() }
+                            transitionSpec = {
+                                (fadeIn(spring(dampingRatio = 0.82f, stiffness = 550f)) +
+                                    scaleIn(initialScale = 0.96f, animationSpec = spring(dampingRatio = 0.78f, stiffness = 550f)))
+                                    .togetherWith(
+                                        fadeOut(spring(dampingRatio = 1.0f, stiffness = 650f)) +
+                                        scaleOut(targetScale = 0.96f, animationSpec = spring(dampingRatio = 1.0f, stiffness = 650f))
+                                    )
+                            }
                         ) { showLyrics ->
                             if (showLyrics) {
                                 InlineLyricsView(

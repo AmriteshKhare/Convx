@@ -193,16 +193,16 @@ fun AppLandscapeRail(
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
         appBackgroundColorInt != 0 -> Color(appBackgroundColorInt)
-        else -> AppTheme.colorScheme.surfaceContainerHigh
+        else -> AppTheme.colorScheme.surfaceContainerLow
     }
 
     val selectedContentColor = com.convx.music.ui.theme.LocalAccentColor.current
     // Non-glass fell back to hardcoded white, which is invisible on a light
-    // theme. glassConfig.textColor is already the adaptive colour (computed from
-    // what the surface composites to); onSurface is its non-glass equivalent.
+    // theme. resolvedTextColor is the adaptive monochromatic chrome color;
+    // onSurface is its non-glass equivalent.
     val unselectedContentColor = when {
         appTextColorInt != 0 -> Color(appTextColorInt)
-        useGlass -> glassConfig.textColor
+        useGlass -> glassConfig.resolvedTextColor()
         else -> AppTheme.colorScheme.onSurface
     }
 

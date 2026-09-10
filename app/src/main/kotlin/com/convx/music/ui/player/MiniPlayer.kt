@@ -153,6 +153,7 @@ import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.resolvedTextColor
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.elasticStretchLayerBlock
 import com.convx.music.ui.component.isGlassAllowed
@@ -342,7 +343,7 @@ private fun NewMiniPlayer(
         glassConfig.isEnabledFor(GlassComponent.MINI_PLAYER) &&
         isGlassAllowed()
     ) {
-        glassConfig.textColor
+        glassConfig.resolvedTextColor()
     } else {
         Color.White
     }

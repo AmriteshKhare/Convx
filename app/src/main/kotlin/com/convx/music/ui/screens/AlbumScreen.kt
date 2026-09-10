@@ -151,6 +151,7 @@ import com.convx.music.ui.component.LinkSegment
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.resolvedTextColor
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.isGlassAllowed
 import androidx.compose.ui.graphics.isSpecified
@@ -340,7 +341,7 @@ fun AlbumScreen(
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
-    val chromeContentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface
+    val chromeContentColor = if (useGlass) glassConfig.resolvedTextColor() else AppTheme.colorScheme.onSurface
 
     // Unattached backdrop (never .layerBackdrop'd): glass chrome sampling it
     // early-returns, so it draws a translucent frosted surface with no live

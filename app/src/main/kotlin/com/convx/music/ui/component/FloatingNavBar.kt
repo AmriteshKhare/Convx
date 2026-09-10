@@ -242,11 +242,14 @@ private fun AppFloatingNavBarChrome(
 
     val (appBackgroundColorInt) = rememberPreference(AppBackgroundColorKey, 0)
     val (appTextColorInt) = rememberPreference(AppTextColorKey, 0)
+    // Design system default: semantic grouped card. The Advanced background
+    // override (non-zero) wins; 0 = system. Glass stays transparent so the
+    // liquid surface — not an opaque fill — shows through.
     val backgroundColor = when {
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
         appBackgroundColorInt != 0 -> Color(appBackgroundColorInt)
-        else -> AppTheme.colorScheme.surfaceContainerHigh
+        else -> AppTheme.colorScheme.surfaceContainerLow
     }
     // Both derive from the glass content colour, which adapts to what the pill
     // composites to. Unselected used to be hardcoded white, which vanished on a
@@ -262,7 +265,7 @@ private fun AppFloatingNavBarChrome(
     // glass reads as a glitch rather than a colour change. Motion.appear() rather
     // than the puck's own morph/select curves: a colour isn't travelling anywhere,
     // it's arriving, which is what appear() is for.
-    val rawTabTextColor = if (appTextColorInt != 0) Color(appTextColorInt) else glassConfig.textColor
+    val rawTabTextColor = if (appTextColorInt != 0) Color(appTextColorInt) else glassConfig.resolvedTextColor()
     val tabTextColor by animateColorAsState(
         targetValue = rawTabTextColor,
         animationSpec = Motion.appear(),
@@ -323,7 +326,7 @@ private fun AppFloatingNavBarChrome(
 
     val accessoryContentColor = when {
         appTextColorInt != 0 -> Color(appTextColorInt)
-        useGlass -> glassConfig.textColor
+        useGlass -> glassConfig.resolvedTextColor()
         pureBlack -> Color.White
         else -> AppTheme.colorScheme.onSurface
     }
@@ -338,8 +341,8 @@ private fun AppFloatingNavBarChrome(
             snapPulse.animateTo(
                 0f,
                 spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium
+                    dampingRatio = 0.65f,
+                    stiffness = 450f,
                 )
             )
         }
@@ -607,7 +610,7 @@ fun NavBarSearchInputBar(
     // On glass, take the adaptive glass content colour rather than a flat white —
     // the search field is the one piece of chrome the user is actively reading.
     val onTint = when {
-        useGlass -> glassConfig.textColor
+        useGlass -> glassConfig.resolvedTextColor()
         pureBlack -> Color.White
         else -> AppTheme.colorScheme.onSurface
     }

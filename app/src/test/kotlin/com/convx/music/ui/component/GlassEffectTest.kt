@@ -15,9 +15,12 @@ class GlassEffectConfigTest {
     }
 
     @Test
-    fun `default config has white text color`() {
+    fun `default config text color is adaptive unspecified`() {
+        // Monochromatic by default: resolved to the semantic label at the call
+        // site (dark over light content, light over dark), never hard-coded
+        // white — white vanishes on light-tinted glass.
         val config = GlassEffectConfig()
-        assertEquals(Color.White, config.textColor)
+        assertEquals(Color.Unspecified, config.textColor)
     }
 
     @Test

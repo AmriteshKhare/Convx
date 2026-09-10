@@ -26,11 +26,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.ui.ios.foundation.LocalIosContentColor
+import com.convx.music.ui.utils.nearestProjectedSnap
+import com.convx.music.ui.utils.projectedEndpoint
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -78,11 +81,11 @@ fun IosSwipeableRow(
     val leadingWidthPx = with(density) { (ActionWidth * leadingActions.size).toPx() }
     val rowWidth = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
 
-    fun settle(target: Float) {
-        scope.launch { offset.animateTo(target, spring(dampingRatio = 1f, stiffness = 500f)) }
+    fun settle(target: Float, velocity: Float = 0f) {
+        scope.launch { offset.animateTo(target, spring(dampingRatio = 1f, stiffness = 500f), initialVelocity = velocity) }
     }
 
-    fun close() = settle(0f)
+    fun close(velocity: Float = 0f) = settle(0f, velocity)
 
     Box(
         modifier = modifier
@@ -113,24 +116,34 @@ fun IosSwipeableRow(
                 .graphicsLayer { translationX = offset.value }
                 .background(IosTheme.colors.secondarySystemGroupedBackground)
                 .pointerInput(trailingActions.size, leadingActions.size) {
+                    val tracker = VelocityTracker()
                     detectHorizontalDragGestures(
+                        onDragStart = { tracker.resetTracking() },
                         onDragEnd = {
                             val x = offset.value
+                            val v = tracker.calculateVelocity().x
                             val full = rowWidth.floatValue * fullSwipeFraction
+                            // Flick throws: decide from projected endpoint, hand off velocity.
+                            val projected = projectedEndpoint(x, v)
                             when {
-                                onFullSwipe != null && -x > full -> {
+                                onFullSwipe != null && -projected > full -> {
                                     onFullSwipe()
-                                    close()
+                                    close(v)
                                 }
-                                // Past halfway to the buttons, they stay open.
-                                -x > trailingWidthPx / 2f -> settle(-trailingWidthPx)
-                                x > leadingWidthPx / 2f -> settle(leadingWidthPx)
-                                else -> close()
+                                else -> {
+                                    val snaps = buildList {
+                                        if (trailingActions.isNotEmpty()) add(-trailingWidthPx)
+                                        add(0f)
+                                        if (leadingActions.isNotEmpty()) add(leadingWidthPx)
+                                    }
+                                    settle(nearestProjectedSnap(x, v, snaps) ?: 0f, v)
+                                }
                             }
                         },
                         onDragCancel = { close() },
                     ) { change, drag ->
                         change.consume()
+                        tracker.addPosition(change.uptimeMillis, change.position)
                         val next = (offset.value + drag)
                             .coerceIn(-rowWidth.floatValue, leadingWidthPx)
                         scope.launch { offset.snapTo(next) }

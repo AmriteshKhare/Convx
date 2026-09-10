@@ -520,14 +520,11 @@ fun PlayerV2(
                     AnimatedContent(
                         targetState = playerState,
                         transitionSpec = {
-                            if (targetState == PlayerInternalState.LYRICS || targetState == PlayerInternalState.QUEUE) {
-                                // Pure crossfade: lets Shared Elements smoothly morph top-left while lyrics fade in calmly
-                                fadeIn(animationSpec = Motion.appear()) togetherWith 
-                                fadeOut(animationSpec = Motion.appear())
-                            } else {
-                                fadeIn(animationSpec = Motion.appear()) togetherWith 
-                                fadeOut(animationSpec = Motion.appear())
-                            }.using(
+                            val enter = fadeIn(animationSpec = spring(dampingRatio = 0.82f, stiffness = 550f)) +
+                                scaleIn(initialScale = 0.96f, animationSpec = spring(dampingRatio = 0.78f, stiffness = 550f))
+                            val exit = fadeOut(animationSpec = spring(dampingRatio = 1.0f, stiffness = 650f)) +
+                                scaleOut(targetScale = 0.96f, animationSpec = spring(dampingRatio = 1.0f, stiffness = 650f))
+                            enter.togetherWith(exit).using(
                                 // Ensure the Lyrics pane is drawn OVER the Cover pane during transition
                                 androidx.compose.animation.SizeTransform(clip = false)
                             ).apply {
@@ -678,21 +675,24 @@ fun PlayerV2(
                                     val heroScale by animateFloatAsState(
                                         targetValue = if (isPlaying || isHeroLook) 1f else 0.94f,
                                         animationSpec = spring(
-                                            dampingRatio = Spring.DampingRatioLowBouncy,
-                                            stiffness = Spring.StiffnessLow,
+                                            dampingRatio = 0.72f,
+                                            stiffness = 520f,
                                         ),
                                         label = "heroScale",
                                     )
                                     AnimatedContent(
                                         targetState = mediaMetadata,
                                         contentKey = { it?.id },
-                                        // Fade only, no slide: the live peek above already carries the
-                                        // whole card across during a swipe (drag-linked, then springs
-                                        // the rest of the way on release). This only needs to swap the
-                                        // content identity in underneath without moving it a second time
-                                        // -- a slide here too would double up on top of the peek's own.
+                                        // Fade coordinated with subtle scale: the live peek above already carries the
+                                        // whole card across during a swipe, but on button skip or track change,
+                                        // this gives Apple Music-like depth.
                                         transitionSpec = {
-                                            fadeIn(Motion.appear()).togetherWith(fadeOut(Motion.appearExit()))
+                                            (fadeIn(spring(dampingRatio = 0.82f, stiffness = 550f)) +
+                                                scaleIn(initialScale = 0.95f, animationSpec = spring(dampingRatio = 0.78f, stiffness = 550f)))
+                                                .togetherWith(
+                                                    fadeOut(spring(dampingRatio = 1.0f, stiffness = 650f)) +
+                                                    scaleOut(targetScale = 0.95f, animationSpec = spring(dampingRatio = 1.0f, stiffness = 650f))
+                                                )
                                         },
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -1599,7 +1599,7 @@ private fun rememberSwipeCardModifier(
     var dragStartTime by remember { mutableLongStateOf(0L) }
     var totalDragDistance by remember { mutableFloatStateOf(0f) }
     val animationSpec = remember {
-        spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)
+        spring<Float>(dampingRatio = 0.74f, stiffness = 650f)
     }
     val autoSwipeThreshold = remember(swipeSensitivity, configuration.screenWidthDp, density) {
         val screenWidthPx = configuration.screenWidthDp * density

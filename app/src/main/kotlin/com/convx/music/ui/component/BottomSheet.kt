@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.isSpecified
 import com.convx.music.constants.NavigationBarAnimationSpec
 import com.convx.music.ui.utils.bounceSeedVelocity
 import com.convx.music.ui.utils.bounceStiffnessFor
+import com.convx.music.ui.utils.nearestProjectedSnap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.pow
@@ -139,7 +140,7 @@ fun BottomSheet(
     LaunchedEffect(state.isExpanded) {
         cornerExpansion.animateTo(
             targetValue = if (state.isExpanded) 1f else 0f,
-            animationSpec = tween(SCREEN_CORNER_EXPANSION_MILLIS),
+            animationSpec = spring(dampingRatio = 0.78f, stiffness = 550f),
         )
     }
 
@@ -404,24 +405,21 @@ class BottomSheetState(
     }
 
     fun collapseSoft() {
-        // Apple Music feel: high damping + low stiffness = smooth, weighty settle.
-        // The snappier 0.70/360 this used briefly is what fed the mini-pill's
-        // measured-height feedback loop (see FloatingMiniPlayer's measuredHeightPx)
-        // fast enough to show up as icon flicker on every tap-driven collapse/expand.
+        // iOS drawer feel: responsive spring with subtle micro-bounce (~260ms settle).
         collapse(
             spring(
-                dampingRatio = 0.85f,
-                stiffness = Spring.StiffnessLow,
+                dampingRatio = 0.76f,
+                stiffness = 520f,
             ),
         )
     }
 
     fun expandSoft() {
-        // Apple Music feel: high damping + low stiffness = smooth, weighty settle.
+        // iOS drawer feel: responsive spring with subtle micro-bounce (~260ms settle).
         expand(
             spring(
-                dampingRatio = 0.85f,
-                stiffness = Spring.StiffnessLow,
+                dampingRatio = 0.76f,
+                stiffness = 520f,
             ),
         )
     }
@@ -455,26 +453,25 @@ class BottomSheetState(
                 collapse(velocity)
             }
         } else {
-            // Midpoints, not half-differences. `(collapsedBound - dismissedBound) / 2` is
-            // the SIZE of the lower band, not where it ends, so every slow-release decision
-            // was taken against thresholds that only happened to be right when both bounds
-            // were 0. Worse, the old `when (value)` ended in `else -> Unit`: the drag is
-            // unbounded above expandedBound (see updateBounds in rememberBottomSheetState),
-            // so a drag-up that overshot the top matched no `in` range at all and the sheet
-            // was left frozen exactly where the finger let go -- the stuck-mid-air bug.
-            // These branches are exhaustive over the whole line, so there is no way out
-            // of a fling without landing on an anchor.
-            val dismissMidpoint = dismissedBound + (collapsedBound - dismissedBound) / 2
-            val collapseMidpoint = collapsedBound + (expandedBound - collapsedBound) / 2
-
+            // Slow release: snap nearest the *projected* endpoint, not the release
+            // point, so a gentle toss toward an anchor still lands there. Work in px
+            // since velocity is px/s; value/anchors are Dp.
+            val currentPx = with(density) { value.toPx() }
+            val snapsPx = buildList {
+                if (onDismiss != null) add(with(density) { dismissedBound.toPx() })
+                add(with(density) { collapsedBound.toPx() })
+                add(with(density) { expandedBound.toPx() })
+            }
+            val pickedPx = nearestProjectedSnap(currentPx, velocity, snapsPx)
+            val collapsedPx = with(density) { collapsedBound.toPx() }
+            val expandedPx = with(density) { expandedBound.toPx() }
             when {
-                onDismiss != null && value <= dismissMidpoint -> {
+                onDismiss != null && pickedPx != null && pickedPx < collapsedPx && value < collapsedBound -> {
                     dismiss()
                     onDismiss.invoke()
                 }
-
-                value < collapseMidpoint -> collapse()
-                else -> expand()
+                pickedPx != null && pickedPx >= expandedPx -> expand()
+                else -> collapse()
             }
         }
     }

@@ -135,7 +135,7 @@ fun GlassCircleButton(
     }
     val contentColor = when {
         useGlass && ambientColor.isSpecified -> ambientColor.asSoftIconTint()
-        useGlass -> glassConfig.textColor
+        useGlass -> glassConfig.resolvedTextColor()
         else -> AppTheme.colorScheme.onSurface
     }
 

@@ -94,7 +94,7 @@ object Motion {
     const val SelectStiffness = 750f
 
     fun <T> select(): FiniteAnimationSpec<T> = spring(
-        dampingRatio = Spring.DampingRatioNoBouncy,
+        dampingRatio = 0.76f,
         stiffness = SelectStiffness,
     )
 
@@ -104,7 +104,7 @@ object Motion {
     const val PressStiffness = 1220f
 
     fun <T> press(): FiniteAnimationSpec<T> = spring(
-        dampingRatio = Spring.DampingRatioNoBouncy,
+        dampingRatio = 0.75f,
         stiffness = PressStiffness,
     )
 

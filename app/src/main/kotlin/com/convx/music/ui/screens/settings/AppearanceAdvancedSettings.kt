@@ -404,6 +404,17 @@ fun AppearanceAdvancedSettings(
                             trailingContent = { AdvancedColorSwatch(appTextColor) },
                             onClick = { showAppTextColorPicker = true }
                         ),
+                        // One click back to the design system: clears both
+                        // overrides (0 = system semantic) so light/dark, glass
+                        // chrome and materials all follow IosTheme again.
+                        IosSettingsItem(
+                            icon = painterResource(R.drawable.refresh),
+                            title = { Text(stringResource(R.string.use_system_colors)) },
+                            onClick = {
+                                onBackgroundColorChange(0)
+                                onTextColorChange(0)
+                            }
+                        ),
                     )
                 )
 

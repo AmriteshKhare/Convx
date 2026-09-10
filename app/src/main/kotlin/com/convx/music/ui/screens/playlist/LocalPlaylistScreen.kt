@@ -167,6 +167,7 @@ import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.GlassComponent
 import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.resolvedTextColor
 import com.convx.music.ui.component.withFixedStyle
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
@@ -609,7 +610,7 @@ fun LocalPlaylistScreen(
     val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
-    val chromeContentColor = if (useGlass) glassConfig.textColor else onTint
+    val chromeContentColor = if (useGlass) glassConfig.resolvedTextColor() else onTint
 
     // Unattached backdrop (never .layerBackdrop'd): glass chrome sampling it
     // early-returns → translucent frosted surface, no RenderNode self-reference.

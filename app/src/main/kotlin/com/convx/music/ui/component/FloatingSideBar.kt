@@ -202,10 +202,11 @@ fun AppFloatingSideBar(
         InteractiveHighlight(animationScope = animationScope, radiusScale = 0.3f)
     }
 
+    val panelChrome = glassConfig.forSidePanel().resolvedTextColor()
     val backgroundColor = when {
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
-        else -> AppTheme.colorScheme.surfaceContainerHigh
+        else -> AppTheme.colorScheme.surfaceContainerLow
     }
     // Collapsed rail is narrow and tall — a full capsule (same shape as the
     // tab rows/puck) reads as a pill, where the expanded panel's fixed 28dp
@@ -254,7 +255,7 @@ fun AppFloatingSideBar(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 22.sp,
                     letterSpacing = 1.5.sp,
-                    color = glassConfig.textColor,
+                    color = panelChrome,
                 )
             }
             Icon(
@@ -262,7 +263,7 @@ fun AppFloatingSideBar(
                 contentDescription = stringResource(
                     if (collapsed) R.string.expand_side_panel else R.string.collapse_side_panel
                 ),
-                tint = glassConfig.textColor.copy(alpha = 0.7f),
+                tint = panelChrome.copy(alpha = 0.7f),
                 modifier = Modifier
                     .padding(end = if (collapsed) 0.dp else 16.dp)
                     .size(22.dp)
@@ -303,12 +304,12 @@ fun AppFloatingSideBar(
                             text = title,
                             style = AppTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = glassConfig.textColor.copy(alpha = 0.6f),
+                            color = panelChrome.copy(alpha = 0.6f),
                             modifier = Modifier.padding(start = 16.dp, top = 18.dp, bottom = 4.dp),
                         )
                     }
                     section.links.forEach { link ->
-                        SideBarLinkRow(link = link, contentColor = glassConfig.textColor)
+                        SideBarLinkRow(link = link, contentColor = panelChrome)
                     }
                 }
             }
@@ -345,8 +346,8 @@ private fun SideNavTabs(
     val glassConfig = LocalGlassEffectConfig.current
     val appleMusicUi = LocalAppleMusicUi.current
 
-    val selectedContentColor = glassConfig.textColor
-    val unselectedContentColor = glassConfig.textColor.copy(alpha = 0.75f)
+    val selectedContentColor = glassConfig.resolvedTextColor()
+    val unselectedContentColor = glassConfig.resolvedTextColor().copy(alpha = 0.75f)
 
     // Same wash the phone puck uses: the configured colour, ambient mesh tint
     // (lighter than the surface, hint of hue) on hero-art screens, or the
@@ -493,7 +494,7 @@ fun BoxWithConstraintsScope.AppFloatingNowPlayingPill(
     val background = when {
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
-        else -> AppTheme.colorScheme.surfaceContainerHigh
+        else -> AppTheme.colorScheme.surfaceContainerLow
     }
     val surface = if (useGlass) {
         // This is the mini player pill, not the side panel — it uses the
@@ -508,7 +509,7 @@ fun BoxWithConstraintsScope.AppFloatingNowPlayingPill(
     FloatingMiniPlayer(
         isInline = false,
         // See AppNavigation: hardcoded white disappeared on light themes.
-        contentColor = if (useGlass) glassConfig.textColor else AppTheme.colorScheme.onSurface,
+        contentColor = if (useGlass) glassConfig.resolvedTextColor() else AppTheme.colorScheme.onSurface,
         onClick = onClick,
         onLyricsClick = onLyricsClick,
         onQueueClick = onQueueClick,
@@ -532,7 +533,7 @@ fun SideBarAccountRow(
     modifier: Modifier = Modifier,
     collapsed: Boolean = false,
 ) {
-    val contentColor = LocalGlassEffectConfig.current.textColor
+    val contentColor = LocalGlassEffectConfig.current.resolvedTextColor()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier

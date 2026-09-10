@@ -12,9 +12,14 @@ import androidx.compose.foundation.Indication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
+import com.convx.music.ui.utils.Motion
 import androidx.compose.foundation.shape.CircleShape
 import com.convx.music.ui.ios.compat.LocalContentColor
 import com.convx.music.ui.ios.foundation.IosTheme
@@ -51,6 +56,13 @@ fun ResizableIconButton(
     onClick: () -> Unit = {},
 ) {
     val custom = if (slot != null) rememberPlayerIcon(slot) else null
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.97f else 1f,
+        animationSpec = Motion.press(),
+        label = "ResizableIconPress",
+    )
     Image(
         painter = if (custom != null) custom.painter else {
             if (iconVector != null) rememberVectorPainter(iconVector) else painterResource(icon)
@@ -58,9 +70,13 @@ fun ResizableIconButton(
         contentDescription = null,
         colorFilter = if (custom == null) ColorFilter.tint(color) else custom.colorFilterFor(color),
         modifier = modifier
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .clickable(
                 indication = indication,
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 enabled = enabled,
                 onClick = onClick,
             )
@@ -80,8 +96,18 @@ fun IconButton(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     content: @Composable () -> Unit,
 ) {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed && enabled) 0.97f else 1f,
+        animationSpec = Motion.press(),
+        label = "IconButtonPress",
+    )
     Box(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .sizeIn(minWidth = 44.dp, minHeight = 44.dp)
             .clip(CircleShape)
             .background(color = containerColor)

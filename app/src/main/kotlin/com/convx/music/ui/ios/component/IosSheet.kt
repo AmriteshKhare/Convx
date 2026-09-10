@@ -52,7 +52,8 @@ import com.convx.music.ui.ios.foundation.IosMetrics
 import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.ui.ios.foundation.TopRoundedShape
 import com.convx.music.ui.ios.foundation.iosGlass
-import kotlin.math.abs
+import com.convx.music.ui.utils.nearestProjectedSnap
+import com.convx.music.ui.utils.projectedEndpoint
 import kotlinx.coroutines.launch
 
 /** SwiftUI's PresentationDetent. */
@@ -260,17 +261,17 @@ private suspend fun settleSheet(state: IosSheetState, containerHeight: Float, ve
     val current = state.offset.value
     val targets = state.anchors.map { containerHeight - it }
 
-    // A decisive flick wins over proximity, the way iOS's sheet settles.
-    val projected = current + velocity * 0.12f
-    val nearest = targets.minByOrNull { abs(it - projected) } ?: return
+    // Project where the flick is going, pick nearest detent to that — not to release point.
+    val projected = projectedEndpoint(current, velocity)
+    val nearest = nearestProjectedSnap(current, velocity, targets) ?: return
 
     val dismissThreshold = (targets.maxOrNull() ?: 0f) + containerHeight * 0.12f
     if (!state.interactiveDismissDisabled && projected > dismissThreshold) {
-        state.offset.animateTo(containerHeight, spring(dampingRatio = 1f, stiffness = 400f))
+        state.offset.animateTo(containerHeight, spring(dampingRatio = 1f, stiffness = 400f), initialVelocity = velocity)
         state.onDismissRequest()
         return
     }
-    state.offset.animateTo(nearest, spring(dampingRatio = 0.86f, stiffness = 380f))
+    state.offset.animateTo(nearest, spring(dampingRatio = 0.86f, stiffness = 380f), initialVelocity = velocity)
 }
 
 /**

@@ -183,9 +183,10 @@ fun FloatingMiniPlayer(
     val glow = remember(glowScope) { InteractiveHighlight(animationScope = glowScope) }
     var dragStartTime by remember { mutableLongStateOf(0L) }
     var totalDragDistance by remember { mutableFloatStateOf(0f) }
-    // Tight return: settles without overshoot past center.
+    val viewConfig = LocalViewConfiguration.current
+    // Natural iOS rubber-band return: settles with subtle micro-bounce past center.
     val animationSpec = remember {
-        spring<Float>(dampingRatio = 0.85f, stiffness = 700f)
+        spring<Float>(dampingRatio = 0.73f, stiffness = 620f)
     }
     // Commit distance for the swipe. The logistic curve this replaces produced
     // ~400dp — about 1200px at 3x, on a screen 1080px wide — so releasing the pill
@@ -195,21 +196,6 @@ fun FloatingMiniPlayer(
     val autoSwipeThreshold = remember(swipeSensitivity, configuration.screenWidthDp, densityScale) {
         val screenWidthPx = configuration.screenWidthDp * densityScale
         (screenWidthPx * (0.45f - 0.33f * swipeSensitivity.coerceIn(0f, 1f))).roundToInt()
-    }
-
-    // Pill press state for tap animations below.
-    val pressInteractionSource = remember { MutableInteractionSource() }
-    // Single tap opens; a hold does not. The row click below fires on any
-    // release, so gate it on press duration here.
-    val viewConfig = LocalViewConfiguration.current
-    var pressStartMs by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(pressInteractionSource) {
-        pressInteractionSource.interactions.collect {
-            if (it is PressInteraction.Press) pressStartMs = System.currentTimeMillis()
-        }
-    }
-    val tapOpen = {
-        if (System.currentTimeMillis() - pressStartMs < viewConfig.longPressTimeoutMillis) onClick()
     }
 
     // Same structure as MiniPlayer: the drag detector sits on the outermost
@@ -258,13 +244,13 @@ fun FloatingMiniPlayer(
             .then(glow.modifier)
             // Edge-flick skip only: center drag stretches (via glow above)
             // but never slides or commits. Snaps hop to the card scope.
-            .pointerInput(Unit) {
+            .pointerInput(swipeEnabled) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val pid = down.id
                     val start = down.position
-                    val edgePx = with(density) { 24.dp.toPx() }
-                    val verticalCapPx = with(density) { 12.dp.toPx() }
+                    val edgePx = with(density) { 64.dp.toPx() }
+                    val verticalCapPx = with(density) { 36.dp.toPx() }
                     val isEdgeZone = start.x < edgePx || start.x > size.width - edgePx
                     val allowSwipe = swipeEnabled && isEdgeZone
                     dragStartTime = System.currentTimeMillis()
@@ -295,18 +281,16 @@ fun FloatingMiniPlayer(
                                 (delta > 0 && !canSkipPrevious && slideX < 0) ||
                                     (delta < 0 && !canSkipNext && slideX > 0)
                             if (allowLeft || allowRight || canReturnToCenter) {
-                                // snapTo can't run in this restricted pointer
-                                // scope, so hop to the card scope (one cheap
-                                // snap, down from three launches per move).
+                                if (abs(slideX) > viewConfig.touchSlop) {
+                                    change.consume()
+                                }
                                 slideX += delta
                                 coroutineScope.launch { offsetXAnimatable.snapTo(slideX) }
                             }
                         }
                     }
                     val duration = System.currentTimeMillis() - dragStartTime
-                    // Mean velocity over the gesture, px/ms. The old gate wanted
-                    // ~7.4px/ms against a mean of 1-3 for a real swipe, so that
-                    // branch never fired either.
+                    // Mean velocity over the gesture, px/ms.
                     val velocity = if (duration > 0) totalDragDistance / duration else 0f
                     val currentOffset = slideX
                     val dragged = abs(currentOffset)
@@ -314,11 +298,9 @@ fun FloatingMiniPlayer(
                         playerConnection.player.previousMediaItemIndex != -1
                     val canSkipNext =
                         playerConnection.player.nextMediaItemIndex != -1
-                    // Quick edge flick only, flat: hold-drag and vertical
-                    // travel fail the gates by definition.
+                    // Quick edge flick or dragged past threshold
                     val shouldChangeSong = allowSwipe &&
                         maxAbsY < verticalCapPx &&
-                        duration < viewConfig.longPressTimeoutMillis &&
                         (dragged > autoSwipeThreshold ||
                             (velocity > 0.55f && dragged > autoSwipeThreshold * 0.25f))
                     if (shouldChangeSong) {
@@ -327,7 +309,7 @@ fun FloatingMiniPlayer(
                         // player, and fires the skip callbacks.
                         if (currentOffset > 0 && canSkipPrevious) {
                             playerConnection.seekToPrevious()
-                        } else if (currentOffset <= 0 && canSkipNext) {
+                        } else if (currentOffset < 0 && canSkipNext) {
                             playerConnection.seekToNext()
                         }
                     }
@@ -337,28 +319,13 @@ fun FloatingMiniPlayer(
                     }
                 }
             }
-            // Tap opens only via thumbnail below; the row click is anim-only.
     ) {
         // Fixed sizes for both phone accessory strips (isInline and the default
         // !tabStyle wave bar) — neither's resting height ever changes, so there is
         // nothing to scale against. Only the tablet pill's height actually varies
         // (FloatingMiniPlayerMinHeight..MaxHeight in FloatingSideBar), so only it
         // scales its icons/thumbnail off the measured height.
-        //
-        // The wave bar used to fall into the scaling branch too even though its
-        // height never changes: artSize/controlSize fed into this Row's own
-        // content, which is exactly what onSizeChanged above measures, which sets
-        // measuredHeightPx -- a same-frame feedback loop with itself. Smoothing
-        // the read with animateIntAsState (still done below, for the tablet pill)
-        // only dampened that loop's oscillation into a slow, continuous jitter
-        // instead of a one-frame pop -- still visible as the wave bar's icons
-        // subtly resizing on every recomposition. Only computing off
-        // measuredHeight for tabStyle removes the self-reference entirely for
-        // the wave bar, the case most phones actually see.
         val animatedHeightPx by animateIntAsState(
-            // Phone strips are fixed height after Q1; only the tablet pill
-            // scales off the measurement. Constant target breaks the
-            // content->measure->content feedback loop for phones.
             targetValue = if (tabStyle) measuredHeightPx else with(density) { 64.dp.roundToPx() },
             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
             label = "miniPlayerMeasuredHeight",
@@ -376,70 +343,63 @@ fun FloatingMiniPlayer(
                 // mini and search pills always sit at the same height.
                 .then(if (isInline) Modifier.height(SearchBarRowHeight) else Modifier)
                 .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
-                .clickable(
-                    interactionSource = pressInteractionSource,
-                    indication = null,
-                    // Thumb opens (see artwork below); middle tap animates only.
-                    onClick = {},
-                )
                 .padding(
                     horizontal = if (isInline) 10.dp else 12.dp,
                     vertical = if (isInline) 6.dp else 8.dp,
                 ),
         ) {
             if (isInline) {
-                AsyncImage(
-                    // Same URL AND decode size as PlayerArtworkMorphOverlay and the
-                    // full player's own artwork -- one shared Coil cache entry for
-                    // all three, so the pill, the flying cover, and the handoff
-                    // target are pixel-identical (no re-decode pop between them).
-                    model = ImageRequest.Builder(context)
-                        .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
-                        .size(CoilSize.ORIGINAL)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    placeholder = rememberNoArtworkPainter(),
-                    error = rememberNoArtworkPainter(),
+                // Left-side tap consumer: tapping thumbnail or song info exposes player
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .size(artSize)
+                        .weight(1f)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = tapOpen,
+                            onClick = onClick,
+                        ),
+                ) {
+                    AsyncImage(
+                        // Same URL AND decode size as PlayerArtworkMorphOverlay and the
+                        // full player's own artwork -- one shared Coil cache entry for
+                        // all three, so the pill, the flying cover, and the handoff
+                        // target are pixel-identical (no re-decode pop between them).
+                        model = ImageRequest.Builder(context)
+                            .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
+                            .size(CoilSize.ORIGINAL)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        placeholder = rememberNoArtworkPainter(),
+                        error = rememberNoArtworkPainter(),
+                        modifier = Modifier
+                            .size(artSize)
+                            .registerMiniArtworkRect(with(density) { artCornerRadius.toPx() })
+                            .hideWhileMorphing()
+                            .clip(RoundedCornerShape(artCornerRadius)),
+                    )
+
+                    Spacer(Modifier.width(8.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = mediaMetadata?.title.orEmpty(),
+                            style = AppTheme.typography.bodySmall,
+                            color = contentColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.additiveChrome(useGlass),
                         )
-                        // Registers this box's on-screen bounds for
-                        // PlayerArtworkMorphOverlay -- this is the real, visible mini
-                        // player (docked in the floating nav bar); MiniPlayer.kt's own
-                        // collapsedContent renders at collapsedBound = 0.dp now and is
-                        // never actually on screen.
-                        .registerMiniArtworkRect(with(density) { artCornerRadius.toPx() })
-                        // The cover is flown by PlayerArtworkMorphOverlay for the whole
-                        // flight; without this the copy baked into the pill's recording
-                        // rides along underneath it.
-                        .hideWhileMorphing()
-                        .clip(RoundedCornerShape(artCornerRadius)),
-                )
-
-                Spacer(Modifier.width(8.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = mediaMetadata?.title.orEmpty(),
-                        style = AppTheme.typography.bodySmall,
-                        color = contentColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.additiveChrome(useGlass),
-                    )
-                    Text(
-                        text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
-                        style = AppTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                        color = contentColor.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.additiveChrome(useGlass),
-                    )
+                        Text(
+                            text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
+                            style = AppTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                            color = contentColor.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.additiveChrome(useGlass),
+                        )
+                    }
                 }
 
                 IconButton(
@@ -469,58 +429,57 @@ fun FloatingMiniPlayer(
                 val playbackFraction = rememberPlaybackFraction(playerConnection.player, isPlaying)
                 val waveformSeed = remember(mediaMetadata?.id) { mediaMetadata?.id?.hashCode() ?: 0 }
 
-                AsyncImage(
-                    // Same URL AND decode size as PlayerArtworkMorphOverlay and the
-                    // full player's own artwork -- one shared Coil cache entry for
-                    // all three, so the pill, the flying cover, and the handoff
-                    // target are pixel-identical (no re-decode pop between them).
-                    model = ImageRequest.Builder(context)
-                        .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
-                        .size(CoilSize.ORIGINAL)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    placeholder = rememberNoArtworkPainter(),
-                    error = rememberNoArtworkPainter(),
+                // Left-side tap consumer: tapping thumbnail or song info exposes player
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .size(artSize)
+                        .weight(1f)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = tapOpen,
+                            onClick = onClick,
+                        ),
+                ) {
+                    AsyncImage(
+                        // Same URL AND decode size as PlayerArtworkMorphOverlay and the
+                        // full player's own artwork -- one shared Coil cache entry for
+                        // all three, so the pill, the flying cover, and the handoff
+                        // target are pixel-identical (no re-decode pop between them).
+                        model = ImageRequest.Builder(context)
+                            .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
+                            .size(CoilSize.ORIGINAL)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        placeholder = rememberNoArtworkPainter(),
+                        error = rememberNoArtworkPainter(),
+                        modifier = Modifier
+                            .size(artSize)
+                            .registerMiniArtworkRect(with(density) { artCornerRadius.toPx() })
+                            .hideWhileMorphing()
+                            .clip(RoundedCornerShape(artCornerRadius)),
+                    )
+
+                    Spacer(Modifier.width(10.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = mediaMetadata?.title.orEmpty(),
+                            style = AppTheme.typography.bodyMedium,
+                            color = contentColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.additiveChrome(useGlass),
                         )
-                        // Registers this box's on-screen bounds for
-                        // PlayerArtworkMorphOverlay -- this is the real, visible mini
-                        // player (docked in the floating nav bar); MiniPlayer.kt's own
-                        // collapsedContent renders at collapsedBound = 0.dp now and is
-                        // never actually on screen.
-                        .registerMiniArtworkRect(with(density) { artCornerRadius.toPx() })
-                        // The cover is flown by PlayerArtworkMorphOverlay for the whole
-                        // flight; without this the copy baked into the pill's recording
-                        // rides along underneath it.
-                        .hideWhileMorphing()
-                        .clip(RoundedCornerShape(artCornerRadius)),
-                )
-
-                Spacer(Modifier.width(10.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = mediaMetadata?.title.orEmpty(),
-                        style = AppTheme.typography.bodyMedium,
-                        color = contentColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.additiveChrome(useGlass),
-                    )
-                    Text(
-                        text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
-                        style = AppTheme.typography.bodySmall,
-                        color = contentColor.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.additiveChrome(useGlass),
-                    )
+                        Text(
+                            text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
+                            style = AppTheme.typography.bodySmall,
+                            color = contentColor.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.additiveChrome(useGlass),
+                        )
+                    }
                 }
 
                 if (miniPlayerWaveform) {
@@ -619,7 +578,7 @@ fun FloatingMiniPlayer(
                         slot = PlayerIconSlot.NEXT,
                         fallbackVector = SfSymbols.Monochrome.SFForwardFill,
                         tint = if (canSkipNext) transportTint else transportTint.copy(alpha = 0.4f),
-                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
+                        modifier = Modifier.size(playIconSize).additiveChrome(useGlass),
                     )
                 }
                 IconButton(
@@ -636,58 +595,57 @@ fun FloatingMiniPlayer(
 
                 Spacer(Modifier.width(8.dp))
 
-                AsyncImage(
-                    // Same URL AND decode size as PlayerArtworkMorphOverlay and the
-                    // full player's own artwork -- one shared Coil cache entry for
-                    // all three, so the pill, the flying cover, and the handoff
-                    // target are pixel-identical (no re-decode pop between them).
-                    model = ImageRequest.Builder(context)
-                        .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
-                        .size(CoilSize.ORIGINAL)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    placeholder = rememberNoArtworkPainter(),
-                    error = rememberNoArtworkPainter(),
+                // Tap consumer for thumbnail + song info
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .size(artSize)
+                        .weight(1f)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = tapOpen,
+                            onClick = onClick,
+                        ),
+                ) {
+                    AsyncImage(
+                        // Same URL AND decode size as PlayerArtworkMorphOverlay and the
+                        // full player's own artwork -- one shared Coil cache entry for
+                        // all three, so the pill, the flying cover, and the handoff
+                        // target are pixel-identical (no re-decode pop between them).
+                        model = ImageRequest.Builder(context)
+                            .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
+                            .size(CoilSize.ORIGINAL)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        placeholder = rememberNoArtworkPainter(),
+                        error = rememberNoArtworkPainter(),
+                        modifier = Modifier
+                            .size(artSize)
+                            .registerMiniArtworkRect(with(density) { artCornerRadius.toPx() })
+                            .hideWhileMorphing()
+                            .clip(RoundedCornerShape(artCornerRadius)),
+                    )
+
+                    Spacer(Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = mediaMetadata?.title.orEmpty(),
+                            style = AppTheme.typography.bodyMedium,
+                            color = contentColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.additiveChrome(useGlass),
                         )
-                        // Registers this box's on-screen bounds for
-                        // PlayerArtworkMorphOverlay -- this is the real, visible mini
-                        // player (docked in the floating nav bar); MiniPlayer.kt's own
-                        // collapsedContent renders at collapsedBound = 0.dp now and is
-                        // never actually on screen.
-                        .registerMiniArtworkRect(with(density) { artCornerRadius.toPx() })
-                        // The cover is flown by PlayerArtworkMorphOverlay for the whole
-                        // flight; without this the copy baked into the pill's recording
-                        // rides along underneath it.
-                        .hideWhileMorphing()
-                        .clip(RoundedCornerShape(artCornerRadius)),
-                )
-
-                Spacer(Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = mediaMetadata?.title.orEmpty(),
-                        style = AppTheme.typography.bodyMedium,
-                        color = contentColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.additiveChrome(useGlass),
-                    )
-                    Text(
-                        text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
-                        style = AppTheme.typography.bodySmall,
-                        color = contentColor.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.additiveChrome(useGlass),
-                    )
+                        Text(
+                            text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
+                            style = AppTheme.typography.bodySmall,
+                            color = contentColor.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.additiveChrome(useGlass),
+                        )
+                    }
                 }
 
                 Spacer(Modifier.width(8.dp))

@@ -42,8 +42,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import com.convx.music.ui.utils.Motion
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
@@ -72,6 +78,7 @@ fun DefaultDialog(
         Surface(
             modifier = Modifier
                 .padding(24.dp)
+                .dialogEnter()
                 .border(
                     width = 0.5.dp,
                     color = Color.White.copy(alpha = 0.15f),
@@ -203,6 +210,7 @@ fun ListDialog(
         Surface(
             modifier = Modifier
                 .padding(24.dp)
+                .dialogEnter()
                 .border(
                     width = 0.5.dp,
                     color = Color.White.copy(alpha = 0.15f),
@@ -362,4 +370,31 @@ fun TextFieldDialog(
             extraContent?.invoke()
         }
     }
+}
+
+/**
+ * Dialog entrance: scale 0.96 -> 1 + fade, on [Motion.appear].
+ * Transform + opacity only. Entry-only: the platform Dialog window is removed
+ * on dismiss, so no exit transition is possible without keeping it composed.
+ */
+@Composable
+private fun Modifier.dialogEnter(): Modifier {
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val scale by animateFloatAsState(
+        targetValue = if (entered) 1f else 0.96f,
+        animationSpec = Motion.appear(),
+        label = "DialogEnterScale",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (entered) 1f else 0f,
+        animationSpec = Motion.appear(),
+        label = "DialogEnterAlpha",
+    )
+    return this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .alpha(alpha)
 }

@@ -56,8 +56,8 @@ data class GlassEffectConfig(
     val lensAmount: Float = 0.6f,
     val chromaticAberration: Boolean = false,
     val depthEffect: Boolean = false,
-    /** [Color.Unspecified] means adaptive: dark grey on dark. */
-    val surfaceTintColor: Color = Color(0xFF1A1A1A),
+    /** [Color.Unspecified] means adaptive: derived from the theme surface. */
+    val surfaceTintColor: Color = Color.Unspecified,
     /** Specular rim ("pluck") colour. [Color.Unspecified] keeps the default white. */
     val highlightColor: Color = Color.Unspecified,
     /** Specular rim opacity, 0..1. */
@@ -70,7 +70,9 @@ data class GlassEffectConfig(
     /** Puck wash opacity at rest. It eases toward clear while pressed. */
     val puckOpacity: Float = 0.8f,
     val surfaceOpacity: Float = 0.5f,
-    val textColor: Color = Color.White,
+    /** [Color.Unspecified] means adaptive monochromatic label (dark over light
+     *  content, light over dark) — resolved by [resolvedTextColor]. */
+    val textColor: Color = Color.Unspecified,
     val miniPlayerEnabled: Boolean = true,
     val navBarEnabled: Boolean = true,
     /** Tablet side panel — split from [navBarEnabled] so it can differ from the
@@ -86,7 +88,7 @@ data class GlassEffectConfig(
     val sidePanelLensAmount: Float = 0.6f,
     val sidePanelColor: Color = Color.Unspecified,
     val sidePanelSurfaceOpacity: Float = 0.5f,
-    val sidePanelTextColor: Color = Color.White,
+    val sidePanelTextColor: Color = Color.Unspecified,
 ) {
     /** A copy of this config with the shared effect fields swapped for the
      *  side panel's own — pass this to Modifier.liquidGlass for the side
@@ -313,6 +315,18 @@ val LocalGlassEffectConfig = staticCompositionLocalOf { GlassEffectConfig() }
  *  floating buttons like these always render glass — the setting only decides
  *  whether the bar itself is glass, not these. */
 fun GlassEffectConfig.withFixedStyle(): GlassEffectConfig = copy(globalEnabled = true)
+
+/**
+ * Monochromatic chrome content color per the design system: the configured
+ * tint when the user picked one, else the semantic label (dark over light
+ * content, light over dark). Never hard-codes white — white vanishes on
+ * light-tinted glass.
+ */
+@Composable
+fun GlassEffectConfig.resolvedTextColor(): Color {
+    if (textColor.isSpecified) return textColor
+    return AppTheme.colorScheme.onSurface
+}
 
 /** The backdrop content (app UI) that glass surfaces sample from. */
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop> { error("No AppBackdrop provided") }

@@ -219,24 +219,24 @@ fun NavGraphBuilder.navigationBuilder(
             },
         ),
         enterTransition = {
-            fadeIn(tween(250))
+            fadeIn(Motion.push()) + slideInHorizontally(Motion.push()) { it / 3 }
         },
         exitTransition = {
             if (targetState.destination.route?.startsWith("search/") == true) {
-                fadeOut(tween(200))
+                fadeOut(Motion.push())
             } else {
-                fadeOut(tween(200)) + slideOutHorizontally { -it / 2 }
+                fadeOut(Motion.push(), targetAlpha = Motion.PushDimAlpha) + slideOutHorizontally(Motion.push()) { Motion.parallaxOffset(it) }
             }
         },
         popEnterTransition = {
             if (initialState.destination.route?.startsWith("search/") == true) {
-                fadeIn(tween(250))
+                fadeIn(Motion.push())
             } else {
-                fadeIn(tween(250)) + slideInHorizontally { -it / 2 }
+                fadeIn(Motion.push()) + slideInHorizontally(Motion.push()) { Motion.parallaxOffset(-it) }
             }
         },
         popExitTransition = {
-            fadeOut(tween(200))
+            fadeOut(Motion.appearExit())
         },
     ) {
         OnlineSearchResult(navController)

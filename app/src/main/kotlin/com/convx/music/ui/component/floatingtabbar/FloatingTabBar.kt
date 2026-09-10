@@ -332,8 +332,8 @@ fun FloatingTabBar(
                         clip = false
                         val thump = snapPulse()
                         if (thump != 0f) {
-                            scaleX = 1f + 0.02f * thump
-                            scaleY = 1f + 0.02f * thump
+                            scaleX = 1f + 0.035f * thump
+                            scaleY = 1f + 0.035f * thump
                         }
                     }
             ) {
@@ -354,8 +354,16 @@ fun FloatingTabBar(
                                     }
                                 )
                         } else {
-                            fadeIn(tween(220 * DIAG_SLOWDOWN, easing = FastOutSlowInEasing)) togetherWith
-                                fadeOut(tween(180 * DIAG_SLOWDOWN, easing = FastOutSlowInEasing))
+                            (fadeIn(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = 650f)) togetherWith
+                                fadeOut(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 800f)))
+                                .using(
+                                    SizeTransform(clip = false) { _, _ ->
+                                        spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMedium,
+                                        )
+                                    }
+                                )
                         }
                     },
                     contentAlignment = Alignment.BottomCenter
