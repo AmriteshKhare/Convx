@@ -3,7 +3,7 @@ package com.music.spotify
 import com.music.spotify.models.*
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.header
@@ -44,13 +44,9 @@ object Spotify {
     }
 
     private val gqlClient by lazy {
-        HttpClient(OkHttp) {
+        HttpClient(CIO) {
             engine {
-                config {
-                    connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                    readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                }
+                requestTimeout = 30000
             }
             defaultRequest {
                 header("User-Agent", randomUserAgent())

@@ -17,7 +17,7 @@ package com.music.jiosaavn
 import android.util.Base64
 import android.util.Log
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -104,7 +104,7 @@ object SaavnService {
     }
 
     private val client by lazy {
-        HttpClient(OkHttp) {
+        HttpClient(CIO) {
             install(ContentNegotiation) { json(json) }
             install(HttpTimeout) {
                 requestTimeoutMillis = 6_000
@@ -258,7 +258,7 @@ object SaavnService {
         Log.d(TAG, "getContentLength: url=$url")
         // Use a dedicated lightweight client for HEAD requests — we don't need JSON
         // negotiation here and we want a short timeout so it never blocks playback.
-        val headClient = HttpClient(OkHttp) {
+        val headClient = HttpClient(CIO) {
             install(HttpTimeout) {
                 requestTimeoutMillis = 3_000
                 connectTimeoutMillis = 2_000
