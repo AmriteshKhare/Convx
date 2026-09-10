@@ -10,6 +10,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.os.StrictMode
 import android.widget.Toast
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -73,13 +74,36 @@ class App : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
 
+        // StrictMode: debug-only, catches main-thread IO before it ships.
+        // Release untouched — zero behavior change there.
+        if (BuildConfig.DEBUG) {
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .detectNetwork()
+                    .detectCustomSlowCalls()
+                    .penaltyLog()
+                    .build()
+            )
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectLeakedClosableObjects()
+                    .detectActivityLeaks()
+                    .penaltyLog()
+                    .build()
+            )
+        }
+
         // MMKV before anything that reads a migrated store. The legacy files are
         // copied once, in place; the readers (widget config, EQ prefs, updater,
         // player-state persistence) then only ever talk to MMKV. Moved above the
         // session restore below, which now reads through it.
         MMKV.initialize(this)
         com.convx.music.ui.theme.colorengine.ColorEngine.init(this)
-        com.convx.music.ui.theme.colorengine.ColorEngine.setDebugEnabled(true)
+        // Was unconditionally true: forced a diagnostics allocation + Log.d per
+        // artwork analysis in release. Debug logs stay in debug builds.
+        com.convx.music.ui.theme.colorengine.ColorEngine.setDebugEnabled(BuildConfig.DEBUG)
         migrateSharedPreferencesToMMKV(this, "widget_config")
         migrateSharedPreferencesToMMKV(this, "nanosonic_eq_profiles")
         migrateSharedPreferencesToMMKV(this, "vivi_eq_prefs")
@@ -372,8 +396,12 @@ class App : Application(), SingletonImageLoader.Factory {
             }
             // Memory cache for fast image loading (prevents network requests on recomposition)
             memoryCache {
+                // 0.35 forced eviction pressure on low-RAM devices. Adaptive cap:
+                // same hit rate on normal phones, survivable on Android Go.
+                val activityManager = getSystemService(android.app.ActivityManager::class.java)
+                val percent = if (activityManager?.isLowRamDevice == true) 0.15 else 0.25
                 MemoryCache.Builder()
-                    .maxSizePercent(context, 0.35)
+                    .maxSizePercent(context, percent)
                     .build()
             }
             if (cacheSize == 0) {
@@ -395,6 +423,15 @@ class App : Application(), SingletonImageLoader.Factory {
                 )
             }
         }.build()
+    }
+
+    // Best-effort memory relief. Coil re-fetches from disk cache — no state lost.
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            runCatching { coil3.SingletonImageLoader.get(this).memoryCache?.clear() }
+        }
     }
 
     companion object {

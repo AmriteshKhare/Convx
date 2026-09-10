@@ -953,7 +953,7 @@ object YTPlayerUtils {
         if (MAIN_CLIENT.useWebPoTokens && sessionId != null) {
             Timber.tag(logTag).d("Generating PoToken for MAIN_CLIENT with sessionId")
             try {
-                poToken = poTokenGenerator.getWebClientPoToken(videoId, sessionId)
+                        poToken = poTokenGenerator.getWebClientPoTokenSuspend(videoId, sessionId)
                 if (poToken != null) {
                     Timber.tag(logTag).d("PoToken generated successfully")
                 }
@@ -978,7 +978,7 @@ object YTPlayerUtils {
                         val metaSessionId = YouTube.dataSyncId
                         if (METADATA_CLIENT.useWebPoTokens && metaSessionId != null) {
                             try {
-                                metaPoToken = poTokenGenerator.getWebClientPoToken(videoId, metaSessionId)
+                                metaPoToken = poTokenGenerator.getWebClientPoTokenSuspend(videoId, metaSessionId)
                             } catch (e: Exception) {
                                 Timber.tag(logTag).e(e, "Metadata PoToken generation failed")
                             }
@@ -1113,7 +1113,7 @@ object YTPlayerUtils {
                 if (client.useWebPoTokens && poToken == null && sessionId != null) {
                     Timber.tag(logTag).d("Lazily generating PoToken for fallback web client: ${client.clientName}")
                     try {
-                        poToken = poTokenGenerator.getWebClientPoToken(videoId, sessionId)
+                poToken = poTokenGenerator.getWebClientPoTokenSuspend(videoId, sessionId)
                     } catch (e: Exception) {
                         Timber.tag(logTag).e(e, "Lazy PoToken generation failed")
                     }

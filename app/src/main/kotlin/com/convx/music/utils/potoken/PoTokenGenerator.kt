@@ -20,7 +20,25 @@ class PoTokenGenerator {
     private var webPoTokenStreamingPot: String? = null
     private var webPoTokenGenerator: PoTokenWebView? = null
 
+    // Sync wrapper kept: some callers resolve playback off a suspend context.
+    // Prefer getWebClientPoTokenSuspend from coroutines — same logic, no thread block.
     fun getWebClientPoToken(videoId: String, sessionId: String): PoTokenResult? {
+        return try {
+            runBlocking { getWebClientPoTokenSuspend(videoId, sessionId) }
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "poToken generation exception: ${e.javaClass.simpleName}: ${e.message}")
+            when (e) {
+                is BadWebViewException -> {
+                    Timber.tag(TAG).e(e, "Could not obtain poToken because WebView is broken")
+                    webViewBadImpl = true
+                    null
+                }
+                else -> throw e // includes PoTokenException
+            }
+        }
+    }
+
+    suspend fun getWebClientPoTokenSuspend(videoId: String, sessionId: String): PoTokenResult? {
         Timber.tag(TAG).d("getWebClientPoToken called: videoId=$videoId, sessionId=$sessionId")
         Timber.tag(TAG).d("WebView state: supported=$webViewSupported, badImpl=$webViewBadImpl")
         if (!webViewSupported || webViewBadImpl) {
@@ -29,8 +47,7 @@ class PoTokenGenerator {
         }
 
         return try {
-            Timber.tag(TAG).d("Calling runBlocking to generate poToken...")
-            runBlocking { getWebClientPoToken(videoId, sessionId, forceRecreate = false) }
+            getWebClientPoToken(videoId, sessionId, forceRecreate = false)
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "poToken generation exception: ${e.javaClass.simpleName}: ${e.message}")
             when (e) {
