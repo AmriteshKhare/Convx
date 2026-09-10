@@ -414,7 +414,7 @@ fun PlayerSettings(
                     } else null
                 ))
                 add(IosSettingsItem(
-                    icon = painterResource(R.drawable.local_songs),
+                    icon = painterResource(R.drawable.music_note),
                     title = { Text(stringResource(R.string.local_only_mode)) },
                     description = { Text(stringResource(R.string.local_only_mode_desc)) },
                     trailingContent = {
@@ -426,7 +426,7 @@ fun PlayerSettings(
                     onClick = { onLocalOnlyModeChange(!localOnlyMode) }
                 ))
                 add(IosSettingsItem(
-                    icon = painterResource(R.drawable.local_songs),
+                    icon = painterResource(R.drawable.music_note),
                     title = { Text(stringResource(R.string.scan_local_files)) },
                     description = { Text(stringResource(R.string.scan_local_files_desc)) },
                     onClick = { navController.navigate("settings/scan_music") }

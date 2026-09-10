@@ -183,13 +183,6 @@ android {
         generateLocaleConfig = true
     }
 
-    // externalNativeBuild {  // NDK disabled temporarily — NDK installation incomplete
-    //     cmake {
-    //         path = file("src/main/cpp/analyzer/CMakeLists.txt")
-    //         version = "3.22.1"
-    //     }
-    // }
-
     packaging {
         jniLibs {
             useLegacyPackaging = false

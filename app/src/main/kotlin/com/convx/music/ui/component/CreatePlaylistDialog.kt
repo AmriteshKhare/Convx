@@ -136,8 +136,9 @@ fun CreatePlaylistDialog(
                         Switch(
                             checked = syncedPlaylist,
                             onCheckedChange = {
-                                val isYtmSyncEnabled = context.isSyncEnabled()
-                                if (!isSignedIn && !syncedPlaylist) {
+                                coroutineScope.launch {
+                                    val isYtmSyncEnabled = context.isSyncEnabled()
+                                    if (!isSignedIn && !syncedPlaylist) {
                                     Toast.makeText(
                                         context,
                                         context.getString(R.string.not_logged_in_youtube),
@@ -151,6 +152,7 @@ fun CreatePlaylistDialog(
                                     ).show()
                                 } else {
                                     syncedPlaylist = !syncedPlaylist
+                                }
                                 }
                             }
                         )

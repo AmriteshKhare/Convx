@@ -1034,7 +1034,7 @@ private fun getAutoPlaylistIcon(name: String): Int = when {
     name == stringResource(R.string.offline) -> R.drawable.offline
     name == stringResource(R.string.cached_playlist) -> R.drawable.cached
     name == stringResource(R.string.uploaded_playlist) -> R.drawable.backup
-    name == stringResource(R.string.filter_local) -> R.drawable.local_songs
+    name == stringResource(R.string.filter_local) -> R.drawable.music_note
     name.startsWith(stringResource(R.string.my_top)) -> R.drawable.trending_up
     else -> R.drawable.queue_music
 }
