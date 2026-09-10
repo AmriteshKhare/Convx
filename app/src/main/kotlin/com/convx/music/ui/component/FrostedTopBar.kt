@@ -184,7 +184,6 @@ fun FrostedTopBar(
                     Icon(
                         painterResource(com.convx.music.R.drawable.arrow_back_ios),
                         contentDescription = "Back",
-                        tint = AppTheme.colorScheme.onSurface,
                     )
                 }
             } else {

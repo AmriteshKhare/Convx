@@ -114,8 +114,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import com.convx.music.ui.component.ArtistBlendStart
 import com.convx.music.ui.component.ArtistHeroImage
 import com.convx.music.ui.component.HeroCardHeader
-import com.convx.music.ui.component.HeroTopBlur
-import com.convx.music.ui.component.rememberHeroTopBlur
+import com.convx.music.ui.component.TopFadeBlur
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import coil3.compose.AsyncImage
@@ -255,12 +254,8 @@ fun ArtistScreen(
 
     val lazyListState = rememberLazyListState()
 
-    // Scroll progress driving the hero photo's progressive blur + the top blur
-    // strip: hoisted so the hero and the floating chrome share one value.
-    val heroTopBlurProgress = rememberHeroTopBlur(lazyListState)
-
-    // Per-screen Haze source (see AlbumScreen): the artwork head + tint plane become
-    // the backdrop that the hero merge band / HeroTopBlur blur through.
+    // Per-screen Haze source: the list content the post-hero TopFadeBlur
+    // samples once scrolled past the photo.
     val hazeState = remember { HazeState() }
     val snackbarHostState = remember { SnackbarHostState() }
     var showLocal by rememberSaveable { mutableStateOf(false) }
@@ -355,11 +350,8 @@ fun ArtistScreen(
     val backdropFreeze = rememberBackdropFreeze()
 
     // A flat fill of `tint` reads as a hard-edged color mismatch once the hero
-    // art (which the tint is extracted from) ends and the plain list content
-    // begins. Easing into the screen's real background color over the lower
-    // half turns that seam into a deliberate wash instead — same fix as
-    // AlbumScreen.kt.
-    val screenBackground = AppTheme.colorScheme.background
+    // art ends — the eased foot wash inside ArtistHeroImage settles the join
+    // before the list begins instead.
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -546,9 +538,12 @@ fun ArtistScreen(
                             ArtistHeroImage(
                                 artworkUrl = thumbnail,
                                 pageColor = tint,
-                                hazeState = hazeState,
+                                // Baked join: static blur plates + eased foot wash
+                                // dissolve the edge. No Haze here — the live band
+                                // sampled the list and ghosted over it. No scroll
+                                // blur either — the photo stays crisp on scroll.
+                                hazeState = null,
                                 heroScale = heroZoom.scale,
-                                scrollBlurProgress = heroTopBlurProgress,
                                 modifier = Modifier.offset {
                                     IntOffset(x = 0, y = headerOffset)
                                 },
@@ -877,7 +872,9 @@ fun ArtistScreen(
                                     }
                                 }
                             }
-                            Spacer(modifier = Modifier.height(24.dp))
+                            // Breathing room between the hero tail and the first
+                            // section, so Top Songs starts clear of the photo.
+                            Spacer(modifier = Modifier.height(36.dp))
                         }
                     }
                 }
@@ -1252,17 +1249,36 @@ fun ArtistScreen(
         // GlassCircleButton below reads LocalAppBackdrop at its own composition
         // point, so wrapping it here (not redeclaring a val above) is enough.
         CompositionLocalProvider(LocalAppBackdrop provides listBackdrop) {
-        // Drawn BEFORE the chrome row below, not after: this used to sit as a
-        // sibling composed later than the whole button row (right at the end
-        // of the composable), which put the blur ON TOP of the buttons/scrim
-        // instead of behind them — visually near-invisible against the
-        // already-dark scrim, and hid the hero-dissolve effect this exists for.
-        HeroTopBlur(
-            hazeState = hazeState,
-            progress = heroTopBlurProgress,
-            pageColor = screenBackground,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+        // Settings-style top glass, post-hero only: zero over the photo (the
+        // hero's own top shade keeps the buttons legible there), fading in
+        // once the list scrolls past the hero foot. Same TopFadeBlur ramp +
+        // scrim as every pushed screen, keyed to this screen's mesh tint.
+        val displayMetrics = LocalResources.current.displayMetrics
+        val heroThresholdPx = remember(density, displayMetrics) {
+            displayMetrics.widthPixels.toFloat() / 0.95f
+        }
+        val topBarInAlpha by remember {
+            derivedStateOf {
+                val scrolledPx = if (lazyListState.firstVisibleItemIndex == 0) {
+                    lazyListState.firstVisibleItemScrollOffset.toFloat()
+                } else {
+                    Float.MAX_VALUE
+                }
+                ((scrolledPx - heroThresholdPx) / 200f).coerceIn(0f, 1f)
+            }
+        }
+        if (topBarInAlpha > 0.001f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer { alpha = topBarInAlpha },
+            ) {
+                TopFadeBlur(
+                    hazeState = hazeState,
+                    pageColor = tint,
+                )
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()

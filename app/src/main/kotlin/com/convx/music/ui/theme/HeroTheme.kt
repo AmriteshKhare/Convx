@@ -40,6 +40,7 @@ fun HeroTintedContent(
     backdrop: Backdrop,
     content: @Composable () -> Unit,
 ) {
+    com.convx.music.PublishAmbientBackgroundColor(tint)
     val base = MaterialTheme.colorScheme
     val onDark = tint.luminance() <= 0.5f
 
