@@ -1,20 +1,16 @@
 package com.convx.music.playback
 
-import android.content.Context
 import android.media.MediaDataSource
 import android.net.Uri
 import android.util.Log
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheKeyFactory
 import androidx.media3.datasource.cache.SimpleCache
-import com.convx.music.data.settings.AppSettings
 import com.convx.music.playback.smart.TrackAnalyzer
-import java.io.File
 import java.io.IOException
 
 /**
@@ -34,17 +30,28 @@ object AudioCache {
 
     private lateinit var cache: SimpleCache
 
+    // ponytail: matches the real player's cache key only when it's the bare
+    // media id (the common case — no lossless/Spine namespace suffix active).
+    // A namespaced key ("$mediaId#suffix") won't be found by this factory;
+    // upgrade path is reading the active namespace the same way
+    // MusicService.effectiveCacheKey does, if that toggle turns out to matter
+    // for analysis too.
     /** Standard key factory: builds from the URI's `v` query parameter. */
     val keyFactory = CacheKeyFactory { spec ->
         spec.uri.getQueryParameter("v") ?: spec.uri.toString()
     }
 
-    fun init(context: Context) {
-        cache = SimpleCache(
-            File(context.cacheDir, "audio"),
-            com.convx.music.playback.smart.DynamicLruCacheEvictor(AppSettings.DEFAULT_CACHE_LIMIT_BYTES),
-            StandaloneDatabaseProvider(context),
-        )
+    /**
+     * [playerCache] must be the SAME [SimpleCache] instance the real player's
+     * [CacheDataSource] writes into (MusicService's `@PlayerCache`-qualified
+     * one) — not a second, independent cache. A separate cache here would
+     * never see a single byte the player actually downloads: [renditionsOf]
+     * would stay permanently empty and every track would read as
+     * unanalysable forever, which is exactly what happened before this was
+     * wired to the real thing.
+     */
+    fun init(playerCache: SimpleCache) {
+        cache = playerCache
     }
 
     //  Rendition API — the surface TrackAnalyzer reads
@@ -94,15 +101,30 @@ object AudioCache {
     fun cacheKeyOf(uri: Uri): String = keyFactory.buildCacheKey(DataSpec(uri))
 
     /**
+     * Installed by [MusicService] to actively fetch a track's opening bytes
+     * into [cache], independent of the player's own buffering. Left null
+     * only outside a running service (tests, previews).
+     */
+    var prefetchHead: ((Uri) -> Unit)? = null
+
+    /**
      * Request the opening bytes of a track so the head analysis pass can
      * run before the full download finishes.
      *
-     * Currently a no-op: vivi-music's player cache fills on playback, and
-     * the analyzer's own progressive head-pass handles partial entries.
-     * Can be wired to a targeted range request later.
+     * Waiting on the player's own buffering left this permanently too late
+     * for the *incoming* half of a transition: ExoPlayer's DefaultLoadControl
+     * only reaches into the next queue item within ~50s of the current one
+     * ending, well inside the window a beat-detection pass needs to run and
+     * land before the crossfade arms. [prefetchHead] does a real bounded
+     * fetch instead.
      */
     fun requestAnalysisHead(uri: Uri) {
-        Log.d(TAG, "requestAnalysisHead: ${uri.getQueryParameter("v") ?: uri}")
+        val hook = prefetchHead
+        if (hook != null) {
+            hook(uri)
+        } else {
+            Log.d(TAG, "requestAnalysisHead: no prefetch hook installed, ${uri.getQueryParameter("v") ?: uri}")
+        }
     }
 
     /**

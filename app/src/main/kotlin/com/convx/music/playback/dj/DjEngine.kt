@@ -340,6 +340,34 @@ class DjEngine(
     fun analysisFor(mediaId: String?): TrackAnalysis? = mediaId?.let { analyses[it] }
 
     /**
+     * Approximates a chorus/drop cut point for [TransitionStyle.ECHO_FREEZE]:
+     * the loudest moment in the middle portion of the track, skipping the
+     * intro (first quarter) and anything past 70% (usually the outro or a
+     * final restatement, not where you'd want to cut away into an echo).
+     *
+     * A real chorus detector needs lyrics/structure the on-device analyzer
+     * doesn't have; the loudest mid-track second is a cheap, local stand-in
+     * that lands on a real chorus or drop far more often than the track's
+     * own tail does. Null when there isn't enough profile to judge from.
+     */
+    fun echoPointMs(mediaId: String?): Long? {
+        val profile = analysisFor(mediaId)?.energyProfile ?: return null
+        if (profile.size < MIN_ECHO_POINT_PROFILE_SECONDS) return null
+        val start = (profile.size * ECHO_POINT_WINDOW_START).toInt()
+        val end = (profile.size * ECHO_POINT_WINDOW_END).toInt().coerceAtLeast(start + 1)
+        var bestIndex = start
+        var bestValue = -1
+        for (i in start until end) {
+            val value = profile[i].toInt() and 0xFF
+            if (value > bestValue) {
+                bestValue = value
+                bestIndex = i
+            }
+        }
+        return bestIndex * 1000L
+    }
+
+    /**
      * Silently pre-plays [item] through a throwaway muted player at
      * [PROBE_SPEED]x so the analyzer can cache a grid for it well before the
      * real crossfade needs one.
@@ -614,6 +642,12 @@ class DjEngine(
 
     companion object {
         private const val TAG = "DjEngine"
+
+        /** [echoPointMs] needs at least this much profile before its answer means
+         *  anything — shorter than this and "loudest second" is just noise. */
+        private const val MIN_ECHO_POINT_PROFILE_SECONDS = 40
+        private const val ECHO_POINT_WINDOW_START = 0.25
+        private const val ECHO_POINT_WINDOW_END = 0.70
 
         /** Probe playback rate. 4x provides ample lead time while keeping background
          *  CPU audio decoding overhead low. */

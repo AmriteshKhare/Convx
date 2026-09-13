@@ -37,13 +37,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.convx.music.LocalDatabase
+import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
+import com.convx.music.ai.toMediaItems
+import com.convx.music.playback.queues.ListQueue
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Button
 import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.ios.compat.OutlinedTextField
+import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.screens.settings.SettingsPage
@@ -54,19 +58,29 @@ private const val MIN_SONG_COUNT = 4
 private const val MAX_SONG_COUNT = 30
 private const val DEFAULT_SONG_COUNT = 12
 
+private const val MIN_DURATION_MINUTES = 15
+private const val MAX_DURATION_MINUTES = 240
+private const val DEFAULT_DURATION_MINUTES = 60
+private const val DURATION_STEP_MINUTES = 15
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiDjSetScreen(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
     seedSongId: String?,
+    startInConcertMode: Boolean = false,
     viewModel: AiDjSetViewModel = hiltViewModel(),
 ) {
     val database = LocalDatabase.current
+    val playerConnection = LocalPlayerConnection.current ?: return
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     var prompt by rememberSaveable { mutableStateOf("") }
     var songCount by rememberSaveable { mutableIntStateOf(DEFAULT_SONG_COUNT) }
+    var byDuration by rememberSaveable { mutableStateOf(false) }
+    var durationMinutes by rememberSaveable { mutableIntStateOf(DEFAULT_DURATION_MINUTES) }
+    var concertMode by rememberSaveable { mutableStateOf(startInConcertMode) }
 
     val seedSong = if (!seedSongId.isNullOrBlank()) {
         database.song(seedSongId).collectAsStateWithLifecycle(initialValue = null).value
@@ -92,6 +106,11 @@ fun AiDjSetScreen(
                     Text(
                         text = stringResource(R.string.ai_dj_mix_song_count, result.orderedTitles.size),
                         style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = stringResource(R.string.ai_dj_mix_method, result.method),
+                        style = AppTheme.typography.bodySmall,
                         color = AppTheme.colorScheme.onSurfaceVariant,
                     )
 
@@ -126,12 +145,27 @@ fun AiDjSetScreen(
                         TextButton(onClick = { viewModel.reset() }) {
                             Text(stringResource(R.string.ai_dj_mix_start_over))
                         }
-                        Button(
-                            onClick = {
-                                navController.navigate(localPlaylistRoute(result.playlistId, null))
-                            },
-                        ) {
-                            Text(stringResource(R.string.ai_dj_mix_open_playlist))
+                        val savedPlaylistId = state.savedPlaylistId
+                        if (savedPlaylistId != null) {
+                            Button(onClick = { navController.navigate(localPlaylistRoute(savedPlaylistId, null)) }) {
+                                Text(stringResource(R.string.ai_dj_mix_open_playlist))
+                            }
+                        } else {
+                            TextButton(
+                                onClick = {
+                                    playerConnection.playQueue(
+                                        ListQueue(title = result.playlistName, items = result.toMediaItems())
+                                    )
+                                },
+                            ) {
+                                Text(stringResource(R.string.ai_dj_mix_play_now))
+                            }
+                            Button(onClick = { viewModel.save() }, enabled = !state.isSaving) {
+                                Text(
+                                    if (state.isSaving) stringResource(R.string.ai_dj_mix_saving)
+                                    else stringResource(R.string.ai_dj_mix_save_as_playlist)
+                                )
+                            }
                         }
                     }
                 }
@@ -212,10 +246,10 @@ fun AiDjSetScreen(
                         label = { Text(stringResource(R.string.ai_dj_mix_prompt_label)) },
                         placeholder = {
                             Text(
-                                if (seedSong != null) {
-                                    stringResource(R.string.ai_dj_mix_prompt_hint_seeded)
-                                } else {
-                                    stringResource(R.string.ai_dj_mix_prompt_hint)
+                                when {
+                                    concertMode -> stringResource(R.string.ai_dj_mix_prompt_hint_concert)
+                                    seedSong != null -> stringResource(R.string.ai_dj_mix_prompt_hint_seeded)
+                                    else -> stringResource(R.string.ai_dj_mix_prompt_hint)
                                 }
                             )
                         },
@@ -227,23 +261,94 @@ fun AiDjSetScreen(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            text = stringResource(R.string.ai_dj_mix_song_count_label),
-                            style = AppTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = { songCount = (songCount - 1).coerceAtLeast(MIN_SONG_COUNT) },
-                        ) {
-                            Icon(painterResource(R.drawable.remove), contentDescription = null)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.ai_dj_mix_concert_mode_label),
+                                style = AppTheme.typography.bodyMedium,
+                            )
+                            Text(
+                                text = stringResource(R.string.ai_dj_mix_concert_mode_hint),
+                                style = AppTheme.typography.bodySmall,
+                                color = AppTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        Text(text = "$songCount", style = AppTheme.typography.bodyLarge)
-                        IconButton(
-                            onClick = { songCount = (songCount + 1).coerceAtMost(MAX_SONG_COUNT) },
+                        Switch(checked = concertMode, onCheckedChange = { concertMode = it })
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (byDuration) {
+                            TextButton(onClick = { byDuration = false }) {
+                                Text(stringResource(R.string.ai_dj_mix_mode_songs))
+                            }
+                            Button(onClick = { }) {
+                                Text(stringResource(R.string.ai_dj_mix_mode_duration))
+                            }
+                        } else {
+                            Button(onClick = { }) {
+                                Text(stringResource(R.string.ai_dj_mix_mode_songs))
+                            }
+                            TextButton(onClick = { byDuration = true }) {
+                                Text(stringResource(R.string.ai_dj_mix_mode_duration))
+                            }
+                        }
+                    }
+
+                    if (byDuration) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Icon(painterResource(R.drawable.add), contentDescription = null)
+                            Text(
+                                text = stringResource(R.string.ai_dj_mix_duration_label),
+                                style = AppTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(
+                                onClick = {
+                                    durationMinutes = (durationMinutes - DURATION_STEP_MINUTES)
+                                        .coerceAtLeast(MIN_DURATION_MINUTES)
+                                },
+                            ) {
+                                Icon(painterResource(R.drawable.remove), contentDescription = null)
+                            }
+                            Text(
+                                text = stringResource(R.string.ai_dj_mix_duration_minutes, durationMinutes),
+                                style = AppTheme.typography.bodyLarge,
+                            )
+                            IconButton(
+                                onClick = {
+                                    durationMinutes = (durationMinutes + DURATION_STEP_MINUTES)
+                                        .coerceAtMost(MAX_DURATION_MINUTES)
+                                },
+                            ) {
+                                Icon(painterResource(R.drawable.add), contentDescription = null)
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.ai_dj_mix_song_count_label),
+                                style = AppTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(
+                                onClick = { songCount = (songCount - 1).coerceAtLeast(MIN_SONG_COUNT) },
+                            ) {
+                                Icon(painterResource(R.drawable.remove), contentDescription = null)
+                            }
+                            Text(text = "$songCount", style = AppTheme.typography.bodyLarge)
+                            IconButton(
+                                onClick = { songCount = (songCount + 1).coerceAtMost(MAX_SONG_COUNT) },
+                            ) {
+                                Icon(painterResource(R.drawable.add), contentDescription = null)
+                            }
                         }
                     }
 
@@ -262,6 +367,8 @@ fun AiDjSetScreen(
                                 prompt = prompt.takeIf { it.isNotBlank() },
                                 seedSongId = seedSongId,
                                 songCount = songCount,
+                                targetDurationSeconds = if (byDuration) durationMinutes * 60L else null,
+                                concertMode = concertMode,
                             )
                         },
                         enabled = canGenerate,

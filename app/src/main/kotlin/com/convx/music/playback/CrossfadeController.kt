@@ -109,9 +109,11 @@ class CrossfadeController(
      * Called once per transition, at the instant the incoming track becomes
      * audible. After it returns, [active] must answer `incoming` and [standby]
      * must answer `outgoing` — this class re-reads neither during a transition,
-     * but everything else in the service does.
+     * but everything else in the service does. [fadeMs] is this transition's
+     * fade length, handed through so the UI can run its own artwork
+     * cross-dissolve at the same duration as the audio fade.
      */
-    private val onHandoff: (outgoing: ExoPlayer, incoming: ExoPlayer) -> Unit,
+    private val onHandoff: (outgoing: ExoPlayer, incoming: ExoPlayer, fadeMs: Long) -> Unit,
     /**
      * Stored Automix analysis for a media item, or an empty [TrackAnalysis]
      * when there is none yet. This is the seam Phase 1's DSP analyzer plugs
@@ -145,6 +147,15 @@ class CrossfadeController(
      * Only feeds the stats line — nothing about a transition waits on it.
      */
     private val analysisRunningFor: (MediaItem) -> Boolean = { false },
+    /**
+     * Optional creative-effects layer riding on top of this class's own fade
+     * timing/EQ: [com.convx.music.playback.dj.DjEngine] decides a style
+     * (transparent/echo-freeze/tape-stop) from its own independent BPM/key
+     * read, and this class arms and tears it down at the right points in the
+     * fade lifecycle. Null (the default) means no layer — behaviour identical
+     * to before this existed.
+     */
+    private val djEngine: com.convx.music.playback.dj.DjEngine? = null,
 ) {
 
     private enum class Phase {
@@ -742,8 +753,27 @@ class CrossfadeController(
         val nextIndex = out.nextMediaItemIndex
         if (nextIndex == C.INDEX_UNSET) return false
 
+        // DjEngine picks its own style from its own independent BPM/key read,
+        // a no-op when DJ mode/creative transitions are off. When it lands on
+        // ECHO_FREEZE, cut into the echo at the loudest mid-track moment
+        // instead of the track's natural/analyzed end — that's the whole
+        // point of the style: an ending, not a tail. Only ever moves the fade
+        // *earlier*, never later, so a bad read degrades to the normal anchor.
+        val outgoingMediaId = out.currentMediaItem?.mediaId
+        val incomingMediaId = out.getMediaItemAt(nextIndex).mediaId
+        djEngine?.planTransition(
+            outgoingMediaId,
+            incomingMediaId,
+            out.duration.takeIf { it != C.TIME_UNSET } ?: 0L,
+        )
+        val effectiveEndMs = djEngine
+            ?.takeIf { it.activeStyle == com.convx.music.playback.dj.TransitionStyle.ECHO_FREEZE }
+            ?.echoPointMs(outgoingMediaId)
+            ?.takeIf { it in 1 until endMs || endMs <= 0L }
+            ?: endMs
+
         fadeMs = fade
-        fadeEndMs = endMs
+        fadeEndMs = effectiveEndMs
         smartFadeActive = smart
         incomingCueTimeMs = cueTimeMs.coerceAtLeast(0L)
         incomingPlaybackRate = playbackRate
@@ -829,6 +859,11 @@ class CrossfadeController(
         val out = outgoing ?: return bail()
         val into = incoming ?: return bail()
 
+        // Arms whatever DjEngine picked in [begin] for the length of this
+        // fade — a no-op when there's nothing to arm (DJ mode/creative
+        // transitions off, or the pair scored plain).
+        djEngine?.startTailEffect(out, fadeMs)
+
         // AutoPlay may have appended to the queue since the standby was loaded
         // with a copy of it; those tracks would otherwise be lost at the swap.
         reconcileQueue(out, into)
@@ -843,7 +878,7 @@ class CrossfadeController(
         // firing on a player this class is about to demote.
         listenTo(into)
         handedOff = true
-        onHandoff(out, into)
+        onHandoff(out, into, fadeMs)
 
         // The outgoing player holds the whole queue too, and a standard
         // crossfade runs right up to its track's natural end — at which point
@@ -987,6 +1022,10 @@ class CrossfadeController(
         // currently lifted out. Dropping a 24 dB/octave filter in one buffer is
         // the click this ramp exists to avoid.
         filters.open()
+        // Effects must never outlive their transition — killed immediately
+        // rather than waiting for the bail ramp, same contract DjEngine's own
+        // stopTailEffects doc states.
+        djEngine?.stopTailEffects(outgoing, incoming)
         incoming?.volume = 1f
         bailFromGain = outgoing?.volume ?: 0f
         bailStartedAt = SystemClock.elapsedRealtime()
@@ -1007,6 +1046,7 @@ class CrossfadeController(
         // Unconditional and idempotent, like the speed reset below: correct
         // whether or not this transition ever filtered anything.
         filters.open()
+        djEngine?.stopTailEffects(outgoing, incoming)
         render = Render()
 
         if (handedOff) {

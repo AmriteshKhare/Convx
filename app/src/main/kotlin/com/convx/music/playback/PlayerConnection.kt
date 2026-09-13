@@ -150,6 +150,10 @@ class PlayerConnection(
     /** BPM, key, tier and transition style, straight from the DJ engine. */
     val djState = service.djState
 
+    /** The fade length of the DJ crossfade that just handed off, or 0 outside
+     *  one — see [com.convx.music.playback.MusicService.crossfadeDurationMs]. */
+    val crossfadeDurationMs = service.crossfadeDurationMs
+
     val queueTitle = MutableStateFlow<String?>(null)
     val queueWindows = MutableStateFlow<List<Timeline.Window>>(emptyList())
     val currentMediaItemIndex = MutableStateFlow(-1)

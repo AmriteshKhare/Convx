@@ -27,6 +27,7 @@ import android.media.audiofx.AudioEffect
 import android.media.audiofx.LoudnessEnhancer
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Binder
 import android.os.Build
 import android.os.SystemClock
@@ -55,6 +56,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
@@ -407,6 +409,13 @@ class MusicService :
     private val _playerFlow = MutableStateFlow<ExoPlayer?>(null)
     val playerFlow = _playerFlow.asStateFlow()
 
+    // The just-completed crossfade's fade length, so the UI can run its own
+    // artwork cross-dissolve at the same duration as the audio fade. Reset to
+    // 0 (meaning "not a DJ crossfade, use the short default") on every plain
+    // media-item transition — see onMediaItemTransition below.
+    private val _crossfadeDurationMs = MutableStateFlow(0L)
+    val crossfadeDurationMs = _crossfadeDurationMs.asStateFlow()
+
     private val playerSilenceProcessors = HashMap<Player, SilenceDetectorAudioProcessor>()
     private val playerStallWatchdogs = HashMap<Player, LosslessStallWatchdogAudioProcessor>()
     private val playerSpatialProcessors = HashMap<Player, SpatialAudioProcessor>()
@@ -600,7 +609,8 @@ class MusicService :
         player = createExoPlayer()
         player.addListener(this@MusicService)
 
-        AudioCache.init(this)
+        AudioCache.init(playerCache)
+        AudioCache.prefetchHead = ::prefetchAnalysisHead
 
         trackAnalyzer = TrackAnalyzer(this, AudioCache)
         crossfade = CrossfadeController(
@@ -610,10 +620,15 @@ class MusicService :
             onHandoff = ::adoptPlayer,
             analysisFor = { trackAnalyzer?.analysisFor(it.mediaId) ?: TrackAnalysis() },
             requestAnalysis = { mediaItem, durationMs ->
-                mediaItem.localConfiguration?.uri?.let { uri ->
-                    trackAnalyzer?.request(mediaItem.mediaId, uri, durationMs / 1000.0)
-                }
+                // AudioCache/TrackAnalyzer look up cached bytes by the `v` query
+                // param (see AudioCache.keyFactory) — mediaItem.localConfiguration
+                // .uri is just the bare media id with no query params at all, so
+                // that lookup always came back empty. A synthetic URI with the id
+                // as `v` is all renditionsOf/keyFactory ever actually read from it.
+                val uri = "https://music.youtube.com/watch?v=${mediaItem.mediaId}".toUri()
+                trackAnalyzer?.request(mediaItem.mediaId, uri, durationMs / 1000.0)
             },
+            djEngine = djEngine,
         )
         crossfade?.start()
 
@@ -2189,6 +2204,10 @@ class MusicService :
             }
         }
         previousMediaItemIndex = player.currentMediaItemIndex
+        // A plain ExoPlayer-internal transition, not a DJ crossfade handoff
+        // (that path is adoptPlayer, a player swap, and never fires this
+        // listener) — the artwork should use its short default dissolve.
+        _crossfadeDurationMs.value = 0L
         prefetchUpcoming()
 
         playerStallWatchdogs[player]?.let { watchdog ->
@@ -3480,6 +3499,56 @@ class MusicService :
         }
     }
 
+    private val headPrefetchInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Actively downloads a track's opening bytes into [playerCache] ahead of
+     * normal playback buffering.
+     *
+     * [DefaultLoadControl]'s buffer window only reaches into the *next* queue
+     * item once playback is within its ~50s min/max buffer of the current
+     * item's end — so the incoming half of a transition routinely had no
+     * cached bytes at all until seconds before the crossfade itself, leaving
+     * [TrackAnalyzer] no window to run its head pass in. This is
+     * [AudioCache.requestAnalysisHead]'s callback: a bounded read through the
+     * same resolving/cache chain real playback uses, run the moment a track
+     * becomes "next" rather than when the player would otherwise get to it.
+     */
+    private fun prefetchAnalysisHead(uri: Uri) {
+        val mediaId = uri.getQueryParameter("v") ?: return
+        if (mediaId.startsWith("content://") ||
+            mediaId.startsWith("file://") ||
+            mediaId.startsWith("/storage/")
+        ) return
+        if (playerCache.isCached(mediaId, 0, HEAD_PREFETCH_BYTES)) return
+        if (!headPrefetchInFlight.add(mediaId)) return
+        scope.launch(Dispatchers.IO) {
+            try {
+                val dataSpec = DataSpec.Builder()
+                    .setUri(uri)
+                    .setKey(mediaId)
+                    .setLength(HEAD_PREFETCH_BYTES)
+                    .build()
+                val source = createDataSourceFactory().createDataSource()
+                try {
+                    source.open(dataSpec)
+                    val buffer = ByteArray(64 * 1024)
+                    // Discard — CacheDataSource writes to playerCache as a side
+                    // effect of the read; nothing here needs the bytes directly.
+                    while (source.read(buffer, 0, buffer.size) != C.RESULT_END_OF_INPUT) {
+                        // keep draining until bounded length is exhausted
+                    }
+                } finally {
+                    runCatching { source.close() }
+                }
+            } catch (e: Exception) {
+                Timber.tag(TAG).d("Head prefetch failed for $mediaId: ${e.message}")
+            } finally {
+                headPrefetchInFlight.remove(mediaId)
+            }
+        }
+    }
+
     private fun createDataSourceFactory(): DataSource.Factory {
         return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
@@ -4040,7 +4109,7 @@ class MusicService :
      * Swaps the session player, audio focus, listeners, and notification onto
      * the incoming player and releases the old one.
      */
-    private fun adoptPlayer(outgoing: ExoPlayer, incoming: ExoPlayer) {
+    private fun adoptPlayer(outgoing: ExoPlayer, incoming: ExoPlayer, fadeMs: Long) {
         // Move listeners from old primary to new
         outgoing.removeListener(this@MusicService)
         outgoing.removeListener(sleepTimer)
@@ -4052,6 +4121,7 @@ class MusicService :
         // Swap roles
         player = incoming
         sparePlayer = outgoing
+        _crossfadeDurationMs.value = fadeMs
         _playerFlow.value = player
 
         // Move MediaSession
@@ -4155,6 +4225,10 @@ class MusicService :
         const val NOTIFICATION_ID = 888
         const val ERROR_CODE_NO_STREAM = 1000001
         private const val CHUNK_LENGTH = 10 * 1024 * 1024L // 10MB chunk instead of 512KB to prevent cutoffs
+        // ~35s at a typical 160kbps stream — comfortably past TrackAnalyzer's
+        // MIN_HEAD_SECONDS (12s) and close to its full head window (~30s), so
+        // one prefetch usually satisfies the head pass without a second round.
+        private const val HEAD_PREFETCH_BYTES = 700 * 1024L
         const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"
         const val PERSISTENT_AUTOMIX_FILE = "persistent_automix.data"
         const val PERSISTENT_PLAYER_STATE_FILE = "persistent_player_state.data"

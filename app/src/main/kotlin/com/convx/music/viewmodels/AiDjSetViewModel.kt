@@ -6,6 +6,7 @@
 package com.convx.music.viewmodels
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.convx.music.ai.AiDjSetBuilder
@@ -28,6 +29,10 @@ data class AiDjSetState(
     /** Set only when the run ended with nothing to show — a log line already
      *  said why (missing key, no songs found, etc). */
     val failed: Boolean = false,
+    val isSaving: Boolean = false,
+    /** Set once [save] commits [result] to the library — before that, the set
+     *  exists only in memory and can be played or discarded for free. */
+    val savedPlaylistId: String? = null,
 )
 
 @HiltViewModel
@@ -41,7 +46,13 @@ class AiDjSetViewModel @Inject constructor(
 
     private var job: Job? = null
 
-    fun generate(prompt: String?, seedSongId: String?, songCount: Int) {
+    fun generate(
+        prompt: String?,
+        seedSongId: String?,
+        songCount: Int,
+        targetDurationSeconds: Long? = null,
+        concertMode: Boolean = false,
+    ) {
         if (_state.value.isRunning) return
         _state.value = AiDjSetState(isRunning = true)
 
@@ -52,9 +63,26 @@ class AiDjSetViewModel @Inject constructor(
                 prompt = prompt,
                 seedSongId = seedSongId,
                 songCount = songCount,
-                onLog = { line -> _state.update { it.copy(logs = it.logs + line) } },
+                targetDurationSeconds = targetDurationSeconds,
+                concertMode = concertMode,
+                // Also to Logcat: the running-state UI drops these once the
+                // result lands, which is exactly the moment they're most
+                // useful for diagnosing a bad set after the fact.
+                onLog = { line -> Log.d("AiDjSet", line); _state.update { it.copy(logs = it.logs + line) } },
             )
             _state.update { it.copy(isRunning = false, result = result, failed = result == null) }
+        }
+    }
+
+    /** Commits the current result to the library. No-op if there's nothing to
+     *  save, a save is already running, or it's already been saved once. */
+    fun save() {
+        val result = _state.value.result ?: return
+        if (_state.value.isSaving || _state.value.savedPlaylistId != null) return
+        viewModelScope.launch {
+            _state.update { it.copy(isSaving = true) }
+            val playlistId = AiDjSetBuilder.savePlaylist(database, result)
+            _state.update { it.copy(isSaving = false, savedPlaylistId = playlistId) }
         }
     }
 

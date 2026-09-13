@@ -52,6 +52,7 @@ object AiChatClient {
         val apiKey = context.dataStore.get(OpenRouterApiKey, "")
         val baseUrl = context.dataStore.get(OpenRouterBaseUrlKey, "https://openrouter.ai/api/v1/chat/completions")
         val model = context.dataStore.get(OpenRouterModelKey, "google/gemini-3.1-flash-lite")
+        onLog("Using $provider / $model")
 
         if (apiKey.isEmpty()) {
             onLog("API Key is missing. Please set it in Settings.")

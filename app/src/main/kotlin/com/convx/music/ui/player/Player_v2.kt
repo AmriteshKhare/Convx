@@ -67,6 +67,7 @@ import com.convx.music.constants.EnableGoogleCastKey
 import com.convx.music.models.MediaMetadata
 import com.convx.music.ui.component.BottomSheetState
 import com.convx.music.ui.component.DjReadout
+import com.convx.music.ui.component.ElasticVolumeSlider
 import com.convx.music.ui.component.PlayerSliderTrack
 import com.convx.music.ui.theme.PlayerSliderColors
 import com.convx.music.utils.makeTimeString
@@ -678,52 +679,36 @@ fun PlayerV2(
                                         ),
                                         label = "heroScale",
                                     )
-                                    AnimatedContent(
-                                        targetState = mediaMetadata,
-                                        contentKey = { it?.id },
-                                        // Fade coordinated with subtle scale: the live peek above already carries the
-                                        // whole card across during a swipe, but on button skip or track change,
-                                        // this gives Apple Music-like depth.
-                                        transitionSpec = {
-                                            (fadeIn(spring(dampingRatio = 0.82f, stiffness = 550f)) +
-                                                scaleIn(initialScale = 0.95f, animationSpec = spring(dampingRatio = 0.78f, stiffness = 550f)))
-                                                .togetherWith(
-                                                    fadeOut(spring(dampingRatio = 1.0f, stiffness = 650f)) +
-                                                    scaleOut(targetScale = 0.95f, animationSpec = spring(dampingRatio = 1.0f, stiffness = 650f))
-                                                )
-                                        },
+                                    // Same morph-on-crossfade artwork as the classic player screen
+                                    // (see Thumbnail.kt's ThumbnailImage) rather than a plain
+                                    // AnimatedContent fade+scale swap: it plays the melt shader
+                                    // during a real DJ crossfade (PlayerConnection.crossfadeDurationMs)
+                                    // and a quick default dissolve otherwise, in one persistent
+                                    // composable instead of tearing down/rebuilding per track id.
+                                    val heroCrossfadeMs by playerConnection.crossfadeDurationMs.collectAsState()
+                                    Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .graphicsLayer { scaleX = heroScale; scaleY = heroScale },
-                                        label = "heroArtwork",
-                                    ) { targetMetadata ->
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .customSoftShadow(
-                                                    elevation = playerThumbnailShadowElevation.dp,
-                                                    cornerRadius = if (isHeroLook) 0.dp else 12.dp,
-                                                    enabled = showPlayerThumbnailShadow && !isHeroLook
-                                                )
-                                                .background(adaptiveSurface, RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
-                                                .clip(RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
-                                        ) {
-                                            AsyncImage(
-                                                model = ImageRequest.Builder(context)
-                                                    .data(targetMetadata?.thumbnailUrl?.resize(1200, 1200))
-                                                    .size(CoilSize.ORIGINAL)
-                                                    .crossfade(true)
-                                                    .build(),
-                                                contentDescription = "Cover Art",
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
+                                            .graphicsLayer { scaleX = heroScale; scaleY = heroScale }
+                                            .customSoftShadow(
+                                                elevation = playerThumbnailShadowElevation.dp,
+                                                cornerRadius = if (isHeroLook) 0.dp else 12.dp,
+                                                enabled = showPlayerThumbnailShadow && !isHeroLook
                                             )
-                                            PlayerV2Canvas(
-                                                mediaMetadata = targetMetadata,
-                                                isPlaying = isPlaying,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        }
+                                            .background(adaptiveSurface, RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
+                                            .clip(RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
+                                    ) {
+                                        ThumbnailImage(
+                                            artworkUri = mediaMetadata?.thumbnailUrl?.resize(1200, 1200),
+                                            cropArtwork = true,
+                                            crossfadeMillis = heroCrossfadeMs.takeIf { it > 0 }?.toInt() ?: 200,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                        PlayerV2Canvas(
+                                            mediaMetadata = mediaMetadata,
+                                            isPlaying = isPlaying,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                     }
                                     }
                                 }
@@ -1309,45 +1294,24 @@ fun PlayerV2(
                             .then(if (hideVolumeBar) Modifier.clearAndSetSemantics {} else Modifier),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.VolumeMute, contentDescription = "Volume Down", tint = adaptiveSecondary, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        val volumeInteractionSource = remember { MutableInteractionSource() }
-                        val isVolDragged by volumeInteractionSource.collectIsDraggedAsState()
-                        val isVolPressed by volumeInteractionSource.collectIsPressedAsState()
-                        val isVolActive = isVolDragged || isVolPressed
-
-                        val volHeight by animateDpAsState(
-                            targetValue = if (isVolActive) 12.dp else 6.dp,
-                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-                            label = "volHeight"
-                        )
-
-                        Slider(
-                            value = if (isVolActive) systemVolume else animatedVolume,
+                        ElasticVolumeSlider(
+                            value = animatedVolume,
                             onValueChange = { newValue ->
                                 systemVolume = newValue
                                 val targetVolume = (newValue * maxSystemVolume).toInt()
                                 audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVolume, 0)
                             },
                             enabled = !hideVolumeBar,
-                            interactionSource = volumeInteractionSource,
-                            thumb = { Spacer(modifier = Modifier.size(0.dp)) },
-                            track = { sliderState ->
-                                PlayerSliderTrack(
-                                    sliderState = sliderState,
-                                    trackHeight = volHeight,
-                                    colors = PlayerSliderColors.getSliderColors(
-                                        activeColor = adaptivePrimary.copy(alpha = 0.8f)
-                                    ),
-                                    // Volume, not position: the mix window means nothing here.
-                                    showAutomix = false
-                                )
+                            activeColor = adaptivePrimary.copy(alpha = 0.8f),
+                            inactiveColor = adaptivePrimary.copy(alpha = 0.3f),
+                            modifier = Modifier.fillMaxWidth(),
+                            leftIcon = {
+                                Icon(Icons.Default.VolumeMute, contentDescription = "Volume Down", tint = adaptiveSecondary, modifier = Modifier.size(20.dp))
                             },
-                            modifier = Modifier.weight(1f).height(24.dp)
+                            rightIcon = {
+                                Icon(Icons.Default.VolumeUp, contentDescription = "Volume Up", tint = adaptiveSecondary, modifier = Modifier.size(20.dp))
+                            },
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                            Icon(Icons.Default.VolumeUp, contentDescription = "Volume Up", tint = adaptiveSecondary, modifier = Modifier.size(20.dp))
                         }
                     }
                     }

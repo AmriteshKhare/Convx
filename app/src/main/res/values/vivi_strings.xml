@@ -893,6 +893,18 @@
     <string name="ai_dj_mix_unmatched_count">%1$d songs couldn\'t be found: %2$s</string>
     <string name="ai_dj_mix_start_over">Start Over</string>
     <string name="ai_dj_mix_open_playlist">Open Playlist</string>
+    <string name="ai_dj_mix_mode_songs">By song count</string>
+    <string name="ai_dj_mix_mode_duration">By duration</string>
+    <string name="ai_dj_mix_duration_label">Target length</string>
+    <string name="ai_dj_mix_duration_minutes">%1$d min</string>
+    <string name="ai_dj_mix_method">How this was built: %1$s</string>
+    <string name="ai_dj_mix_concert_mode_label">Concert mode</string>
+    <string name="ai_dj_mix_concert_mode_hint">Builds a set with an opener, rising energy, peak, and closer — like an actual live show</string>
+    <string name="ai_dj_mix_prompt_hint_concert">e.g. an artist, band, or genre for the set</string>
+    <string name="ai_dj_mix_play_now">Play Now</string>
+    <string name="ai_dj_mix_save_as_playlist">Save as Playlist</string>
+    <string name="ai_dj_mix_saving">Saving…</string>
+    <string name="ai_dj_mix_concert_mode_explore_subtitle">AI-designed live sets</string>
 
     <!-- Crash Handler -->
     <string name="crash_title">App Crashed</string>

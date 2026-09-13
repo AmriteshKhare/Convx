@@ -542,16 +542,25 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "ai_dj_set?seedSongId={seedSongId}",
+        route = "ai_dj_set?seedSongId={seedSongId}&concert={concert}",
         arguments = listOf(
             navArgument("seedSongId") {
                 type = NavType.StringType
                 nullable = true
                 defaultValue = null
             },
+            navArgument("concert") {
+                type = NavType.BoolType
+                defaultValue = false
+            },
         ),
     ) {
-        AiDjSetScreen(navController, scrollBehavior, it.arguments?.getString("seedSongId"))
+        AiDjSetScreen(
+            navController,
+            scrollBehavior,
+            it.arguments?.getString("seedSongId"),
+            it.arguments?.getBoolean("concert") ?: false,
+        )
     }
 
 

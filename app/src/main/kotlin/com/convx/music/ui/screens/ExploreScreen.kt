@@ -282,6 +282,14 @@ fun ExploreScreen(
                                 )
                             }
                         }
+                        item(key = "spotlight_concert_mode") {
+                            SpotlightCard(
+                                thumbnailUrl = null,
+                                title = stringResource(R.string.ai_dj_mix_concert_mode_label),
+                                subtitle = stringResource(R.string.ai_dj_mix_concert_mode_explore_subtitle),
+                                onClick = { navController.navigate("ai_dj_set?concert=true") },
+                            )
+                        }
                     }
                 }
 
