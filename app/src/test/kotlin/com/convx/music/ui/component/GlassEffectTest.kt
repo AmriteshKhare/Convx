@@ -75,10 +75,10 @@ class GlassEffectConfigTest {
     @Test
     fun `defaults follow the Apple liquid glass recipe`() {
         val config = GlassEffectConfig()
-        // 2dp blur, 0.4 lens height, 0.6 lens amount, 50% tint.
-        assertEquals(2f, config.blurRadius, 0.001f)
-        assertEquals(19.2f, config.lensHeight * LENS_MAX_DP, 0.001f)
-        assertEquals(28.8f, config.lensAmount * LENS_MAX_DP, 0.001f)
+        // Nav spec (Q16): 3dp blur, 0.60 lens height, 0.69 lens amount, 50% tint.
+        assertEquals(3f, config.blurRadius, 0.001f)
+        assertEquals(28.8f, config.lensHeight * LENS_MAX_DP, 0.001f)
+        assertEquals(33.12f, config.lensAmount * LENS_MAX_DP, 0.001f)
         assertEquals(0.5f, config.surfaceOpacity, 0.001f)
     }
 

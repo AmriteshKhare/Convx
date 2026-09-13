@@ -86,6 +86,36 @@ fun invalidateArtistCache(name: String? = null, id: String? = null) {
     else artistIdCache.clear()
 }
 
+/**
+ * Sorts a loaded [Song] graph by artist then album. Pure CPU-bound work
+ * (Collator over the full list, grouping by album) that Room SQL cannot
+ * express over @Relation graphs — each ARTIST branch below runs its helper on
+ * Dispatchers.Default via branch-local flowOn. Every other branch is
+ * SQL-ordered and main-safe, with no flowOn in the DAO.
+ */
+private fun sortSongsByArtistGraph(songs: List<Song>): List<Song> {
+    val collator = Collator.getInstance(Locale.getDefault())
+    collator.strength = Collator.PRIMARY
+    return songs
+        .sortedWith(
+            compareBy(collator) { song ->
+                song.artists.joinToString("") { it.name }
+            },
+        ).groupBy { it.album?.title }
+        .flatMap { (_, songsByAlbum) ->
+            songsByAlbum.sortedBy { album ->
+                album.artists.joinToString("") { it.name }
+            }
+        }
+}
+
+/** Album-graph counterpart of [sortSongsByArtistGraph] — same threading note. */
+private fun sortAlbumsByArtistGraph(albums: List<Album>): List<Album> {
+    val collator = Collator.getInstance(Locale.getDefault())
+    collator.strength = Collator.PRIMARY
+    return albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { it.name } })
+}
+
 @Dao
 interface DatabaseDao {
     @Transaction
@@ -97,7 +127,7 @@ interface DatabaseDao {
     fun songsByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE inLibrary IS NOT NULL ORDER BY title")
+    @Query("SELECT * FROM song WHERE inLibrary IS NOT NULL ORDER BY title COLLATE NOCASE")
     fun songsByNameAsc(): Flow<List<Song>>
 
     @Transaction
@@ -110,36 +140,14 @@ interface DatabaseDao {
         descending: Boolean,
     ) = when (sortType) {
         SongSortType.CREATE_DATE -> songsByCreateDateAsc()
-        SongSortType.NAME ->
-            songsByNameAsc().map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs.sortedWith(compareBy(collator) { it.song.title })
-            }
+        SongSortType.NAME -> songsByNameAsc()
 
         SongSortType.ARTIST ->
-            songsByRowIdAsc().map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs
-                    .sortedWith(
-                        compareBy(collator) { song ->
-                            song.artists.joinToString("") { it.name }
-                        },
-                    ).groupBy { it.album?.title }
-                    .flatMap { (_, songsByAlbum) ->
-                        songsByAlbum.sortedBy { album ->
-                            album.artists.joinToString(
-                                "",
-                            ) { it.name }
-                        }
-                    }
-            }
+            songsByRowIdAsc().map(::sortSongsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         SongSortType.PLAY_TIME -> songsByPlayTimeAsc()
     }.map { it.reversed(descending) }
-        // Collator sort of the full library must not run on the collector (main).
-        .flowOn(Dispatchers.Default)
 
     @Transaction
     @Query("SELECT * FROM song WHERE liked ORDER BY rowId")
@@ -150,7 +158,7 @@ interface DatabaseDao {
     fun likedSongsByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE liked ORDER BY title")
+    @Query("SELECT * FROM song WHERE liked ORDER BY title COLLATE NOCASE")
     fun likedSongsByNameAsc(): Flow<List<Song>>
 
     @Transaction
@@ -169,35 +177,14 @@ interface DatabaseDao {
         descending: Boolean,
     ) = when (sortType) {
         SongSortType.CREATE_DATE -> likedSongsByCreateDateAsc()
-        SongSortType.NAME ->
-            likedSongsByNameAsc().map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs.sortedWith(compareBy(collator) { it.song.title })
-            }
+        SongSortType.NAME -> likedSongsByNameAsc()
 
         SongSortType.ARTIST ->
-            likedSongsByRowIdAsc().map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs
-                    .sortedWith(
-                        compareBy(collator) { song ->
-                            song.artists.joinToString("") { it.name }
-                        },
-                    ).groupBy { it.album?.title }
-                    .flatMap { (_, songsByAlbum) ->
-                        songsByAlbum.sortedBy { album ->
-                            album.artists.joinToString(
-                                "",
-                            ) { it.name }
-                        }
-                    }
-            }
+            likedSongsByRowIdAsc().map(::sortSongsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         SongSortType.PLAY_TIME -> likedSongsByPlayTimeAsc()
     }.map { it.reversed(descending) }
-        .flowOn(Dispatchers.Default)
 
     @Transaction
     @Query("SELECT COUNT(1) FROM song WHERE liked")
@@ -219,7 +206,7 @@ interface DatabaseDao {
 
     @Transaction
     @Query(
-        "SELECT song.* FROM song_artist_map JOIN song ON song_artist_map.songId = song.id WHERE artistId = :artistId AND inLibrary IS NOT NULL ORDER BY title",
+        "SELECT song.* FROM song_artist_map JOIN song ON song_artist_map.songId = song.id WHERE artistId = :artistId AND inLibrary IS NOT NULL ORDER BY title COLLATE NOCASE",
     )
     fun artistSongsByNameAsc(artistId: String): Flow<List<Song>>
 
@@ -239,12 +226,7 @@ interface DatabaseDao {
     ): Flow<List<Song>> {
         val songsFlow = when (sortType) {
             ArtistSongSortType.CREATE_DATE -> artistSongsByCreateDateAsc(artistId)
-            ArtistSongSortType.NAME ->
-                artistSongsByNameAsc(artistId).map { artistSongs ->
-                    val collator = Collator.getInstance(Locale.getDefault())
-                    collator.strength = Collator.PRIMARY
-                    artistSongs.sortedWith(compareBy(collator) { it.song.title })
-                }
+            ArtistSongSortType.NAME -> artistSongsByNameAsc(artistId)
 
             ArtistSongSortType.PLAY_TIME -> {
                 if (fromTimeStamp != null && toTimeStamp != null) {
@@ -258,7 +240,7 @@ interface DatabaseDao {
         return songsFlow.map { songs ->
             val limitedSongs = if (limit > 0) songs.take(limit) else songs
             limitedSongs.reversed(descending)
-        }.flowOn(Dispatchers.Default)
+        }
     }
 
     @Transaction
@@ -761,7 +743,7 @@ interface DatabaseDao {
             artists
                 .filter { it.artist.isYouTubeArtist || it.artist.isLocal } // TODO: add ui to filter by local or remote or something idk
                 .reversed(descending)
-        }.flowOn(Dispatchers.Default)
+        }
 
     fun artistsBookmarked(sortType: ArtistSortType, descending: Boolean) =
         when (sortType) {
@@ -773,7 +755,7 @@ interface DatabaseDao {
             artists
                 .filter { it.artist.isYouTubeArtist || it.artist.isLocal } // TODO: add ui to filter by local or remote or something idk
                 .reversed(descending)
-        }.flowOn(Dispatchers.Default)
+        }
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
@@ -957,7 +939,7 @@ interface DatabaseDao {
             ArtistSortType.NAME -> artistsLocalByNameAsc()
             ArtistSortType.SONG_COUNT -> artistsLocalBySongCountAsc()
             ArtistSortType.PLAY_TIME -> artistsLocalByPlayTimeAsc()
-        }.map { it.reversed(descending) }.flowOn(Dispatchers.Default)
+        }.map { it.reversed(descending) }
 
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     @Query("SELECT *, (SELECT COUNT(1) FROM song_artist_map JOIN song ON song_artist_map.songId = song.id WHERE artistId = artist.id AND song.inLibrary IS NOT NULL) AS songCount FROM artist WHERE id = :id")
@@ -970,7 +952,7 @@ interface DatabaseDao {
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
-    @Query("SELECT * FROM album WHERE EXISTS(SELECT * FROM song WHERE song.albumId = album.id AND song.inLibrary IS NOT NULL) ORDER BY title")
+    @Query("SELECT * FROM album WHERE EXISTS(SELECT * FROM song WHERE song.albumId = album.id AND song.inLibrary IS NOT NULL) ORDER BY title COLLATE NOCASE")
     fun albumsByNameAsc(): Flow<List<Album>>
 
     @Transaction
@@ -1010,7 +992,7 @@ interface DatabaseDao {
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
-    @Query("SELECT * FROM album WHERE bookmarkedAt IS NOT NULL ORDER BY title")
+    @Query("SELECT * FROM album WHERE bookmarkedAt IS NOT NULL ORDER BY title COLLATE NOCASE")
     fun albumsLikedByNameAsc(): Flow<List<Album>>
 
     @Transaction
@@ -1050,7 +1032,7 @@ interface DatabaseDao {
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
-    @Query("SELECT * FROM album WHERE bookmarkedAt IS NOT NULL ORDER BY title")
+    @Query("SELECT * FROM album WHERE bookmarkedAt IS NOT NULL ORDER BY title COLLATE NOCASE")
     fun albumsUploadedByNameAsc(): Flow<List<Album>>
 
     @Transaction
@@ -1088,19 +1070,11 @@ interface DatabaseDao {
         descending: Boolean,
     ) = when (sortType) {
         AlbumSortType.CREATE_DATE -> albumsByCreateDateAsc()
-        AlbumSortType.NAME ->
-            albumsByNameAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { it.album.title })
-            }
+        AlbumSortType.NAME -> albumsByNameAsc()
 
         AlbumSortType.ARTIST ->
-            albumsByCreateDateAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { it.name } })
-            }
+            albumsByCreateDateAsc().map(::sortAlbumsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         AlbumSortType.YEAR -> albumsByYearAsc()
         AlbumSortType.SONG_COUNT -> albumsBySongCountAsc()
@@ -1113,19 +1087,11 @@ interface DatabaseDao {
         descending: Boolean,
     ) = when (sortType) {
         AlbumSortType.CREATE_DATE -> albumsLikedByCreateDateAsc()
-        AlbumSortType.NAME ->
-            albumsLikedByNameAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { it.album.title })
-            }
+        AlbumSortType.NAME -> albumsLikedByNameAsc()
 
         AlbumSortType.ARTIST ->
-            albumsLikedByCreateDateAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { it.name } })
-            }
+            albumsLikedByCreateDateAsc().map(::sortAlbumsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         AlbumSortType.YEAR -> albumsLikedByYearAsc()
         AlbumSortType.SONG_COUNT -> albumsLikedBySongCountAsc()
@@ -1138,19 +1104,11 @@ interface DatabaseDao {
         descending: Boolean,
     ) = when (sortType) {
         AlbumSortType.CREATE_DATE -> albumsUploadedByCreateDateAsc()
-        AlbumSortType.NAME ->
-            albumsUploadedByNameAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { it.album.title })
-            }
+        AlbumSortType.NAME -> albumsUploadedByNameAsc()
 
         AlbumSortType.ARTIST ->
-            albumsUploadedByCreateDateAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { it.name } })
-            }
+            albumsUploadedByCreateDateAsc().map(::sortAlbumsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         AlbumSortType.YEAR -> albumsUploadedByYearAsc()
         AlbumSortType.SONG_COUNT -> albumsUploadedBySongCountAsc()
@@ -1160,12 +1118,12 @@ interface DatabaseDao {
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
-    @Query("SELECT * FROM album WHERE isLocal = 1 ORDER BY title")
+    @Query("SELECT * FROM album WHERE isLocal = 1 ORDER BY title COLLATE NOCASE")
     fun albumsLocalByNameAsc(): Flow<List<Album>>
 
     @Transaction
     @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
-    @Query("SELECT * FROM album WHERE isLocal = 1 ORDER BY title DESC")
+    @Query("SELECT * FROM album WHERE isLocal = 1 ORDER BY title COLLATE NOCASE DESC")
     fun albumsLocalByNameDesc(): Flow<List<Album>>
 
     @Transaction
@@ -1237,19 +1195,11 @@ interface DatabaseDao {
         descending: Boolean,
     ) = when (sortType) {
         AlbumSortType.CREATE_DATE -> albumsLocalByRowIdAsc()
-        AlbumSortType.NAME ->
-            albumsLocalByNameAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { it.album.title })
-            }
+        AlbumSortType.NAME -> albumsLocalByNameAsc()
 
         AlbumSortType.ARTIST ->
-            albumsLocalByRowIdAsc().map { albums ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                albums.sortedWith(compareBy(collator) { album -> album.artists.joinToString("") { it.name } })
-            }
+            albumsLocalByRowIdAsc().map(::sortAlbumsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         AlbumSortType.YEAR -> albumsLocalByYearAsc()
         AlbumSortType.SONG_COUNT -> albumsLocalBySongCountAsc()
@@ -1281,11 +1231,11 @@ interface DatabaseDao {
     fun playlistsByUpdatedDateAsc(): Flow<List<Playlist>>
 
     @Transaction
-    @Query("SELECT *, (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id) AS songCount FROM playlist WHERE bookmarkedAt IS NOT NULL ORDER BY name")
+    @Query("SELECT *, (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id) AS songCount FROM playlist WHERE bookmarkedAt IS NOT NULL ORDER BY name COLLATE NOCASE")
     fun playlistsByNameAsc(): Flow<List<Playlist>>
 
     @Transaction
-    @Query("SELECT *, (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id) AS songCount FROM playlist WHERE isEditable AND bookmarkedAt IS NOT NULL ORDER BY name")
+    @Query("SELECT *, (SELECT COUNT(*) FROM playlist_song_map WHERE playlistId = playlist.id) AS songCount FROM playlist WHERE isEditable AND bookmarkedAt IS NOT NULL ORDER BY name COLLATE NOCASE")
     fun editablePlaylistsByNameAsc(): Flow<List<Playlist>>
 
     @Transaction
@@ -1297,12 +1247,7 @@ interface DatabaseDao {
         descending: Boolean,
     ) = when (sortType) {
         PlaylistSortType.CREATE_DATE -> playlistsByCreateDateAsc()
-        PlaylistSortType.NAME ->
-            playlistsByNameAsc().map { playlists ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                playlists.sortedWith(compareBy(collator) { it.playlist.name })
-            }
+        PlaylistSortType.NAME -> playlistsByNameAsc()
 
         PlaylistSortType.SONG_COUNT -> playlistsBySongCountAsc()
         PlaylistSortType.LAST_UPDATED -> playlistsByUpdatedDateAsc()
@@ -1352,30 +1297,21 @@ interface DatabaseDao {
         descending: Boolean
     ): Flow<List<Song>> = when (sortType) {
         SongSortType.CREATE_DATE -> downloadedSongsByCreateDateAsc()
-        SongSortType.NAME -> downloadedSongsByNameAsc().map { songs ->
-            val collator = Collator.getInstance(Locale.getDefault())
-            collator.strength = Collator.PRIMARY
-            songs.sortedWith(compareBy(collator) { it.song.title })
-        }
+        SongSortType.NAME -> downloadedSongsByNameAsc()
 
-        SongSortType.ARTIST -> downloadedSongsByNameAsc().map { songs ->
-            val collator = Collator.getInstance(Locale.getDefault())
-            collator.strength = Collator.PRIMARY
-            songs.sortedWith(compareBy(collator) { song ->
-                song.artists.joinToString("") { it.name }
-            })
-        }
+        SongSortType.ARTIST ->
+            downloadedSongsByNameAsc().map(::sortSongsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         SongSortType.PLAY_TIME -> downloadedSongsByPlayTimeAsc()
     }.map { it.reversed(descending) }
-        .flowOn(Dispatchers.Default)
 
     @Transaction
     @Query("SELECT * FROM song WHERE isDownloaded = 1 ORDER BY dateDownload")
     fun downloadedSongsByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isDownloaded = 1 ORDER BY title")
+    @Query("SELECT * FROM song WHERE isDownloaded = 1 ORDER BY title COLLATE NOCASE")
     fun downloadedSongsByNameAsc(): Flow<List<Song>>
 
     @Transaction
@@ -1390,7 +1326,7 @@ interface DatabaseDao {
     fun uploadedSongsByCreateDateAsc(): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isUploaded = 1 ORDER BY title")
+    @Query("SELECT * FROM song WHERE isUploaded = 1 ORDER BY title COLLATE NOCASE")
     fun uploadedSongsByNameAsc(): Flow<List<Song>>
 
     @Transaction
@@ -1406,35 +1342,14 @@ interface DatabaseDao {
         descending: Boolean,
     ) = when (sortType) {
         SongSortType.CREATE_DATE -> uploadedSongsByCreateDateAsc()
-        SongSortType.NAME ->
-            uploadedSongsByNameAsc().map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs.sortedWith(compareBy(collator) { it.song.title })
-            }
+        SongSortType.NAME -> uploadedSongsByNameAsc()
 
         SongSortType.ARTIST ->
-            uploadedSongsByRowIdAsc().map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs
-                    .sortedWith(
-                        compareBy(collator) { song ->
-                            song.artists.joinToString("") { it.name }
-                        },
-                    ).groupBy { it.album?.title }
-                    .flatMap { (_, songsByAlbum) ->
-                        songsByAlbum.sortedBy { album ->
-                            album.artists.joinToString(
-                                "",
-                            ) { it.name }
-                        }
-                    }
-            }
+            uploadedSongsByRowIdAsc().map(::sortSongsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         SongSortType.PLAY_TIME -> uploadedSongsByPlayTimeAsc()
     }.map { it.reversed(descending) }
-        .flowOn(Dispatchers.Default)
 
     @Transaction
     // Local songs are scanned, never downloaded, so dateDownload is NULL for all of
@@ -1448,7 +1363,7 @@ interface DatabaseDao {
     suspend fun localSongIds(): List<String>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE isLocal = 1 ORDER BY title")
+    @Query("SELECT * FROM song WHERE isLocal = 1 ORDER BY title COLLATE NOCASE")
     fun localSongsByNameAsc(): Flow<List<Song>>
 
     @Transaction
@@ -1463,36 +1378,15 @@ interface DatabaseDao {
         sortType: SongSortType,
         descending: Boolean,
     ) = when (sortType) {
-        SongSortType.CREATE_DATE -> localSongsByCreateDateAsc()
-        SongSortType.NAME ->
-            localSongsByNameAsc().map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs.sortedWith(compareBy(collator) { it.song.title })
-            }
+        SongSortType.CREATE_DATE -> uploadedSongsByCreateDateAsc()
+        SongSortType.NAME -> uploadedSongsByNameAsc()
 
         SongSortType.ARTIST ->
-            localSongsByRowIdAsc().map { songs ->
-                val collator = Collator.getInstance(Locale.getDefault())
-                collator.strength = Collator.PRIMARY
-                songs
-                    .sortedWith(
-                        compareBy(collator) { song ->
-                            song.artists.joinToString("") { it.name }
-                        },
-                    ).groupBy { it.album?.title }
-                    .flatMap { (_, songsByAlbum) ->
-                        songsByAlbum.sortedBy { album ->
-                            album.artists.joinToString(
-                                "",
-                            ) { it.name }
-                        }
-                    }
-            }
+            localSongsByRowIdAsc().map(::sortSongsByArtistGraph)
+                .flowOn(Dispatchers.Default)
 
         SongSortType.PLAY_TIME -> localSongsByPlayTimeAsc()
     }.map { it.reversed(descending) }
-        .flowOn(Dispatchers.Default)
 
     @Transaction
     @Query("SELECT * FROM song WHERE title LIKE '%' || :query || '%' AND inLibrary IS NOT NULL LIMIT :previewSize")
@@ -1560,6 +1454,11 @@ interface DatabaseDao {
     @Transaction
     @Query("SELECT * FROM event ORDER BY rowId DESC")
     fun events(): Flow<List<EventWithSong>>
+
+    /** Latest play only — hot paths (quick picks seed, explore seed) must not load the full event table. */
+    @Transaction
+    @Query("SELECT * FROM event ORDER BY rowId DESC LIMIT 1")
+    fun latestEvent(): Flow<EventWithSong?>
 
     @Transaction
     @Query("SELECT * FROM event ORDER BY rowId ASC LIMIT 1")

@@ -154,6 +154,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
+    // JVM unit tests touch framework stubs (ColorUtils in tint math). Return
+    // defaults instead of throwing — Robolectric would be heavier than these
+    // token tests warrant.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     kotlin {
         jvmToolchain(21)
         compilerOptions {

@@ -19,6 +19,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.AutoMigrationSpec
 import androidx.room.migration.Migration
+import androidx.room.withTransaction as roomWithTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import com.convx.music.db.daos.SpeedDialDao
@@ -77,13 +78,13 @@ class MusicDatabase(
             }
         }
 
-    suspend fun withTransaction(block: suspend MusicDatabase.() -> Unit) =
-        with(delegate) {
-            // Room 2.6+: suspend lambda runs in the txn context, no runBlocking.
-            withTransaction {
-                block(this@MusicDatabase)
-            }
+    suspend fun withTransaction(block: suspend MusicDatabase.() -> Unit) {
+        // Room 2.6+: suspend lambda runs in the txn context, no runBlocking.
+        // Aliased: a bare withTransaction() here would resolve to this wrapper.
+        delegate.roomWithTransaction {
+            block(this@MusicDatabase)
         }
+    }
 
     fun close() = delegate.close()
 }

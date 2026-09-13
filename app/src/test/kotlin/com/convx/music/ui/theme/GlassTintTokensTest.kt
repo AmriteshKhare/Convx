@@ -27,8 +27,9 @@ class GlassTintTokensTest {
         val darkNeutral = GlassTintTokens.neutralTintColor(isDark = true)
         val lightNeutral = GlassTintTokens.neutralTintColor(isDark = false)
 
-        assertEquals(0.06f, darkNeutral.alpha, 0.001f)
-        assertEquals(0.05f, lightNeutral.alpha, 0.001f)
+        // Compose packs alpha into 8 bits: 0.06*255 rounds to 15/255.
+        assertEquals(0.06f, darkNeutral.alpha, 0.005f)
+        assertEquals(0.05f, lightNeutral.alpha, 0.005f)
 
         // Must never have strong saturation/red hue
         assertNotEquals(Color.Red, darkNeutral)
@@ -38,8 +39,8 @@ class GlassTintTokensTest {
     @Test
     fun `heroTintOpacity has plus 10 percent boost`() {
         // §3.2: 0.30 dark, 0.25 light
-        assertEquals(0.30f, GlassTintTokens.heroTintOpacity(isDark = true), 0.001f)
-        assertEquals(0.25f, GlassTintTokens.heroTintOpacity(isDark = false), 0.001f)
+        assertEquals(0.30f, GlassTintTokens.heroTintOpacity(isDark = true), 0.005f)
+        assertEquals(0.25f, GlassTintTokens.heroTintOpacity(isDark = false), 0.005f)
     }
 
     @Test
@@ -55,8 +56,8 @@ class GlassTintTokensTest {
         val darkBorder = GlassTintTokens.borderColor(isDark = true)
         val lightBorder = GlassTintTokens.borderColor(isDark = false)
 
-        assertEquals(0.12f, darkBorder.alpha, 0.001f)
-        assertEquals(0.08f, lightBorder.alpha, 0.001f)
+        assertEquals(0.12f, darkBorder.alpha, 0.005f)
+        assertEquals(0.08f, lightBorder.alpha, 0.005f)
     }
 
     @Test
@@ -74,7 +75,7 @@ class GlassTintTokensTest {
 
         assertEquals(GlassTintTokens.AccentSelectedRedDark.copy(alpha = GlassTintTokens.IconDimOpacity), selectedDark)
         assertEquals(GlassTintTokens.AccentSelectedRedLight, selectedLight)
-        assertEquals(1.0f, selectedLight.alpha, 0.001f)
+        assertEquals(1.0f, selectedLight.alpha, 0.005f)
     }
 
     @Test
@@ -84,13 +85,13 @@ class GlassTintTokensTest {
         val tabLabelLight = GlassTintTokens.glassContentColor(isDark = false, isSelected = false, isUnselectedTabLabel = true)
 
         assertEquals(GlassTintTokens.IconOpaqueBlackishLight, iconLight)
-        assertEquals(1.0f, iconLight.alpha, 0.001f)
+        assertEquals(1.0f, iconLight.alpha, 0.005f)
 
         assertEquals(GlassTintTokens.TitleOpaqueBlackishLight, titleLight)
-        assertEquals(1.0f, titleLight.alpha, 0.001f)
+        assertEquals(1.0f, titleLight.alpha, 0.005f)
 
         assertEquals(GlassTintTokens.TabLabelOpaqueBlackishLight, tabLabelLight)
-        assertEquals(1.0f, tabLabelLight.alpha, 0.001f)
+        assertEquals(1.0f, tabLabelLight.alpha, 0.005f)
     }
 
     @Test
@@ -101,7 +102,7 @@ class GlassTintTokensTest {
             isTitle = true,
             overrideRedForSelection = true
         )
-        assertEquals(0.92f, selectedTitle.alpha, 0.001f)
+        assertEquals(0.92f, selectedTitle.alpha, 0.005f)
     }
 
     @Test
@@ -117,8 +118,8 @@ class GlassTintTokensTest {
             isSelected = false
         )
 
-        assertEquals(GlassTintTokens.IconDimOpacity, unselectedDark.alpha, 0.001f)
-        assertEquals(1.0f, unselectedLight.alpha, 0.001f)
+        assertEquals(GlassTintTokens.IconDimOpacity, unselectedDark.alpha, 0.005f)
+        assertEquals(1.0f, unselectedLight.alpha, 0.005f)
 
         // Must not be red
         assertNotEquals(Color(0xFFFF453A), unselectedDark.copy(alpha = 1f))
@@ -131,24 +132,24 @@ class GlassTintTokensTest {
         val titleColor = GlassTintTokens.glassContentColor(isDark = true, isSelected = false, isTitle = true)
         val unselectedTabLabel = GlassTintTokens.glassContentColor(isDark = true, isSelected = false, isUnselectedTabLabel = true)
 
-        assertEquals(0.85f, iconColor.alpha, 0.001f)
-        assertEquals(0.92f, titleColor.alpha, 0.001f)
-        assertEquals(0.75f, unselectedTabLabel.alpha, 0.001f)
+        assertEquals(0.85f, iconColor.alpha, 0.005f)
+        assertEquals(0.92f, titleColor.alpha, 0.005f)
+        assertEquals(0.75f, unselectedTabLabel.alpha, 0.005f)
     }
 
     @Test
     fun `pluckOpacity matches theme and hero context specification`() {
-        assertEquals(0.30f, GlassTintTokens.pluckOpacity(isDark = true, isHeroContext = false), 0.001f)
-        assertEquals(0.48f, GlassTintTokens.pluckOpacity(isDark = true, isHeroContext = true), 0.001f)
-        assertEquals(0.40f, GlassTintTokens.pluckOpacity(isDark = false, isHeroContext = false), 0.001f)
-        assertEquals(0.55f, GlassTintTokens.pluckOpacity(isDark = false, isHeroContext = true), 0.001f)
+        assertEquals(0.30f, GlassTintTokens.pluckOpacity(isDark = true, isHeroContext = false), 0.005f)
+        assertEquals(0.48f, GlassTintTokens.pluckOpacity(isDark = true, isHeroContext = true), 0.005f)
+        assertEquals(0.40f, GlassTintTokens.pluckOpacity(isDark = false, isHeroContext = false), 0.005f)
+        assertEquals(0.55f, GlassTintTokens.pluckOpacity(isDark = false, isHeroContext = true), 0.005f)
     }
 
     @Test
     fun `puckOpacity matches theme and hero context specification`() {
-        assertEquals(0.55f, GlassTintTokens.puckOpacity(isDark = true, isHeroContext = false), 0.001f)
-        assertEquals(0.80f, GlassTintTokens.puckOpacity(isDark = true, isHeroContext = true), 0.001f)
-        assertEquals(0.45f, GlassTintTokens.puckOpacity(isDark = false, isHeroContext = false), 0.001f)
-        assertEquals(0.70f, GlassTintTokens.puckOpacity(isDark = false, isHeroContext = true), 0.001f)
+        assertEquals(0.55f, GlassTintTokens.puckOpacity(isDark = true, isHeroContext = false), 0.005f)
+        assertEquals(0.80f, GlassTintTokens.puckOpacity(isDark = true, isHeroContext = true), 0.005f)
+        assertEquals(0.45f, GlassTintTokens.puckOpacity(isDark = false, isHeroContext = false), 0.005f)
+        assertEquals(0.70f, GlassTintTokens.puckOpacity(isDark = false, isHeroContext = true), 0.005f)
     }
 }

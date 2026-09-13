@@ -42,7 +42,7 @@ constructor(
 
     private suspend fun loadRecommendedForYou() {
         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
-        val seedSong = database.events().first().firstOrNull()?.song ?: return
+        val seedSong = database.latestEvent().first()?.song ?: return
         val endpoint = YouTube.next(WatchEndpoint(videoId = seedSong.id)).getOrNull()?.relatedEndpoint ?: return
         YouTube.related(endpoint).onSuccess { page ->
             recommendedForYou.value = (page.songs + page.albums + page.artists + page.playlists)

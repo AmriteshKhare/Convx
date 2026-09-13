@@ -219,6 +219,7 @@ import kotlinx.coroutines.FlowPreview
 import android.os.PowerManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -315,7 +316,7 @@ class MusicService :
     // showed up as "Parent job is Cancelling" followed by every fallback client
     // failing in under a millisecond for a completely different track — not a
     // real all-clients-blocked failure, just collateral damage from the crash.
-    private var scope = CoroutineScope(Dispatchers.Main) + SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.Main) + SupervisorJob()
 
     // Serialized disk writer for queue/player-state persistence: one worker keeps
     // snapshots from overwriting each other and keeps ObjectOutputStream IO (3
@@ -438,11 +439,12 @@ class MusicService :
     private var retryCount = 0
     private var silenceSkipJob: Job? = null
 
-    // URL cache for stream URLs - class-level so it can be invalidated on errors
-    private val songUrlCache = HashMap<String, Pair<String, Long>>()
+    // URL cache for stream URLs - class-level so it can be invalidated on errors.
+    // Concurrent: read on the ExoPlayer loader thread (resolver), written on IO.
+    private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
 
     // Flag to bypass cache when quality changes - forces fresh stream fetch
-    private val bypassCacheForQualityChange = mutableSetOf<String>()
+    private val bypassCacheForQualityChange = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     // Enhanced error tracking for strict retry management
     private var currentMediaIdRetryCount = mutableMapOf<String, Int>()
@@ -451,13 +453,13 @@ class MusicService :
 
     // Tracks which mediaIds resolved to a Tidal/Spine lossless stream, so the
     // stall watchdog only acts on lossless playback (the dropout bug is
-    // lossless-only â€” confirmed, never happens on plain YouTube audio).
-    private val losslessStreamMediaIds = mutableSetOf<String>()
+    // lossless-only — confirmed, never happens on plain YouTube audio).
+    private val losslessStreamMediaIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
-    // Set once a track has stalled/parsing-errored too many times on lossless â€”
+    // Set once a track has stalled/parsing-errored too many times on lossless —
     // the next resolve for this mediaId skips Spine/Tidal and goes straight to
     // the plain YouTube stream (see forceStandardAudio in YTPlayerUtils).
-    private val forceStandardAudioMediaIds = mutableSetOf<String>()
+    private val forceStandardAudioMediaIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     // Separate from currentMediaIdRetryCount (real PlaybackExceptions): counts
     // silent-stall recoveries, which never throw an exception.
@@ -753,7 +755,7 @@ class MusicService :
                     songUrlCache.remove(mediaId)
 
                     // CRITICAL: Clear caches synchronously to prevent format parsing errors
-                    runBlocking(Dispatchers.IO) {
+                    withContext(Dispatchers.IO) {
                         try {
                             playerCache.removeResource(mediaId)
                             downloadCache.removeResource(mediaId)
@@ -1590,8 +1592,6 @@ class MusicService :
         queue: Queue,
         playWhenReady: Boolean = true,
     ) {
-        if (!scope.isActive) scope = CoroutineScope(Dispatchers.Main) + SupervisorJob()
-
         // Safety Check : Ensuring player is initilized
         if (!playerInitialized.value) {
             Timber.tag(TAG).w("playQueue called before player initialization, queuing request")
@@ -1656,6 +1656,10 @@ class MusicService :
                 player.prepare()
                 player.playWhenReady = playWhenReady
             }
+
+            // Warm the stream-URL cache for the current + next items off the
+            // loader thread, so resolution usually hits cache.
+            prefetchUpcoming()
 
             // Rebuild shuffle order if shuffle is enabled
             if (player.shuffleModeEnabled) {
@@ -2180,6 +2184,7 @@ class MusicService :
             }
         }
         previousMediaItemIndex = player.currentMediaItemIndex
+        prefetchUpcoming()
 
         playerStallWatchdogs[player]?.let { watchdog ->
             watchdog.armed = mediaItem?.mediaId?.let { losslessStreamMediaIds.contains(it) } == true
@@ -3314,6 +3319,162 @@ class MusicService :
         }
     }
 
+    /**
+     * Cache key for [mediaId] under the lossless/Spine namespace. Reads
+     * DataStore synchronously — call only off the main thread (loader/IO).
+     */
+    private fun effectiveCacheKey(mediaId: String): String {
+        val losslessOn = dataStore.get(EnableTidalStreamingKey, false)
+        val spineEnabled = dataStore.get(EnabledModulesKey, "[]") != "[]"
+        return if (losslessOn || spineEnabled) "$mediaId#flac" else mediaId
+    }
+
+    private data class ResolvedStream(
+        val uri: android.net.Uri,
+        val directFile: Boolean,
+    )
+
+    /**
+     * Network fetch + side effects half of the resolver below (format/loudness
+     * bookkeeping, DB upsert, recover kick, URL cache put). Suspend twin of the
+     * blocking fetch so [prefetchStreamUrl] can warm the cache off the loader
+     * thread; the resolver keeps a blocking call only as fallback.
+     */
+    private suspend fun fetchResolvedStream(mediaId: String, effKey: String): ResolvedStream {
+        Timber.tag("MusicService").i("FETCHING STREAM: $mediaId | quality=$audioQuality")
+        val fetchStart = SystemClock.elapsedRealtime()
+        val playbackData = try {
+            YTPlayerUtils.playerResponseForPlayback(
+                mediaId,
+                audioQuality = audioQuality,
+                connectivityManager = connectivityManager,
+                context = this@MusicService,
+                forceStandardAudio = forceStandardAudioMediaIds.contains(mediaId),
+            ).getOrElse { throwable ->
+                when (throwable) {
+                    is PlaybackException -> throw throwable
+
+                    is java.net.ConnectException, is java.net.UnknownHostException -> {
+                        throw PlaybackException(
+                            getString(R.string.error_no_internet),
+                            throwable,
+                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+                        )
+                    }
+
+                    is java.net.SocketTimeoutException -> {
+                        throw PlaybackException(
+                            getString(R.string.error_timeout),
+                            throwable,
+                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+                        )
+                    }
+
+                    else -> throw PlaybackException(
+                        getString(R.string.error_unknown),
+                        throwable,
+                        PlaybackException.ERROR_CODE_REMOTE_ERROR
+                    )
+                }
+            }
+        } finally {
+            Timber.tag(TAG).i("Stream fetch for $mediaId took ${SystemClock.elapsedRealtime() - fetchStart}ms")
+        }
+
+        // requireNotNull would escape the data source factory as a raw
+        // IllegalArgumentException that ExoPlayer maps to a generic IO error
+        // with no recoverable error code. Throw a typed PlaybackException so
+        // onPlayerError routes it through handleGenericIOError (cache clear
+        // + retry) instead of the generic fallback.
+        val nonNullPlayback = playbackData ?: throw PlaybackException(
+            getString(R.string.error_unknown),
+            IllegalStateException("playerResponseForPlayback returned null for $mediaId"),
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+        )
+        return run {
+            val format = nonNullPlayback.format
+            val loudnessDb = nonNullPlayback.audioConfig?.loudnessDb
+            val perceptualLoudnessDb = nonNullPlayback.audioConfig?.perceptualLoudnessDb
+
+            Timber.tag(TAG).d("Storing format for $mediaId with loudnessDb: $loudnessDb, perceptualLoudnessDb: $perceptualLoudnessDb")
+            if (loudnessDb == null && perceptualLoudnessDb == null) {
+                Timber.tag(TAG).w("No loudness data available from YouTube for video: $mediaId")
+            }
+
+            database.query {
+                upsert(
+                    FormatEntity(
+                        id = mediaId,
+                        itag = format.itag,
+                        mimeType = format.mimeType.split(";")[0],
+                        codecs = format.mimeType.split("codecs=").getOrNull(1)?.removeSurrounding("\"") ?: "mp3",
+                        bitrate = format.bitrate,
+                        sampleRate = format.audioSampleRate,
+                        contentLength = format.contentLength ?: 0L,
+                        loudnessDb = loudnessDb,
+                        perceptualLoudnessDb = perceptualLoudnessDb,
+                        playbackUrl = nonNullPlayback.playbackTracking?.videostatsPlaybackUrl?.baseUrl
+                    )
+                )
+            }
+            scope.launch(Dispatchers.IO) { recoverSong(mediaId, nonNullPlayback) }
+
+            // Clear bypass flag now that we've fetched fresh stream
+            if (bypassCacheForQualityChange.remove(mediaId)) {
+                Timber.tag(TAG).d("Cleared bypass cache flag for $mediaId after fresh fetch")
+            }
+
+            val streamUrl = nonNullPlayback.streamUrl
+            Timber.tag("SpineDebug").d("DataSourceResolver: resolved mediaId=$mediaId isSpineStream=${nonNullPlayback.isSpineStream} isTidalStream=${nonNullPlayback.isTidalStream} streamUrl=${streamUrl?.take(120)}")
+
+            if (nonNullPlayback.isTidalStream || nonNullPlayback.isSpineStream) {
+                losslessStreamMediaIds.add(mediaId)
+            } else {
+                losslessStreamMediaIds.remove(mediaId)
+            }
+
+            songUrlCache[effKey] =
+                streamUrl to System.currentTimeMillis() + (nonNullPlayback.streamExpiresInSeconds * 1000L)
+
+            ResolvedStream(
+                uri = streamUrl.toUri(),
+                directFile = nonNullPlayback.isTidalStream || nonNullPlayback.isSpineStream,
+            )
+        }
+    }
+
+    private val prefetchInFlight = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    private fun prefetchStreamUrl(mediaId: String) {
+        if (mediaId.startsWith("content://") ||
+            mediaId.startsWith("file://") ||
+            mediaId.startsWith("/storage/")
+        ) return
+        if (bypassCacheForQualityChange.contains(mediaId)) return
+        scope.launch(Dispatchers.IO) {
+            val effKey = effectiveCacheKey(mediaId)
+            if (playerCache.isCached(effKey, 0, CHUNK_LENGTH)) return@launch
+            if (downloadCache.isCached(mediaId, 0, 1)) return@launch
+            if (songUrlCache[effKey]?.takeIf { it.second > System.currentTimeMillis() } != null) return@launch
+            if (!prefetchInFlight.add(effKey)) return@launch
+            try {
+                runCatching { fetchResolvedStream(mediaId, effKey) }
+            } finally {
+                prefetchInFlight.remove(effKey)
+            }
+        }
+    }
+
+    /** Pre-resolves the current and next queue items (player order). */
+    private fun prefetchUpcoming() {
+        if (player.mediaItemCount == 0) return
+        val index = player.currentMediaItemIndex.coerceAtLeast(0)
+        for (i in index..minOf(index + 1, player.mediaItemCount - 1)) {
+            runCatching { player.getMediaItemAt(i).mediaId }
+                .getOrNull()?.takeIf { it.isNotEmpty() }?.let(::prefetchStreamUrl)
+        }
+    }
+
     private fun createDataSourceFactory(): DataSource.Factory {
         return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
@@ -3331,13 +3492,8 @@ class MusicService :
             // for the same video never collide across a toggle. Streaming only:
             // offline downloads live in the plain (Opus) namespace.
             // Spine streams also use lossless namepacing to avoid cache collisions.
-            val losslessOn = dataStore.get(EnableTidalStreamingKey, false)
-            val spineEnabled = dataStore.get(EnabledModulesKey, "[]") != "[]"
-            val effKey = when {
-                losslessOn || spineEnabled -> "$mediaId#flac"
-                else -> mediaId
-            }
-            Timber.tag("SpineDebug").d("DataSourceResolver: mediaId=$mediaId spineEnabled=$spineEnabled losslessOn=$losslessOn effKey=$effKey")
+            val effKey = effectiveCacheKey(mediaId)
+            Timber.tag("SpineDebug").d("DataSourceResolver: mediaId=$mediaId effKey=$effKey")
             val spec = if (effKey == mediaId) dataSpec else dataSpec.buildUpon().setKey(effKey).build()
 
             // Check if we need to bypass cache for quality change
@@ -3373,114 +3529,23 @@ class MusicService :
                 Timber.tag("MusicService").i("BYPASSING CACHE for $mediaId due to quality change")
             }
 
-            Timber.tag("MusicService").i("FETCHING STREAM: $mediaId | quality=$audioQuality")
-            val fetchStart = SystemClock.elapsedRealtime()
-            val playbackData = try {
-                runBlocking(Dispatchers.IO) {
-                    YTPlayerUtils.playerResponseForPlayback(
-                        mediaId,
-                        audioQuality = audioQuality,
-                        connectivityManager = connectivityManager,
-                        context = this@MusicService,
-                        forceStandardAudio = forceStandardAudioMediaIds.contains(mediaId),
-                    )
-                }.getOrElse { throwable ->
-                    when (throwable) {
-                        is PlaybackException -> throw throwable
+            // Sync API forces a blocking call; the fetch itself is shared with
+            // prefetch above, which warms the cache so this fallback rarely runs.
+            val resolved = runBlocking(Dispatchers.IO) { fetchResolvedStream(mediaId, effKey) }
 
-                        is java.net.ConnectException, is java.net.UnknownHostException -> {
-                            throw PlaybackException(
-                                getString(R.string.error_no_internet),
-                                throwable,
-                                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
-                            )
-                        }
+            // (Fetch + format/loudness/DB/cache bookkeeping lives in
+            // fetchResolvedStream above; prefetch warms the same path.)
 
-                        is java.net.SocketTimeoutException -> {
-                            throw PlaybackException(
-                                getString(R.string.error_timeout),
-                                throwable,
-                                PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
-                            )
-                        }
-
-                        else -> throw PlaybackException(
-                            getString(R.string.error_unknown),
-                            throwable,
-                            PlaybackException.ERROR_CODE_REMOTE_ERROR
-                        )
-                    }
-                }
-            } finally {
-                Timber.tag(TAG).i("Stream fetch for $mediaId took ${SystemClock.elapsedRealtime() - fetchStart}ms")
+            // Tidal/Spine hand back one direct static file URL, not a segmented
+            // YouTube-style itag CDN, and their proxies can't be trusted to return
+            // correct Content-Range headers on every ranged request. Slicing them
+            // into CHUNK_LENGTH windows risks ExoPlayer reading a short response as
+            // real end-of-file mid-song (auto-advances to the next track with no
+            // error). Fetch the whole remaining file in one open-ended request instead.
+            if (resolved.directFile) {
+                return@Factory spec.withUri(resolved.uri)
             }
-
-            // requireNotNull would escape the data source factory as a raw
-            // IllegalArgumentException that ExoPlayer maps to a generic IO error
-            // with no recoverable error code. Throw a typed PlaybackException so
-            // onPlayerError routes it through handleGenericIOError (cache clear
-            // + retry) instead of the generic fallback.
-            val nonNullPlayback = playbackData ?: throw PlaybackException(
-                getString(R.string.error_unknown),
-                IllegalStateException("playerResponseForPlayback returned null for $mediaId"),
-                PlaybackException.ERROR_CODE_IO_UNSPECIFIED
-            )
-            run {
-                val format = nonNullPlayback.format
-                val loudnessDb = nonNullPlayback.audioConfig?.loudnessDb
-                val perceptualLoudnessDb = nonNullPlayback.audioConfig?.perceptualLoudnessDb
-
-                Timber.tag(TAG).d("Storing format for $mediaId with loudnessDb: $loudnessDb, perceptualLoudnessDb: $perceptualLoudnessDb")
-                if (loudnessDb == null && perceptualLoudnessDb == null) {
-                    Timber.tag(TAG).w("No loudness data available from YouTube for video: $mediaId")
-                }
-
-                database.query {
-                    upsert(
-                        FormatEntity(
-                            id = mediaId,
-                            itag = format.itag,
-                            mimeType = format.mimeType.split(";")[0],
-                            codecs = format.mimeType.split("codecs=").getOrNull(1)?.removeSurrounding("\"") ?: "mp3",
-                            bitrate = format.bitrate,
-                            sampleRate = format.audioSampleRate,
-                            contentLength = format.contentLength ?: 0L,
-                            loudnessDb = loudnessDb,
-                            perceptualLoudnessDb = perceptualLoudnessDb,
-                            playbackUrl = nonNullPlayback.playbackTracking?.videostatsPlaybackUrl?.baseUrl
-                        )
-                    )
-                }
-                scope.launch(Dispatchers.IO) { recoverSong(mediaId, nonNullPlayback) }
-
-                // Clear bypass flag now that we've fetched fresh stream
-                if (bypassCacheForQualityChange.remove(mediaId)) {
-                    Timber.tag("MusicService").d("Cleared bypass cache flag for $mediaId after fresh fetch")
-                }
-
-                val streamUrl = nonNullPlayback.streamUrl
-                Timber.tag("SpineDebug").d("DataSourceResolver: resolved mediaId=$mediaId isSpineStream=${nonNullPlayback.isSpineStream} isTidalStream=${nonNullPlayback.isTidalStream} streamUrl=${streamUrl?.take(120)}")
-
-                if (nonNullPlayback.isTidalStream || nonNullPlayback.isSpineStream) {
-                    losslessStreamMediaIds.add(mediaId)
-                } else {
-                    losslessStreamMediaIds.remove(mediaId)
-                }
-
-                songUrlCache[effKey] =
-                    streamUrl to System.currentTimeMillis() + (nonNullPlayback.streamExpiresInSeconds * 1000L)
-
-                // Tidal/Spine hand back one direct static file URL, not a segmented
-                // YouTube-style itag CDN, and their proxies can't be trusted to return
-                // correct Content-Range headers on every ranged request. Slicing them
-                // into CHUNK_LENGTH windows risks ExoPlayer reading a short response as
-                // real end-of-file mid-song (auto-advances to the next track with no
-                // error). Fetch the whole remaining file in one open-ended request instead.
-                if (nonNullPlayback.isTidalStream || nonNullPlayback.isSpineStream) {
-                    return@Factory spec.withUri(streamUrl.toUri())
-                }
-                return@Factory spec.withUri(streamUrl.toUri()).subrange(dataSpec.uriPositionOffset, CHUNK_LENGTH)
-            }
+            return@Factory spec.withUri(resolved.uri).subrange(dataSpec.uriPositionOffset, CHUNK_LENGTH)
         }
     }
 
@@ -3737,6 +3802,7 @@ class MusicService :
         // But since we are destroying the service, it's fine.
         player.release()
         discordUpdateJob?.cancel()
+        scope.cancel()
         super.onDestroy()
     }
 
