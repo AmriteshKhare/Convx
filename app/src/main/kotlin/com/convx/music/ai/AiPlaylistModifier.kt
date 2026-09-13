@@ -8,27 +8,16 @@ package com.convx.music.ai
 import android.content.Context
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
-import com.convx.music.constants.AiProviderKey
-import com.convx.music.constants.OpenRouterApiKey
-import com.convx.music.constants.OpenRouterBaseUrlKey
-import com.convx.music.constants.OpenRouterModelKey
 import com.convx.music.db.InternalDatabase
 import com.convx.music.db.entities.PlaylistSong
 import com.convx.music.db.entities.PlaylistSongMap
 import com.convx.music.db.entities.SongEntity
-import com.convx.music.utils.dataStore
-import com.convx.music.utils.get
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
 object AiPlaylistModifier {
-    private val client = OkHttpClient()
 
     suspend fun modifyPlaylist(
         context: Context,
@@ -40,8 +29,6 @@ object AiPlaylistModifier {
         val database = InternalDatabase.newInstance(context)
 
         onLog("Connecting to AI Provider...")
-
-        val aiProvider = context.dataStore.get(AiProviderKey, "OpenRouter")
 
         val currentPlaylistJson = JSONArray().apply {
             currentSongs.forEach { playlistSong ->
@@ -76,55 +63,7 @@ object AiPlaylistModifier {
             }
         """.trimIndent()
 
-        val jsonOutput = if (aiProvider == "Puter") {
-            onLog("Puter is not implemented yet. Using dummy data.")
-            "{}"
-        } else {
-            val apiKey = context.dataStore.get(OpenRouterApiKey, "")
-            val baseUrl = context.dataStore.get(OpenRouterBaseUrlKey, "https://openrouter.ai/api/v1/chat/completions")
-            val model = context.dataStore.get(OpenRouterModelKey, "google/gemini-2.5-flash-lite")
-
-            if (apiKey.isEmpty()) {
-                onLog("API Key is missing. Please set it in Settings.")
-                return@withContext
-            }
-
-            val requestBody = JSONObject().apply {
-                put("model", model)
-                put("messages", JSONArray().apply {
-                    put(JSONObject().apply {
-                        put("role", "system")
-                        put("content", systemPrompt)
-                    })
-                    put(JSONObject().apply {
-                        put("role", "user")
-                        put("content", userPrompt)
-                    })
-                })
-            }.toString().toRequestBody("application/json".toMediaType())
-
-            val request = Request.Builder()
-                .url(baseUrl)
-                .addHeader("Authorization", "Bearer $apiKey")
-                .post(requestBody)
-                .build()
-
-            try {
-                val response = client.newCall(request).execute()
-                if (!response.isSuccessful) {
-                    onLog("AI Request failed: ${response.code}")
-                    return@withContext
-                }
-
-                val responseString = response.body?.string() ?: return@withContext
-                val responseJson = JSONObject(responseString)
-                val choices = responseJson.optJSONArray("choices") ?: return@withContext
-                choices.optJSONObject(0)?.optJSONObject("message")?.optString("content") ?: "{}"
-            } catch (e: Exception) {
-                onLog("Network error: ${e.message}")
-                return@withContext
-            }
-        }
+        val jsonOutput = AiChatClient.complete(context, systemPrompt, userPrompt, onLog) ?: return@withContext
 
         onLog("Parsing AI response...")
         val cleanJsonStr = jsonOutput.replace("```json", "").replace("```", "").trim()

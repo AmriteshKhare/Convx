@@ -21,9 +21,11 @@ import kotlin.math.roundToInt
  */
 @UnstableApi
 class DelayAudioProcessor(
-    private val delayMs: Long = 220L,
+    initialDelayMs: Long = 220L,
     private val feedback: Float = 0.35f,
 ) : AudioProcessor {
+
+    private var delayMs: Long = initialDelayMs
 
     /** 0 = dry (no effect, default), up to ~0.6 for an audible slap-back echo. */
     @Volatile
@@ -69,6 +71,21 @@ class DelayAudioProcessor(
     }
 
     override fun isActive(): Boolean = sampleRate != 0 && channelCount != 0
+
+    /**
+     * Retunes the delay to a beat-grid subdivision instead of the fixed
+     * default — a canned delay time unrelated to the track's own tempo reads
+     * as an artificial/"washy" echo rather than a musical one. Only safe to
+     * call while [wetMix] is 0: the line is reallocated and any tail decaying
+     * in it is lost, inaudible while dry but a click mid-echo.
+     */
+    fun setDelayMs(ms: Long) {
+        delayMs = ms
+        if (sampleRate <= 0 || channelCount <= 0) return
+        val delayFrames = ((sampleRate * delayMs) / 1000L).toInt().coerceAtLeast(1)
+        delayBuffer = ShortArray(delayFrames * channelCount)
+        writeIndex = 0
+    }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         if (!inputBuffer.hasRemaining()) {

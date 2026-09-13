@@ -928,7 +928,21 @@ fun planTransition(
 
     val policy = assessTransitionTier(analysis, nextAnalysis)
     if (policy.tier == TransitionTier.PLAIN_CROSSFADE) {
-        val transitionStart = max(0.0, mixAnchor - standardFade)
+        // standardFade alone is the same duration on every single plain
+        // crossfade, which reads as mechanical over a long queue — vary it
+        // per pair instead. Tempo is the real signal when it's known (a fast
+        // track gets a tighter fade, a slow one more room); when it isn't
+        // (this tier is exactly the case where analysis is often unusable),
+        // fall back to a deterministic scalar from track length so back-to-back
+        // plain crossfades still don't land on the identical number.
+        val bpm = analysis.bpm.orZero().takeIf { it > 0 } ?: nextAnalysis.bpm.orZero().takeIf { it > 0 }
+        val variedFade = if (bpm != null) {
+            standardFade * (120.0 / bpm).coerceIn(0.75, 1.35)
+        } else {
+            standardFade * (0.85 + (length % 23.0) / 23.0 * 0.3)
+        }
+        val plainFade = clamp(variedFade, minFadeSeconds, 12.0)
+        val transitionStart = max(0.0, mixAnchor - plainFade)
         val started = playbackTime >= transitionStart
         return TransitionPlan(
             shouldStart = started,

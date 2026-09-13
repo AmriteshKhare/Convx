@@ -463,6 +463,10 @@ class DjEngine(
 
             TransitionStyle.ECHO_FREEZE -> {
                 val echo = delays[outgoing] ?: return
+                // Eighth-note slap-back on the outgoing track's own tempo, not
+                // a fixed 220ms — a delay unrelated to the beat reads as an
+                // artificial/washy echo instead of a musical one.
+                echo.setDelayMs((beatMs / 2f).toLong().coerceAtLeast(1L))
                 Timber.tag(TAG).d("Echo freeze at ${(crossfadeMs * ECHO_FREEZE_AT).toLong()}ms into the fade")
                 // Two stages, and the timing matters as much as the order.
                 // Freezing an empty delay line produces silence, so the line is

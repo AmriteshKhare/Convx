@@ -53,8 +53,12 @@ class DjFilterAudioProcessor : BaseAudioProcessor() {
     private var appliedLowPass = Float.NaN
     private var appliedHighPass = Float.NaN
 
-    private lateinit var lowPass: Array<Biquad>
-    private lateinit var highPass: Array<Biquad>
+    // Two cascaded biquads per channel = 24 dB/octave (4th-order Butterworth),
+    // not the 12 dB/octave a single stage gives — steep enough that content
+    // past the cutoff is actually gone rather than merely attenuated, which
+    // matters now that both filters share one crossover point (see below).
+    private lateinit var lowPass: Array<Array<Biquad>>
+    private lateinit var highPass: Array<Array<Biquad>>
 
     /** Snaps cutoffs to their targets without gliding. Call when arming or
      *  disarming outside a transition so the first buffer isn't a sweep from
@@ -80,8 +84,8 @@ class DjFilterAudioProcessor : BaseAudioProcessor() {
         }
         channels = inputAudioFormat.channelCount
         sampleRate = inputAudioFormat.sampleRate
-        lowPass = Array(channels) { Biquad() }
-        highPass = Array(channels) { Biquad() }
+        lowPass = Array(channels) { arrayOf(Biquad(), Biquad()) }
+        highPass = Array(channels) { arrayOf(Biquad(), Biquad()) }
         // Snap to whatever the targets already are — deliberately NOT open().
         // configure() runs on the playback thread some time after prepare(), so
         // resetting the targets here would silently undo an arm that was set up
@@ -112,18 +116,26 @@ class DjFilterAudioProcessor : BaseAudioProcessor() {
             // sweep is audible as zipper noise.
             advanceCutoffs(chunk)
             if (!nearlyEqual(currentLowPass, appliedLowPass)) {
-                for (channel in 0 until channels) lowPass[channel].setLowPass(sampleRate, currentLowPass)
+                for (channel in 0 until channels) {
+                    lowPass[channel].forEach { it.setLowPass(sampleRate, currentLowPass) }
+                }
                 appliedLowPass = currentLowPass
             }
             if (!nearlyEqual(currentHighPass, appliedHighPass)) {
-                for (channel in 0 until channels) highPass[channel].setHighPass(sampleRate, currentHighPass)
+                for (channel in 0 until channels) {
+                    highPass[channel].forEach { it.setHighPass(sampleRate, currentHighPass) }
+                }
                 appliedHighPass = currentHighPass
             }
             repeat(chunk) {
                 for (channel in 0 until channels) {
                     var sample = inputBuffer.short.toDouble()
-                    if (currentLowPass < OPEN_LOW_PASS_HZ) sample = lowPass[channel].process(sample)
-                    if (currentHighPass > OPEN_HIGH_PASS_HZ) sample = highPass[channel].process(sample)
+                    if (currentLowPass < OPEN_LOW_PASS_HZ) {
+                        for (stage in lowPass[channel]) sample = stage.process(sample)
+                    }
+                    if (currentHighPass > OPEN_HIGH_PASS_HZ) {
+                        for (stage in highPass[channel]) sample = stage.process(sample)
+                    }
                     output.putShort(sample.coerceIn(MIN_SAMPLE, MAX_SAMPLE).toInt().toShort())
                 }
             }
@@ -156,8 +168,8 @@ class DjFilterAudioProcessor : BaseAudioProcessor() {
             lowPassHz >= OPEN_LOW_PASS_HZ && highPassHz <= OPEN_HIGH_PASS_HZ
 
     override fun onFlush() {
-        if (::lowPass.isInitialized) lowPass.forEach { it.reset() }
-        if (::highPass.isInitialized) highPass.forEach { it.reset() }
+        if (::lowPass.isInitialized) lowPass.forEach { channel -> channel.forEach { it.reset() } }
+        if (::highPass.isInitialized) highPass.forEach { channel -> channel.forEach { it.reset() } }
     }
 
     override fun onReset() {
@@ -174,9 +186,18 @@ class DjFilterAudioProcessor : BaseAudioProcessor() {
         const val OPEN_LOW_PASS_HZ = 20_000f
         const val OPEN_HIGH_PASS_HZ = 20f
 
-        /** Where a bass swap parks the outgoing low-pass / incoming high-pass. */
-        const val BASS_KILL_LOW_PASS_HZ = 220f
-        const val BASS_KILL_HIGH_PASS_HZ = 300f
+        /**
+         * Where a bass swap parks the outgoing low-pass / incoming high-pass.
+         *
+         * Both sides target the SAME crossover point deliberately: at 220f/300f
+         * the two mismatched cutoffs each rolled off before the other one picked
+         * up, leaving a dead ~220-300Hz band neither track's filtered signal
+         * covered — audible as a hollow/thin patch through every bass swap. One
+         * shared crossover means the combined signal has continuous coverage:
+         * outgoing owns everything below it, incoming everything above.
+         */
+        const val BASS_KILL_LOW_PASS_HZ = 250f
+        const val BASS_KILL_HIGH_PASS_HZ = 250f
 
         private const val COEFFICIENT_CHUNK_FRAMES = 128
         private const val GLIDE_TIME_CONSTANT_S = 0.35

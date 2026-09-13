@@ -51,6 +51,7 @@ import com.convx.music.ui.screens.artist.ArtistItemsScreen
 import com.convx.music.ui.screens.artist.ArtistScreen
 import com.convx.music.ui.screens.artist.ArtistSongsScreen
 import com.convx.music.ui.screens.equalizer.EqScreen
+import com.convx.music.ui.screens.library.AiDjSetScreen
 import com.convx.music.ui.screens.library.LocalFolderScreen
 import com.convx.music.ui.screens.library.LocalMusicScreen
 import com.convx.music.ui.screens.library.LibraryScreen
@@ -538,6 +539,19 @@ fun NavGraphBuilder.navigationBuilder(
 
     sharedComposable("settings/spotify") {
         SpotifyScreen(navController, scrollBehavior)
+    }
+
+    sharedComposable(
+        route = "ai_dj_set?seedSongId={seedSongId}",
+        arguments = listOf(
+            navArgument("seedSongId") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+        ),
+    ) {
+        AiDjSetScreen(navController, scrollBehavior, it.arguments?.getString("seedSongId"))
     }
 
 

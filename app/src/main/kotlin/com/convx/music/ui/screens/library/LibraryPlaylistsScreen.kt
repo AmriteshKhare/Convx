@@ -192,6 +192,16 @@ fun LibraryPlaylistsScreen(
             songCount = 0,
             songThumbnails = emptyList(),
         )
+
+    val aiDjMixPlaylist =
+        Playlist(
+            playlist = PlaylistEntity(
+                id = UUID.randomUUID().toString(),
+                name = stringResource(R.string.ai_dj_mix)
+            ),
+            songCount = 0,
+            songThumbnails = emptyList(),
+        )
         
     val uploadedPlaylist =
         Playlist(
@@ -477,6 +487,19 @@ fun LibraryPlaylistsScreen(
                         }
                     }
 
+                    item(
+                        key = "aiDjMixPlaylist",
+                        contentType = { CONTENT_TYPE_PLAYLIST },
+                    ) {
+                        AutoPlaylistCard(
+                            playlist = aiDjMixPlaylist,
+                            grid = false,
+                            onClick = { navController.navigate("ai_dj_set") },
+                            showIconOnly = libraryIconsOnly,
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+
                     playlists.let { playlists ->
                         if (playlists.isEmpty()) {
                             item(key = "empty_placeholder") {
@@ -663,6 +686,19 @@ fun LibraryPlaylistsScreen(
                                 modifier = Modifier.animateItem(),
                             )
                         }
+                    }
+
+                    item(
+                        key = "aiDjMixPlaylist",
+                        contentType = { CONTENT_TYPE_PLAYLIST },
+                    ) {
+                        AutoPlaylistCard(
+                            playlist = aiDjMixPlaylist,
+                            grid = true,
+                            onClick = { navController.navigate("ai_dj_set") },
+                            showIconOnly = libraryIconsOnly,
+                            modifier = Modifier.animateItem(),
+                        )
                     }
 
                     playlists.let { playlists ->

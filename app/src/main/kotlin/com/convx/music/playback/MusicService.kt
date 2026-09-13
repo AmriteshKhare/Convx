@@ -609,6 +609,11 @@ class MusicService :
             standby = { sparePlayer ?: createExoPlayer().also { sparePlayer = it } },
             onHandoff = ::adoptPlayer,
             analysisFor = { trackAnalyzer?.analysisFor(it.mediaId) ?: TrackAnalysis() },
+            requestAnalysis = { mediaItem, durationMs ->
+                mediaItem.localConfiguration?.uri?.let { uri ->
+                    trackAnalyzer?.request(mediaItem.mediaId, uri, durationMs / 1000.0)
+                }
+            },
         )
         crossfade?.start()
 

@@ -113,7 +113,7 @@ fun AiSettings(
     var aiProvider by rememberPreference(AiProviderKey, "OpenRouter")
     var openRouterApiKey by rememberPreference(OpenRouterApiKey, "")
     var openRouterBaseUrl by rememberPreference(OpenRouterBaseUrlKey, "https://openrouter.ai/api/v1/chat/completions")
-    var openRouterModel by rememberPreference(OpenRouterModelKey, "google/gemini-2.5-flash-lite")
+    var openRouterModel by rememberPreference(OpenRouterModelKey, "google/gemini-3.1-flash-lite")
     var translateLanguage by rememberPreference(TranslateLanguageKey, "en")
     var translateMode by rememberPreference(TranslateModeKey, "Literal")
     var deeplApiKey by rememberPreference(DeeplApiKey, "")
@@ -121,6 +121,7 @@ fun AiSettings(
 
     val aiProviders = mapOf(
         "OpenRouter" to "https://openrouter.ai/api/v1/chat/completions",
+        "Groq" to "https://api.groq.com/openai/v1/chat/completions",
         "OpenAI" to "https://api.openai.com/v1/chat/completions",
         "Perplexity" to "https://api.perplexity.ai/chat/completions",
         "Claude" to "https://api.anthropic.com/v1/messages",
@@ -133,6 +134,7 @@ fun AiSettings(
 
     val providerHelpText = mapOf(
         "OpenRouter" to stringResource(R.string.ai_provider_openrouter_help),
+        "Groq" to stringResource(R.string.ai_provider_groq_help),
         "OpenAI" to stringResource(R.string.ai_provider_openai_help),
         "Perplexity" to stringResource(R.string.ai_provider_perplexity_help),
         "Claude" to stringResource(R.string.ai_provider_claude_help),
@@ -145,12 +147,20 @@ fun AiSettings(
 
     val modelsByProvider = mapOf(
         "OpenRouter" to listOf(
-            "google/gemini-2.5-flash-lite",
-            "google/gemini-2.5-flash",
-            "x-ai/grok-4.1-fast",
+            "google/gemini-3.1-flash-lite",
+            "google/gemini-3.5-flash",
+            "x-ai/grok-4.3",
             "deepseek/deepseek-v3.1-terminus:exacto",
             "openai/gpt-4o-mini",
-            "google/gemini-3-flash-preview"
+            "google/gemini-2.5-flash-lite"
+        ),
+        "Groq" to listOf(
+            // Free-tier accounts don't get every model Groq's own docs list —
+            // llama-3.3-70b-versatile and llama-3.1-8b-instant 404 as
+            // "does not exist or you do not have access to it" on a fresh key.
+            // gpt-oss verified working (200) against a real free-tier key.
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
         ),
         "OpenAI" to listOf(
             "gpt-4o-mini",

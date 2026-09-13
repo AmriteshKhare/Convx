@@ -393,6 +393,21 @@ fun SongMenu(
                     NewAction(
                         icon = {
                             Icon(
+                                painter = painterResource(R.drawable.sparks),
+                                contentDescription = null,
+                                modifier = Modifier.size(28.dp),
+                                tint = AppTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        text = stringResource(R.string.ai_dj_mix_from_song),
+                        onClick = {
+                            onDismiss()
+                            navController.navigate("ai_dj_set?seedSongId=${song.id}")
+                        }
+                    ),
+                    NewAction(
+                        icon = {
+                            Icon(
                                 painter = painterResource(R.drawable.share),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),

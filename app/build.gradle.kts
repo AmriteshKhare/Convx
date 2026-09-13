@@ -33,7 +33,7 @@ plugins {
 android {
     namespace = "com.convx.music"
     compileSdk = 37
-    // ndkVersion = "27.0.12077973"
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.convx.music"
@@ -188,6 +188,13 @@ android {
 
     androidResources {
         generateLocaleConfig = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/analyzer/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     packaging {
