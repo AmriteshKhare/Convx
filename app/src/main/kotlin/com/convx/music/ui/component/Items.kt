@@ -1295,6 +1295,8 @@ fun MediaMetadataListItem(
     shape: Shape = RectangleShape,
     flat: Boolean = false,
     trailingContent: @Composable RowScope.() -> Unit = {},
+    /** See the base ListItem: subtitle tier + flat divider via additiveChrome. */
+    secondaryAdditiveChrome: Boolean = false,
 ) {
     ListItem(
         title = mediaMetadata.title,
@@ -1333,7 +1335,8 @@ fun MediaMetadataListItem(
         modifier = modifier,
         isActive = isActive,
         shape = shape,
-        flat = flat
+        flat = flat,
+        secondaryAdditiveChrome = secondaryAdditiveChrome
     )
 }
 

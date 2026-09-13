@@ -68,6 +68,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.music.innertube.models.WatchEndpoint
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.LocalPlayerAwareWindowInsets
@@ -392,7 +394,7 @@ fun StatsScreen(
                                     Modifier
                                         .combinedBounceClick(
                                             onClick = {
-                                                navController.navigate("artist/${artist.id}")
+                                                navController.navigate(artistRoute(artist.id, artist.artist.thumbnailUrl))
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -449,7 +451,7 @@ fun StatsScreen(
                                         .fillMaxWidth()
                                         .combinedBounceClick(
                                             onClick = {
-                                                navController.navigate("album/${album.id}")
+                                                navController.navigate(albumRoute(album.id, album.album.thumbnailUrl))
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)

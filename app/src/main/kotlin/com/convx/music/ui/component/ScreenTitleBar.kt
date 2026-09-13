@@ -34,9 +34,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.constants.AppBarHeight
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.LocalAccentTextColor
+import com.convx.music.ui.theme.isHueless
+import androidx.compose.ui.graphics.isSpecified
 
 /**
  * A screen's large title, rendered as the first item of its list or grid.
@@ -57,11 +60,19 @@ fun LargeScreenTitle(
 ) {
     Spacer(Modifier.height(40.dp))
 
+    // Neutral per theme; hero screens keep their artwork-derived tint.
+    val ambient = LocalAmbientBackgroundColor.current.value
+    val titleColor = color ?: if (ambient.isSpecified && !ambient.isHueless()) {
+        LocalAccentTextColor.current
+    } else {
+        AppTheme.colorScheme.onSurface
+    }
+
     Text(
         text = title,
         style = AppTheme.typography.headlineLarge,
         fontWeight = FontWeight.ExtraBold,
-        color = color ?: LocalAccentTextColor.current,
+        color = titleColor,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier

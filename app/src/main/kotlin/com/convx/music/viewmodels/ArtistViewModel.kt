@@ -49,7 +49,8 @@ class ArtistViewModel @Inject constructor(
     database: MusicDatabase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    val artistId = savedStateHandle.get<String>("artistId")!!
+    val artistId = requireNotNull(savedStateHandle.get<String>("artistId")) { "Missing artistId" }
+    val thumbArg = savedStateHandle.get<String>("thumb")?.takeIf { it.isNotEmpty() }
     var artistPage by mutableStateOf<ArtistPage?>(null)
     
     private val _artistVideoUrl = MutableStateFlow<String?>(null)

@@ -594,11 +594,20 @@ fun LocalPlaylistScreen(
         delay(1500)
         heroUrl = rawHeroUrl
     }
+    // Instant seed: route thumb -> live tile thumb. Paints mesh bg frame one
+    // while the playlist row (and its debounced hero) loads.
+    val instantLocalThumb = com.convx.music.ui.component.detailSeed(
+        viewModel.thumbArg,
+        com.convx.music.ui.utils.pendingSharedArtworkThumbFor(viewModel.playlistId),
+        null,
+    )
+    val bgHeroUrl = instantLocalThumb ?: heroUrl
+    val localChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 1)
 
     // Same mesh backdrop as ArtistScreen/AlbumScreen/OnlinePlaylistScreen/the player's
     // BITCHORD_MESH style, not the flat single-swatch fill rememberHeroPalette used to
     // paint here.
-    val meshPalette = rememberArtworkMeshPalette(heroUrl)
+    val meshPalette = rememberArtworkMeshPalette(bgHeroUrl)
     val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
     // Same flat white every icon/text reads in the player on a mesh background,
@@ -641,7 +650,7 @@ fun LocalPlaylistScreen(
     val heroZoom = rememberHeroZoom()
 
     val heroSource = rememberHeroSource(
-        staticArt = heroUrl,
+        staticArt = bgHeroUrl,
         songs = songs.map { it.song.song.thumbnailUrl to false },
     )
 
@@ -659,7 +668,7 @@ fun LocalPlaylistScreen(
     ) {
     MeshGradientBackground(
         palette = meshPalette,
-        trackKey = heroUrl,
+        trackKey = bgHeroUrl,
         modifier = Modifier.matchParentSize(),
     )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -1129,6 +1138,9 @@ fun LocalPlaylistScreen(
                 GlassCircleButton(
                     onClick = { navController.navigateUp() },
                     onLongClick = { navController.backToMain() },
+                    modifier = with(localChrome) {
+                        Modifier.backEnter().then(com.convx.music.ui.component.backExitModifier())
+                    },
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.arrow_back_ios),
@@ -1152,7 +1164,12 @@ fun LocalPlaylistScreen(
                     Spacer(Modifier.weight(1f))
                 }
 
-                GlassCircleButton(onClick = { isSearching = true }) {
+                GlassCircleButton(
+                    onClick = { isSearching = true },
+                    modifier = with(localChrome) {
+                        Modifier.iconEnter(0).then(com.convx.music.ui.component.backExitModifier())
+                    },
+                ) {
                     Icon(
                         imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                         contentDescription = null

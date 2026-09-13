@@ -80,6 +80,8 @@ import com.convx.music.playback.queues.ListQueue
 import com.convx.music.ui.component.ListScrollRail
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.menu.SongMenu
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import java.time.LocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -490,7 +492,7 @@ fun LocalMusicScreen(
                 AlbumListItem(
                     album = album,
                     onClick = {
-                        navController.navigate("album/${album.id}")
+                        navController.navigate(albumRoute(album.id, album.thumbnailUrl))
                     },
                 )
                 if (index != displayAlbums.lastIndex) HorizontalDivider()
@@ -514,7 +516,7 @@ fun LocalMusicScreen(
                 ArtistListItem(
                     artist = artist,
                     onClick = {
-                        navController.navigate("artist/${artist.id}")
+                        navController.navigate(artistRoute(artist.id, artist.thumbnailUrl))
                     },
                 )
                 if (index != displayArtists.lastIndex) HorizontalDivider()

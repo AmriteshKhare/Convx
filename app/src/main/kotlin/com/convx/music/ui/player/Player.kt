@@ -115,6 +115,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -415,7 +416,7 @@ fun BottomSheetPlayer(
 
     val shouldUseDarkButtonColors = remember(playerBackground, useDarkTheme) {
         when (playerBackground) {
-            PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> true
+            PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT, PlayerBackgroundStyle.GLASS -> true
             PlayerBackgroundStyle.DEFAULT -> useDarkTheme
         }
     }
@@ -436,7 +437,7 @@ fun BottomSheetPlayer(
             val insetsController = WindowCompat.getInsetsController(window, window.decorView)
             
             when (playerBackground) {
-                PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> {
+                PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT, PlayerBackgroundStyle.GLASS -> {
                     insetsController.isAppearanceLightStatusBars = false
                 }
                 PlayerBackgroundStyle.DEFAULT -> {
@@ -744,6 +745,7 @@ fun BottomSheetPlayer(
             PlayerBackgroundStyle.APPLE_MUSIC -> Color.White
             PlayerBackgroundStyle.LIVE_MESH -> Color.White
             PlayerBackgroundStyle.BITCHORD_MESH -> Color.White
+            PlayerBackgroundStyle.GLASS -> Color.White
             PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.White
         },
         label = "TextBackgroundColor"
@@ -758,6 +760,7 @@ fun BottomSheetPlayer(
             PlayerBackgroundStyle.APPLE_MUSIC -> Color.Black
             PlayerBackgroundStyle.LIVE_MESH -> Color.Black
             PlayerBackgroundStyle.BITCHORD_MESH -> Color.Black
+            PlayerBackgroundStyle.GLASS -> Color.Black
             PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT -> Color.Black
         },
         label = "icBackgroundColor"
@@ -861,7 +864,8 @@ fun BottomSheetPlayer(
         playerBackground == PlayerBackgroundStyle.GLOW_ANIMATED ||
         playerBackground == PlayerBackgroundStyle.APPLE_MUSIC ||
         playerBackground == PlayerBackgroundStyle.LIVE_MESH ||
-        playerBackground == PlayerBackgroundStyle.BITCHORD_MESH -> {
+        playerBackground == PlayerBackgroundStyle.BITCHORD_MESH ||
+        playerBackground == PlayerBackgroundStyle.GLASS -> {
             when (playerButtonsStyle) {
                 PlayerButtonsStyle.DEFAULT -> Pair(Color.White, Color.Black)
                 PlayerButtonsStyle.PRIMARY -> Pair(
@@ -904,7 +908,8 @@ fun BottomSheetPlayer(
     // original per-background split.
     val (sideButtonContainerColor, sideButtonContentColor) = when {
         playerBackground == PlayerBackgroundStyle.BLUR ||
-        playerBackground == PlayerBackgroundStyle.GRADIENT -> {
+        playerBackground == PlayerBackgroundStyle.GRADIENT ||
+        playerBackground == PlayerBackgroundStyle.GLASS -> {
             when (playerButtonsStyle) {
                 PlayerButtonsStyle.DEFAULT -> Pair(
                     Color.White.copy(alpha = 0.2f),
@@ -1150,7 +1155,7 @@ fun BottomSheetPlayer(
     }
 
     val bottomSheetBackgroundColor = when (playerBackground) {
-        PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC ->
+        PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.GLASS ->
             AppTheme.colorScheme.surfaceContainer
         PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH ->
             Color.Black
@@ -1300,7 +1305,10 @@ fun BottomSheetPlayer(
         },
         background = {
             val glassConfig = LocalGlassEffectConfig.current
-            val glassActive = isGlassAllowed()
+            // Glass is its own style now, not a base under every style: only GLASS
+            // pays the full-screen capture + blur chain. All other styles render
+            // their own layers over the solid fallback below.
+            val glassActive = playerBackground == PlayerBackgroundStyle.GLASS && isGlassAllowed()
             
             Box(
                 modifier = Modifier
@@ -1315,9 +1323,9 @@ fun BottomSheetPlayer(
                     .graphicsLayer()
                     .then(
                         if (glassActive) {
-                            // Unified Apple Music glass player background:
-                            // Samples appBackdrop (root content) behind the sheet.
-                            // Higher blur than pills to feel like heavy material.
+                            // GLASS style only: samples appBackdrop (root content)
+                            // behind the sheet. Higher blur than pills to feel
+                            // like heavy material.
                             Modifier.liquidGlass(
                                 config = glassConfig,
                                 applyEdgeEffects = false,
@@ -1329,9 +1337,11 @@ fun BottomSheetPlayer(
                         }
                     )
             ) {
-                // Secondary dynamic layers (Artwork Blur, Mesh, Canvas) render ON TOP 
-                // of the glass material base if enabled.
+                // Secondary dynamic layers (Artwork Blur, Mesh, Canvas) render ON TOP
+                // of the base fill — except GLASS, whose liquid-glass base above
+                // IS the look, so it adds nothing here.
                 when (playerBackground) {
+                    PlayerBackgroundStyle.GLASS -> {}
                     PlayerBackgroundStyle.BLUR -> {
                         AnimatedContent(
                             targetState = mediaMetadata?.thumbnailUrl,
@@ -1747,6 +1757,11 @@ fun BottomSheetPlayer(
                                             scaleX = 1.7f
                                             scaleY = 1.7f
                                         }
+                                        // Single melt pass over the three baked-blur layers so the
+                                        // rotating shapes read as mesh blobs. One pass on the
+                                        // container, not per layer. No-op below API 31, where the
+                                        // baked blur underneath still holds.
+                                        .blur(32.dp)
                                 ) {
                                     val matrix = remember { 
                                         val m = ColorMatrix()
@@ -1863,13 +1878,14 @@ fun BottomSheetPlayer(
                 // No artwork for this song: BLUR/GRADIENT/GLOW_ANIMATED/APPLE_MUSIC/
                 // LIVE_MESH all gate on thumbnailUrl above and render nothing in that
                 // case, leaving the player fully blank. Center the app's own mark
-                // instead of a void. STATIC/CUSTOM_GRADIENT/DEFAULT never depend on
-                // artwork in the first place, so they're excluded here.
+                // instead of a void. STATIC/CUSTOM_GRADIENT/DEFAULT/GLASS never depend
+                // on artwork in the first place, so they're excluded here.
                 if (mediaMetadata?.thumbnailUrl == null &&
                     playerBackground !in setOf(
                         PlayerBackgroundStyle.STATIC,
                         PlayerBackgroundStyle.CUSTOM_GRADIENT,
                         PlayerBackgroundStyle.DEFAULT,
+                        PlayerBackgroundStyle.GLASS,
                     )
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

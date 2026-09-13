@@ -73,10 +73,6 @@ import com.convx.music.ui.ios.foundation.IosTheme
  * no RenderEffect, so the refraction only shows on a device running API 31+.
  */
 
-// --------------------------------------------------------------------------------
-// Shared scaffolding
-// --------------------------------------------------------------------------------
-
 @Composable
 private fun CatalogSection(title: String, content: @Composable () -> Unit) {
     Column(
@@ -131,10 +127,6 @@ private fun CatalogScaffold(dark: Boolean, content: @Composable () -> Unit) {
         }
     }
 }
-
-// --------------------------------------------------------------------------------
-// Buttons
-// --------------------------------------------------------------------------------
 
 @Composable
 private fun ButtonCatalog() {
@@ -221,10 +213,6 @@ private fun ButtonCatalog() {
     }
 }
 
-// --------------------------------------------------------------------------------
-// Controls
-// --------------------------------------------------------------------------------
-
 @Composable
 private fun ControlCatalog() {
     var switchOn by remember { mutableStateOf(true) }
@@ -274,10 +262,6 @@ private fun ControlCatalog() {
         }
     }
 }
-
-// --------------------------------------------------------------------------------
-// Lists
-// --------------------------------------------------------------------------------
 
 @Composable
 private fun SettingsListCatalog(dark: Boolean) {
@@ -362,10 +346,6 @@ private fun PlainListCatalog() {
         }
     }
 }
-
-// --------------------------------------------------------------------------------
-// Menu, tab bar, sheet
-// --------------------------------------------------------------------------------
 
 @Composable
 private fun MenuCatalog() {
@@ -456,10 +436,6 @@ private fun SheetCatalog() {
     }
 }
 
-// --------------------------------------------------------------------------------
-// Foundations
-// --------------------------------------------------------------------------------
-
 @Composable
 private fun ColorCatalog() {
     val c = IosTheme.colors
@@ -508,10 +484,6 @@ private fun TypographyCatalog() {
         }
     }
 }
-
-// --------------------------------------------------------------------------------
-// Previews
-// --------------------------------------------------------------------------------
 
 @Preview(name = "Buttons — light", showBackground = true, heightDp = 1100)
 @Composable

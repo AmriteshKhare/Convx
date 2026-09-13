@@ -20,6 +20,9 @@ import com.convx.music.R
 import com.convx.music.db.entities.Album
 import com.convx.music.db.entities.Artist
 import com.convx.music.db.entities.Playlist
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
+import com.convx.music.ui.utils.localPlaylistRoute
 import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.ui.menu.AlbumMenu
 import com.convx.music.ui.menu.ArtistMenu
@@ -59,7 +62,7 @@ fun LibraryArtistListItem(
     modifier = modifier
         .fillMaxWidth()
         .clickable {
-            navController.navigate("artist/${artist.id}")
+            navController.navigate(artistRoute(artist.id, artist.thumbnailUrl))
         }
 )
 
@@ -80,7 +83,7 @@ fun LibraryArtistGridItem(
         .fillMaxWidth()
         .combinedClickable(
             onClick = {
-                navController.navigate("artist/${artist.id}")
+                navController.navigate(artistRoute(artist.id, artist.thumbnailUrl))
             },
             onLongClick = {
                 menuState.show {
@@ -129,7 +132,7 @@ fun LibraryAlbumListItem(
     modifier = modifier
         .fillMaxWidth()
         .clickable {
-            navController.navigate("album/${album.id}")
+            navController.navigate(albumRoute(album.id, album.thumbnailUrl))
         }
 )
 
@@ -155,7 +158,7 @@ fun LibraryAlbumGridItem(
         .fillMaxWidth()
         .combinedClickable(
             onClick = {
-                navController.navigate("album/${album.id}")
+                navController.navigate(albumRoute(album.id, album.thumbnailUrl))
             },
             onLongClick = {
                 menuState.show {
@@ -233,7 +236,7 @@ fun LibraryPlaylistListItem(
             if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.remoteSongCount != 0)
                 navController.navigate(onlinePlaylistRoute(playlist.playlist.browseId.orEmpty(), playlist.playlist.name, playlist.playlist.thumbnailUrl))
             else
-                navController.navigate("local_playlist/${playlist.id}")
+                navController.navigate(localPlaylistRoute(playlist.id, playlist.thumbnailUrl))
         }
 )
 
@@ -257,7 +260,7 @@ fun LibraryPlaylistGridItem(
                 if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.remoteSongCount != 0)
                     navController.navigate(onlinePlaylistRoute(playlist.playlist.browseId.orEmpty(), playlist.playlist.name, playlist.playlist.thumbnailUrl))
                 else
-                    navController.navigate("local_playlist/${playlist.id}")
+                    navController.navigate(localPlaylistRoute(playlist.id, playlist.thumbnailUrl))
             },
             onLongClick = {
                 menuState.show {

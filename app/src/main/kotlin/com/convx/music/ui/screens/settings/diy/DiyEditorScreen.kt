@@ -353,8 +353,6 @@ fun DiyEditorScreen(navController: NavController) {
     }
 }
 
-// ------------------------------------------------------------------------------- canvas
-
 /**
  * The real player at true size (background, artwork, controls — not an approximation), plus
  * an interactive sticker layer over it.
@@ -528,8 +526,6 @@ private fun hitTest(
 
 private const val MIN_TOUCH_HALF_PX = 36f
 
-// ------------------------------------------------------------------------ floating controls
-
 @Composable
 private fun TopControls(
     canUndo: Boolean,
@@ -682,8 +678,6 @@ private fun PillText(
         )
     }
 }
-
-// ---------------------------------------------------------------------------- floating popups
 
 /**
  * The popup layer. Drawn last so its panels float above the pills; input-inert when nothing is

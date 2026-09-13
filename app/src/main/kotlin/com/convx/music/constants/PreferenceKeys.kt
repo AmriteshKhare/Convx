@@ -350,7 +350,7 @@ val AddToPlaylistSortDescendingKey = booleanPreferencesKey("addToPlaylistSortDes
 val ArtistSongSortTypeKey = stringPreferencesKey("artistSongSortType")
 val ArtistSongSortDescendingKey = booleanPreferencesKey("artistSongSortDescending")
 val MixSortTypeKey = stringPreferencesKey("mixSortType")
-val MixSortDescendingKey = booleanPreferencesKey("albumSortDescending")
+val MixSortDescendingKey = booleanPreferencesKey("mixSortDescending")
 
 val SongFilterKey = stringPreferencesKey("songFilter")
 val ArtistFilterKey = stringPreferencesKey("artistFilter")
@@ -574,6 +574,12 @@ enum class PlayerBackgroundStyle {
     BITCHORD_MESH,
     STATIC,
     CUSTOM_GRADIENT,
+    /**
+     * Full-screen liquid glass over the app backdrop. The only style that pays for
+     * the full-screen RenderEffect blur chain — every other style renders its own
+     * layers over a solid fill with no glass cost.
+     */
+    GLASS,
 }
 
 /** Shape + motion applied to the player artwork. */

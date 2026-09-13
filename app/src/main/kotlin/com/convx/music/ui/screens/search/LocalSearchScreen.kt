@@ -8,8 +8,11 @@ package com.convx.music.ui.screens.search
 import android.content.res.Configuration
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.localPlaylistRoute
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -137,7 +140,7 @@ fun LocalSearchScreen(
     // the app (online SearchScreen included) actually painted. Same token online
     // search uses, with pureBlack forcing flat black same as every other
     // hero-tinted screen already does (see rememberHeroTint's PureBlack override).
-    val tint = if (pureBlack) Color.Black else rememberAppBackgroundColor(AppleTokens.BgElevated)
+    val tint = if (pureBlack) Color.Black else rememberAppBackgroundColor(AppTheme.colorScheme.background)
     val onTint = AppleTokens.onColor(tint)
 
     // Glass Effect setting only drives the nav bar/mini player now — this
@@ -301,7 +304,7 @@ fun LocalSearchScreen(
                         modifier = Modifier
                             .bounceClick {
                                 onDismiss()
-                                navController.navigate("album/${item.id}")
+                                navController.navigate(albumRoute(item.id, item.thumbnailUrl))
                             }
                             .animateItem(),
                     )
@@ -312,7 +315,7 @@ fun LocalSearchScreen(
                         modifier = Modifier
                             .bounceClick {
                                 onDismiss()
-                                navController.navigate("artist/${item.id}")
+                                navController.navigate(artistRoute(item.id, item.thumbnailUrl))
                             }
                             .animateItem(),
                     )
@@ -323,7 +326,7 @@ fun LocalSearchScreen(
                         modifier = Modifier
                             .bounceClick {
                                 onDismiss()
-                                navController.navigate("local_playlist/${item.id}")
+                                navController.navigate(localPlaylistRoute(item.id, item.thumbnailUrl))
                             }
                             .animateItem(),
                     )

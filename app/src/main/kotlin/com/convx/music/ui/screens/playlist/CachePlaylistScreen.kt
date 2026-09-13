@@ -244,7 +244,17 @@ fun CachePlaylistScreen(
     // Same mesh backdrop as ArtistScreen/AlbumScreen/OnlinePlaylistScreen/the player's
     // BITCHORD_MESH style, not the blurred-photo HeroBackground that used to paint here.
     val heroUrl = filteredSongs.firstOrNull()?.thumbnailUrl
-    val meshPalette = rememberArtworkMeshPalette(heroUrl)
+    // Instant seed: route thumb -> live tile thumb. Paints mesh bg frame one.
+    val instantCacheThumb = com.convx.music.ui.component.detailSeed(
+        viewModel.thumbArg,
+        com.convx.music.ui.utils.pendingSharedArtworkThumbFor(
+            navController.currentBackStackEntry?.arguments?.getString("playlist")
+        ),
+        heroUrl,
+    )
+    val bgCacheUrl = instantCacheThumb ?: heroUrl
+    val cacheChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 1)
+    val meshPalette = rememberArtworkMeshPalette(bgCacheUrl)
     val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
     // Same flat white every icon/text reads in the player on a mesh background,
@@ -283,7 +293,7 @@ fun CachePlaylistScreen(
     ) {
       MeshGradientBackground(
           palette = meshPalette,
-          trackKey = heroUrl,
+          trackKey = bgCacheUrl,
           modifier = Modifier.matchParentSize(),
       )
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -528,14 +538,12 @@ fun CachePlaylistScreen(
                         modifier = Modifier.weight(1f)
                     )
 
-                    Row(
+                    com.convx.music.ui.component.GlassPillRow(
                         modifier = Modifier
                             .height(48.dp)
                             .clip(chromeShape)
-                            .background(onTint.copy(alpha = 0.15f), chromeShape)
+                            .then(com.convx.music.ui.component.pillGlassBackground(chromeShape))
                             .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Checkbox(
                             checked = selection.size == filteredSongs.size && selection.isNotEmpty(),
@@ -622,6 +630,9 @@ fun CachePlaylistScreen(
                     GlassCircleButton(
                         onClick = { navController.navigateUp() },
                         onLongClick = { navController.backToMain() },
+                        modifier = with(cacheChrome) {
+                            Modifier.backEnter().then(com.convx.music.ui.component.backExitModifier())
+                        },
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.arrow_back_ios),
@@ -631,7 +642,12 @@ fun CachePlaylistScreen(
 
                     Spacer(Modifier.weight(1f))
 
-                    GlassCircleButton(onClick = { isSearching = true }) {
+                    GlassCircleButton(
+                        onClick = { isSearching = true },
+                        modifier = with(cacheChrome) {
+                            Modifier.iconEnter(0).then(com.convx.music.ui.component.backExitModifier())
+                        },
+                    ) {
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                             contentDescription = null

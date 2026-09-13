@@ -93,6 +93,7 @@ import com.convx.music.constants.LiquidGlassTextColorKey
 import com.convx.music.constants.LiquidGlassVibrancyKey
 import com.convx.music.models.MediaMetadata
 import com.convx.music.ui.component.GlassStyle
+import com.convx.music.ui.theme.GlassTintTokens
 import com.convx.music.ui.component.ColorPickerDialog
 import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.component.GlassEffectConfig
@@ -134,16 +135,16 @@ fun GlassEffectSettings(
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     val (vibrancy, onVibrancyChange) = rememberPreference(
-        LiquidGlassVibrancyKey, defaultValue = 1.2f
+        LiquidGlassVibrancyKey, defaultValue = 2.0f
     )
     val (blurRadius, onBlurRadiusChange) = rememberPreference(
-        LiquidGlassBlurRadiusKey, defaultValue = 2f
+        LiquidGlassBlurRadiusKey, defaultValue = 3f
     )
     val (lensHeight, onLensHeightChange) = rememberPreference(
-        LiquidGlassLensHeightKey, defaultValue = 0.4f
+        LiquidGlassLensHeightKey, defaultValue = 0.60f
     )
     val (lensAmount, onLensAmountChange) = rememberPreference(
-        LiquidGlassLensAmountKey, defaultValue = 0.6f
+        LiquidGlassLensAmountKey, defaultValue = 0.69f
     )
     val (chromaticAberration, onChromaticAberrationChange) = rememberPreference(
         LiquidGlassChromaticAberrationKey, defaultValue = false
@@ -173,15 +174,17 @@ fun GlassEffectSettings(
         LiquidGlassHighlightColorKey, defaultValue = 0
     )
     val (highlightOpacity, onHighlightOpacityChange) = rememberPreference(
-        LiquidGlassHighlightOpacityKey, defaultValue = 0.55f
+        LiquidGlassHighlightOpacityKey, defaultValue = 0.33f
     )
     val adaptiveTintColor = if (AppTheme.colorScheme.surface.luminance() > 0.5f) {
         Color(0xFFFAFAFA)
     } else {
         Color(0xFF4A4A4E)
     }
+    val settingsDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    // Untouched (0) previews the per-theme spec default, matching MainActivity.
     val surfaceTintColor = if (surfaceTintColorInt == 0) {
-        adaptiveTintColor
+        if (settingsDark) GlassTintTokens.DefaultSurfaceDark else GlassTintTokens.DefaultSurfaceLight
     } else {
         Color(surfaceTintColorInt)
     }
@@ -539,7 +542,7 @@ fun GlassEffectSettings(
         DefaultDialog(
             onDismiss = { tempValue = vibrancy; showVibrancyDialog = false },
             buttons = {
-                TextButton(onClick = { tempValue = 1f }) { Text(stringResource(R.string.reset)) }
+                TextButton(onClick = { tempValue = 2.0f }) { Text(stringResource(R.string.reset)) }
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { tempValue = vibrancy; showVibrancyDialog = false }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = { onVibrancyChange(tempValue); showVibrancyDialog = false }) { Text(stringResource(android.R.string.ok)) }
@@ -558,7 +561,7 @@ fun GlassEffectSettings(
         DefaultDialog(
             onDismiss = { tempValue = blurRadius; showBlurRadiusDialog = false },
             buttons = {
-                TextButton(onClick = { tempValue = 8f }) { Text(stringResource(R.string.reset)) }
+                TextButton(onClick = { tempValue = 3f }) { Text(stringResource(R.string.reset)) }
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { tempValue = blurRadius; showBlurRadiusDialog = false }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = { onBlurRadiusChange(tempValue); showBlurRadiusDialog = false }) { Text(stringResource(android.R.string.ok)) }
@@ -577,7 +580,7 @@ fun GlassEffectSettings(
         DefaultDialog(
             onDismiss = { tempValue = lensHeight; showLensHeightDialog = false },
             buttons = {
-                TextButton(onClick = { tempValue = 0.5f }) { Text(stringResource(R.string.reset)) }
+                TextButton(onClick = { tempValue = 0.60f }) { Text(stringResource(R.string.reset)) }
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { tempValue = lensHeight; showLensHeightDialog = false }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = { onLensHeightChange(tempValue); showLensHeightDialog = false }) { Text(stringResource(android.R.string.ok)) }
@@ -599,7 +602,7 @@ fun GlassEffectSettings(
         DefaultDialog(
             onDismiss = { tempValue = lensAmount; showLensAmountDialog = false },
             buttons = {
-                TextButton(onClick = { tempValue = 0.5f }) { Text(stringResource(R.string.reset)) }
+                TextButton(onClick = { tempValue = 0.69f }) { Text(stringResource(R.string.reset)) }
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { tempValue = lensAmount; showLensAmountDialog = false }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = { onLensAmountChange(tempValue); showLensAmountDialog = false }) { Text(stringResource(android.R.string.ok)) }
@@ -747,7 +750,7 @@ fun GlassEffectSettings(
         DefaultDialog(
             onDismiss = { tempValue = surfaceOpacity; showSurfaceOpacityDialog = false },
             buttons = {
-                TextButton(onClick = { tempValue = 0.3f }) { Text(stringResource(R.string.reset)) }
+                TextButton(onClick = { tempValue = if (settingsDark) GlassTintTokens.DefaultSurfaceOpacityDark else GlassTintTokens.DefaultSurfaceOpacityLight }) { Text(stringResource(R.string.reset)) }
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { tempValue = surfaceOpacity; showSurfaceOpacityDialog = false }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = { onSurfaceOpacityChange(tempValue); showSurfaceOpacityDialog = false }) { Text(stringResource(android.R.string.ok)) }
@@ -809,7 +812,11 @@ fun GlassEffectSettings(
 
     if (showPuckColorDialog) {
         ColorPickerDialog(
-            initialColor = if (puckColorInt == 0) Color(0xFF1C1B1C) else Color(puckColorInt),
+            initialColor = if (puckColorInt == 0) {
+                if (settingsDark) GlassTintTokens.DefaultPuckDark else GlassTintTokens.DefaultPuckLight
+            } else {
+                Color(puckColorInt)
+            },
             title = stringResource(R.string.liquid_glass_puck_color),
             onDismiss = { showPuckColorDialog = false },
             onConfirm = { color ->
@@ -829,7 +836,7 @@ fun GlassEffectSettings(
         DefaultDialog(
             onDismiss = { tempValue = puckOpacity; showPuckOpacityDialog = false },
             buttons = {
-                TextButton(onClick = { tempValue = 0.8f }) { Text(stringResource(R.string.reset)) }
+                TextButton(onClick = { tempValue = if (settingsDark) GlassTintTokens.DefaultPuckOpacityDark else GlassTintTokens.DefaultPuckOpacityLight }) { Text(stringResource(R.string.reset)) }
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { tempValue = puckOpacity; showPuckOpacityDialog = false }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = { onPuckOpacityChange(tempValue); showPuckOpacityDialog = false }) { Text(stringResource(android.R.string.ok)) }
@@ -845,7 +852,11 @@ fun GlassEffectSettings(
 
     if (showHighlightColorDialog) {
         ColorPickerDialog(
-            initialColor = if (highlightColorInt == 0) Color.White else Color(highlightColorInt),
+            initialColor = if (highlightColorInt == 0) {
+                if (settingsDark) GlassTintTokens.DefaultHighlightDark else GlassTintTokens.DefaultHighlightLight
+            } else {
+                Color(highlightColorInt)
+            },
             title = stringResource(R.string.liquid_glass_highlight_color),
             onDismiss = { showHighlightColorDialog = false },
             onConfirm = { color ->
@@ -864,7 +875,7 @@ fun GlassEffectSettings(
         DefaultDialog(
             onDismiss = { tempValue = highlightOpacity; showHighlightOpacityDialog = false },
             buttons = {
-                TextButton(onClick = { tempValue = 0.55f }) { Text(stringResource(R.string.reset)) }
+                TextButton(onClick = { tempValue = if (settingsDark) GlassTintTokens.DefaultHighlightOpacityDark else GlassTintTokens.DefaultHighlightOpacityLight }) { Text(stringResource(R.string.reset)) }
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { tempValue = highlightOpacity; showHighlightOpacityDialog = false }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = { onHighlightOpacityChange(tempValue); showHighlightOpacityDialog = false }) { Text(stringResource(android.R.string.ok)) }

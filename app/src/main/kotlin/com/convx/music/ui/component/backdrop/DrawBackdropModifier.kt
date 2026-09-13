@@ -9,6 +9,7 @@
  */
 package com.convx.music.ui.component.backdrop
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf

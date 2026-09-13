@@ -44,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import com.convx.music.LocalAmbientBackgroundColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.input.pointer.util.addPointerInputChange
@@ -140,16 +142,17 @@ fun FloatingMiniPlayer(
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val ambientColor = LocalAmbientBackgroundColor.current.value
-    // Play/pause stays fully opaque; secondary transport keeps its dim.
-    val playTint = when {
-        useGlass && ambientColor.isSpecified -> ambientColor
-        else -> contentColor
-    }
-    val transportTint = when {
-        useGlass && ambientColor.isSpecified -> ambientColor.asSoftIconTint().copy(alpha = 0.65f)
-        useGlass -> contentColor.copy(alpha = 0.45f)
-        else -> contentColor
-    }
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val playTint = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = isDark,
+        activeTint = ambientColor,
+        isSelected = false,
+    ).copy(alpha = 1.0f)
+    val transportTint = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = isDark,
+        activeTint = ambientColor,
+        isSelected = false,
+    )
     val context = LocalContext.current
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
@@ -287,6 +290,10 @@ fun FloatingMiniPlayer(
                                 slideX += delta
                                 coroutineScope.launch { offsetXAnimatable.snapTo(slideX) }
                             }
+                        } else if (totalDragDistance > viewConfig.touchSlop) {
+                            // Center drag (stretch only): swallow the move so the
+                            // tap-to-open below can't fire on release after a drag.
+                            change.consume()
                         }
                     }
                     val duration = System.currentTimeMillis() - dragStartTime
@@ -319,6 +326,15 @@ fun FloatingMiniPlayer(
                     }
                 }
             }
+            // Single tap anywhere on the pill (except the transport controls and
+            // the seek waveform, which consume the tap themselves) opens the
+            // full player. Sits after pointerInput so a drag that consumes the
+            // move above cancels this tap instead of opening on release.
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
     ) {
         // Fixed sizes for both phone accessory strips (isInline and the default
         // !tabStyle wave bar) — neither's resting height ever changes, so there is
@@ -389,7 +405,7 @@ fun FloatingMiniPlayer(
                             color = contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass),
+                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -397,7 +413,7 @@ fun FloatingMiniPlayer(
                             color = contentColor.copy(alpha = 0.7f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass),
+                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                     }
                 }
@@ -469,7 +485,7 @@ fun FloatingMiniPlayer(
                             color = contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass),
+                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -477,7 +493,7 @@ fun FloatingMiniPlayer(
                             color = contentColor.copy(alpha = 0.7f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass),
+                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                     }
                 }
@@ -499,7 +515,7 @@ fun FloatingMiniPlayer(
                         modifier = Modifier
                             .width(64.dp)
                             .height(22.dp)
-                            .additiveChrome(useGlass),
+                            .additiveChrome(useGlass && isDark),
                     )
                 }
 
@@ -524,7 +540,7 @@ fun FloatingMiniPlayer(
                         slot = PlayerIconSlot.NEXT,
                         fallbackVector = SfSymbols.Monochrome.SFForwardFill,
                         tint = if (canSkipNext) transportTint else transportTint.copy(alpha = 0.4f),
-                        modifier = Modifier.size(playIconSize).additiveChrome(useGlass),
+                        modifier = Modifier.size(playIconSize).additiveChrome(useGlass && isDark),
                     )
                 }
             } else {
@@ -542,9 +558,9 @@ fun FloatingMiniPlayer(
                 ) {
                     Icon(
                         imageVector = SfSymbols.Monochrome.SFShuffle,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.shuffle_label),
                         tint = transportTint,
-                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark),
                     )
                 }
                 IconButton(
@@ -556,7 +572,7 @@ fun FloatingMiniPlayer(
                         slot = PlayerIconSlot.PREVIOUS,
                         fallbackVector = SfSymbols.Monochrome.SFBackwardFill,
                         tint = if (canSkipPrevious) transportTint else transportTint.copy(alpha = 0.4f),
-                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark),
                     )
                 }
                 IconButton(
@@ -578,7 +594,7 @@ fun FloatingMiniPlayer(
                         slot = PlayerIconSlot.NEXT,
                         fallbackVector = SfSymbols.Monochrome.SFForwardFill,
                         tint = if (canSkipNext) transportTint else transportTint.copy(alpha = 0.4f),
-                        modifier = Modifier.size(playIconSize).additiveChrome(useGlass),
+                        modifier = Modifier.size(playIconSize).additiveChrome(useGlass && isDark),
                     )
                 }
                 IconButton(
@@ -587,9 +603,9 @@ fun FloatingMiniPlayer(
                 ) {
                     Icon(
                         imageVector = if (repeatMode == Player.REPEAT_MODE_ONE) SfSymbols.Monochrome.SFRepeat1 else SfSymbols.Monochrome.SFRepeat,
-                        contentDescription = null,
+                        contentDescription = stringResource(R.string.repeat_mode_all),
                         tint = if (repeatMode != Player.REPEAT_MODE_OFF) transportTint else transportTint.copy(alpha = 0.4f),
-                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark),
                     )
                 }
 
@@ -635,7 +651,7 @@ fun FloatingMiniPlayer(
                             color = contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass),
+                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -643,7 +659,7 @@ fun FloatingMiniPlayer(
                             color = contentColor.copy(alpha = 0.7f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass),
+                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                     }
                 }
@@ -658,7 +674,7 @@ fun FloatingMiniPlayer(
                         imageVector = SfSymbols.Monochrome.SFQuoteBubble,
                         contentDescription = stringResource(R.string.lyrics),
                         tint = transportTint,
-                        modifier = Modifier.size(iconSize * LyricsIconScale).additiveChrome(useGlass),
+                        modifier = Modifier.size(iconSize * LyricsIconScale).additiveChrome(useGlass && isDark),
                     )
                 }
                 IconButton(
@@ -669,7 +685,7 @@ fun FloatingMiniPlayer(
                         imageVector = SfSymbols.Monochrome.SFListBullet,
                         contentDescription = stringResource(R.string.queue),
                         tint = transportTint,
-                        modifier = Modifier.size(iconSize).additiveChrome(useGlass),
+                        modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark),
                     )
                 }
             }

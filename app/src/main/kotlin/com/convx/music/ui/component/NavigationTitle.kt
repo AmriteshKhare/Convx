@@ -28,10 +28,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.convx.music.R
 
+import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.ui.ios.compat.LocalContentColor
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.LocalAccentTextColor
+import com.convx.music.ui.theme.isHueless
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 
 @Composable
 fun NavigationTitle(
@@ -43,10 +46,16 @@ fun NavigationTitle(
     onClick: (() -> Unit)? = null,
     onPlayAllClick: (() -> Unit)? = null,
 ) {
-    // Headings take the accent-contrast colour rather than plain content colour.
-    // Hero screens provide their own artwork tint into this local, so a section
-    // title matches the screen it is on rather than the app-wide accent.
-    val contentColor = color ?: LocalAccentTextColor.current
+    // Headings stay neutral per theme; only hero screens keep the
+    // artwork-derived tint (provided into this local), so a section title
+    // matches the screen it is on. The See All/Play All link beside it
+    // always keeps the accent — links are in accent scope.
+    val ambient = LocalAmbientBackgroundColor.current.value
+    val contentColor = color ?: if (ambient.isSpecified && !ambient.isHueless()) {
+        LocalAccentTextColor.current
+    } else {
+        AppTheme.colorScheme.onSurface
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -94,12 +103,8 @@ fun NavigationTitle(
         // "See All" / "Play all" as a plain accent text action rather than an
         // outlined button or a chevron: the design keeps every section header to
         // one weight of chrome, so the action reads as a link beside the title
-        // instead of as a control stacked on it.
-        //
-        // Takes the same color as the title beside it. This was hardcoded to
-        // AppleTokens.AccentRed, so it stayed red on every screen no matter what
-        // the user picked in Theme settings — and on a hero screen it clashed with
-        // the artwork tint the title next to it was already following.
+        // instead of as a control stacked on it. Links stay accent even though
+        // the title beside them is neutral.
         val action = onPlayAllClick ?: onClick
         if (action != null) {
             Text(
@@ -109,7 +114,7 @@ fun NavigationTitle(
                 fontSize = AppleTokens.ItemTitle,
                 lineHeight = AppleTokens.ItemTitleLineHeight,
                 fontWeight = FontWeight.Normal,
-                color = contentColor,
+                color = LocalAccentTextColor.current,
                 maxLines = 1,
                 modifier = Modifier.clickable(onClick = action),
             )

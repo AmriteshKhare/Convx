@@ -114,8 +114,11 @@ import com.convx.music.ui.menu.ArtistMenu
 import com.convx.music.ui.menu.PlaylistMenu
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.localPlaylistRoute
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.constants.LocalOnlyModeKey
@@ -721,7 +724,7 @@ fun LibraryMixScreen(
                                         .fillMaxWidth()
                                         .combinedBounceClick(
                                             onClick = {
-                                                navController.navigate("local_playlist/${item.id}")
+                                                navController.navigate(localPlaylistRoute(item.id, item.thumbnailUrl))
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -766,7 +769,7 @@ fun LibraryMixScreen(
                                         .fillMaxWidth()
                                         .combinedBounceClick(
                                             onClick = {
-                                                navController.navigate("artist/${item.id}")
+                                                navController.navigate(artistRoute(item.id, item.thumbnailUrl))
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -813,7 +816,7 @@ fun LibraryMixScreen(
                                         .fillMaxWidth()
                                         .combinedBounceClick(
                                             onClick = {
-                                                navController.navigate("album/${item.id}")
+                                                navController.navigate(albumRoute(item.id, item.thumbnailUrl))
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1133,7 +1136,7 @@ fun LibraryMixScreen(
                                         .fillMaxWidth()
                                         .combinedBounceClick(
                                             onClick = {
-                                                navController.navigate("local_playlist/${item.id}")
+                                                navController.navigate(localPlaylistRoute(item.id, item.thumbnailUrl))
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1160,7 +1163,7 @@ fun LibraryMixScreen(
                                         .fillMaxWidth()
                                         .combinedBounceClick(
                                             onClick = {
-                                                navController.navigate("artist/${item.id}")
+                                                navController.navigate(artistRoute(item.id, item.thumbnailUrl))
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1190,7 +1193,7 @@ fun LibraryMixScreen(
                                         .fillMaxWidth()
                                         .combinedBounceClick(
                                             onClick = {
-                                                navController.navigate("album/${item.id}")
+                                                navController.navigate(albumRoute(item.id, item.thumbnailUrl))
                                             },
                                             onLongClick = {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)

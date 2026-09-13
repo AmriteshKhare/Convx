@@ -24,6 +24,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.luminance
+import com.convx.music.ui.theme.isHueless
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
@@ -101,11 +103,13 @@ fun GlassCircleButton(
     // Same idea as the nav bar's own rim tint: the caller's current artwork/background
     // colour, already boosted (asRimPop). Unspecified keeps the plain default rim.
     rimTintColor: Color = Color.Unspecified,
+    // Photos (account avatar) must not run through additiveChrome: Plus adds
+    // white over every pixel and washes the photo out. Icons keep it.
+    applyAdditiveChrome: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    // Glass Effect setting only drives the nav bar/mini player now — this button
-    // keeps glass but pinned to the fixed style.
-    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
+    // Non-nav glass: thinner lens per spec Q17 (.35/.40), fixed style.
+    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle().forAccessory()
     // These float over content the same way the nav bar does and are meant to
     // read as the same material, so they follow the nav bar's own on/off switch
     // and its effect values rather than only the global one.
@@ -115,28 +119,33 @@ fun GlassCircleButton(
     // Single limelight: no local rim computation — pass an explicit caller tint
     // through, otherwise Unspecified so liquidGlass derives the same shared
     // ambient rim every other glass surface on this screen uses.
-    val highlightAlpha = if (ambientColor.isSpecified || rimTintColor.isSpecified) 0.48f else 0.30f
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val isHeroContext = (ambientColor.isSpecified && !ambientColor.isHueless()) || rimTintColor.isSpecified
+    val highlightAlpha = com.convx.music.ui.theme.GlassTintTokens.pluckOpacity(isDark, isHeroContext)
+    val effectiveRimTintColor = if (rimTintColor.isSpecified) rimTintColor else com.convx.music.ui.theme.GlassTintTokens.pluckColor(isDark, ambientColor)
+
+    val fallbackFill = com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark).copy(
+        alpha = if (isDark) com.convx.music.ui.theme.GlassTintTokens.NavPillFillOpacityDark else com.convx.music.ui.theme.GlassTintTokens.NavPillFillOpacityLight
+    )
 
     val backgroundModifier = if (useGlass) {
         Modifier.liquidGlass(
             config = glassConfig,
             shape = GlassCircleShape,
             highlightAlpha = highlightAlpha,
-            rimTintColor = rimTintColor,
-            // backdropScale is left at liquidGlass's default
-            // (glassResolutionScale of the blur radius) so these record their
-            // backdrop at the same reduced resolution the nav bar uses instead
-            // of full res — the blur hides the upscale.
+            rimTintColor = effectiveRimTintColor,
         )
     } else {
         Modifier
             .clip(GlassCircleShape)
-            .background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f))
+            .background(fallbackFill)
     }
-    val contentColor = when {
-        useGlass && ambientColor.isSpecified -> ambientColor.asSoftIconTint()
-        useGlass -> glassConfig.resolvedTextColor()
-        else -> AppTheme.colorScheme.onSurface
+    // Hero exemption Q14: tinted screens force dark chrome even in light mode.
+    val effectiveDark = isDark || isHeroContext
+    val contentColor = if (useGlass) {
+        glassConfig.resolvedTextColor(activeTint = ambientColor)
+    } else {
+        com.convx.music.ui.theme.GlassTintTokens.glassContentColor(isDark = effectiveDark, activeTint = ambientColor)
     }
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -160,7 +169,7 @@ fun GlassCircleButton(
             .then(elasticStretch.gestureModifier)
     ) {
         CompositionLocalProvider(LocalContentColor provides contentColor) {
-            Box(modifier = Modifier.additiveChrome(useGlass)) {
+            Box(modifier = Modifier.additiveChrome(applyAdditiveChrome && useGlass && effectiveDark)) {
                 content()
             }
         }

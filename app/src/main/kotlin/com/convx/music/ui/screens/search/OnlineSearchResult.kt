@@ -73,6 +73,8 @@ import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
@@ -245,8 +247,8 @@ fun OnlineSearchResult(
                                 }
                             }
 
-                            is AlbumItem -> navController.navigate("album/${item.id}")
-                            is ArtistItem -> navController.navigate("artist/${item.id}")
+                            is AlbumItem -> navController.navigate(albumRoute(item.id, item.thumbnail))
+                            is ArtistItem -> navController.navigate(artistRoute(item.id, item.thumbnail))
                             is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                         }
                     },
@@ -269,7 +271,7 @@ fun OnlineSearchResult(
     // The suggestions/"hint" overlay below (shown while re-typing on this results
     // page) tints from the app's home background image, not this page's own
     // search-result hero — matching the initial SearchScreen's header tint.
-    val hintTint = rememberAppBackgroundColor(AppleTokens.BgElevated)
+    val hintTint = rememberAppBackgroundColor(AppTheme.colorScheme.background)
     val hintOnTint = AppleTokens.onColor(hintTint)
 
     val heroBackdrop = rememberLayerBackdrop()

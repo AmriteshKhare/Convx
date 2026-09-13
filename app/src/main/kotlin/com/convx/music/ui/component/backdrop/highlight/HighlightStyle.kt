@@ -25,6 +25,8 @@ import com.convx.music.ui.component.backdrop.internal.AmbientHighlightShaderStri
 import com.convx.music.ui.component.backdrop.internal.DefaultHighlightShaderString
 import com.convx.music.ui.component.backdrop.isRuntimeShaderSupported
 import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Immutable
 interface HighlightStyle {
@@ -67,10 +69,18 @@ interface HighlightStyle {
                     "Default",
                     DefaultHighlightShaderString
                 ).apply {
-                    setFloatUniform("size", size.width, size.height)
+                    val w = size.width
+                    val h = size.height
+                    // A/B legacy: per-pixel `halfSize = size * 0.5` in-shader
+                    // setFloatUniform("size", w, h)
+                    setFloatUniform("halfSize", w * 0.5f, h * 0.5f)
+                    setFloatUniform("minHalf", minOf(w, h) * 0.5f)
                     setFloatUniform("cornerRadii", getCornerRadii(shape))
                     setColorUniform("color", color.copy(alpha = 1f))
-                    setFloatUniform("angle", angle * (PI / 180f).toFloat())
+                    val angleRad = angle * (PI / 180f).toFloat()
+                    // A/B legacy: per-pixel `cos(angle)/sin(angle)` in-shader
+                    // setFloatUniform("angle", angleRad)
+                    setFloatUniform("lightDir", cos(angleRad), sin(angleRad))
                     setFloatUniform("falloff", falloff)
                 }
             } else {
@@ -97,9 +107,17 @@ interface HighlightStyle {
                     "Ambient",
                     AmbientHighlightShaderString
                 ).apply {
-                    setFloatUniform("size", size.width, size.height)
+                    val w = size.width
+                    val h = size.height
+                    // A/B legacy: per-pixel `halfSize = size * 0.5` in-shader
+                    // setFloatUniform("size", w, h)
+                    setFloatUniform("halfSize", w * 0.5f, h * 0.5f)
+                    setFloatUniform("minHalf", minOf(w, h) * 0.5f)
                     setFloatUniform("cornerRadii", getCornerRadii(shape))
-                    setFloatUniform("angle", 45f * (PI / 180f).toFloat())
+                    val angleRad = 45f * (PI / 180f).toFloat()
+                    // A/B legacy: per-pixel `cos(angle)/sin(angle)` in-shader
+                    // setFloatUniform("angle", angleRad)
+                    setFloatUniform("lightDir", cos(angleRad), sin(angleRad))
                     setFloatUniform("falloff", 1f)
                 }
             } else {

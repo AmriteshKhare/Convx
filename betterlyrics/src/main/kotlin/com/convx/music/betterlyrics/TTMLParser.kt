@@ -28,17 +28,16 @@ object TTMLParser {
         val hasTrailingSpace: Boolean
     )
     
-    // Helper function to get attribute by local name (handles namespace prefixes)
+    // Lookup by local name, handling namespace prefixes.
     private fun Element.getAttributeByLocalName(localName: String): String {
-        // First try namespace-aware lookup
+        // Try namespace-aware lookup.
         val nsValue = getAttributeNS("http://www.w3.org/ns/ttml#metadata", localName)
         if (nsValue.isNotEmpty()) return nsValue
         
-        // Then try with common prefixes
+        // Try common prefixes.
         val prefixedValue = getAttribute("ttm:$localName")
         if (prefixedValue.isNotEmpty()) return prefixedValue
-        
-        // Finally, search through all attributes
+
         val attrs = attributes
         for (i in 0 until attrs.length) {
             val attr = attrs.item(i)
@@ -56,6 +55,13 @@ object TTMLParser {
         try {
             val factory = DocumentBuilderFactory.newInstance()
             factory.isNamespaceAware = true
+            // Harden against XXE: remote TTML must not resolve external entities.
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            factory.isXIncludeAware = false
+            factory.isExpandEntityReferences = false
             val builder = factory.newDocumentBuilder()
             val doc = builder.parse(ttml.byteInputStream())
             

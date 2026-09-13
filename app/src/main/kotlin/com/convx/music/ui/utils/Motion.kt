@@ -72,18 +72,22 @@ object Motion {
     )
 
     /**
-     * Card growing OUT of its tile (push) with Melox 320ms FastOutSlowIn curve.
+     * Card growing OUT of its tile (push): 320ms on the iOS nav curve so the
+     * morph and the push behind it stay on one clock. Body staggers 70ms after.
+     * Value-duplicates PushEasing below: forward ref illegal in object init order.
      */
     const val MorphEnterMillis = 320
-    val MorphEnterEasing: Easing = FastOutSlowInEasing
+    val MorphEnterEasing: Easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 
     fun <T> morphEnter(): FiniteAnimationSpec<T> = tween(MorphEnterMillis, easing = MorphEnterEasing)
 
     /**
-     * Card shrinking BACK into its tile (pop) with 240ms FastOutSlowIn curve.
+     * Card shrinking BACK into its tile (pop): body out first 90ms, hero holds
+     * to midway then drops. Timed (album intercepts predictive back), so a
+     * scrub-safe tween is fine. See SharedArtwork.MorphBoundsTransform.
      */
-    const val MorphExitMillis = 240
-    val MorphExitEasing: Easing = FastOutSlowInEasing
+    const val MorphExitMillis = 260
+    val MorphExitEasing: Easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
 
     fun <T> morphExit(): FiniteAnimationSpec<T> = tween(MorphExitMillis, easing = MorphExitEasing)
 
@@ -130,7 +134,7 @@ object Motion {
     // here: it is velocity-adaptive (a hard flick gets a longer arc), which no single
     // constant can express.
 
-    // ---- Navigation push/pop -------------------------------------------------
+    // Navigation push and pop.
 
     /**
      * Duration of a screen push/pop.

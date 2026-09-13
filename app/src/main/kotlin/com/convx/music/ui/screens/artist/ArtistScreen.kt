@@ -14,6 +14,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.ui.utils.bleedStart
 import com.convx.music.ui.utils.plusStart
@@ -294,7 +296,15 @@ fun ArtistScreen(
     // own content behind it; the play-row buttons (info/play/subscribe) and the
     // subscriber/listener pills are a flat fill in the tint's own contrast
     // color instead — see ContrastCircleButton below.
+    // Instant seed: route thumb arg -> live tile thumb -> DB/page. Paints hero +
+    // mesh bg on frame one; page/DB overwrites when it lands.
     val artistThumbnail = artistPage?.artist?.thumbnail ?: libraryArtist?.artist?.thumbnailUrl
+    val instantArtistThumb = com.convx.music.ui.component.detailSeed(
+        viewModel.thumbArg,
+        com.convx.music.ui.utils.pendingSharedArtworkThumbFor(viewModel.artistId),
+        artistThumbnail,
+    )
+    val artistChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 1)
 
     // Glass chrome (back/share buttons, chips) samples LocalAppBackdrop. The app
     // root's backdrop (MainActivity's Modifier.layerBackdrop(appBackdrop)) captures
@@ -321,7 +331,7 @@ fun ArtistScreen(
     // The BitChord player's own mesh extraction (Palette-based, four blobs) — same call
     // as Player.kt's BITCHORD_MESH style, raw, so this screen's mesh matches the
     // player's for the same artwork instead of running its own extra saturation pass.
-    val meshPalette = rememberArtworkMeshPalette(artistThumbnail)
+    val meshPalette = rememberArtworkMeshPalette(instantArtistThumb ?: artistThumbnail)
     val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
     // Same flat white every icon/text reads in the player on an artwork
@@ -360,7 +370,7 @@ fun ArtistScreen(
     ) {
     MeshGradientBackground(
         palette = meshPalette,
-        trackKey = artistThumbnail,
+        trackKey = instantArtistThumb ?: artistThumbnail,
         modifier = Modifier.matchParentSize(),
     )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -426,29 +436,34 @@ fun ArtistScreen(
         ) {
             if (artistPage == null && !showLocal) {
                 item(key = "shimmer") {
-                    ShimmerHost (
+                    Column(
                         modifier = Modifier
                             .offset {
                                 IntOffset(x = 0, y = headerOffset)
                             }
                     ) {
-                        // Artist Image Placeholder
+                        // Hero sits outside the shimmer sweep: the seeded thumb
+                        // mirrors the loaded photo statically, and no grey
+                        // shimmer block ever covers the artwork area.
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1.1f),
                         ) {
-                            Spacer(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .shimmer()
-                                    .background(AppTheme.colorScheme.onSurface)
-                                    .fadingEdge(
-                                        top = systemBarsTopPadding + AppBarHeight,
-                                        bottom = 200.dp,
-                                    ),
-                            )
+                            if (instantArtistThumb != null) {
+                                com.convx.music.ui.component.SeededShimmerHero(
+                                    thumbUrl = instantArtistThumb,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .fadingEdge(
+                                            top = systemBarsTopPadding + AppBarHeight,
+                                            bottom = 200.dp,
+                                        ),
+                                    ratio = 1.1f,
+                                )
+                            }
                         }
+                    ShimmerHost {
                         // Artist Name and Controls Section
                         Column(
                             modifier = Modifier
@@ -508,6 +523,7 @@ fun ArtistScreen(
                             ListItemPlaceHolder()
                         }
                     }
+                    }
                 }
             } else {
                 item(key = "header") {
@@ -534,9 +550,9 @@ fun ArtistScreen(
                         // the foot smears into the page colour instead of meeting
                         // it at an edge. The name block below sits on that blend
                         // start and the rest follows it up.
-                        if (!tabView && (thumbnail != null || backgroundVideoUrl != null)) {
+                        if (!tabView && (thumbnail != null || backgroundVideoUrl != null || instantArtistThumb != null)) {
                             ArtistHeroImage(
-                                artworkUrl = thumbnail,
+                                artworkUrl = thumbnail ?: instantArtistThumb,
                                 pageColor = tint,
                                 // Baked join: static blur plates + eased foot wash
                                 // dissolve the edge. No Haze here — the live band
@@ -1009,7 +1025,7 @@ fun ArtistScreen(
                                         modifier = Modifier
                                             .combinedBounceClick(
                                                 onClick = {
-                                                    navController.navigate("album/${album.id}")
+                                                    navController.navigate(albumRoute(album.id, album.thumbnailUrl))
                                                 },
                                                 onLongClick = {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -1058,7 +1074,7 @@ fun ArtistScreen(
                                 FeaturedReleaseCard(
                                     album = firstItem,
                                     onTint = onTint,
-                                    onClick = { navController.navigate("album/${firstItem.id}") },
+                                    onClick = { navController.navigate(albumRoute(firstItem.id, firstItem.thumbnail)) },
                                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp).animateItem()
                                 )
                             }
@@ -1170,8 +1186,8 @@ fun ArtistScreen(
                                                                     ),
                                                                 )
 
-                                                            is AlbumItem -> navController.navigate("album/${item.id}")
-                                                            is ArtistItem -> navController.navigate("artist/${item.id}")
+                                                            is AlbumItem -> navController.navigate(albumRoute(item.id, item.thumbnail))
+                                                            is ArtistItem -> navController.navigate(artistRoute(item.id, item.thumbnail))
                                                             is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                                         }
                                                     },
@@ -1308,6 +1324,9 @@ fun ArtistScreen(
             GlassCircleButton(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
+                modifier = with(artistChrome) {
+                    Modifier.backEnter().then(com.convx.music.ui.component.backExitModifier())
+                },
             ) {
                 Icon(
                     painter = painterResource(R.drawable.arrow_back_ios),
@@ -1323,6 +1342,9 @@ fun ArtistScreen(
                         clipboard.setPrimaryClip(clip)
                         Toast.makeText(context, R.string.link_copied, Toast.LENGTH_SHORT).show()
                     }
+                },
+                modifier = with(artistChrome) {
+                    Modifier.iconEnter(0).then(com.convx.music.ui.component.backExitModifier())
                 },
             ) {
                 Icon(

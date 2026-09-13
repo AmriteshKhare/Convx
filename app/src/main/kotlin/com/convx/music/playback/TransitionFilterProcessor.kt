@@ -192,8 +192,6 @@ class TransitionFilterProcessor : BaseAudioProcessor() {
         outputBuffer.flip()
     }
 
-    // ---- Filter ------------------------------------------------------------
-
     private fun glide(current: Float, target: Float): Float {
         val from = ln(current.coerceAtLeast(MIN_HZ))
         val to = ln(target.coerceAtLeast(MIN_HZ))

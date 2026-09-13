@@ -31,7 +31,7 @@ constructor(
     @ApplicationContext val context: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val browseId = savedStateHandle.get<String>("browseId")!!
+    private val browseId = requireNotNull(savedStateHandle.get<String>("browseId")) { "Missing browseId" }
     private val params = savedStateHandle.get<String>("params")
 
     val result = MutableStateFlow<BrowseResult?>(null)

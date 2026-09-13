@@ -79,9 +79,7 @@ internal class ColorEngineDiskCache(context: Context, version: String) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Serializable mirror of ColorEngineResult
-// ---------------------------------------------------------------------------
+// Serializable mirror of ColorEngineResult.
 
 @Serializable
 private data class StoredScheme(

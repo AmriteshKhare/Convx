@@ -155,28 +155,6 @@ fun PlayerV2(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // starting landscape not support. Skipped for the DIY editor's preview mount
-    // (isPreviewOnly): pinning the real activity to portrait here would fight the
-    // editor's own design, which previews the landscape sticker layout by letting
-    // the user physically rotate the device.
-    if (!isPreviewOnly) {
-        DisposableEffect(Unit) {
-            val activity = (context as? android.app.Activity) ?: run {
-                var ctx = context
-                while (ctx is android.content.ContextWrapper) {
-                    if (ctx is android.app.Activity) break
-                    ctx = ctx.baseContext
-                }
-                ctx as? android.app.Activity
-            }
-            val originalOrientation = activity?.requestedOrientation ?: android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            onDispose {
-                activity?.requestedOrientation = originalOrientation
-            }
-        }
-    }
-    // ended landscape not support
     val playerConnection = LocalPlayerConnection.current ?: return
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
@@ -413,7 +391,8 @@ fun PlayerV2(
             PlayerBackgroundStyle.GLOW_ANIMATED,
             PlayerBackgroundStyle.APPLE_MUSIC,
             PlayerBackgroundStyle.LIVE_MESH,
-            PlayerBackgroundStyle.BITCHORD_MESH -> Color.White
+            PlayerBackgroundStyle.BITCHORD_MESH,
+            PlayerBackgroundStyle.GLASS -> Color.White
             PlayerBackgroundStyle.STATIC,
             PlayerBackgroundStyle.CUSTOM_GRADIENT -> flatOnColor
         },
@@ -431,6 +410,7 @@ fun PlayerV2(
             PlayerBackgroundStyle.APPLE_MUSIC -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
             PlayerBackgroundStyle.LIVE_MESH -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
             PlayerBackgroundStyle.BITCHORD_MESH -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
+            PlayerBackgroundStyle.GLASS -> Color.White.copy(alpha = FlamingoSecondaryAlpha)
             PlayerBackgroundStyle.STATIC,
             PlayerBackgroundStyle.CUSTOM_GRADIENT -> flatOnColor.copy(alpha = FlamingoSecondaryAlpha)
         },
@@ -451,7 +431,8 @@ fun PlayerV2(
             PlayerBackgroundStyle.GLOW_ANIMATED,
             PlayerBackgroundStyle.APPLE_MUSIC,
             PlayerBackgroundStyle.LIVE_MESH,
-            PlayerBackgroundStyle.BITCHORD_MESH -> Color.White.copy(alpha = 0.2f)
+            PlayerBackgroundStyle.BITCHORD_MESH,
+            PlayerBackgroundStyle.GLASS -> Color.White.copy(alpha = 0.2f)
             PlayerBackgroundStyle.STATIC,
             PlayerBackgroundStyle.CUSTOM_GRADIENT -> flatOnColor.copy(alpha = 0.2f)
         },
@@ -493,7 +474,14 @@ fun PlayerV2(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = if (isHeroLook) 0.dp else systemBarsTopPadding)
-                .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()),
+                .padding(bottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
+                // Landscape: keep content out of side gesture bars/cutouts,
+                // like the classic player's landscape branch does.
+                .then(
+                    if (isWidePlayerLayout) Modifier.windowInsetsPadding(
+                        WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)
+                    ) else Modifier
+                ),
             handle = {
             // Minimal drag handle header
             Row(
@@ -585,6 +573,16 @@ fun PlayerV2(
                                                     blendMode = BlendMode.DstIn
                                                 )
                                             }
+                                    } else if (isWidePlayerLayout) {
+                                        // Landscape/tablet side-by-side: height is the
+                                        // limiting dimension, a fillMaxWidth square
+                                        // overflows the short pane. Constrain by
+                                        // height like the classic player's landscape
+                                        // Thumbnail does.
+                                        Modifier
+                                            .fillMaxHeight(0.65f)
+                                            .aspectRatio(1f)
+                                            .align(Alignment.CenterHorizontally)
                                     } else {
                                         Modifier
                                             .fillMaxWidth()
@@ -1072,34 +1070,6 @@ fun PlayerV2(
                                             queueBackdropAlpha.animateTo(1f, animationSpec = Motion.appear())
                                         }
                                         Box(modifier = Modifier.fillMaxSize()) {
-                                            AsyncImage(
-                                                model = ImageRequest.Builder(context)
-                                                    .data(mediaMetadata?.thumbnailUrl?.resize(1200, 1200))
-                                                    .size(CoilSize.ORIGINAL)
-                                                    .crossfade(true)
-                                                    .build(),
-                                                contentDescription = null,
-                                                contentScale = ContentScale.Crop,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .fillMaxHeight(0.4f)
-                                                    .align(Alignment.TopCenter)
-                                                    .alpha(queueBackdropAlpha.value)
-                                                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                                                    .drawWithContent {
-                                                        drawContent()
-                                                        drawRect(
-                                                            brush = Brush.verticalGradient(
-                                                                colorStops = arrayOf(
-                                                                    0.00f to Color.Black,
-                                                                    0.60f to Color.Black,
-                                                                    1.00f to Color.Transparent,
-                                                                )
-                                                            ),
-                                                            blendMode = BlendMode.DstIn
-                                                        )
-                                                    }
-                                            )
                                             Queue(
                                                 state = queueSheetState,
                                                 playerBottomSheetState = state,
@@ -1119,7 +1089,7 @@ fun PlayerV2(
                                                 // Drag-to-dismiss on this sheet was getting stuck —
                                                 // the queue toggle icon and back gesture still close it.
                                                 sheetDraggable = false,
-                                                modifier = Modifier.fillMaxSize()
+                                                modifier = Modifier.fillMaxSize().padding(top = 16.dp)
                                             )
                                         }
                                     }

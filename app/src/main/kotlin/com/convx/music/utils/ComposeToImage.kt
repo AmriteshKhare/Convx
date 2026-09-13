@@ -168,7 +168,7 @@ object ComposeToImage {
 
         val padding = 28f * scale
         
-        // --- Header Section ---
+        // Header.
         val coverArtSize = 64f * scale
         val headerBottomPadding = 12f * scale
         
@@ -236,7 +236,7 @@ object ComposeToImage {
         artistLayout.draw(canvas)
         canvas.restore()
 
-        // --- Footer Section ---
+        // Footer.
         val logoBoxSize = 22f * scale
         val logoIconSize = 16f * scale
         val footerY = imageHeight - padding - logoBoxSize
@@ -288,7 +288,7 @@ object ComposeToImage {
         val appNameY = footerY + logoBoxSize/2f - (appNamePaint.descent() + appNamePaint.ascent()) / 2f
         canvas.drawText(appName, appNameX, appNameY, appNamePaint)
 
-        // --- Lyrics Section ---
+        // Lyrics.
         // Calculate available space
         val lyricsTop = padding + coverArtSize + headerBottomPadding
         val lyricsBottom = footerY - (12f * scale) // Add some padding above footer

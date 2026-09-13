@@ -188,7 +188,6 @@ fun SquigglySlider(
                 totalWidth * (minWaveEndpoint + (matchedWaveEndpoint - minWaveEndpoint) * t)
             }
 
-            // Helper function to compute amplitude
             fun computeAmplitude(x: Float, sign: Float): Float {
                 return if (transitionEnabled) {
                     val length = transitionPeriods * waveLength
@@ -259,7 +258,6 @@ fun SquigglySlider(
             // Unplayed segment
             drawPathSegment(totalProgressPx, totalWidth, inactiveTrackColor)
 
-            // Helper function to get wave Y position at any X
             fun getWaveY(x: Float): Float {
                 val phase = (x - waveStart) / waveLength
                 val waveCycle = phase - kotlin.math.floor(phase)

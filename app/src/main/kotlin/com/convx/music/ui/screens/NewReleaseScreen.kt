@@ -87,6 +87,7 @@ import com.convx.music.ui.menu.YouTubeAlbumMenu
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.utils.backToMain
+import com.convx.music.ui.utils.albumRoute
 import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.viewmodels.NewReleaseViewModel
@@ -168,7 +169,7 @@ fun NewReleaseScreen(
                         Modifier
                             .combinedBounceClick(
                                 onClick = {
-                                    navController.navigate("album/${album.id}")
+                                    navController.navigate(albumRoute(album.id, album.thumbnail))
                                 },
                                 onLongClick = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)

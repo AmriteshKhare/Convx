@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.isSpecified
+import com.convx.music.ui.theme.isHueless
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import com.convx.music.ui.component.backdrop.BackdropEffectScope
@@ -47,13 +48,13 @@ import com.convx.music.ui.utils.outerDarkRim
 @Stable
 data class GlassEffectConfig(
     val globalEnabled: Boolean = true,
-    val vibrancy: Float = 1.2f,
-    /** Blur in dp applied to glass pills. User requested 2dp for landscape fix. */
-    val blurRadius: Float = 2f,
-    /** 0..1, mapped to 0..[LENS_MAX_DP] dp of lens refraction height. 0.4 = 40%. */
-    val lensHeight: Float = 0.4f,
-    /** 0..1, mapped to 0..[LENS_MAX_DP] dp of lens refraction amount. 0.6 = 60%. */
-    val lensAmount: Float = 0.6f,
+    val vibrancy: Float = 2.0f,
+    /** Blur in dp applied to glass pills. Nav spec = 3dp (Q16). */
+    val blurRadius: Float = 3f,
+    /** 0..1, mapped to 0..[LENS_MAX_DP] dp of lens refraction height. Nav spec .60 (Q16). */
+    val lensHeight: Float = 0.60f,
+    /** 0..1, mapped to 0..[LENS_MAX_DP] dp of lens refraction amount. Nav spec .69 (Q16). */
+    val lensAmount: Float = 0.69f,
     val chromaticAberration: Boolean = false,
     val depthEffect: Boolean = false,
     /** [Color.Unspecified] means adaptive: derived from the theme surface. */
@@ -103,6 +104,10 @@ data class GlassEffectConfig(
         surfaceOpacity = sidePanelSurfaceOpacity,
         textColor = sidePanelTextColor,
     )
+    /** Accessory glass (back/menu/circles) follows the user's own lens/blur
+     *  values instead of a fixed thinner set, so slider changes apply
+     *  everywhere and reset restores the same defaults. */
+    fun forAccessory(): GlassEffectConfig = this
     /**
      * Whether the glass effect should be rendered for [component], taking the master
      * switch and the per-component switch into account.
@@ -323,9 +328,24 @@ fun GlassEffectConfig.withFixedStyle(): GlassEffectConfig = copy(globalEnabled =
  * light-tinted glass.
  */
 @Composable
-fun GlassEffectConfig.resolvedTextColor(): Color {
+fun GlassEffectConfig.resolvedTextColor(
+    activeTint: Color = Color.Unspecified,
+    isSelected: Boolean = false,
+    isTitle: Boolean = false,
+    isUnselectedTabLabel: Boolean = false,
+): Color {
     if (textColor.isSpecified) return textColor
-    return AppTheme.colorScheme.onSurface
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val ambient = if (activeTint.isSpecified) activeTint else LocalAmbientBackgroundColor.current.value
+    // Hero exemption Q14: tinted screens force dark chrome even in light mode.
+    val effectiveDark = isDark || (ambient.isSpecified && !ambient.isHueless())
+    return com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = effectiveDark,
+        activeTint = ambient,
+        isSelected = isSelected,
+        isTitle = isTitle,
+        isUnselectedTabLabel = isUnselectedTabLabel,
+    )
 }
 
 /** The backdrop content (app UI) that glass surfaces sample from. */
@@ -432,43 +452,33 @@ fun Modifier.liquidGlass(
     val lensAmountPx = with(density) { (config.lensAmount * LENS_MAX_DP).dp.toPx() } * resolutionScale
     val ambientColor = LocalAmbientBackgroundColor.current.value
     val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
-    // Apple's Liquid Glass is a bright, reflective material: even in dark mode it
-    // reads as a distinctly lighter "frosted" surface, not a near-black rectangle
-    // that blends into an OLED-black background. Honor an explicit user color,
-    // otherwise carry the screen's mesh hue at 20% into the neutral frost so the
-    // surface feels tinted without going colorful, falling back to adaptive
-    // glass gray when no hero ambient is active.
-    val surfaceTintColor = when {
-        config.surfaceTintColor.isSpecified -> config.surfaceTintColor
-        ambientColor.isSpecified -> ambientColor.asAmbientSurfaceTint(isDark)
-        isDark -> Color(0xFF4A4A4E)
-        else -> Color(0xFFFAFAFA)
-    }
-    // Hero-art screens use the pre-defined ambient treatment (0.36) instead of
-    // the user's global surfaceOpacity — the normal bar's own values land later.
-    val effectiveSurfaceOpacity = when {
-        ambientColor.isSpecified && !config.surfaceTintColor.isSpecified -> 0.36f
-        else -> config.surfaceOpacity.coerceIn(0f, 1f)
+    val baseSurfaceColor = com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark)
+    val baseSurfaceOpacity = if (isDark) {
+        com.convx.music.ui.theme.GlassTintTokens.BaseSurfaceOpacityDark
+    } else {
+        com.convx.music.ui.theme.GlassTintTokens.BaseSurfaceOpacityLight
     }
 
-    // Translucent style short-circuits everything below: no backdrop is sampled and
-    // no RenderEffect runs, so there is nothing to configure. Content behind shows
-    // through the tint directly, which is the point — the alternative when glass is
-    // off is an opaque fill, and that reads as a black blob sitting on the content.
-    //
-    // Also taken when the platform can't do the real blur (below API 31):
-    // this used to fall through to a hardcoded opaque-black surface instead
-    // (reasoning: unblurred sharp content behind a translucent tint "reads as
-    // broken, not glass"), which is exactly the "solid black instead of any
-    // transparency" bug reported on older/low-end devices. This same
-    // translucent-tint path is already the app's own answer to "can't do a
-    // real blur, need something cheap that still respects the user's tint
-    // and opacity settings" — so route the unsupported case here too instead
-    // of a separate hardcoded fallback.
+    val isHeroContext = ambientColor.isSpecified && !ambientColor.isHueless()
+    val tintColor = when {
+        config.surfaceTintColor.isSpecified -> config.surfaceTintColor
+        isHeroContext -> ambientColor
+        else -> com.convx.music.ui.theme.GlassTintTokens.neutralTintColor(isDark)
+    }
+    val tintOpacity = when {
+        config.surfaceTintColor.isSpecified -> config.surfaceOpacity.coerceIn(0f, 1f)
+        isHeroContext -> com.convx.music.ui.theme.GlassTintTokens.heroTintOpacity(isDark)
+        else -> 1f
+    }
+    // Neutral tints carry their own spec alpha (0.06/0.05); copy(alpha=1) would
+    // make them opaque. Multiply so 1f means "use tint's own alpha".
+    val effectiveTintAlpha = (tintColor.alpha * tintOpacity).coerceIn(0f, 1f)
+
     if (shouldUseTranslucentGlassFallback(config.style, isRenderEffectSupported())) {
         return this
             .clip(shape)
-            .background(surfaceTintColor.copy(alpha = effectiveSurfaceOpacity))
+            .background(baseSurfaceColor.copy(alpha = baseSurfaceOpacity))
+            .background(tintColor.copy(alpha = effectiveTintAlpha))
     }
 
     // ponytail: frozen mid-sweep. The drift described at [HighlightAngleMin] was a
@@ -547,18 +557,16 @@ fun Modifier.liquidGlass(
     // between chrome and neon, so it is worth exposing rather than assuming. An
     // explicit user highlight color still wins over the automatic artwork tint —
     // the same override precedence surfaceTintColor already follows.
+    val isHeroContextForPluck = (ambientColor.isSpecified && !ambientColor.isHueless()) || rimTintColor.isSpecified
     val rimColor = when {
         config.highlightColor.isSpecified -> config.highlightColor
         rimTintColor.isSpecified -> rimTintColor
-        ambientColor.isSpecified -> ambientColor.asRimPop()
-        else -> Color.White
+        else -> com.convx.music.ui.theme.GlassTintTokens.pluckColor(isDark, ambientColor)
     }
-    // On Home / default screens, highlight alpha is minimal (0.30f off-white).
-    // On hero-tinted screens, the opacity slightly increases (0.48f) so the saturated rim highlight is felt.
+    // Highlight / pluck opacity adapted to theme and hero context:
     val baseHighlightAlpha = when {
         highlightAlpha != EdgeHighlightAlpha -> highlightAlpha
-        ambientColor.isSpecified || rimTintColor.isSpecified -> 0.48f
-        else -> 0.30f
+        else -> com.convx.music.ui.theme.GlassTintTokens.pluckOpacity(isDark, isHeroContextForPluck)
     }
     // Call sites pass a per-component alpha (the nav bar wants a dimmer rim than a
     // button). Scale the user's setting by it rather than replacing it, so both the
@@ -596,11 +604,17 @@ fun Modifier.liquidGlass(
 
     // RenderEffect is guaranteed supported past this point — the unsupported
     // case already returned the translucent-tint fallback above.
-    val surfaceBlock: DrawScope.() -> Unit = remember(surfaceTintColor, effectiveSurfaceOpacity) {
+    val surfaceBlock: DrawScope.() -> Unit = remember(baseSurfaceColor, baseSurfaceOpacity, tintColor, effectiveTintAlpha) {
         {
-            if (effectiveSurfaceOpacity > 0f) {
+            if (baseSurfaceOpacity > 0f) {
                 drawRect(
-                    color = surfaceTintColor.copy(alpha = effectiveSurfaceOpacity),
+                    color = baseSurfaceColor.copy(alpha = baseSurfaceOpacity),
+                    size = size,
+                )
+            }
+            if (effectiveTintAlpha > 0f) {
+                drawRect(
+                    color = tintColor.copy(alpha = effectiveTintAlpha),
                     size = size,
                 )
             }

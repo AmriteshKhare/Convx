@@ -15,6 +15,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -191,6 +192,8 @@ object Shazam {
                 try {
                     val result = executeRequest(request.signature, request.sampleDurationMs)
                     request.completeWith(result)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     request.completeWith(Result.failure(e))
                 } finally {
@@ -223,6 +226,8 @@ object Shazam {
                 cacheResult(cacheKey, result)
                 
                 return Result.success(result)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 lastException = e
 

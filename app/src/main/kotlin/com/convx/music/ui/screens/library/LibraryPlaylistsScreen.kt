@@ -21,6 +21,7 @@ import com.convx.music.ui.utils.rememberGridColumns
 import com.convx.music.constants.SongSortType
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.localPlaylistRoute
 import kotlinx.coroutines.flow.first
 
 import androidx.compose.foundation.layout.Arrangement
@@ -384,7 +385,7 @@ fun LibraryPlaylistsScreen(
                                         modifier = Modifier
                                             .width(150.dp)
                                             .combinedBounceClick(
-                                                onClick = { navController.navigate("local_playlist/${playlist.id}") },
+                                                onClick = { navController.navigate(localPlaylistRoute(playlist.id, playlist.thumbnailUrl)) },
                                                 onLongClick = {
                                                     menuState.show {
                                                         PlaylistMenu(
@@ -572,7 +573,7 @@ fun LibraryPlaylistsScreen(
                                         modifier = Modifier
                                             .width(150.dp)
                                             .combinedBounceClick(
-                                                onClick = { navController.navigate("local_playlist/${playlist.id}") },
+                                                onClick = { navController.navigate(localPlaylistRoute(playlist.id, playlist.thumbnailUrl)) },
                                                 onLongClick = {
                                                     menuState.show {
                                                         PlaylistMenu(

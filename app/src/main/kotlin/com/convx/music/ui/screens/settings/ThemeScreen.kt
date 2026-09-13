@@ -86,6 +86,7 @@ import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.ios.compat.ripple
+import com.convx.music.ui.component.ColorPickerDialog
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.DefaultThemeColor
 import com.convx.music.ui.theme.vivimusicTheme
@@ -125,7 +126,6 @@ fun ThemeScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    // Helper function to handle color selection with dynamic theme toggle
     val handleColorSelection: (Color) -> Unit = { color ->
         onSelectedThemeColorChange(color.toArgb())
         // Enable dynamic theme only when selecting the default/dynamic color
@@ -211,6 +211,8 @@ fun PortraitThemeLayout(
             onDarkModeChange = onDarkModeChange,
             pureBlack = pureBlack,
             onReset = onReset,
+            selectedThemeColor = selectedThemeColor,
+            onSelectedThemeColorChange = onSelectedThemeColorChange,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -310,6 +312,8 @@ fun LandscapeThemeLayout(
                 onDarkModeChange = onDarkModeChange,
                 pureBlack = pureBlack,
                 onReset = onReset,
+                selectedThemeColor = selectedThemeColor,
+                onSelectedThemeColorChange = onSelectedThemeColorChange,
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -336,7 +340,19 @@ fun ThemeControls(
     onDarkModeChange: (DarkMode) -> Unit,
     pureBlack: Boolean,
     onReset: () -> Unit,
+    selectedThemeColor: Color = DefaultThemeColor,
+    onSelectedThemeColorChange: (Color) -> Unit = {},
 ) {
+    var showAccentPicker by remember { mutableStateOf(false) }
+    if (showAccentPicker) {
+        ColorPickerDialog(
+            initialColor = selectedThemeColor,
+            title = stringResource(R.string.theme_colors),
+            onDismiss = { showAccentPicker = false },
+            onConfirm = { onSelectedThemeColorChange(it); showAccentPicker = false },
+            onReset = { onSelectedThemeColorChange(DefaultThemeColor); showAccentPicker = false },
+        )
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -351,6 +367,21 @@ fun ThemeControls(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().bounceClick(onClick = { showAccentPicker = true }),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.theme_colors),
+                    style = AppTheme.typography.titleMedium,
+                    color = AppTheme.colorScheme.onSurface
+                )
+                Box(
+                    modifier = Modifier.size(28.dp).clip(CircleShape).background(selectedThemeColor)
+                        .border(1.dp, AppTheme.colorScheme.outline.copy(alpha = 0.4f), CircleShape)
+                )
+            }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = stringResource(R.string.theme_mode),

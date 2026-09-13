@@ -25,7 +25,8 @@ fun BackdropEffectScope.lens(
     @FloatRange(from = 0.0) refractionHeight: Float,
     @FloatRange(from = 0.0) refractionAmount: Float,
     depthEffect: Boolean = false,
-    chromaticAberration: Boolean = false
+    chromaticAberration: Boolean = false,
+    fastCircleMap: Boolean = false
 ) {
     if (!isRuntimeShaderSupported()) return
     if (refractionHeight <= 0f || refractionAmount <= 0f) return
@@ -50,12 +51,18 @@ fun BackdropEffectScope.lens(
                     )
                 }
             shader.apply {
-                setFloatUniform("size", size.width, size.height)
+                val w = size.width
+                val h = size.height
+                // A/B legacy: per-pixel `halfSize = size * 0.5` in-shader
+                // setFloatUniform("size", w, h)
+                setFloatUniform("halfSize", w * 0.5f, h * 0.5f)
+                setFloatUniform("minHalf", minOf(w, h) * 0.5f)
                 setFloatUniform("offset", -padding, -padding)
                 setFloatUniform("cornerRadii", cornerRadii)
                 setFloatUniform("refractionHeight", refractionHeight)
                 setFloatUniform("refractionAmount", -refractionAmount)
                 setFloatUniform("depthEffect", if (depthEffect) 1f else 0f)
+                setIntUniform("circleMapMode", if (fastCircleMap) 1 else 0)
                 if (chromaticAberration) {
                     setFloatUniform("chromaticAberration", 1f)
                 }

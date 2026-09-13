@@ -226,7 +226,7 @@ fun PlayerThemeScreen(
         SectionTitle(stringResource(R.string.player_background_style))
         PresetRow {
             PlayerBackgroundStyle.entries.filter {
-                it != PlayerBackgroundStyle.BLUR || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                (it != PlayerBackgroundStyle.BLUR && it != PlayerBackgroundStyle.GLASS) || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
             }.forEach { style ->
                 val disabledByV17 = v17Active && style == PlayerBackgroundStyle.APPLE_MUSIC
                 PresetCard(
@@ -608,6 +608,7 @@ private fun backgroundLabel(style: PlayerBackgroundStyle) = when (style) {
     PlayerBackgroundStyle.BITCHORD_MESH -> stringResource(R.string.player_theme_colour_mesh)
     PlayerBackgroundStyle.STATIC -> stringResource(R.string.player_theme_static)
     PlayerBackgroundStyle.CUSTOM_GRADIENT -> stringResource(R.string.player_theme_custom_gradient)
+    PlayerBackgroundStyle.GLASS -> stringResource(R.string.player_background_liquid_glass)
 }
 
 @Composable

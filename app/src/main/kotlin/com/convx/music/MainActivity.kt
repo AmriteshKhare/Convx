@@ -160,6 +160,7 @@ import com.convx.music.ui.utils.markMorphDirection
 import com.convx.music.ui.utils.morphArtworkId
 import com.convx.music.ui.utils.isMorphRoute
 import com.convx.music.ui.component.prewarmHeroTint
+import com.convx.music.ui.player.prewarmMeshPalette
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import com.airbnb.lottie.compose.LottieAnimation
@@ -294,8 +295,11 @@ import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.screens.settings.NavigationTab
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.BrandName
+import androidx.compose.ui.graphics.isSpecified
 import com.convx.music.ui.theme.DefaultThemeColor
+import com.convx.music.ui.theme.GlassTintTokens
 import com.convx.music.ui.theme.LocalAccentTextColor
+import com.convx.music.ui.theme.isHueless
 import com.convx.music.ui.theme.rememberBrandFontFamily
 import com.convx.music.ui.theme.vivimusicTheme
 import com.convx.music.ui.utils.appBarScrollBehavior
@@ -717,6 +721,7 @@ class MainActivity : ComponentActivity() {
                         // composes -- that is what makes the colour already be there as the
                         // screen finishes growing instead of washing in a beat later.
                         prewarmHeroTint(this@MainActivity, thumbnailUrl)
+                        prewarmMeshPalette(this@MainActivity, thumbnailUrl)
                     }
                     navController.addOnDestinationChangedListener(listener)
                     onDispose { navController.removeOnDestinationChangedListener(listener) }
@@ -754,10 +759,10 @@ class MainActivity : ComponentActivity() {
                 }
                 val floatingNavBarScrollConnection = rememberFloatingTabBarScrollConnection()
                 val (liquidGlassGlobalEnabled) = rememberPreference(LiquidGlassGlobalEnabledKey, defaultValue = true)
-                val (liquidGlassVibrancy) = rememberPreference(LiquidGlassVibrancyKey, defaultValue = 1.2f)
-                val (liquidGlassBlurRadius) = rememberPreference(LiquidGlassBlurRadiusKey, defaultValue = 2f)
-                val (liquidGlassLensHeight) = rememberPreference(LiquidGlassLensHeightKey, defaultValue = 0.4f)
-                val (liquidGlassLensAmount) = rememberPreference(LiquidGlassLensAmountKey, defaultValue = 0.6f)
+                val (liquidGlassVibrancy) = rememberPreference(LiquidGlassVibrancyKey, defaultValue = 2.0f)
+                val (liquidGlassBlurRadius) = rememberPreference(LiquidGlassBlurRadiusKey, defaultValue = 3f)
+                val (liquidGlassLensHeight) = rememberPreference(LiquidGlassLensHeightKey, defaultValue = 0.60f)
+                val (liquidGlassLensAmount) = rememberPreference(LiquidGlassLensAmountKey, defaultValue = 0.69f)
                 val (liquidGlassChromaticAberration) = rememberPreference(LiquidGlassChromaticAberrationKey, defaultValue = false)
                 val (liquidGlassDepthEffect) = rememberPreference(LiquidGlassDepthEffectKey, defaultValue = false)
                 // 0 (fully transparent, unreachable from the color picker) marks the
@@ -772,7 +777,7 @@ class MainActivity : ComponentActivity() {
                 val (liquidGlassPuckColorInt) = rememberPreference(LiquidGlassPuckColorKey, defaultValue = 0)
                 val (liquidGlassPuckOpacity) = rememberPreference(LiquidGlassPuckOpacityKey, defaultValue = 0.8f)
                 val (liquidGlassHighlightColorInt) = rememberPreference(LiquidGlassHighlightColorKey, defaultValue = 0)
-                val (liquidGlassHighlightOpacity) = rememberPreference(LiquidGlassHighlightOpacityKey, defaultValue = 0.55f)
+                val (liquidGlassHighlightOpacity) = rememberPreference(LiquidGlassHighlightOpacityKey, defaultValue = 0.33f)
                 // 0 (fully transparent, unreachable from the color picker) marks the
                 // theme-adaptive default, same convention as the surface tint above.
                 // A hardcoded white default left the mini player and nav bar text
@@ -801,10 +806,39 @@ class MainActivity : ComponentActivity() {
                 // the surface behind it blended with the chosen tint at its opacity â€”
                 // rather than from the theme alone. Keeps chrome legible for any
                 // tint/opacity/theme combination instead of only the untinted ones.
+                // Per-theme glass defaults (spec Q1-Q4): a 0 sentinel means
+                // "untouched" and resolves to the dark/light spec set, so
+                // switching theme flips the glass automatically. Picking a
+                // custom color unlocks the manual opacity sliders instead.
                 val resolvedGlassTint = if (liquidGlassSurfaceTintColorInt == 0) {
-                    Color.Unspecified
+                    if (useDarkTheme) GlassTintTokens.DefaultSurfaceDark else GlassTintTokens.DefaultSurfaceLight
                 } else {
                     Color(liquidGlassSurfaceTintColorInt)
+                }
+                val resolvedGlassOpacity = if (liquidGlassSurfaceTintColorInt == 0) {
+                    if (useDarkTheme) GlassTintTokens.DefaultSurfaceOpacityDark else GlassTintTokens.DefaultSurfaceOpacityLight
+                } else {
+                    liquidGlassSurfaceOpacity
+                }
+                val resolvedPuckTint = if (liquidGlassPuckColorInt == 0) {
+                    if (useDarkTheme) GlassTintTokens.DefaultPuckDark else GlassTintTokens.DefaultPuckLight
+                } else {
+                    Color(liquidGlassPuckColorInt)
+                }
+                val resolvedPuckOpacity = if (liquidGlassPuckColorInt == 0) {
+                    if (useDarkTheme) GlassTintTokens.DefaultPuckOpacityDark else GlassTintTokens.DefaultPuckOpacityLight
+                } else {
+                    liquidGlassPuckOpacity
+                }
+                val resolvedHighlightTint = if (liquidGlassHighlightColorInt == 0) {
+                    if (useDarkTheme) GlassTintTokens.DefaultHighlightDark else GlassTintTokens.DefaultHighlightLight
+                } else {
+                    Color(liquidGlassHighlightColorInt)
+                }
+                val resolvedHighlightOpacity = if (liquidGlassHighlightColorInt == 0) {
+                    if (useDarkTheme) GlassTintTokens.DefaultHighlightOpacityDark else GlassTintTokens.DefaultHighlightOpacityLight
+                } else {
+                    liquidGlassHighlightOpacity
                 }
                 val resolvedSidePanelTint = if (liquidGlassSidePanelColorInt == 0) {
                     Color.Unspecified
@@ -813,7 +847,7 @@ class MainActivity : ComponentActivity() {
                 }
                 val glassSurfaceBehind = AppTheme.colorScheme.surface
                 val adaptiveGlassTextColor = if (liquidGlassAdaptiveContrast) {
-                    glassContentColorFor(glassSurfaceBehind, resolvedGlassTint, liquidGlassSurfaceOpacity)
+                    glassContentColorFor(glassSurfaceBehind, resolvedGlassTint, resolvedGlassOpacity)
                 } else {
                     themeGlassTextColor
                 }
@@ -838,7 +872,7 @@ class MainActivity : ComponentActivity() {
                     liquidGlassSidePanelVibrancy, liquidGlassSidePanelBlurRadius,
                     liquidGlassSidePanelLensHeight, liquidGlassSidePanelLensAmount,
                     liquidGlassSidePanelColorInt, liquidGlassSidePanelSurfaceOpacity, liquidGlassSidePanelTextColorInt,
-                    adaptiveGlassTextColor, adaptiveSidePanelTextColor,
+                    adaptiveGlassTextColor, adaptiveSidePanelTextColor, useDarkTheme,
                 ) {
                     // The sliders in Glass settings are always the source of truth: the
                     // Apple Music UI toggle just writes a starting preset into them once
@@ -853,17 +887,13 @@ class MainActivity : ComponentActivity() {
                         lensAmount = liquidGlassLensAmount,
                         chromaticAberration = liquidGlassChromaticAberration,
                         depthEffect = liquidGlassDepthEffect,
-                        surfaceTintColor = if (liquidGlassSurfaceTintColorInt == 0) {
-                            Color.Unspecified
-                        } else {
-                            Color(liquidGlassSurfaceTintColorInt)
-                        },
-                        surfaceOpacity = liquidGlassSurfaceOpacity,
-                        highlightColor = if (liquidGlassHighlightColorInt == 0) Color.Unspecified else Color(liquidGlassHighlightColorInt),
-                        highlightOpacity = liquidGlassHighlightOpacity,
+                        surfaceTintColor = resolvedGlassTint,
+                        surfaceOpacity = resolvedGlassOpacity,
+                        highlightColor = resolvedHighlightTint,
+                        highlightOpacity = resolvedHighlightOpacity,
                         style = liquidGlassStyle,
-                        puckColor = if (liquidGlassPuckColorInt == 0) Color.Unspecified else Color(liquidGlassPuckColorInt),
-                        puckOpacity = liquidGlassPuckOpacity,
+                        puckColor = resolvedPuckTint,
+                        puckOpacity = resolvedPuckOpacity,
                         textColor = if (liquidGlassTextColorInt == 0) adaptiveGlassTextColor else Color(liquidGlassTextColorInt),
                         miniPlayerEnabled = liquidGlassMiniPlayerEnabled,
                         navBarEnabled = liquidGlassNavBarEnabled,
@@ -1604,6 +1634,14 @@ class MainActivity : ComponentActivity() {
                                             ),
                                         )
                                         val isHome = effectiveRoute == Screens.Home.route
+                                        // Titles/wordmark stay neutral per theme; only hero-tinted
+                                        // screens keep the artwork-derived accent text.
+                                        val topBarAmbient = LocalAmbientBackgroundColor.current.value
+                                        val topBarTitleColor = if (topBarAmbient.isSpecified && !topBarAmbient.isHueless()) {
+                                            LocalAccentTextColor.current
+                                        } else {
+                                            AppTheme.colorScheme.onSurface
+                                        }
                                         FrostedTopBar(
                                             leading = {
                                                 if (isHome) {
@@ -1619,7 +1657,7 @@ class MainActivity : ComponentActivity() {
                                                             fontSize = 26.sp,
                                                             letterSpacing = 1.5.sp,
                                                         ),
-                                                        color = LocalAccentTextColor.current,
+                                                        color = topBarTitleColor,
                                                         modifier = Modifier.graphicsLayer { alpha = logoProgress },
                                                     )
                                                 } else {
@@ -1629,7 +1667,7 @@ class MainActivity : ComponentActivity() {
                                                             fontWeight = FontWeight.Bold,
                                                             fontSize = 24.sp,
                                                         ),
-                                                        color = LocalAccentTextColor.current,
+                                                        color = topBarTitleColor,
                                                     )
                                                 }
                                             },
@@ -1643,7 +1681,7 @@ class MainActivity : ComponentActivity() {
                                                 // this gets the same liquid-glass rim + elastic
                                                 // press stretch as every other floating chrome
                                                 // button (back/share on detail screens).
-                                                GlassCircleButton(onClick = {
+                                                GlassCircleButton(applyAdditiveChrome = false, onClick = {
                                                       if (enableSettingsPopup) {
                                                           showSettingDialoge = true
                                                       } else {
@@ -2344,10 +2382,21 @@ class MainActivity : ComponentActivity() {
         intent.data = null
         intent.removeExtra(Intent.EXTRA_TEXT)
         val coroutineScope = lifecycle.coroutineScope
+        // Allowlist: YouTube-style ids only, no slashes/routes injection.
+        fun cleanId(raw: String?, min: Int = 4, max: Int = 64): String? {
+            if (raw.isNullOrBlank()) return null
+            val v = raw.trim()
+            if (v.length !in min..max) return null
+            if (v.contains("/") || v.contains("?") || v.contains("#") || v.contains(" ")) return null
+            if (!v.matches(Regex("^[A-Za-z0-9_\\-]+\$"))) return null
+            return v
+        }
 
-        val listenCode = uri.getQueryParameter("code")
+        val listenCode = cleanId(
+            uri.getQueryParameter("code")
             ?: uri.getQueryParameter("room")
-            ?: uri.pathSegments.getOrNull(1)
+            ?: uri.pathSegments.getOrNull(1), min = 4, max = 16
+        )
         val isListenLink = uri.pathSegments.firstOrNull() == "listen" || uri.host?.equals("listen", ignoreCase = true) == true
         if (!listenCode.isNullOrBlank() && isListenLink) {
             val username = dataStore.get(ListenTogetherUsernameKey, "").ifBlank { "Guest" }
@@ -2356,11 +2405,11 @@ class MainActivity : ComponentActivity() {
         }
 
         when (val path = uri.pathSegments.firstOrNull()) {
-            "playlist" -> uri.getQueryParameter("list")?.let { playlistId ->
+            "playlist" -> cleanId(uri.getQueryParameter("list"), max = 128)?.let { playlistId ->
                 if (playlistId.startsWith("OLAK5uy_")) {
                     coroutineScope.launch(Dispatchers.IO) {
                         YouTube.albumSongs(playlistId).onSuccess { songs ->
-                            songs.firstOrNull()?.album?.id?.let { browseId ->
+                            cleanId(songs.firstOrNull()?.album?.id)?.let { browseId ->
                                 withContext(Dispatchers.Main) {
                                     navController.navigate("album/$browseId") { launchSingleTop = true }
                                 }
@@ -2372,28 +2421,30 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            "browse" -> uri.lastPathSegment?.let { browseId ->
+            "browse" -> cleanId(uri.lastPathSegment)?.let { browseId ->
                 navController.navigate("album/$browseId") { launchSingleTop = true }
             }
 
-            "channel", "c" -> uri.lastPathSegment?.let { artistId ->
+            "channel", "c" -> cleanId(uri.lastPathSegment)?.let { artistId ->
                 navController.navigate("artist/$artistId") { launchSingleTop = true }
             }
 
             "search" -> {
-                uri.getQueryParameter("q")?.let {
+                uri.getQueryParameter("q")?.takeIf { it.isNotBlank() }?.take(200)?.let {
                     navController.navigate("search/${URLEncoder.encode(it, "UTF-8")}") { launchSingleTop = true }
                 }
             }
 
             else -> {
-                val videoId = when {
-                    path == "watch" -> uri.getQueryParameter("v")
-                    uri.host == "youtu.be" -> uri.pathSegments.firstOrNull()
-                    else -> null
-                }
+                val videoId = cleanId(
+                    when {
+                        path == "watch" -> uri.getQueryParameter("v")
+                        uri.host == "youtu.be" -> uri.pathSegments.firstOrNull()
+                        else -> null
+                    }, min = 6, max = 32
+                )
 
-                val playlistId = uri.getQueryParameter("list")
+                val playlistId = cleanId(uri.getQueryParameter("list"), max = 128)
 
                 if (videoId != null) {
                     coroutineScope.launch(Dispatchers.IO) {

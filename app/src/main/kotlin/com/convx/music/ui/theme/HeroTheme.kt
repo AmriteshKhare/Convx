@@ -17,7 +17,7 @@ import com.convx.music.ui.component.backdrop.Backdrop
 import com.convx.music.utils.rememberPreference
 
 /** saturation floor shared with [AppleTokens.shiftedForContrast] (0.08f). */
-internal fun Color.isHueless(): Boolean {
+fun Color.isHueless(): Boolean {
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(toArgb(), hsl)
     return hsl[1] < 0.08f

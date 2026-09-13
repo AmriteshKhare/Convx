@@ -11,8 +11,10 @@ import androidx.activity.compose.BackHandler
 import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.constants.AppBackgroundColorKey
 import com.convx.music.constants.AppTextColorKey
+import com.convx.music.ui.theme.isHueless
 import com.convx.music.utils.rememberPreference
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -265,47 +267,54 @@ private fun AppFloatingNavBarChrome(
     // glass reads as a glitch rather than a colour change. Motion.appear() rather
     // than the puck's own morph/select curves: a colour isn't travelling anywhere,
     // it's arriving, which is what appear() is for.
-    val rawTabTextColor = if (appTextColorInt != 0) Color(appTextColorInt) else glassConfig.resolvedTextColor()
-    val tabTextColor by animateColorAsState(
-        targetValue = rawTabTextColor,
-        animationSpec = Motion.appear(),
-        label = "navBarTextColor",
-    )
-    val selectedContentColor = Color(0xFFFF3B30).copy(alpha = 0.93f)
-    val unselectedContentColor = tabTextColor.copy(alpha = 0.6f)
-
-    // The rim's own tint: whatever the current screen published as its background/hero
-    // colour, boosted the same way a hero mesh-wash blob is; the same plain default
-    // liquidGlass would otherwise pick (an explicit highlight colour if the user set
-    // one, else white) when the screen on top has no hero of its own -- Home,
-    // Settings, and so on. Both are real colours, never Color.Unspecified, so the
-    // fade between them is a genuine animateColorAsState interpolation rather than a
-    // cut through an undefined sentinel. Animated on its own -- separately from
-    // tabTextColor above -- since a screen with no hero colour crossing to one that
-    // has one is exactly the kind of change that should fade, not cut.
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     val ambientColor = LocalAmbientBackgroundColor.current.value
-    val defaultRimColor = if (glassConfig.highlightColor.isSpecified) glassConfig.highlightColor else Color.White
-    val targetRimColor = if (ambientColor.isSpecified) ambientColor.asRimPop() else defaultRimColor
+    val animatedAmbientColor by animateColorAsState(
+        targetValue = if (ambientColor.isSpecified && !ambientColor.isHueless()) {
+            ambientColor
+        } else {
+            com.convx.music.ui.theme.GlassTintTokens.neutralTintColor(isDark)
+        },
+        animationSpec = androidx.compose.animation.core.tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "navBarAmbientTint",
+    )
+
+    val selectedIconColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = isDark,
+        isSelected = true,
+        isTitle = false,
+    )
+    val selectedLabelColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = isDark,
+        isSelected = true,
+        isTitle = true,
+    )
+    val unselectedIconColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = isDark,
+        activeTint = animatedAmbientColor,
+        isSelected = false,
+        isTitle = false,
+    )
+    val unselectedLabelColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = isDark,
+        activeTint = animatedAmbientColor,
+        isSelected = false,
+        isUnselectedTabLabel = true,
+    )
+
+    val targetRimColor = com.convx.music.ui.theme.GlassTintTokens.pluckColor(isDark, ambientColor, glassConfig.highlightColor)
     val rimTintColor by animateColorAsState(
         targetValue = targetRimColor,
-        animationSpec = Motion.appear(),
+        animationSpec = androidx.compose.animation.core.tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         label = "navBarRimTint",
     )
-    val navHighlightAlpha = if (ambientColor.isSpecified) 0.48f else 0.30f
-    val unselectedIconTint = if (ambientColor.isSpecified) {
-        ambientColor.asSoftIconTint()
-    } else {
-        unselectedContentColor
-    }
+    val navHighlightAlpha = com.convx.music.ui.theme.GlassTintTokens.pluckOpacity(isDark, ambientColor.isSpecified && !ambientColor.isHueless())
 
     val tabBarContentModifier = if (useGlass) {
         Modifier.liquidGlass(
             config = glassConfig,
             shape = NavBarShape,
             highlightAlpha = navHighlightAlpha,
-            // The bar's own surface is the largest of its glass layers, and its
-            // bounds animate across the whole inline/expanded/search transition —
-            // freezing its capture for those frames is most of the win.
             frozen = LocalTabBarBackdropFrozen.current,
             rimTintColor = rimTintColor,
         )
@@ -428,7 +437,7 @@ private fun AppFloatingNavBarChrome(
             // must match exactly — the lens warp offsets this sampled copy slightly
             // from the crisp one, so any color mismatch between them reads as a
             // doubled/ghosted icon, not just a subtle glow.
-            accentColor = selectedContentColor,
+            accentColor = selectedIconColor,
             searchMode = searchModeActive,
             searchBarContent = if (searchModeActive) {
                 { contentModifier ->
@@ -452,11 +461,11 @@ private fun AppFloatingNavBarChrome(
                     title = {
                         Text(
                             text = stringResource(screen.titleId),
-                            color = if (isSelected) selectedContentColor else unselectedIconTint,
+                            color = if (isSelected) selectedLabelColor else unselectedLabelColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 12.sp,
-                            modifier = Modifier.additiveChrome(useGlass && !isSelected && ambientColor.isSpecified),
+                            modifier = Modifier.additiveChrome(useGlass && !isSelected && isDark && ambientColor.isSpecified),
                         )
                     },
                     icon = {
@@ -465,8 +474,8 @@ private fun AppFloatingNavBarChrome(
                                 screen.icon(appleMusicUi)
                             ),
                             contentDescription = stringResource(screen.titleId),
-                            tint = if (isSelected) selectedContentColor else unselectedIconTint,
-                            modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected),
+                            tint = if (isSelected) selectedIconColor else unselectedIconColor,
+                            modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected && isDark),
                         )
                     },
                     onClick = {
@@ -490,7 +499,7 @@ private fun AppFloatingNavBarChrome(
                     title = {
                         Text(
                             text = stringResource(screen.titleId),
-                            color = if (isSelected) selectedContentColor else unselectedIconTint,
+                            color = if (isSelected) selectedLabelColor else unselectedLabelColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             fontSize = 12.sp,
@@ -503,7 +512,7 @@ private fun AppFloatingNavBarChrome(
                                 screen.icon(appleMusicUi)
                             ),
                             contentDescription = stringResource(screen.titleId),
-                            tint = if (isSelected) selectedContentColor else unselectedIconTint,
+                            tint = if (isSelected) selectedIconColor else unselectedIconColor,
                             modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected),
                         )
                     },
@@ -607,6 +616,7 @@ fun NavBarSearchInputBar(
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val ambientColor = LocalAmbientBackgroundColor.current.value
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     // On glass, take the adaptive glass content colour rather than a flat white —
     // the search field is the one piece of chrome the user is actively reading.
     val onTint = when {
@@ -615,11 +625,12 @@ fun NavBarSearchInputBar(
         else -> AppTheme.colorScheme.onSurface
     }
     val searchIconTint = when {
+        !isDark -> com.convx.music.ui.theme.GlassTintTokens.IconOpaqueBlackishLight
         useGlass && ambientColor.isSpecified -> ambientColor.asSoftIconTint()
         else -> onTint
     }
-    val searchRimTint = if (ambientColor.isSpecified) ambientColor.asRimPop() else Color.White
-    val searchHighlightAlpha = if (ambientColor.isSpecified) 0.48f else 0.30f
+    val searchRimTint = com.convx.music.ui.theme.GlassTintTokens.pluckColor(isDark, ambientColor)
+    val searchHighlightAlpha = com.convx.music.ui.theme.GlassTintTokens.pluckOpacity(isDark, ambientColor.isSpecified && !ambientColor.isHueless())
     val pillShape = ContinuousRoundedRectangle(percent = 50)
     val coroutineScope = rememberCoroutineScope()
     // Finger-tracking glow, same as the nav bar puck's InteractiveHighlight: a
@@ -679,7 +690,7 @@ fun NavBarSearchInputBar(
                 painter = painterResource(R.drawable.arrow_back),
                 contentDescription = stringResource(R.string.dismiss),
                 tint = searchIconTint,
-                modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
+                modifier = Modifier.fillMaxSize().additiveChrome(useGlass && isDark),
             )
         }
         Box(modifier = Modifier.weight(1f)) {

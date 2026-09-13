@@ -49,7 +49,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
+import com.convx.music.LocalAmbientBackgroundColor
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -77,6 +80,31 @@ fun <T> ChipsRow(
     labelColor: Color = Color.Unspecified,
     selectedLabelColor: Color = Color.Unspecified,
 ) {
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val ambientColor = LocalAmbientBackgroundColor.current.value
+    val defaultContainerColor = com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark).copy(
+        alpha = if (isDark) com.convx.music.ui.theme.GlassTintTokens.NavPillFillOpacityDark else com.convx.music.ui.theme.GlassTintTokens.NavPillFillOpacityLight
+    )
+    val defaultSelectedContainerColor = com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark).copy(
+        alpha = if (isDark) com.convx.music.ui.theme.GlassTintTokens.PillSelectedFillOpacityDark else com.convx.music.ui.theme.GlassTintTokens.PillSelectedFillOpacityLight
+    )
+    val defaultLabelColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = isDark,
+        activeTint = ambientColor,
+        isSelected = false,
+    )
+    val defaultSelectedLabelColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = isDark,
+        activeTint = ambientColor,
+        isSelected = false, // Ambient tint for applied filter chip
+    )
+    val pillBorder = androidx.compose.foundation.BorderStroke(1.dp, com.convx.music.ui.theme.GlassTintTokens.borderColor(isDark))
+
+    val effectiveContainerColor = if (containerColor != AppTheme.colorScheme.surfaceContainer) containerColor else defaultContainerColor
+    val effectiveSelectedContainerColor = if (selectedContainerColor != AppTheme.colorScheme.secondaryContainer) selectedContainerColor else defaultSelectedContainerColor
+    val effectiveLabelColor = if (labelColor.isSpecified) labelColor else defaultLabelColor
+    val effectiveSelectedLabelColor = if (selectedLabelColor.isSpecified) selectedLabelColor else defaultSelectedLabelColor
+
     Row(
         modifier =
         modifier
@@ -104,10 +132,10 @@ fun <T> ChipsRow(
                 label = { Text(label) },
                 selected = isSelected,
                 colors = FilterChipDefaults.filterChipColors(
-                    containerColor = containerColor,
-                    selectedContainerColor = selectedContainerColor,
-                    labelColor = labelColor,
-                    selectedLabelColor = selectedLabelColor,
+                    containerColor = effectiveContainerColor,
+                    selectedContainerColor = effectiveSelectedContainerColor,
+                    labelColor = effectiveLabelColor,
+                    selectedLabelColor = effectiveSelectedLabelColor,
                 ),
                 onClick = { onValueUpdate(value) },
                 leadingIcon = if (isSelected) {
@@ -115,7 +143,7 @@ fun <T> ChipsRow(
                         Icon(
                             imageVector = Icons.Filled.Done,
                             contentDescription = null,
-                            tint = selectedLabelColor,
+                            tint = effectiveSelectedLabelColor,
                             modifier = Modifier.size(FilterChipDefaults.IconSize),
                         )
                     }
@@ -123,7 +151,7 @@ fun <T> ChipsRow(
                     null
                 },
                 shape = RoundedCornerShape(cornerRadius),
-                border = null,
+                border = pillBorder,
                 modifier = Modifier.animateContentSize(
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,

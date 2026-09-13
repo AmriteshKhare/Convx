@@ -5,52 +5,16 @@
 
 package com.convx.music.ui.screens.playlist
 
-import com.convx.music.ui.utils.FloatingChromeSpacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import com.convx.music.ui.ios.compat.Checkbox
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.ios.compat.IconButton
-import com.convx.music.ui.ios.compat.LocalContentColor
-import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.ios.compat.ripple
-import com.convx.music.ui.ios.compat.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import com.convx.music.ui.ios.compat.Surface
-import com.convx.music.ui.ios.compat.Text
-import androidx.compose.foundation.shape.CircleShape
-import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
-import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFArrowDownCircle
-import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
-import com.composables.sfsymbols.monochrome.SFECircle
-import com.composables.sfsymbols.monochrome.SFEllipsis
-import com.composables.sfsymbols.monochrome.SFHeart
-import com.composables.sfsymbols.monochrome.SFHeartFill
-import com.composables.sfsymbols.monochrome.SFMagnifyingglass
-import com.composables.sfsymbols.monochrome.SFShuffle
-import com.composables.sfsymbols.monochrome.SFWifiSlash
-import com.composables.sfsymbols.monochrome.SFXmark
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.activity.compose.BackHandler
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import com.convx.music.ui.utils.bounceClick
-import com.convx.music.ui.utils.combinedBounceClick
-import com.convx.music.ui.utils.onlinePlaylistRoute
-
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,7 +25,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -77,27 +40,37 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -114,103 +87,110 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEachReversed
-import androidx.media3.exoplayer.offline.Download
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import com.music.innertube.models.PlaylistItem
-import com.music.innertube.models.SongItem
-import com.music.innertube.models.ArtistItem
-import com.music.innertube.models.AlbumItem
-import com.music.innertube.models.WatchEndpoint
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.monochrome.SFArrowDownCircle
+import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
+import com.composables.sfsymbols.monochrome.SFECircle
+import com.composables.sfsymbols.monochrome.SFEllipsis
+import com.composables.sfsymbols.monochrome.SFHeart
+import com.composables.sfsymbols.monochrome.SFHeartFill
+import com.composables.sfsymbols.monochrome.SFMagnifyingglass
+import com.composables.sfsymbols.monochrome.SFShuffle
+import com.composables.sfsymbols.monochrome.SFWifiSlash
+import com.composables.sfsymbols.monochrome.SFXmark
+import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.LocalDatabase
 import com.convx.music.LocalDownloadUtil
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
+import com.convx.music.LocalTabView
 import com.convx.music.R
 import com.convx.music.constants.HideExplicitKey
 import com.convx.music.db.entities.Playlist
 import com.convx.music.db.entities.PlaylistEntity
 import com.convx.music.db.entities.PlaylistSongMap
 import com.convx.music.models.toMediaMetadata
+import com.convx.music.playback.DownloadTarget
+import com.convx.music.playback.cancelDownloads
+import com.convx.music.playback.downloadSongs
 import com.convx.music.playback.queues.YouTubePlaylistQueue
+import com.convx.music.playback.queues.YouTubeQueue
+import com.convx.music.playback.removeDownloads
+import com.convx.music.ui.component.AlbumStyleHeroImage
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
+import com.convx.music.ui.component.ChromeScrim
 import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
-import com.convx.music.ui.component.ChromeScrim
-import com.convx.music.ui.component.rememberChromeScrimProgress
-import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.GlassComponent
+import com.convx.music.ui.component.HeroCardHeader
+import com.convx.music.ui.component.HeroTopBlur
+import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalGlassEffectConfig
-import com.convx.music.ui.component.resolvedTextColor
-import com.convx.music.ui.component.withFixedStyle
-import com.convx.music.ui.component.backdrop.backdrops.LayerBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
-import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.NavigationTitle
 import com.convx.music.ui.component.YouTubeGridItem
 import com.convx.music.ui.component.YouTubeListItem
-import com.convx.music.ui.component.isGlassAllowed
-import androidx.compose.ui.graphics.isSpecified
-import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.ui.component.asSoftIconTint
-import com.convx.music.ui.utils.additiveChrome
+import com.convx.music.ui.component.backdrop.backdrops.LayerBackdrop
+import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
+import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
+import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.liquidGlass
-import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
-import com.convx.music.ui.component.HeroBackground
-import com.convx.music.ui.component.HeroCardHeader
+import com.convx.music.ui.component.rememberChromeScrimProgress
 import com.convx.music.ui.component.rememberHeroSource
-import com.convx.music.ui.component.AlbumStyleHeroImage
-import com.convx.music.ui.component.HeroTopBlur
 import com.convx.music.ui.component.rememberHeroTopBlur
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
-import com.convx.music.LocalTabView
-import com.convx.music.ui.utils.rememberHeroZoom
-import com.convx.music.ui.utils.heroPullZoom
-import com.convx.music.ui.utils.listOverscroll
-import com.convx.music.ui.component.rememberHeroTint
-import com.convx.music.ui.player.MeshGradientBackground
-import com.convx.music.ui.player.dimmed
-import com.convx.music.ui.player.rememberArtworkMeshPalette
-import com.convx.music.ui.theme.AppleTokens
-import com.convx.music.ui.theme.HeroTintedContent
-import com.convx.music.ui.theme.rememberArtworkTint
+import com.convx.music.ui.component.resolvedTextColor
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.component.withFixedStyle
+import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Checkbox
+import com.convx.music.ui.ios.compat.CircularProgressIndicator
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.compat.SnackbarHost
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.ripple
 import com.convx.music.ui.menu.YouTubeAlbumMenu
 import com.convx.music.ui.menu.YouTubeArtistMenu
 import com.convx.music.ui.menu.YouTubePlaylistMenu
 import com.convx.music.ui.menu.YouTubeSelectionSongMenu
 import com.convx.music.ui.menu.YouTubeSongMenu
+import com.convx.music.ui.player.MeshGradientBackground
+import com.convx.music.ui.player.dimmed
+import com.convx.music.ui.player.rememberArtworkMeshPalette
+import com.convx.music.ui.theme.HeroTintedContent
+import com.convx.music.ui.theme.rememberArtworkTint
+import com.convx.music.ui.utils.FloatingChromeSpacer
+import com.convx.music.ui.utils.additiveChrome
+import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
+import com.convx.music.ui.utils.bounceClick
+import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.heroPullZoom
+import com.convx.music.ui.utils.listOverscroll
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
+import com.convx.music.ui.utils.onlinePlaylistRoute
+import com.convx.music.ui.utils.rememberHeroZoom
 import com.convx.music.utils.listItemShape
-import com.convx.music.utils.makeTimeString
 import com.convx.music.utils.rememberPreference
 import com.convx.music.viewmodels.OnlinePlaylistViewModel
+import com.music.innertube.models.AlbumItem
+import com.music.innertube.models.ArtistItem
+import com.music.innertube.models.PlaylistItem
+import com.music.innertube.models.SongItem
+import com.music.innertube.models.WatchEndpoint
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-
-import com.convx.music.ui.ios.compat.CircularProgressIndicator
-import com.convx.music.playback.queues.YouTubeQueue
-import com.convx.music.ui.component.OnlineBlur
-import com.convx.music.constants.AppBarHeight
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.systemBars
-import com.convx.music.ui.ios.compat.CircularProgressIndicator
-import com.convx.music.playback.DownloadTarget
-import com.convx.music.playback.cancelDownloads
-import com.convx.music.playback.downloadSongs
-import com.convx.music.playback.removeDownloads
+import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -347,15 +327,24 @@ fun OnlinePlaylistScreen(
     // flat empty-capture fallback.
     val heroZoom = rememberHeroZoom()
 
+    // Instant seed: route thumbnail arg (every caller passes it) -> live tile
+    // thumb -> seeded playlist. Paints hero + mesh bg on frame one.
+    val instantPlaylistThumb = com.convx.music.ui.component.detailSeed(
+        viewModel.routeThumb,
+        com.convx.music.ui.utils.pendingSharedArtworkThumbFor(playlist?.id),
+        playlist?.thumbnail,
+    )
+    val onlineChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 3)
+
     val heroSource = rememberHeroSource (
-        staticArt = playlist?.thumbnail,
+        staticArt = instantPlaylistThumb ?: playlist?.thumbnail,
         songs = songs.map { it.thumbnail to false },
     )
     // Same mesh backdrop as ArtistScreen/the player's BITCHORD_MESH style, not the
     // flat single-swatch fill rememberHeroPalette used to paint here -- this screen
     // is reached straight off the artist page and read visibly flatter than the
     // player over the same artwork.
-    val meshPalette = rememberArtworkMeshPalette(playlist?.thumbnail)
+    val meshPalette = rememberArtworkMeshPalette(instantPlaylistThumb ?: playlist?.thumbnail)
     val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
     // Same flat white every icon/text reads in the player on a mesh background,
@@ -392,7 +381,7 @@ fun OnlinePlaylistScreen(
     ) {
       MeshGradientBackground(
           palette = meshPalette,
-          trackKey = playlist?.thumbnail,
+          trackKey = instantPlaylistThumb ?: playlist?.thumbnail,
           modifier = Modifier.matchParentSize(),
       )
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -436,16 +425,45 @@ fun OnlinePlaylistScreen(
                 .asPaddingValues(),
         ) {
             if (playlist == null || songs.isEmpty()) {
-                if (isLoading) {
-                    item(key = "loading_placeholder") {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
+                // Loading mirrors loaded: seeded hero + meta skeleton on the
+                // seeded bg, so arrival swaps content, never layout. No spinner.
+                item(key = "shimmer_header", contentType = "header") {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (instantPlaylistThumb != null) {
+                            com.convx.music.ui.component.SeededShimmerHero(
+                                thumbUrl = instantPlaylistThumb,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
+                        Spacer(Modifier.height(16.dp))
+                        com.convx.music.ui.component.ShimmerLine(fraction = 0.55f, height = 24.dp)
+                        Spacer(Modifier.height(24.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            com.convx.music.ui.component.ShimmerBox(
+                                Modifier.size(48.dp),
+                                androidx.compose.foundation.shape.CircleShape
+                            )
+                            com.convx.music.ui.component.ShimmerBox(
+                                Modifier.size(72.dp),
+                                androidx.compose.foundation.shape.CircleShape
+                            )
+                            com.convx.music.ui.component.ShimmerBox(
+                                Modifier.size(48.dp),
+                                androidx.compose.foundation.shape.CircleShape
+                            )
+                        }
+                        Spacer(Modifier.height(24.dp))
+                    }
+                }
+                items(8) { index ->
+                    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                        com.convx.music.ui.component.SongRowSkeleton(index = index)
                     }
                 }
             } else {
@@ -575,8 +593,8 @@ fun OnlinePlaylistScreen(
                                                 onClick = {
                                                     when (item) {
                                                         is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
-                                                        is AlbumItem -> navController.navigate("album/${item.browseId}")
-                                                        is ArtistItem -> navController.navigate("artist/${item.id}")
+                                                        is AlbumItem -> navController.navigate(albumRoute(item.browseId, item.thumbnail))
+                                                        is ArtistItem -> navController.navigate(artistRoute(item.id, item.thumbnail))
                                                         is SongItem -> playerConnection.playQueue(
                                                             YouTubeQueue(WatchEndpoint(videoId = item.id))
                                                         )
@@ -676,14 +694,12 @@ fun OnlinePlaylistScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                Row(
+                com.convx.music.ui.component.GlassPillRow(
                     modifier = Modifier
                         .height(48.dp)
                         .clip(chromeShape)
-                        .then(chromeBackgroundModifier)
+                        .then(com.convx.music.ui.component.pillGlassBackground(chromeShape))
                         .padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Checkbox(
                         checked = selection.size == filteredSongs.size && selection.isNotEmpty(),
@@ -769,6 +785,9 @@ fun OnlinePlaylistScreen(
                 GlassCircleButton(
                     onClick = { navController.navigateUp() },
                     onLongClick = { navController.backToMain() },
+                    modifier = with(onlineChrome) {
+                        Modifier.backEnter().then(com.convx.music.ui.component.backExitModifier())
+                    },
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.arrow_back_ios),
@@ -798,14 +817,13 @@ fun OnlinePlaylistScreen(
 
                 val ambientColor = LocalAmbientBackgroundColor.current.value
                 val pillIconTint = if (useGlass && ambientColor.isSpecified) ambientColor.asSoftIconTint() else chromeContentColor
-                Row(
-                    modifier = Modifier
+                com.convx.music.ui.component.GlassPillRow(
+                    modifier = with(onlineChrome) { Modifier.containerEnter() }
                         .height(48.dp)
                         .clip(chromeShape)
-                        .then(chromeBackgroundModifier)
+                        .then(com.convx.music.ui.component.pillGlassBackground(chromeShape))
                         .padding(horizontal = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     IconButton(
                         onClick = { isSearching = true },
@@ -814,9 +832,11 @@ fun OnlinePlaylistScreen(
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                             contentDescription = stringResource(R.string.search),
-                            modifier = Modifier
-                                .size(20.dp)
-                                .additiveChrome(useGlass && ambientColor.isSpecified),
+                            modifier = with(onlineChrome) {
+                                Modifier.iconEnter(0)
+                                    .size(20.dp)
+                                    .additiveChrome(useGlass && ambientColor.isSpecified)
+                            },
                             tint = pillIconTint
                         )
                     }
@@ -837,9 +857,11 @@ fun OnlinePlaylistScreen(
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                             contentDescription = stringResource(R.string.share),
-                            modifier = Modifier
-                                .size(20.dp)
-                                .additiveChrome(useGlass && ambientColor.isSpecified),
+                            modifier = with(onlineChrome) {
+                                Modifier.iconEnter(1)
+                                    .size(20.dp)
+                                    .additiveChrome(useGlass && ambientColor.isSpecified)
+                            },
                             tint = pillIconTint
                         )
                     }
@@ -862,9 +884,11 @@ fun OnlinePlaylistScreen(
                         Icon(
                             imageVector = SfSymbols.Monochrome.SFEllipsis,
                             contentDescription = stringResource(R.string.more_options),
-                            modifier = Modifier
-                                .size(20.dp)
-                                .additiveChrome(useGlass && ambientColor.isSpecified),
+                            modifier = with(onlineChrome) {
+                                Modifier.iconEnter(2)
+                                    .size(20.dp)
+                                    .additiveChrome(useGlass && ambientColor.isSpecified)
+                            },
                             tint = pillIconTint
                         )
                     }

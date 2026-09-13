@@ -41,6 +41,7 @@ import coil3.toBitmap
 import com.convx.music.constants.ReduceDynamicBlurKey
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.abs
@@ -60,6 +61,29 @@ private val FallbackColors = listOf(
 )
 
 private val meshPaletteCache = android.util.LruCache<String, List<Color>>(64)
+private val meshPrewarmScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+
+/**
+ * Starts extracting [url]'s mesh palette now, off composition.
+ * Called alongside prewarmHeroTint as navigation begins, so bg paints frame one.
+ */
+fun prewarmMeshPalette(context: android.content.Context, url: String?) {
+    if (url.isNullOrEmpty() || meshPaletteCache.get(url) != null) return
+    val appContext = context.applicationContext
+    meshPrewarmScope.launch {
+        try {
+            val request = ImageRequest.Builder(appContext)
+                .data(url)
+                .size(128)
+                .allowHardware(false)
+                .build()
+            val result = SingletonImageLoader.get(appContext).execute(request)
+            val bitmap = (result as? SuccessResult)?.image?.toBitmap() ?: return@launch
+            val extracted = withContext(Dispatchers.Default) { paletteOf(bitmap) }
+            meshPaletteCache.put(url, extracted)
+        } catch (_: Exception) { }
+    }
+}
 
 /** The four mesh colours, wrapped so the backdrop can skip recomposition. */
 @Immutable

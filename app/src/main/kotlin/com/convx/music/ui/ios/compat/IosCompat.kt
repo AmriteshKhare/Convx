@@ -83,10 +83,6 @@ import com.convx.music.ui.ios.foundation.LocalIosTextStyle
  * hand-drawn is what compose-hig has no counterpart for.
  */
 
-// --------------------------------------------------------------------------------
-// Text
-// --------------------------------------------------------------------------------
-
 /** The style a bare [Text] inherits — the compat stand-in for M3's LocalTextStyle. */
 val LocalTextStyle = LocalIosTextStyle
 
@@ -205,10 +201,6 @@ fun ProvideTextStyle(value: TextStyle, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalTextStyle provides value, content = content)
 }
 
-// --------------------------------------------------------------------------------
-// Icon
-// --------------------------------------------------------------------------------
-
 @Composable
 fun Icon(
     painter: Painter,
@@ -244,10 +236,6 @@ fun Icon(
     modifier,
     tint,
 )
-
-// --------------------------------------------------------------------------------
-// Progress
-// --------------------------------------------------------------------------------
 
 /**
  * iOS's spinner: twelve tapering spokes, not a Material arc. Cupertino's, which steps
@@ -353,10 +341,6 @@ fun LinearProgressIndicator(
     }
 }
 
-// --------------------------------------------------------------------------------
-// Dividers
-// --------------------------------------------------------------------------------
-
 @Composable
 fun HorizontalDivider(
     modifier: Modifier = Modifier,
@@ -378,10 +362,6 @@ fun VerticalDivider(
     thickness = thickness,
     color = if (color.isSpecified) color else IosTheme.colors.separator,
 )
-
-// --------------------------------------------------------------------------------
-// Buttons
-// --------------------------------------------------------------------------------
 
 /**
  * M3's IconButton, drawn iOS-style: no ripple, no 48dp Material touch circle drawn in

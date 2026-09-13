@@ -676,7 +676,6 @@ object YTPlayerUtils {
             if (saavnEnabled) {
                 Timber.tag(TAG).d("JioSaavn streaming enabled — trying Saavn for videoId=$videoId")
                 val saavnResult = runCatching {
-                    // Step 1: fetch YouTube Music next items and player metadata concurrently
                     val (currentSong, meta) = coroutineScope {
                         val nextDeferred = async {
                             val nextResult = YouTube.next(WatchEndpoint(videoId = videoId)).getOrNull()
@@ -784,7 +783,7 @@ object YTPlayerUtils {
 
                     Timber.tag(TAG).i("Saavn: matched \"${bestSong.title}\" (id=${bestSong.id}, album=\"${bestSong.moreInfo.album}\")")
 
-                    // Step 4: resolve the stream. The API has no "give me this
+                    // The API has no "give me this
                     // bitrate" parameter — it hands back whatever rendition the
                     // CDN actually has for the track (upgraded to 320 only when
                     // the catalogue says one exists, see SaavnService.bestStream).

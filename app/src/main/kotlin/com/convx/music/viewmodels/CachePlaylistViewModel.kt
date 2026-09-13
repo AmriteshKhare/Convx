@@ -6,6 +6,7 @@
 package com.convx.music.viewmodels
 
 import android.content.Context
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.datasource.cache.SimpleCache
@@ -34,8 +35,10 @@ class CachePlaylistViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: MusicDatabase,
     @PlayerCache private val playerCache: SimpleCache,
-    @DownloadCache private val downloadCache: SimpleCache
+    @DownloadCache private val downloadCache: SimpleCache,
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+    val thumbArg = savedStateHandle.get<String>("thumb")?.takeIf { it.isNotEmpty() }
 
     private val _cachedSongs = MutableStateFlow<List<Song>>(emptyList())
     val cachedSongs: StateFlow<List<Song>> = _cachedSongs

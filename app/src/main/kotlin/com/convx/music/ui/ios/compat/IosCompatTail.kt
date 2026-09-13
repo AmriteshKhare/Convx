@@ -197,10 +197,6 @@ fun PlainTooltip(
     }
 }
 
-// --------------------------------------------------------------------------------
-// Segmented control
-// --------------------------------------------------------------------------------
-
 /**
  * The iOS segmented control: one recessed capsule track holding equal segments, the
  * selected one lifted out as a lighter capsule. Material draws outlined pills with a
@@ -301,10 +297,6 @@ fun RowScope.SegmentedButton(
 object SegmentedButtonDefaults {
     fun itemShape(index: Int, count: Int, baseShape: Shape? = null): Shape = ContinuousCapsule()
 }
-
-// --------------------------------------------------------------------------------
-// Odds and ends
-// --------------------------------------------------------------------------------
 
 /** iOS has no FAB; the nearest thing is a floating capsule button on the tint. */
 @Composable

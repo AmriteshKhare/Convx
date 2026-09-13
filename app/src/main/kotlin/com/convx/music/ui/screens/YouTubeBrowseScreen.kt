@@ -90,6 +90,8 @@ import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.viewmodels.YouTubeBrowseViewModel
@@ -211,8 +213,8 @@ fun YouTubeBrowseScreen(
                                                     ),
                                                 )
 
-                                            is AlbumItem -> navController.navigate("album/${item.id}")
-                                            is ArtistItem -> navController.navigate("artist/${item.id}")
+                                            is AlbumItem -> navController.navigate(albumRoute(item.id, item.thumbnail))
+                                            is ArtistItem -> navController.navigate(artistRoute(item.id, item.thumbnail))
                                             is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                         }
                                     },

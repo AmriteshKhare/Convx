@@ -32,7 +32,8 @@ constructor(
     private val database: MusicDatabase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    val albumId = savedStateHandle.get<String>("albumId")!!
+    val albumId = requireNotNull(savedStateHandle.get<String>("albumId")) { "Missing albumId" }
+    val thumbArg = savedStateHandle.get<String>("thumb")?.takeIf { it.isNotEmpty() }
     val playlistId = MutableStateFlow("")
     val albumWithSongs =
         database

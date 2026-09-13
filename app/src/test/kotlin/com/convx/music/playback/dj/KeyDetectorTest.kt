@@ -68,8 +68,6 @@ class KeyDetectorTest {
         assertEquals(0, MusicalKey.matchingShift(gMajor, gMajor))
     }
 
-    // --- fixtures -----------------------------------------------------------
-
     private fun analyze(samples: FloatArray): MusicalKey {
         val detector = KeyDetector(SAMPLE_RATE)
         for (sample in samples) detector.accept(sample)

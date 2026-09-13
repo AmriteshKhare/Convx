@@ -84,13 +84,14 @@ constructor(
 ) {
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
-    private val songUrlCache = HashMap<String, Pair<String, Long>>()
+    private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
     // Keep a reference to context so we can read DataStore prefs for JioSaavn support
     private val appContext: Context = context
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
+    private val _downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
+    val downloads: kotlinx.coroutines.flow.StateFlow<Map<String, Download>> = _downloads
 
     init {
         // Auto-download-on-like watches the `liked` column instead of hooking the
@@ -110,7 +111,7 @@ constructor(
                 if (!appContext.dataStore.get(AutoDownloadOnLikeKey, false)) return@collect
 
                 for (songId in current - previous) {
-                    if (downloads.value[songId] != null) continue
+                    if (_downloads.value[songId] != null) continue
                     runCatching {
                         val title = database.songTitle(songId).orEmpty()
                         DownloadService.sendAddDownload(
@@ -246,7 +247,7 @@ constructor(
                     SingletonImageLoader.get(context).enqueue(request)
                 }
 
-                // --- CANVAS CACHING ---
+                // Canvas caching.
                 scope.launch {
                     val canvasSource = context.dataStore.data.map { it[CanvasSourceKey] ?: CanvasSource.AUTO.name }.first().let { name -> CanvasSource.entries.find { it.name == name } ?: CanvasSource.AUTO }
 
@@ -347,7 +348,7 @@ constructor(
                         download: Download,
                         finalException: Exception?,
                     ) {
-                        downloads.update { map ->
+                        _downloads.update { map ->
                             map.toMutableMap().apply {
                                 set(download.request.id, download)
                             }
@@ -403,7 +404,7 @@ constructor(
                     result[c.download.request.id] = c.download
                 }
             }
-            downloads.value = result
+            _downloads.value = result
         }
     }
 

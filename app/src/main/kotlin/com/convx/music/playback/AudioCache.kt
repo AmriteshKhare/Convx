@@ -47,9 +47,7 @@ object AudioCache {
         )
     }
 
-    // ------------------------------------------------------------------
     //  Rendition API — the surface TrackAnalyzer reads
-    // ------------------------------------------------------------------
 
     data class Rendition(
         val key: String,
@@ -123,9 +121,7 @@ object AudioCache {
             .isSuccess
     }
 
-    // ------------------------------------------------------------------
     //  MediaDataSource bridge — adapts Media3 DataSource to MediaExtractor
-    // ------------------------------------------------------------------
 
     private class CacheMediaDataSource(
         private val delegate: DataSource,
@@ -133,15 +129,21 @@ object AudioCache {
     ) : MediaDataSource() {
 
         override fun readAt(position: Long, buffer: ByteArray?, offset: Int, size: Int): Int {
-            if (buffer == null || size == 0) return -1
+            if (buffer == null || size == 0) return 0
+            if (position < 0) return -1
             val dataSpec = DataSpec.Builder()
                 .setUri(uri)
                 .setPosition(position)
                 .setLength(size.toLong())
                 .build()
-            return delegate.open(dataSpec).let { bytesread ->
-                delegate.read(buffer, offset, size)
-            }.toInt().coerceAtLeast(0)
+            try {
+                delegate.open(dataSpec)
+                val bytesRead = delegate.read(buffer, offset, size)
+                // Media3 read returns C.RESULT_END_OF_INPUT (-1) at EOF.
+                return bytesRead
+            } finally {
+                runCatching { delegate.close() }
+            }
         }
 
         override fun getSize(): Long = C.LENGTH_UNSET.toLong()

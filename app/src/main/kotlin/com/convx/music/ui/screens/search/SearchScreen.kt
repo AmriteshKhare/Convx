@@ -80,6 +80,7 @@ import com.convx.music.constants.SearchSource
 import com.convx.music.db.entities.SearchHistory
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.NavigationTitle
+import com.convx.music.ui.utils.albumRoute
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.utils.rememberEnumPreference
@@ -187,9 +188,10 @@ fun SearchScreen(
         }
     }
 
-    // Fixed elevated token, not derived from any specific result's thumbnail —
-    // safe to override with the user's own picked theme color.
-    val tint = rememberAppBackgroundColor(AppleTokens.BgElevated)
+    // Theme background, not a fixed dark token — in light mode the hero stays
+    // light with dark content via onColor. Still overridable by the user's
+    // own picked theme color, same as Home/Explore.
+    val tint = rememberAppBackgroundColor(AppTheme.colorScheme.background)
     val onTint = AppleTokens.onColor(tint)
     val heroSource = rememberHeroSource(staticArt = null)
     val heroBackdrop = rememberLayerBackdrop {
@@ -501,7 +503,7 @@ fun AlbumsTabContent(
                     modifier = Modifier
                         .combinedBounceClick(
                             onClick = {
-                                navController.navigate("album/${album.id}")
+                                navController.navigate(albumRoute(album.id, album.thumbnail))
                             },
                             onLongClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)

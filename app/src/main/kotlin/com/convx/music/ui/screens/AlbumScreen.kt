@@ -8,6 +8,7 @@ package com.convx.music.ui.screens
 import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,7 +40,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.ios.compat.Checkbox
-import com.convx.music.ui.ios.compat.ContainedLoadingIndicator
 import com.convx.music.ui.ios.compat.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -103,7 +103,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.graphics.Color
 import com.convx.music.constants.AppBarHeight
-import com.convx.music.constants.GridThumbnailHeight
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEachIndexed
@@ -112,8 +111,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import com.convx.music.ui.utils.resize
 import com.convx.music.LocalDatabase
 import com.convx.music.LocalTabView
@@ -141,7 +138,6 @@ import com.convx.music.playback.queues.ListQueue
 import com.convx.music.playback.queues.LocalAlbumRadio
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.AlbumGradient
-import com.convx.music.ui.component.thumbnailPx
 import com.convx.music.ui.component.ExpandableText
 import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
@@ -158,7 +154,6 @@ import androidx.compose.ui.graphics.isSpecified
 import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.ui.component.asSoftIconTint
 import com.convx.music.ui.utils.additiveChrome
-import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
 import com.convx.music.ui.component.backdrop.backdrops.rememberBackdropFreeze
 import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
@@ -172,6 +167,17 @@ import com.convx.music.ui.menu.SongMenu
 import com.convx.music.ui.menu.YouTubeAlbumMenu
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.utils.backToMain
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
+import com.convx.music.ui.utils.pendingSharedArtworkThumbFor
+import com.convx.music.ui.component.SongRowSkeleton
+import com.convx.music.ui.component.ShimmerLine
+import com.convx.music.ui.component.ThumbThenFullHero
+import com.convx.music.ui.component.SeededShimmerHero
+import com.convx.music.ui.component.GlassPillRow
+import com.convx.music.ui.component.pillGlassBackground
+import com.convx.music.ui.component.backExitModifier
+import com.convx.music.ui.component.rememberDetailChromeEntrance
 import com.convx.music.ui.utils.rememberHeroZoom
 import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
@@ -259,6 +265,18 @@ fun AlbumScreen(
     if (inSelectMode) {
         BackHandler(onBack = onExitSelectionMode)
     }
+    // Timed pop: consume system back here so NavHost predictive scrub (finger-
+    // tracking the fade) never runs for this route. Gesture commits, then the
+    // 260ms shrink-to-tile plays on a timer. Selection/long-press/deep-link
+    // keep their existing behavior via the guards agreed in grill.
+    if (!inSelectMode) {
+        PredictiveBackHandler(enabled = true) { progress ->
+            // Collect to completion: commit navigates, cancel throws
+            // CancellationException so navigateUp is skipped.
+            progress.collect {}
+            navController.navigateUp()
+        }
+    }
 
     LaunchedEffect(filteredSongs) {
         selection.fastForEachReversed { songId ->
@@ -328,10 +346,30 @@ fun AlbumScreen(
     // hoisted so the header artwork and the floating chrome share one value.
     val heroTopBlurProgress = rememberHeroTopBlur(lazyListState)
 
+    // Enter stagger: hero opaque frame 0 (container fade), body fades + rises 70ms
+    // later over 180ms. Draw-phase only (graphicsLayer), no recomposition per frame.
+    // ponytail: exit body-first is the container hold in SharedArtwork, not here.
+    val bodyEnter = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(70)
+        bodyEnter.animateTo(1f, androidx.compose.animation.core.tween(180))
+    }
+
+    // Chrome entrance shared with every detail top bar: pill grows right-to-
+    // left after the morph lands, icons deblur staggered, back 60ms earlier.
+    val chrome = rememberDetailChromeEntrance(iconCount = 2)
+
+    // Instant seed: route thumb arg -> live tile thumb -> DB. Paints hero + bg on
+    // frame one instead of after the DB round trip; DB/full-res overwrites below.
+    val instantThumbUrl = viewModel.thumbArg
+        ?: pendingSharedArtworkThumbFor(viewModel.albumId)
+        ?: albumWithSongs?.album?.thumbnailUrl
+    val bgUrl = instantThumbUrl ?: albumWithSongs?.album?.thumbnailUrl
+
     // Same mesh backdrop as ArtistScreen/OnlinePlaylistScreen/the player's BITCHORD_MESH
     // style, not the flat single-swatch wash rememberHeroPalette+HeroMeshWash used to
     // paint here.
-    val meshPalette = rememberArtworkMeshPalette(albumWithSongs?.album?.thumbnailUrl)
+    val meshPalette = rememberArtworkMeshPalette(bgUrl)
     val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
     // Same flat white every icon/text reads in the player on a mesh background,
@@ -390,13 +428,9 @@ fun AlbumScreen(
         modifier = Modifier.matchParentSize(),
     )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
-    // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
-    // root appBackdrop — sampling appBackdrop here is the RenderNode cycle.
-    val chromeBackgroundModifier = if (useGlass) {
-        Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
-    } else {
-        Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
-    }
+    // Pills paint fixed-style liquidGlass (see pillGlassBackground) inside this
+    // provider so they sample the list backdrop, not the root appBackdrop —
+    // sampling appBackdrop here is the RenderNode cycle.
     // Capture from a plain Box wrapping the LazyColumn, not the LazyColumn's own
     // modifier: LazyColumn promotes its items to their own RenderNodes for
     // scroll recycling, which a capture attached directly to it doesn't
@@ -495,39 +529,13 @@ fun AlbumScreen(
                                     scaleY = heroZoom.scale
                                 }
                         ) {
-                            // Same request the grid tile that opened this screen made:
-                            // same data URL, same decode size, same disk key, so the morph
-                            // lands on the bitmap Coil already has in memory instead of
-                            // decoding a second copy of it mid-animation. Must track
-                            // ItemThumbnail's own default (thumbnailPx(GridThumbnailHeight)),
-                            // not a separate constant, and the same resolved-URL keying it
-                            // uses, or the two requests fall out of sync and this stops
-                            // being a cache hit.
-                            val heroTargetPx = thumbnailPx(GridThumbnailHeight)
-                            val heroRequest = remember(albumWithSongs.album.thumbnailUrl, heroTargetPx) {
-                                val resolvedUrl = albumWithSongs.album.thumbnailUrl?.resize(heroTargetPx, heroTargetPx)
-                                ImageRequest.Builder(context)
-                                    .data(resolvedUrl)
-                                    .diskCacheKey(resolvedUrl)
-                                    .size(heroTargetPx, heroTargetPx)
-                                    // Only override for the morph's own hero art: this is
-                                    // the one image in the app that has to fade in rather
-                                    // than pop, since it sits inside a card that is itself
-                                    // still growing out of the tile that opened it -- a hard
-                                    // cut here is the only thing left in the morph that
-                                    // still reads as "swapped", not "grown".
-                                    .crossfade(Motion.MorphEnterMillis)
-                                    .build()
-                            }
-                            AsyncImage(
-                                model = heroRequest,
-                                contentDescription = null,
-                                // Target half of the artwork morph: the tapped tile on the
-                                // previous screen grows into this header rather than the two
-                                // screens cross-fading past each other.
-                                modifier = Modifier
-                                    .fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                            // Target half of the artwork morph: the tapped tile on the
+                            // previous screen grows into this header rather than the two
+                            // screens cross-fading past each other.
+                            ThumbThenFullHero(
+                                thumbUrl = instantThumbUrl ?: albumWithSongs.album.thumbnailUrl,
+                                fullUrl = albumWithSongs.album.thumbnailUrl,
+                                modifier = Modifier.fillMaxSize(),
                             )
 
                             if (albumCanvasEnabled && canvasArtwork != null) {
@@ -573,6 +581,10 @@ fun AlbumScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .graphicsLayer {
+                                alpha = bodyEnter.value
+                                translationY = (1f - bodyEnter.value) * 8.dp.toPx()
+                            }
                             .padding(
                                 top = if (tabView) 0.dp else {
                                     LocalContext.current.resources.displayMetrics.widthPixels.let { screenWidth ->
@@ -649,12 +661,12 @@ fun AlbumScreen(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier
-                                        .combinedBounceClick(
-                                            onClick = {
-                                                navController.navigate("artist/${artist.id}")
-                                            }
-                                        )
+                                        modifier = Modifier
+                                            .combinedBounceClick(
+                                                onClick = {
+                                                    navController.navigate(artistRoute(artist.id, artist.thumbnailUrl))
+                                                }
+                                            )
                                 ) {
                                     AsyncImage(
                                         model = artist.thumbnailUrl,
@@ -1026,7 +1038,7 @@ fun AlbumScreen(
                                 modifier =
                                 Modifier
                                     .combinedBounceClick(
-                                        onClick = { navController.navigate("album/${item.id}") },
+                                        onClick = { navController.navigate(albumRoute(item.id, item.thumbnail)) },
                                         onLongClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             menuState.show {
@@ -1068,7 +1080,7 @@ fun AlbumScreen(
                                 modifier =
                                 Modifier
                                     .combinedBounceClick(
-                                        onClick = { navController.navigate("album/${item.id}") },
+                                        onClick = { navController.navigate(albumRoute(item.id, item.thumbnail)) },
                                         onLongClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             menuState.show {
@@ -1091,14 +1103,137 @@ fun AlbumScreen(
                 Spacer(Modifier.height(50.dp))
             }
         } else {
-            item(key = "loading") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ContainedLoadingIndicator()
+            // Loading mirrors loaded: same hero size/offset/foot-fade/merge band on
+            // the seeded bg, skeleton lines standing where title/artist/actions/
+            // about/songs will land — so arrival swaps content, never layout.
+            item(key = "shimmer_header", contentType = "header") {
+                val systemBarsTopPadding = WindowInsets.systemBars.asPaddingValues().calculateTopPadding()
+                val density = LocalDensity.current
+                val headerOffset = with(density) {
+                    -(systemBarsTopPadding + AppBarHeight).roundToPx()
+                }
+                val tabView = LocalTabView.current
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    if (!tabView && instantThumbUrl != null) Box(modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .offset { IntOffset(x = 0, y = headerOffset) }
+                                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        brush = Brush.verticalGradient(
+                                            0.55f to Color.Black,
+                                            1.00f to Color.Transparent,
+                                        ),
+                                        blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
+                                    )
+                                }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        scaleX = heroZoom.scale
+                                        scaleY = heroZoom.scale
+                                    }
+                            ) {
+                                SeededShimmerHero(
+                                    thumbUrl = instantThumbUrl,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                        HeroMergeBand(
+                            artworkUrl = instantThumbUrl,
+                            heroRatio = 1f,
+                            pageColor = tint,
+                            hazeState = hazeState,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .offset { IntOffset(x = 0, y = headerOffset) }
+                                .offset(y = HeroMergeBandHeight / 2),
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                top = if (tabView) 0.dp else {
+                                    LocalContext.current.resources.displayMetrics.widthPixels.let { screenWidth ->
+                                        with(density) {
+                                            ((screenWidth / 1.2f) - 144).toDp()
+                                        }
+                                    }
+                                }
+                            )
+                            .padding(bottom = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (!tabView) Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 32.dp)
+                                .padding(bottom = 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            ShimmerLine(fraction = 0.62f, height = 30.dp)
+                            Spacer(Modifier.height(10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                com.convx.music.ui.component.ShimmerBox(
+                                    Modifier.size(28.dp),
+                                    androidx.compose.foundation.shape.CircleShape
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                ShimmerLine(fraction = 0.4f, height = 16.dp, modifier = Modifier.fillMaxWidth(0.4f))
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            ShimmerLine(fraction = 0.5f, height = 13.dp)
+                            Spacer(Modifier.height(24.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                com.convx.music.ui.component.ShimmerBox(
+                                    Modifier.size(48.dp),
+                                    androidx.compose.foundation.shape.CircleShape
+                                )
+                                com.convx.music.ui.component.ShimmerBox(
+                                    Modifier.size(72.dp),
+                                    androidx.compose.foundation.shape.CircleShape
+                                )
+                                com.convx.music.ui.component.ShimmerBox(
+                                    Modifier.size(48.dp),
+                                    androidx.compose.foundation.shape.CircleShape
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(5.dp))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                        ) {
+                            ShimmerLine(fraction = 0.32f, height = 18.dp, modifier = Modifier.padding(bottom = 8.dp))
+                            ShimmerLine(fraction = 0.95f, height = 13.dp)
+                            Spacer(Modifier.height(8.dp))
+                            ShimmerLine(fraction = 0.88f, height = 13.dp)
+                        }
+                    }
+                }
+            }
+            item(key = "shimmer_songs_title") {
+                Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+                    ShimmerLine(fraction = 0.25f, height = 20.dp)
+                }
+            }
+            items(8) { index ->
+                Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
+                    SongRowSkeleton(index = index)
                 }
             }
         }
@@ -1168,14 +1303,12 @@ fun AlbumScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                Row(
+                GlassPillRow(
                     modifier = Modifier
                         .height(48.dp)
                         .clip(chromeShape)
-                        .then(chromeBackgroundModifier)
+                        .then(pillGlassBackground(chromeShape))
                         .padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Checkbox(
                         checked = selection.size == filteredSongs.size && selection.isNotEmpty(),
@@ -1214,6 +1347,7 @@ fun AlbumScreen(
                 GlassCircleButton(
                     onClick = { navController.navigateUp() },
                     onLongClick = { navController.backToMain() },
+                    modifier = with(chrome) { Modifier.backEnter().then(backExitModifier()) },
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.arrow_back_ios),
@@ -1224,14 +1358,12 @@ fun AlbumScreen(
                 Spacer(Modifier.weight(1f))
 
                 albumWithSongs?.let { albumWithSongs ->
-                    Row(
-                        modifier = Modifier
+                    GlassPillRow(
+                        modifier = with(chrome) { Modifier.containerEnter() }
                             .height(48.dp)
                             .clip(chromeShape)
-                            .then(chromeBackgroundModifier)
+                            .then(pillGlassBackground(chromeShape))
                             .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         IconButton(
                             onClick = {
@@ -1255,9 +1387,11 @@ fun AlbumScreen(
                                 imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
                                 contentDescription = stringResource(R.string.share),
                                 tint = pillIconTint,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .additiveChrome(useGlass && ambientColor.isSpecified)
+                                modifier = with(chrome) {
+                                    Modifier.iconEnter(0)
+                                        .size(20.dp)
+                                        .additiveChrome(useGlass && ambientColor.isSpecified)
+                                }
                             )
                         }
 
@@ -1280,9 +1414,11 @@ fun AlbumScreen(
                                 imageVector = SfSymbols.Monochrome.SFEllipsis,
                                 contentDescription = stringResource(R.string.more_options),
                                 tint = pillIconTint,
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .additiveChrome(useGlass && ambientColor.isSpecified)
+                                modifier = with(chrome) {
+                                    Modifier.iconEnter(1)
+                                        .size(20.dp)
+                                        .additiveChrome(useGlass && ambientColor.isSpecified)
+                                }
                             )
                         }
                     }

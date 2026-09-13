@@ -79,12 +79,9 @@ class MusicDatabase(
 
     suspend fun withTransaction(block: suspend MusicDatabase.() -> Unit) =
         with(delegate) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runInTransaction {
-                    kotlinx.coroutines.runBlocking {
-                        block(this@MusicDatabase)
-                    }
-                }
+            // Room 2.6+: suspend lambda runs in the txn context, no runBlocking.
+            withTransaction {
+                block(this@MusicDatabase)
             }
         }
 
@@ -177,9 +174,9 @@ abstract class InternalDatabase : RoomDatabase() {
                         MIGRATION_24_25,
                         MIGRATION_35_36,
                     )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .fallbackToDestructiveMigrationOnDowngrade()
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                    .setTransactionExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
+                    .setTransactionExecutor(java.util.concurrent.Executors.newSingleThreadExecutor())
                     .setQueryExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
                     .addCallback(object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
@@ -199,7 +196,7 @@ abstract class InternalDatabase : RoomDatabase() {
     }
 }
 
-// ===== Migrations =====
+// Migrations.
 
 val MIGRATION_1_2 =
     object : Migration(1, 2) {
@@ -475,7 +472,7 @@ val MIGRATION_22_24 =
         }
     }
 
-// ===== AutoMigration Specs =====
+// Automigration specs.
 
 @DeleteColumn.Entries(
     DeleteColumn(tableName = "song", columnName = "isTrash"),
@@ -499,9 +496,8 @@ class Migration5To6 : AutoMigrationSpec {
     override fun onPostMigrate(db: SupportSQLiteDatabase) {
         db.query("SELECT id FROM playlist WHERE id NOT LIKE 'LP%'").use { cursor ->
             while (cursor.moveToNext()) {
-                db.execSQL(
-                    "UPDATE playlist SET browseId = '${cursor.getString(0)}' WHERE id = '${cursor.getString(0)}'"
-                )
+                val id = cursor.getString(0)
+                db.execSQL("UPDATE playlist SET browseId = ? WHERE id = ?", arrayOf(id, id))
             }
         }
     }
@@ -511,9 +507,9 @@ class Migration6To7 : AutoMigrationSpec {
     override fun onPostMigrate(db: SupportSQLiteDatabase) {
         db.query("SELECT id, createDate FROM song").use { cursor ->
             while (cursor.moveToNext()) {
-                db.execSQL(
-                    "UPDATE song SET inLibrary = ${cursor.getLong(1)} WHERE id = '${cursor.getString(0)}'"
-                )
+                val id = cursor.getString(0)
+                val createDate = cursor.getLong(1)
+                db.execSQL("UPDATE song SET inLibrary = ? WHERE id = ?", arrayOf(createDate, id))
             }
         }
     }

@@ -312,7 +312,7 @@ constructor(
     database: MusicDatabase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val artistId = savedStateHandle.get<String>("artistId")!!
+    private val artistId = requireNotNull(savedStateHandle.get<String>("artistId")) { "Missing artistId" }
     val artist =
         database
             .artist(artistId)

@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -138,11 +139,21 @@ fun FrostedTopBar(
         label = "topBarDivider",
     )
 
+    val ambientColor = com.convx.music.LocalAmbientBackgroundColor.current.value
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val activeTint = if (titleColor.isSpecified) titleColor else ambientColor
+    val resolvedTitleColor = if (titleColor.isSpecified) {
+        titleColor
+    } else {
+        com.convx.music.ui.theme.GlassTintTokens.glassContentColor(isDark = isDark, activeTint = activeTint, isTitle = true)
+    }
+    val resolvedIconColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(isDark = isDark, activeTint = activeTint, isTitle = false)
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (reduceDynamicBlur) Modifier.background(AppTheme.colorScheme.surface)
+                if (reduceDynamicBlur) Modifier.background(com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark))
                 else Modifier,
             ),
     ) {
@@ -156,7 +167,7 @@ fun FrostedTopBar(
                 text = title,
                 style = AppTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = if (titleColor.isSpecified) titleColor else AppTheme.colorScheme.onSurface,
+                color = resolvedTitleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
@@ -187,21 +198,25 @@ fun FrostedTopBar(
                     )
                 }
             } else {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 16.dp),
-                ) {
-                    leading()
+                androidx.compose.runtime.CompositionLocalProvider(com.convx.music.ui.ios.compat.LocalContentColor provides resolvedIconColor) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 16.dp),
+                    ) {
+                        leading()
+                    }
                 }
             }
-            Row(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                actions()
+            androidx.compose.runtime.CompositionLocalProvider(com.convx.music.ui.ios.compat.LocalContentColor provides resolvedIconColor) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    actions()
+                }
             }
         }
         // The divider and the loader line share the bar's bottom edge; the box
@@ -231,7 +246,13 @@ fun TopBarAccountButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    GlassCircleButton(onClick = onClick, modifier = modifier, size = 36.dp) {
+    GlassCircleButton(
+        onClick = onClick,
+        modifier = modifier,
+        size = 36.dp,
+        // Account photo, not an icon — additive would wash it out.
+        applyAdditiveChrome = false,
+    ) {
         if (photoUrl != null) {
             AsyncImage(
                 model = photoUrl,

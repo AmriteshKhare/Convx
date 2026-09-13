@@ -183,8 +183,6 @@ class TransitionSelectorTest {
         assertEquals(TransitionStyle.TRANSPARENT, style)
     }
 
-    // --- fixtures -----------------------------------------------------------
-
     private fun analysis(confidence: Float, profile: ByteArray) = TrackAnalysis(
         grid = BeatGrid(bpm = 128f, anchorBeatMs = 0f, confidence = confidence),
         energyProfile = profile,

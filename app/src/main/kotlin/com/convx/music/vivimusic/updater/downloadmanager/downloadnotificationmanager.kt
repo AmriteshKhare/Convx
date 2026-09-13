@@ -100,7 +100,7 @@ object DownloadNotificationManager {
         notificationManager.cancel(NOTIFICATION_ID)
     }
 
-    // ============ Modern Implementation (Android 16+) ============
+    // Modern implementation (Android 16+).
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     private fun showDownloadStartingModern(version: String, fileSize: String) {
         val progressStyle = Notification.ProgressStyle()
@@ -259,7 +259,7 @@ object DownloadNotificationManager {
         } catch (e: Exception) {}
     }
 
-    // ============ Legacy Implementation (Pre-Android 16) ============
+    // Legacy implementation (pre-Android 16).
     private fun showDownloadStartingLegacy(version: String, fileSize: String) {
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground) // Your app icon

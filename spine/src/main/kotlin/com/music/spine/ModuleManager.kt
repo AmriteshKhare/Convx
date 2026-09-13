@@ -11,6 +11,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import timber.log.Timber
 
@@ -45,6 +46,7 @@ class ModuleManager {
     suspend fun fetchIndex(sourceUrl: String): Result<List<SpineModule>> = withContext(Dispatchers.IO) {
         Log.d(TAG, "▶ fetchIndex($sourceUrl)")
         runCatching {
+            require(sourceUrl.startsWith("https://")) { "Module index must be https" }
             val resp = client.get(sourceUrl)
             Log.d(TAG, "  HTTP ${resp.status.value}")
             if (resp.status != HttpStatusCode.OK) {
@@ -83,6 +85,7 @@ class ModuleManager {
             }
 
             Log.d(TAG, "  Resolved download URL: $downloadUrl")
+            require(downloadUrl.startsWith("https://")) { "Module download must be https" }
             val resp = client.get(downloadUrl)
             Log.d(TAG, "  HTTP ${resp.status.value}")
             if (resp.status != HttpStatusCode.OK) {
@@ -111,7 +114,9 @@ class ModuleManager {
         limit: Int = 50,
         settings: Map<String, String> = emptyMap(),
     ): Result<ModuleSearchResponse> = withContext(Dispatchers.IO) {
-        val settingsJson = settings.entries.joinToString(",") { "\"${it.key}\":\"${it.value}\"" }
+        val settingsJson = settings.entries.joinToString(",") {
+            "${Json.encodeToString(it.key)}:${Json.encodeToString(it.value)}"
+        }
         val contextArg = "{settings:{value:{$settingsJson}}}"
         Log.d(TAG, "▶ searchTracks() module=${loaded.module.id} query=\"$query\" limit=$limit settings=$settings")
         Log.d(TAG, "  contextArg: $contextArg")
@@ -120,7 +125,7 @@ class ModuleManager {
             val result = QuickJsExecutor.callExport(
                 moduleId = loaded.module.id,
                 functionName = "searchTracks",
-                args = listOf("\"$query\"", limit.toString(), contextArg),
+                args = listOf(Json.encodeToString(query), limit.toString(), contextArg),
             ).getOrThrow()
 
             Log.d(TAG, "  searchTracks result: ${result.length} chars")
@@ -147,7 +152,9 @@ class ModuleManager {
         trackId: String,
         settings: Map<String, String> = emptyMap(),
     ): Result<ModuleStreamResponse> = withContext(Dispatchers.IO) {
-        val settingsJson = settings.entries.joinToString(",") { "\"${it.key}\":\"${it.value}\"" }
+        val settingsJson = settings.entries.joinToString(",") {
+            "${Json.encodeToString(it.key)}:${Json.encodeToString(it.value)}"
+        }
         val contextArg = "{settings:{value:{$settingsJson}}}"
         Log.d(TAG, "▶ getStreamUrl() module=${loaded.module.id} trackId=$trackId settings=$settings")
         Log.d(TAG, "  contextArg: $contextArg")
@@ -156,7 +163,7 @@ class ModuleManager {
             val result = QuickJsExecutor.callExport(
                 moduleId = loaded.module.id,
                 functionName = "getTrackStreamUrl",
-                args = listOf("\"$trackId\"", "\"\"", contextArg),
+                args = listOf(Json.encodeToString(trackId), Json.encodeToString(""), contextArg),
             ).getOrThrow()
 
             Log.d(TAG, "  getStreamUrl result: ${result.length} chars")

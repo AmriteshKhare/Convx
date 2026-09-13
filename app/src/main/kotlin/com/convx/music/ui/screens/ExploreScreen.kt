@@ -110,13 +110,14 @@ import com.convx.music.ui.menu.YouTubePlaylistMenu
 import com.convx.music.ui.menu.YouTubeSongMenu
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.ui.utils.SnapLayoutInfoProvider
 import com.convx.music.utils.listItemShape
 import com.convx.music.utils.reportException
 import com.convx.music.viewmodels.ChartsViewModel
 import com.convx.music.viewmodels.ExploreViewModel
-import java.net.URLEncoder
 
 /**
  * The discovery tab — the Browse counterpart to Home: charts, new releases,
@@ -603,7 +604,7 @@ fun ExploreScreen(
                                         modifier = Modifier
                                             .combinedBounceClick(
                                                 onClick = {
-                                                    navController.navigate("album/${album.id}")
+                                                    navController.navigate(albumRoute(album.id, album.thumbnail))
                                                 },
                                                 onLongClick = {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -708,8 +709,8 @@ fun ExploreScreen(
                                                                 ),
                                                             )
                                                         }
-                                                        is AlbumItem -> navController.navigate("album/${recItem.id}")
-                                                        is ArtistItem -> navController.navigate("artist/${recItem.id}")
+                                                        is AlbumItem -> navController.navigate(albumRoute(recItem.id, recItem.thumbnail))
+                                                        is ArtistItem -> navController.navigate(artistRoute(recItem.id, recItem.thumbnail))
                                                         is PlaylistItem -> navController.navigate(
                                                             onlinePlaylistRoute(recItem.id, recItem.title, recItem.thumbnail)
                                                         )
@@ -814,10 +815,10 @@ private fun ChartShelfItem(
             .combinedBounceClick(
                 onClick = {
                     when (item) {
-                        is AlbumItem -> navController.navigate("album/${item.id}")
-                        is ArtistItem -> navController.navigate("artist/${item.id}")
+                        is AlbumItem -> navController.navigate(albumRoute(item.id, item.thumbnail))
+                        is ArtistItem -> navController.navigate(artistRoute(item.id, item.thumbnail))
                         is PlaylistItem -> navController.navigate(
-                            "online_playlist/${item.id}?title=${URLEncoder.encode(item.title, "UTF-8")}"
+                            onlinePlaylistRoute(item.id, item.title, item.thumbnail)
                         )
                         is SongItem -> {
                             if (item.id == mediaMetadataId) {

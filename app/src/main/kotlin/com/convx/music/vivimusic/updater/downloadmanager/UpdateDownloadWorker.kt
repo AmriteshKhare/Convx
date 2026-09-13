@@ -26,6 +26,7 @@ class UpdateDownloadWorker(private val context: Context, workerParams: WorkerPar
 
         try {
             val url = URL(apkUrl)
+            require(url.protocol.equals("https", ignoreCase = true)) { "APK URL must be https" }
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 15000
@@ -41,8 +42,6 @@ class UpdateDownloadWorker(private val context: Context, workerParams: WorkerPar
             }
 
             val fileLength = connection.contentLength
-            val inputStream = connection.inputStream
-
             val downloadDir = File(
                 context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
                 "vivi_updates"
@@ -53,38 +52,35 @@ class UpdateDownloadWorker(private val context: Context, workerParams: WorkerPar
 
             val isZip = apkUrl.contains("nightly.link") || apkUrl.endsWith(".zip")
             val downloadFile = if (isZip) File(downloadDir, "vivi_temp.zip") else File(downloadDir, "vivi.apk")
-            val outputStream = FileOutputStream(downloadFile)
 
-            val buffer = ByteArray(8192)
-            var bytesRead: Int
-            var totalBytesRead: Long = 0
+            connection.inputStream.use { inputStream ->
+                FileOutputStream(downloadFile).use { outputStream ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    var totalBytesRead: Long = 0
 
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                if (isStopped) {
-                    outputStream.close()
-                    inputStream.close()
-                    connection.disconnect()
-                    if (downloadFile.exists()) {
-                        downloadFile.delete()
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        if (isStopped) {
+                            if (downloadFile.exists()) {
+                                downloadFile.delete()
+                            }
+                            return@withContext Result.retry()
+                        }
+
+                        outputStream.write(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+
+                        if (fileLength > 0) {
+                            val progress = (totalBytesRead.toFloat() / fileLength.toFloat() * 100).toInt()
+                            // Update notification
+                            DownloadNotificationManager.updateDownloadProgress(progress, version)
+                            // Update WorkManager progress for UI observation
+                            setProgress(workDataOf("progress" to progress.toFloat() / 100f))
+                        }
                     }
-                    return@withContext Result.retry()
-                }
-
-                outputStream.write(buffer, 0, bytesRead)
-                totalBytesRead += bytesRead
-
-                if (fileLength > 0) {
-                    val progress = (totalBytesRead.toFloat() / fileLength.toFloat() * 100).toInt()
-                    // Update notification
-                    DownloadNotificationManager.updateDownloadProgress(progress, version)
-                    // Update WorkManager progress for UI observation
-                    setProgress(workDataOf("progress" to progress.toFloat() / 100f))
+                    outputStream.flush()
                 }
             }
-
-            outputStream.flush()
-            outputStream.close()
-            inputStream.close()
             connection.disconnect()
 
             val finalFile = if (isZip) {
@@ -94,7 +90,9 @@ class UpdateDownloadWorker(private val context: Context, workerParams: WorkerPar
                     ZipInputStream(downloadFile.inputStream()).use { zis ->
                         var entry = zis.nextEntry
                         while (entry != null) {
-                            if (!entry.isDirectory && entry.name.endsWith(".apk")) {
+                            val name = entry.name
+                            // Zip-slip guard: only a top-level .apk, no traversal.
+                            if (!entry.isDirectory && name.endsWith(".apk") && !name.contains("/") && !name.contains("\\") && !name.contains("..")) {
                                 FileOutputStream(targetApkFile).use { fos ->
                                     zis.copyTo(fos)
                                 }
@@ -131,6 +129,8 @@ class UpdateDownloadWorker(private val context: Context, workerParams: WorkerPar
             DownloadNotificationManager.showDownloadComplete(version, finalFile.absolutePath)
 
             Result.success(workDataOf("file_path" to finalFile.absolutePath))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             DownloadNotificationManager.showDownloadFailed(
                 version,

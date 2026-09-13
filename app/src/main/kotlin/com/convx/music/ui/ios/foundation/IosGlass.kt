@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.isSpecified
+import com.convx.music.ui.theme.isHueless
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -28,6 +29,7 @@ import com.convx.music.ui.component.backdrop.effects.lens
 import com.convx.music.ui.component.backdrop.highlight.Highlight
 import com.convx.music.ui.component.backdrop.isRenderEffectSupported
 import com.convx.music.ui.component.backdrop.shadow.Shadow
+import com.convx.music.ui.ios.foundation.IosTheme.colors
 
 /**
  * The two liquid-glass materials iOS 26 exposes: `.glass` (clear, lets the backdrop
@@ -90,26 +92,32 @@ fun Modifier.iosGlass(
     backdrop: Backdrop = IosTheme.backdrop,
 ): Modifier {
     val colors = IosTheme.colors
+    val isDark = colors.isDark
+    val baseSurfaceColor = com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark)
+    val baseOpacity = if (isDark) {
+        com.convx.music.ui.theme.GlassTintTokens.BaseSurfaceOpacityDark
+    } else {
+        com.convx.music.ui.theme.GlassTintTokens.BaseSurfaceOpacityLight
+    }
+
+    val isHeroContext = tint.isSpecified && !tint.isHueless()
+    val activeTint = if (isHeroContext) tint else com.convx.music.ui.theme.GlassTintTokens.neutralTintColor(isDark)
+    val tintOpacity = if (isHeroContext) com.convx.music.ui.theme.GlassTintTokens.heroTintOpacity(isDark) else 1f
+    // Neutral tint carries its own spec alpha; copy(alpha=1) would go opaque.
+    val effectiveTintAlpha = (activeTint.alpha * tintOpacity).coerceIn(0f, 1f)
+
     if (!isRenderEffectSupported()) {
-        val fallback = when {
-            tint.isSpecified && style == IosGlassStyle.Prominent -> tint
-            tint.isSpecified -> tint.copy(alpha = 0.28f)
-            colors.isDark -> Color.White.copy(alpha = 0.14f)
-            else -> Color.White.copy(alpha = 0.72f)
+        if (style == IosGlassStyle.Prominent) {
+            val prominent = if (tint.isSpecified) tint else colors.accent
+            return clip(shape).background(prominent.copy(alpha = 0.82f))
         }
-        return clip(shape).background(fallback)
+        return clip(shape)
+            .background((baseSurfaceColor.copy(alpha = baseOpacity)))
+            .background(activeTint.copy(alpha = effectiveTintAlpha))
     }
 
     val scope = rememberCoroutineScope()
     val highlight = remember(scope) { InteractiveHighlight(animationScope = scope) }
-
-    // iOS 26 regular glass is a heavy near-white (near-black in dark) frost: the
-    // backdrop reads as blurred colour, not as a legible image. Measured off Apple's
-    // own glass buttons, where a photo behind the pill shows only as a wash.
-    val surfaceTint = when {
-        colors.isDark -> Color.White.copy(alpha = 0.18f)
-        else -> Color.White.copy(alpha = 0.62f)
-    }
 
     return this
         .drawBackdrop(
@@ -141,6 +149,7 @@ fun Modifier.iosGlass(
                 when (style) {
                     IosGlassStyle.Prominent -> {
                         if (tint.isSpecified) {
+                            drawRect(baseSurfaceColor.copy(alpha = baseOpacity))
                             drawRect(tint, blendMode = BlendMode.Hue)
                             drawRect(tint.copy(alpha = 0.82f))
                         } else {
@@ -148,9 +157,10 @@ fun Modifier.iosGlass(
                         }
                     }
 
-                    // A tint on regular glass recolours the *label*, not the fill —
-                    // Apple's tinted .glass button stays white and turns its text red.
-                    IosGlassStyle.Regular -> drawRect(surfaceTint)
+                    IosGlassStyle.Regular -> {
+                        drawRect(baseSurfaceColor.copy(alpha = baseOpacity))
+                        drawRect(activeTint.copy(alpha = effectiveTintAlpha))
+                    }
                 }
             },
         )
@@ -163,6 +173,10 @@ fun iosGlassContentColor(style: IosGlassStyle, tint: Color = Color.Unspecified):
     val colors = IosTheme.colors
     return when (style) {
         IosGlassStyle.Prominent -> Color.White
-        IosGlassStyle.Regular -> if (tint.isSpecified) tint else colors.label
+        IosGlassStyle.Regular -> com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+            isDark = colors.isDark,
+            activeTint = tint,
+            isSelected = false,
+        )
     }
 }

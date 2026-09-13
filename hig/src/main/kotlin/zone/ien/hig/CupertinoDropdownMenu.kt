@@ -708,7 +708,6 @@ internal data class DropdownMenuPositionProvider(
     }
 }
 
-// ✅ Added hasIcon
 internal class CupertinoMenuScopeImpl : CupertinoMenuScope {
     var hasPicker: Boolean by mutableStateOf(false)
     var hasIcon: Boolean by mutableStateOf(false)

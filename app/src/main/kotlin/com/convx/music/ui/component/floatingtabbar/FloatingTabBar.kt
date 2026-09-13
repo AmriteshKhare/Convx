@@ -41,7 +41,6 @@ import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
@@ -135,6 +134,7 @@ import com.convx.music.ui.component.backdrop.highlight.Highlight
 import com.convx.music.ui.component.backdrop.shadow.InnerShadow
 import com.convx.music.ui.component.backdrop.shadow.Shadow
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.theme.isHueless
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sign
@@ -167,12 +167,8 @@ private const val PuckRestShadowAlpha = 0.35f
  *  actually settles. */
 private const val ScrollFreezeTailNs = 120_000_000L
 
-// EMA weight for the scroll-velocity estimate the collapse/expand size
-// morph reads to pick its spring. Plain value, no recomposition.
+// EMA weight for the scroll-velocity estimate. Plain value, no recomposition.
 private const val MomentumVelocityEmaAlpha = 0.35f
-
-// Per-event scroll speed above which the collapse morph goes loose/bouncy.
-private const val FastScrollSpeedPx = 120f
 
 // Vendored addition: the three shapes the bar can render. INLINE is the
 // scroll-collapsed row (unchanged by search mode); EXPANDED is the normal
@@ -326,45 +322,20 @@ fun FloatingTabBar(
                 Modifier
                     .gooey { if (meltTransitionEnabled) gooeyBlurPx * gooeyProgress else 0f }
                     // Unclipped so per-item elastic stretch can protrude past the
-                    // bar bounds instead of slicing at its edge. Also carries the
-                    // whole-bar snap thump answering the mini's drag release.
-                    .graphicsLayer {
-                        clip = false
-                        val thump = snapPulse()
-                        if (thump != 0f) {
-                            scaleX = 1f + 0.035f * thump
-                            scaleY = 1f + 0.035f * thump
-                        }
-                    }
+                    // bar bounds instead of slicing at its edge.
+                    .graphicsLayer { clip = false }
             ) {
                 transition.AnimatedContent(
                     transitionSpec = {
-                        if (meltTransitionEnabled) {
-                            (fadeIn(tween(GooeyDurationMs, easing = FastOutSlowInEasing)) togetherWith
-                                fadeOut(tween(GooeyDurationMs, easing = FastOutSlowInEasing)))
-                                .using(
-                                    SizeTransform(clip = false) { _, _ ->
-                                        // Velocity-aware: a fast fling collapses on a
-                                        // loose spring, a slow drag on a stiff one.
-                                        // Return trip always settles bouncy.
-                                        spring(
-                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                            stiffness = if (scrollConnection.scrollSpeed() > FastScrollSpeedPx) Spring.StiffnessLow else Spring.StiffnessMediumLow,
-                                        )
-                                    }
-                                )
-                        } else {
-                            (fadeIn(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = 650f)) togetherWith
-                                fadeOut(spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 800f)))
-                                .using(
-                                    SizeTransform(clip = false) { _, _ ->
-                                        spring(
-                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                            stiffness = Spring.StiffnessMedium,
-                                        )
-                                    }
-                                )
-                        }
+                        // Calm morph, no bounce: the bar shrinks/grows with the same
+                        // gooey fade + size tween in both directions.
+                        (fadeIn(tween(GooeyDurationMs, easing = FastOutSlowInEasing)) togetherWith
+                            fadeOut(tween(GooeyDurationMs, easing = FastOutSlowInEasing)))
+                            .using(
+                                SizeTransform(clip = false) { _, _ ->
+                                    tween(GooeyDurationMs, easing = FastOutSlowInEasing)
+                                }
+                            )
                     },
                     contentAlignment = Alignment.BottomCenter
                 ) { targetVisual ->
@@ -1279,15 +1250,19 @@ private fun SharedTransitionScope.ExpandedTabs(
     val themeDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     val puckWash = if (glassConfig.puckColor.isSpecified) {
         glassConfig.puckColor
-    } else if (ambientPuckColor.isSpecified) {
+    } else if (ambientPuckColor.isSpecified && !ambientPuckColor.isHueless()) {
         ambientPuckColor.asPuckTint(themeDark)
     } else {
-        LocalAccentColor.current
+        com.convx.music.ui.theme.GlassTintTokens.neutralTintColor(themeDark)
     }
-    // Contrast-picked rest opacity on ambient screens (0.80 dark, 0.70 light);
-    // the user setting still rules everywhere else.
-    val puckRestAlpha = if (!glassConfig.puckColor.isSpecified && ambientPuckColor.isSpecified) {
-        if (themeDark) 0.80f else 0.70f
+    // Spec Q3/Q4: select pill .80 dark / .67 light at rest; hero keeps .80/.70.
+    val isHeroContext = ambientPuckColor.isSpecified && !ambientPuckColor.isHueless()
+    val puckRestAlpha = if (!glassConfig.puckColor.isSpecified) {
+        if (themeDark) {
+            0.80f
+        } else {
+            if (isHeroContext) 0.70f else 0.67f
+        }
     } else {
         glassConfig.puckOpacity.coerceIn(0f, 1f)
     }
@@ -1595,10 +1570,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                                 18f.dp.toPx() * progress * tabsBackdropScale
                             )
                         },
-                        highlight = {
-                            val progress = dampedDragAnimation.pressProgress
-                            Highlight.Default.copy(alpha = progress)
-                        },
+                        highlight = null,
                         onDrawSurface = { drawRect(colors.backgroundColor) },
                         // Same GPU-saving trick as Modifier.liquidGlass: record this
                         // hidden row at a fraction of surface resolution and let the
@@ -1704,13 +1676,11 @@ private fun SharedTransitionScope.ExpandedTabs(
                                     chromaticAberration = progress > 0.01f
                                 )
                             },
-                            // No rim, at rest or pressed. The reference bars
-                            // (designRefrence/navbar.png, navbar.webp) draw the
-                            // selected capsule as a plain fill; a specular edge on
-                            // top of it is the single thing that stopped ours
-                            // reading as the same object. The wash below plus the
-                            // resting shadow carry the shape instead.
-                            highlight = { null },
+                            // Spec Q13: rim light only while dragged/pressed.
+                            highlight = {
+                                val p = dampedDragAnimation.pressProgress
+                                if (p > 0.01f) Highlight(width = 1.dp, alpha = 0.55f * p) else null
+                            },
                             shadow = {
                                 val progress = dampedDragAnimation.pressProgress
                                 // Same reasoning: a little separation at rest so

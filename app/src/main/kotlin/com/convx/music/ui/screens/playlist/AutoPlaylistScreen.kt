@@ -275,7 +275,16 @@ fun AutoPlaylistScreen(
     // Same mesh backdrop as ArtistScreen/AlbumScreen/OnlinePlaylistScreen/the player's
     // BITCHORD_MESH style, not the blurred-photo HeroBackground that used to paint here.
     val heroUrl = filteredSongs.firstOrNull()?.thumbnailUrl
-    val meshPalette = rememberArtworkMeshPalette(heroUrl)
+    // Instant seed: route thumb -> live tile thumb. Paints mesh bg frame one
+    // while the song flow (and its first-song hero) loads.
+    val instantAutoThumb = com.convx.music.ui.component.detailSeed(
+        viewModel.thumbArg,
+        com.convx.music.ui.utils.pendingSharedArtworkThumbFor(viewModel.playlist),
+        heroUrl,
+    )
+    val bgAutoUrl = instantAutoThumb ?: heroUrl
+    val autoChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 1)
+    val meshPalette = rememberArtworkMeshPalette(bgAutoUrl)
     val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
     com.convx.music.PublishAmbientBackgroundColor(tint)
     // Same flat white every icon/text reads in the player on a mesh background,
@@ -314,7 +323,7 @@ fun AutoPlaylistScreen(
     ) {
         MeshGradientBackground(
             palette = meshPalette,
-            trackKey = heroUrl,
+            trackKey = bgAutoUrl,
             modifier = Modifier.matchParentSize(),
         )
         HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
@@ -671,6 +680,9 @@ fun AutoPlaylistScreen(
                         GlassCircleButton(
                             onClick = { navController.navigateUp() },
                             onLongClick = { navController.backToMain() },
+                            modifier = with(autoChrome) {
+                                Modifier.backEnter().then(com.convx.music.ui.component.backExitModifier())
+                            },
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.arrow_back_ios),
@@ -701,7 +713,12 @@ Icon(
                             Spacer(Modifier.width(8.dp))
                         }
 
-                        GlassCircleButton(onClick = { isSearching = true }) {
+                        GlassCircleButton(
+                            onClick = { isSearching = true },
+                            modifier = with(autoChrome) {
+                                Modifier.iconEnter(0).then(com.convx.music.ui.component.backExitModifier())
+                            },
+                        ) {
                             Icon(
                                 imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
                                 contentDescription = null,

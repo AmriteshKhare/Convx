@@ -50,10 +50,6 @@ import com.convx.music.ui.ios.foundation.IosTheme
  * controls whose Material versions are unmistakable on sight.
  */
 
-// --------------------------------------------------------------------------------
-// Surfaces
-// --------------------------------------------------------------------------------
-
 /**
  * M3's Surface without the elevation tint ladder — iOS surfaces are flat fills, so
  * `tonalElevation` and `shadowElevation` are accepted and ignored rather than turning
@@ -124,10 +120,6 @@ fun IosCard(
         CompositionLocalProvider(LocalContentColor provides colors.label) { content() }
     }
 }
-
-// --------------------------------------------------------------------------------
-// Alert
-// --------------------------------------------------------------------------------
 
 /** One button of an [IosAlertDialog]. */
 data class IosAlertAction(
@@ -212,10 +204,6 @@ fun IosAlertDialog(
         }
     }
 }
-
-// --------------------------------------------------------------------------------
-// Controls
-// --------------------------------------------------------------------------------
 
 /**
  * M3's Switch call shape, drawn as cupertino's iOS switch.

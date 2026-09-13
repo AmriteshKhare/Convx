@@ -19,6 +19,7 @@ import com.convx.music.playback.smart.TransitionStyle
 import com.convx.music.playback.smart.TransitionTrackInfo
 import com.convx.music.playback.smart.planTransition
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -355,9 +356,12 @@ class CrossfadeController(
         listeningTo = target
     }
 
+    private var tickJob: Job? = null
+
     fun start() {
         listenTo(active())
-        scope.launch {
+        if (tickJob?.isActive == true) return
+        tickJob = scope.launch {
             while (isActive) {
                 tick()
                 delay(
@@ -373,14 +377,14 @@ class CrossfadeController(
     }
 
     fun release() {
+        tickJob?.cancel()
+        tickJob = null
         listeningTo?.removeListener(listener)
         listeningTo = null
         active().volume = 1f
         AppSettings.smartMixInProgress.value = false
         filters.open()
     }
-
-    // ---- Entry points -------------------------------------------------------
 
     /**
      * A skip the listener asked for: drop any blend in flight and get out of
@@ -399,8 +403,6 @@ class CrossfadeController(
     fun onSkipRequested() {
         if (phase != Phase.IDLE) bail()
     }
-
-    // ---- Ticker -------------------------------------------------------------
 
     private fun tick() {
         // A pause has to take the other player with it, or one half of the blend
@@ -960,8 +962,6 @@ class CrossfadeController(
         finish()
     }
 
-    // ---- Lifecycle of a transition -----------------------------------------
-
     /**
      * Abandons whatever is in flight.
      *
@@ -1057,8 +1057,6 @@ class CrossfadeController(
         player.volume = 1f
         player.setPlaybackSpeed(AppSettings.playbackSpeed.value)
     }
-
-    // ---- Numbers ------------------------------------------------------------
 
     private fun configuredFadeMs(): Long = (AppSettings.crossfadeSeconds.value * 1000f).toLong()
 

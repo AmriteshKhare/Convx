@@ -54,10 +54,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PlainTooltip
@@ -97,6 +97,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboard
@@ -132,6 +133,7 @@ import com.convx.music.ui.component.BottomSheetState
 import com.convx.music.ui.component.LocalBottomSheetPageState
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.MediaMetadataListItem
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.component.thumbnailPx
 import com.convx.music.ui.menu.PlayerMenu
 import com.convx.music.ui.menu.QueueMenu
@@ -164,6 +166,7 @@ import android.widget.Toast
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import com.convx.music.ui.utils.additiveChrome
 import coil3.size.Size as CoilSize
 import kotlinx.coroutines.coroutineScope
 import kotlin.math.roundToInt
@@ -203,6 +206,34 @@ fun Queue(
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
     var showAudioDeviceBottomSheet by remember { mutableStateOf(false) }
+
+
+    /** Title stays white; the artist line sits well back. Flamingo's own value. */
+    val FlamingoSecondaryAlpha = 0.35f
+
+    /** Elapsed/remaining under the seek bar — quieter again than the artist line. */
+    val FlamingoTimeAlpha = 0.3f
+
+    /**
+     * Strength of white content added onto the background under [additiveChrome]. Below full so
+     * the blend doesn't clip to plain white -- the background's own colour and saturation stay
+     * visible through the tint instead of getting washed out.
+     */
+    val AdditiveChromeContentAlpha = 0.45f
+
+    // Theme-independent Flamingo chrome, same values as PlayerV2 (Player_v2.kt):
+    // additiveChrome = true always, primary = White, secondary = White 0.35,
+    // content alpha 0.45. Never reads TextBackgroundColor / theme params.
+    val chromeAdditive = true
+    val chromePrimary = Color.White
+    val chromeSecondary = Color.White.copy(alpha = FlamingoSecondaryAlpha)
+    val chromeArtist = chromeSecondary.copy(alpha = 0.7f)
+    val chromePillContainer = Color.White.copy(alpha = 0.12f)
+    // Active pill fill: brighter translucent white, never solid — the glyph
+    // stays white so it keeps glowing through additiveChrome instead of
+    // going black. Brightness (not hue) signals state, same as PlayerV2's
+    // own queue/lyrics icons.
+    val chromePillActive = Color.White.copy(alpha = 0.28f)
 
     val isBluetoothConnected by produceState(initialValue = isBluetoothHeadphoneConnected(context)) {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -367,7 +398,8 @@ fun Queue(
 //                    Spacer(modifier = Modifier.weight(1f))
 
                     PlayerQueueButton(
-                        icon = R.drawable.queue_music,
+                        icon =  R.drawable.flamingo_queue,
+                        activeIcon =R.drawable.flamingo_queueon ,
                         onClick = { state.expandSoft() },
                         isActive = false,
                         shape = queueShape,
@@ -479,7 +511,7 @@ fun Queue(
                         modifier = Modifier
                             .size(buttonSize)
                             .clip(CircleShape)
-                            .background(textButtonColor)
+                            .background(chromePillActive)
                             .clickable {
                                 menuState.show {
                                     PlayerMenu(
@@ -502,8 +534,11 @@ fun Queue(
                         Icon(
                             painter = painterResource(id = R.drawable.more_vert),
                             contentDescription = null,
-                            modifier = Modifier.size(iconSize),
-                            tint = iconButtonColor
+                            modifier = Modifier
+                                .size(iconSize)
+                                .additiveChrome(true)
+                                .graphicsLayer { alpha = 0.45f },
+                            tint = Color.White
                         )
                     }
                 }
@@ -537,8 +572,11 @@ fun Queue(
                             Icon(
                                 painter = painterResource(id = R.drawable.queue_music),
                                 contentDescription = null,
-                                modifier = Modifier.size(40.dp),
-                                tint = TextBackgroundColor
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
+                                tint = chromePrimary
                             )
 //                            Spacer(modifier = Modifier.width(6.dp))
 //                            Text(
@@ -567,10 +605,10 @@ fun Queue(
                                 .height(56.dp)
                                 .weight(1f),
                             colors = ToggleButtonDefaults.toggleButtonColors(
-                                containerColor = TextBackgroundColor.copy(alpha = 0.2f),
-                                contentColor = TextBackgroundColor,
-                                checkedContainerColor = TextBackgroundColor.copy(alpha = 0.4f),
-                                checkedContentColor = TextBackgroundColor
+                                containerColor = chromePillContainer,
+                                contentColor = chromeSecondary,
+                                checkedContainerColor = chromePillActive,
+                                checkedContentColor = chromePrimary
                             )
                         ) {
                             Icon(
@@ -578,7 +616,10 @@ fun Queue(
                                     if (isBluetoothConnected) R.drawable.headset_applemusic else R.drawable.speaker_apple
                                 ),
                                 contentDescription = null,
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha }
                             )
                         }
 
@@ -598,15 +639,18 @@ fun Queue(
                                 .height(56.dp)
                                 .weight(1f),
                             colors = ToggleButtonDefaults.toggleButtonColors(
-                                containerColor = TextBackgroundColor.copy(alpha = 0.2f),
-                                contentColor = TextBackgroundColor,
-                                checkedContainerColor = TextBackgroundColor.copy(alpha = 0.4f),
-                                checkedContentColor = TextBackgroundColor
+                                containerColor = chromePillContainer,
+                                contentColor = chromeSecondary,
+                                checkedContainerColor = chromePillActive,
+                                checkedContentColor = chromePrimary
                             )
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                             ) {
                                 Icon(
                                     painter = painterResource(id = R.drawable.timer),
@@ -618,7 +662,6 @@ fun Queue(
                                     Text(
                                         text = makeTimeString(sleepTimerTimeLeft),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = TextBackgroundColor,
                                         maxLines = 1
                                     )
                                 }
@@ -640,8 +683,11 @@ fun Queue(
                             Icon(
                                 painter = painterResource(id = R.drawable.lyrics),
                                 contentDescription = null,
-                                modifier = Modifier.size(60.dp),
-                                tint = TextBackgroundColor
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
+                                tint = chromePrimary
                             )
 //                            Spacer(modifier = Modifier.width(6.dp))
 //                            Text(
@@ -803,8 +849,8 @@ fun Queue(
             }
         }
 
-        LaunchedEffect(mutableQueueWindows, currentWindowIndex) {
-            if (currentWindowIndex != -1) {
+        LaunchedEffect(currentWindowIndex) {
+            if (currentWindowIndex != -1 && !reorderableState.isAnyItemDragging) {
                 lazyListState.scrollToItem(currentWindowIndex)
             }
         }
@@ -853,16 +899,19 @@ fun Queue(
                             text = mediaMetadata?.title.orEmpty(),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            color = TextBackgroundColor,
+                            color = chromePrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextBackgroundColor.copy(alpha = 0.7f),
+                            color = chromeArtist,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .additiveChrome(chromeAdditive)
+                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                         )
                     }
 
@@ -874,7 +923,11 @@ fun Queue(
                     ) {
                         FilledTonalIconButton(
                             onClick = playerConnection::toggleLike,
-                            modifier = Modifier.padding(end = 8.dp)
+                            modifier = Modifier.padding(end = 8.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = chromePillContainer,
+                                contentColor = chromePrimary,
+                            )
                         ) {
                             Icon(
                                 painter = painterResource(
@@ -882,7 +935,10 @@ fun Queue(
                                     else R.drawable.favorite_border
                                 ),
                                 contentDescription = likeDescription,
-                                tint = if (currentSong?.song?.liked == true) MaterialTheme.colorScheme.error else LocalContentColor.current
+                                tint = if (currentSong?.song?.liked == true) MaterialTheme.colorScheme.error else chromePrimary,
+                                modifier = Modifier
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                             )
                         }
                     }
@@ -895,11 +951,19 @@ fun Queue(
                     ) {
                         FilledTonalIconButton(
                             onClick = { locked = !locked },
-                            modifier = Modifier.padding(end = 8.dp)
+                            modifier = Modifier.padding(end = 8.dp),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = chromePillContainer,
+                                contentColor = chromePrimary,
+                            )
                         ) {
                             Icon(
                                 painter = painterResource(if (locked) R.drawable.lock else R.drawable.lock_open),
                                 contentDescription = lockDescription,
+                                tint = chromePrimary,
+                                modifier = Modifier
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                             )
                         }
                     }
@@ -927,11 +991,19 @@ fun Queue(
                                         onDismiss = menuState::dismiss
                                     )
                                 }
-                            }
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = chromePillContainer,
+                                contentColor = chromePrimary,
+                            )
                         ) {
                             Icon(
                                 painter = painterResource(R.drawable.more_vert),
                                 contentDescription = moreDescription,
+                                tint = chromePrimary,
+                                modifier = Modifier
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                             )
                         }
                     }
@@ -942,7 +1014,7 @@ fun Queue(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                         .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     ToggleButton(
                         checked = shuffleModeEnabled,
@@ -958,26 +1030,34 @@ fun Queue(
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
                         colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = chromePillContainer,
+                            contentColor = chromeSecondary,
+                            checkedContainerColor = chromePillActive,
+                            checkedContentColor = chromePrimary
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp),
+                            .height(56.dp)
+                            .clip(ContinuousRoundedRectangle(percent = 50))
+                            .animateContentSize(),
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.shuffle),
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier
+                                .size(22.dp)
+                                .additiveChrome(chromeAdditive)
+                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha }
                         )
                         Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
                         Text(
                             text = stringResource(R.string.shuffle),
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .additiveChrome(chromeAdditive)
+                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                             )
                     }
 
@@ -989,14 +1069,16 @@ fun Queue(
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
                         colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = chromePillContainer,
+                            contentColor = chromeSecondary,
+                            checkedContainerColor = chromePillActive,
+                            checkedContentColor = chromePrimary
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp),
+                            .height(56.dp)
+                            .clip(ContinuousRoundedRectangle(percent = 50))
+                            .animateContentSize(),
                     ) {
                         Icon(
                             painter = painterResource(
@@ -1007,14 +1089,20 @@ fun Queue(
                                 }
                             ),
                             contentDescription = null,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier
+                                .size(22.dp)
+                                .additiveChrome(chromeAdditive)
+                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha }
                         )
                         Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
                         Text(
                             text = stringResource(R.string.repeat),
                             style = MaterialTheme.typography.labelMedium,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .additiveChrome(chromeAdditive)
+                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                         )
                     }
 
@@ -1027,16 +1115,23 @@ fun Queue(
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
                         colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = chromePillContainer,
+                            contentColor = chromeSecondary,
+                            checkedContainerColor = chromePillActive,
+                            checkedContentColor = chromePrimary
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp),
+                            .height(56.dp)
+                            .clip(ContinuousRoundedRectangle(percent = 50))
+                            .animateContentSize(),
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .additiveChrome(chromeAdditive)
+                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
+                        ) {
                             Icon(
                                 painter = painterResource(R.drawable.radio),
                                 contentDescription = null,
@@ -1108,11 +1203,19 @@ fun Queue(
                         ) {
                             FilledTonalIconButton(
                                 onClick = { locked = !locked },
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier.padding(start = 8.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = chromePillContainer,
+                                    contentColor = chromePrimary,
+                                )
                             ) {
                                 Icon(
                                     painter = painterResource(if (locked) R.drawable.lock else R.drawable.lock_open),
                                     contentDescription = lockDescription,
+                                    tint = chromePrimary,
+                                    modifier = Modifier
+                                        .additiveChrome(chromeAdditive)
+                                        .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                                 )
                             }
                         }
@@ -1144,6 +1247,10 @@ fun Queue(
                             Icon(
                                 painter = painterResource(R.drawable.close),
                                 contentDescription = null,
+                                tint = chromePrimary,
+                                modifier = Modifier
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                             )
                         }
                         Text(
@@ -1179,7 +1286,10 @@ fun Queue(
                             Icon(
                                 painter = painterResource(R.drawable.more_vert),
                                 contentDescription = null,
-                                tint = LocalContentColor.current,
+                                tint = chromePrimary,
+                                modifier = Modifier
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                             )
                         }
                     }
@@ -1213,11 +1323,11 @@ fun Queue(
 
                     itemsIndexed(
                         items = mutableQueueWindows,
-                        key = { _, item -> item.uid.hashCode() },
+                        key = { _, item -> item.uid },
                     ) { index, window ->
                         ReorderableItem(
                             state = reorderableState,
-                            key = window.uid.hashCode(),
+                            key = window.uid,
                         ) {
                             val currentItem by rememberUpdatedState(window)
                             val isActive = window.uid == currentPlayingUid
@@ -1311,6 +1421,10 @@ fun Queue(
                                                         Icon(
                                                             painter = painterResource(R.drawable.more_vert),
                                                             contentDescription = null,
+                                                            tint = chromePrimary,
+                                                            modifier = Modifier
+                                                                .additiveChrome(chromeAdditive)
+                                                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                                                         )
                                                     }
                                                 }
@@ -1322,6 +1436,10 @@ fun Queue(
                                                         Icon(
                                                             painter = painterResource(R.drawable.drag_handle),
                                                             contentDescription = null,
+                                                            tint = chromePrimary,
+                                                            modifier = Modifier
+                                                                .additiveChrome(chromeAdditive)
+                                                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                                                         )
                                                     }
                                                 }
@@ -1401,7 +1519,11 @@ fun Queue(
 
                             Text(
                                 text = stringResource(R.string.similar_content),
-                                modifier = Modifier.padding(start = 16.dp),
+                                color = chromeSecondary,
+                                modifier = Modifier
+                                    .padding(start = 16.dp)
+                                    .additiveChrome(chromeAdditive)
+                                    .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                             )
                         }
 
@@ -1429,6 +1551,10 @@ fun Queue(
                                                 Icon(
                                                     painter = painterResource(R.drawable.playlist_play),
                                                     contentDescription = null,
+                                                    tint = chromePrimary,
+                                                    modifier = Modifier
+                                                        .additiveChrome(chromeAdditive)
+                                                        .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                                                 )
                                             }
                                             IconButton(
@@ -1440,8 +1566,12 @@ fun Queue(
                                                 },
                                             ) {
                                                 Icon(
-                                                    painter = painterResource(R.drawable.queue_music),
+                                                    painter = painterResource(R.drawable.flamingo_lyrics),
                                                     contentDescription = null,
+                                                    tint = chromePrimary,
+                                                    modifier = Modifier
+                                                        .additiveChrome(chromeAdditive)
+                                                        .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
                                                 )
                                             }
                                         }
@@ -1517,6 +1647,15 @@ private fun PlayerQueueButton(
     textBackgroundColor: Color,
     playerBackground: PlayerBackgroundStyle
 ) {
+    // Theme-independent Flamingo chrome (PlayerV2 values): active pill is a
+    // brighter translucent white with a full-white glyph, inactive a white
+    // hairline with a White-0.35 glyph — both run through additiveChrome at
+    // 0.45 so active reads lit, never blacked. Theme params above are kept
+    // in the signature for call-site compatibility but not read.
+    val chromeWhite = Color.White
+    val chromeInactive = Color.White.copy(alpha = 0.35f)
+    val chromeActiveFill = Color.White.copy(alpha = 0.28f)
+    val chromeContentAlpha = 0.45f
     val buttonModifier = Modifier
         .clip(shape)
         .clickable(enabled = enabled, onClick = onClick)
@@ -1524,12 +1663,12 @@ private fun PlayerQueueButton(
     val alphaFactor = if (enabled) 1f else 0.35f
 
     val appliedModifier = if (isActive) {
-        modifier.then(buttonModifier.background(textButtonColor)).alpha(alphaFactor)
+        modifier.then(buttonModifier.background(chromeActiveFill)).alpha(alphaFactor)
     } else {
         modifier.then(
             buttonModifier.border(
                 width = 1.dp,
-                color = textButtonColor.copy(alpha = 0.3f),
+                color = chromeWhite.copy(alpha = 0.3f),
                 shape = shape
             )
         ).alpha(alphaFactor)
@@ -1542,7 +1681,7 @@ private fun PlayerQueueButton(
         if (text != null) {
             Text(
                 text = text,
-                color = iconButtonColor.copy(alpha = if (enabled) 1f else 0.6f),
+                color = (if (isActive) chromeWhite else chromeInactive).copy(alpha = if (enabled) 1f else 0.6f),
                 fontSize = 10.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1550,28 +1689,20 @@ private fun PlayerQueueButton(
                 modifier = Modifier
                     .fillMaxWidth()
                     .basicMarquee()
+                    .additiveChrome(true)
+                    .graphicsLayer { alpha = chromeContentAlpha }
             )
         } else {
-            val baseTint = if (isActive) {
-                iconButtonColor
-            } else {
-                // Dimmed on purpose: iconButtonColor/textButtonColor are often
-                // white-on-photo too, so without a clear alpha drop the "off"
-                // state was indistinguishable from "active" at this icon size —
-                // the filled-vs-outlined button background was the only tell.
-                when (playerBackground) {
-                    PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED, PlayerBackgroundStyle.APPLE_MUSIC, PlayerBackgroundStyle.LIVE_MESH, PlayerBackgroundStyle.BITCHORD_MESH, PlayerBackgroundStyle.STATIC, PlayerBackgroundStyle.CUSTOM_GRADIENT ->
-                        Color.White.copy(alpha = 0.55f)
-                    PlayerBackgroundStyle.DEFAULT ->
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                }
-            }
+            val baseTint = if (isActive) chromeWhite else chromeInactive
             val finalTint = if (enabled) baseTint else baseTint.copy(alpha = 0.5f)
             val resolvedIcon = if (isActive && activeIcon != null) activeIcon else icon
             Icon(
                 painter = painterResource(id = resolvedIcon),
                 contentDescription = null,
-                modifier = Modifier.size(iconSize),
+                modifier = Modifier
+                    .size(iconSize)
+                    .additiveChrome(true)
+                    .graphicsLayer { alpha = chromeContentAlpha },
                 tint = finalTint
             )
         }

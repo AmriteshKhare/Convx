@@ -15,7 +15,7 @@ import kotlin.math.min
  */
 class ColorEngineTest {
 
-    // ---- colour models -----------------------------------------------------
+    // Colour models.
 
     @Test
     fun `sRGB round trips through LAB`() {
@@ -75,7 +75,7 @@ class ColorEngineTest {
         assertTrue("fitted colour must be in gamut", fitted.toLab().isInSRGBGamut)
     }
 
-    // ---- determinism -------------------------------------------------------
+    // Determinism.
 
     @Test
     fun `SplitMix64 is reproducible for a seed and differs between seeds`() {
@@ -91,7 +91,7 @@ class ColorEngineTest {
         assertTrue("unit doubles stay in range", firstRun.all { it in 0.0..1.0 })
     }
 
-    // ---- roles and schemes -------------------------------------------------
+    // Roles and schemes.
 
     private fun cluster(
         l: Float,

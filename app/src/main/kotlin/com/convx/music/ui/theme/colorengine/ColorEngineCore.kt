@@ -28,10 +28,6 @@ import kotlin.math.sqrt
  * presentation colours where precision matters more than throughput.
  */
 
-// ---------------------------------------------------------------------------
-// Options
-// ---------------------------------------------------------------------------
-
 /**
  * How much scene understanding feeds the weight map.
  *
@@ -54,10 +50,6 @@ enum class DeltaEAlgorithm { EUCLIDEAN, CIE94, CIEDE2000 }
 
 /** Geometric hue relationships on the LCh wheel. */
 enum class ColorHarmony { COMPLEMENTARY, SPLIT_COMPLEMENTARY, TRIADIC, TETRADIC, ANALOGOUS }
-
-// ---------------------------------------------------------------------------
-// Colour models
-// ---------------------------------------------------------------------------
 
 data class LabColor(val l: Double, val a: Double, val b: Double) {
 
@@ -267,10 +259,6 @@ data class LabPoint(val l: Float, val a: Float, val b: Float) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Conversion tables
-// ---------------------------------------------------------------------------
-
 /** sRGB byte -> linear light. 256 entries, so the per-pixel path never calls pow(). */
 private val sRGBLinear8BitLUT: FloatArray = FloatArray(256) { byte ->
     val value = byte / 255f
@@ -323,10 +311,6 @@ fun linearRgbToLab(red: Float, green: Float, blue: Float): LabPoint {
     val fz = labTransform(z)
     return LabPoint(116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
 }
-
-// ---------------------------------------------------------------------------
-// Small shared helpers
-// ---------------------------------------------------------------------------
 
 /** Hermite interpolation between two edges — the engine's only easing primitive. */
 fun smoothStep(edge0: Float, edge1: Float, value: Float): Float {

@@ -113,6 +113,7 @@ private val MorphBoundsTransform = BoundsTransform { _, _ ->
  * correctness.
  */
 private val pendingSharedArtworkId = mutableStateOf<String?>(null)
+private val pendingSharedArtworkThumb = mutableStateOf<String?>(null)
 
 /**
  * Every artwork currently placed on screen, by item id.
@@ -130,6 +131,7 @@ private val placedArtwork = HashMap<String, Pair<LayoutCoordinates, String?>>()
  * container that consumes it from drifting apart.
  */
 fun NavBackStackEntry.morphArtworkId(): String? = arguments.morphArtworkId()
+fun NavBackStackEntry.morphArtworkThumb(): String? = arguments.morphArtworkThumb()
 
 /**
  * Same lookup against a raw argument [Bundle], for `OnDestinationChangedListener` --
@@ -141,6 +143,10 @@ fun NavBackStackEntry.morphArtworkId(): String? = arguments.morphArtworkId()
  * silently left with a destination that expects a morph and a source that was never
  * nominated, and it falls back to a cross-fade for no visible reason.
  */
+fun Bundle?.morphArtworkThumb(): String? =
+    this?.getString("thumb")
+        ?: this?.getString("thumbnail")
+
 fun Bundle?.morphArtworkId(): String? =
     this?.getString("albumId")
         ?: this?.getString("artistId")
@@ -195,7 +201,56 @@ private val MorphRoutePrefixes =
 fun markSharedArtworkSource(id: String?): String? {
     if (id.isNullOrEmpty()) return null
     pendingSharedArtworkId.value = id
+    val thumb = placedArtwork[id]?.second
+    pendingSharedArtworkThumb.value = thumb
+    return thumb
+}
+
+/**
+ * Instant thumbnail for [id]'s detail hero, without a nav-arg round trip.
+ *
+ * Prefer the route's `thumb` arg when present (cold start, process death);
+ * this is the live-tile fallback for callers still on plain `album/{id}`.
+ */
+fun pendingSharedArtworkThumbFor(id: String?): String? {
+    if (id.isNullOrEmpty()) return null
+    if (pendingSharedArtworkId.value == id) pendingSharedArtworkThumb.value?.let { return it }
     return placedArtwork[id]?.second
+}
+
+/**
+ * Album route carrying the tapped tile's thumbnail, so the destination paints
+ * its hero + bg on frame one instead of after the DB round trip. Optional;
+ * plain `album/{id}` (deep links) still matches.
+ */
+fun albumRoute(id: String, thumbnail: String?): String = buildString {
+    append("album/").append(id)
+    if (!thumbnail.isNullOrEmpty()) {
+        append("?thumb=").append(Uri.encode(thumbnail))
+    }
+}
+
+/**
+ * Same as [albumRoute] for artists: `artist/{id}?thumb={thumb}` is already a
+ * registered route, this just builds it from a tile. Plain `artist/{id}`
+ * (menus, player taps, deep links) still matches.
+ */
+fun artistRoute(id: String, thumbnail: String?): String = buildString {
+    append("artist/").append(id)
+    if (!thumbnail.isNullOrEmpty()) {
+        append("?thumb=").append(Uri.encode(thumbnail))
+    }
+}
+
+/**
+ * Same as [albumRoute] for local playlists:
+ * `local_playlist/{id}?thumb={thumb}` is already registered.
+ */
+fun localPlaylistRoute(id: String, thumbnail: String?): String = buildString {
+    append("local_playlist/").append(id)
+    if (!thumbnail.isNullOrEmpty()) {
+        append("?thumb=").append(Uri.encode(thumbnail))
+    }
 }
 
 /**
@@ -310,14 +365,11 @@ fun Modifier.morphContainer(id: String?, isSource: Boolean): Modifier {
                 // most obvious tell that a morph is two images and not one object.
                 //
                 // Arriving (push) resolves early so the card is opaque while it is still
-                // growing; leaving (pop) holds and drops at the very end. Scaled to the
-                // same proportion of the flight as before (roughly the first/last fifth)
-                // now that MorphEnterMillis/MorphExitStiffness are slower -- these were
-                // still 80ms/90ms after that change, i.e. a sixth of the new flight
-                // instead of a fifth, which read as an abrupt little flash at the start
-                // of an otherwise slow, smooth motion.
+                // growing; leaving (pop) holds to midway then drops over the last 120ms
+                // (body-first hero-late mirror: screen body fades in its own first 90ms
+                // inside AlbumScreen, hero rides the container to the tile).
                 enter = fadeIn(tween(110, easing = FastOutSlowInEasing)),
-                exit = fadeOut(tween(120, delayMillis = 120, easing = FastOutSlowInEasing)),
+                exit = fadeOut(tween(120, delayMillis = 140, easing = FastOutSlowInEasing)),
                 clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(radius)),
             )
             .clip(RoundedCornerShape(radius))

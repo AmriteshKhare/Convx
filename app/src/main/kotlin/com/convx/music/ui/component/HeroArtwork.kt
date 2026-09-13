@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -490,11 +491,11 @@ fun Color.asGlassSurfaceTint(isDark: Boolean = true): Color {
  *  to read as lit glass rather than neon — saturated enough to see the color,
  *  never colorful. Shared by every glass surface on the screen (see
  *  [Modifier.liquidGlass]'s default rim), so all rims match. */
-fun Color.asRimPop(): Color {
+fun Color.asRimPop(isDark: Boolean = true): Color {
     val hsl = FloatArray(3)
     androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
     hsl[1] = hsl[1].coerceIn(0.40f, 0.55f) // visible hue, not neon
-    hsl[2] = hsl[2].coerceIn(0.62f, 0.74f) // light enough to read as highlight
+    hsl[2] = if (isDark) hsl[2].coerceIn(0.62f, 0.74f) else hsl[2].coerceIn(0.75f, 0.90f)
     return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
 }
 
@@ -624,14 +625,16 @@ private val heroTintScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 fun rememberHeroPalette(url: String?): HeroPalette {
     val context = LocalContext.current
 
-    // Where a failed extraction lands. Black is only ever the *pending*
-    // value below; a device that couldn't fetch the artwork (offline, 403,
-    // decode failure, image evicted under memory pressure) resolves to the
-    // user's own theme colour instead, so a miss degrades to their accent,
-    // not to black.
-    val fallbackTint = LocalAccentColor.current.asDeepTint()
+    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val fallbackTint = com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark)
     val fallbackPalette = remember(fallbackTint) {
-        HeroPalette(background = fallbackTint, accent = fallbackTint.asVividAccent(), wash = fallbackTint.asWashTint())
+        HeroPalette(
+            background = fallbackTint,
+            accent = fallbackTint,
+            wash = fallbackTint,
+            primaryText = if (isDark) Color.White else Color.Black,
+            secondaryText = if (isDark) Color(0xFFEBEBF5) else Color(0xFF3C3C43),
+        )
     }
 
     // The same accent fallback as a failed extraction, not black, while the real
@@ -780,12 +783,14 @@ fun AlbumStyleHeroImage(
             },
     ) {
         if (!artworkUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = artworkUrl,
-                contentDescription = null,
+            // Thumb-then-full: tile-sized bitmap lands opaque frame one (morph
+            // grows, never swaps), 1024px fades over it. Fade lives on the box,
+            // NOT the image: the merge band below is a sibling and must reach
+            // the join at full strength.
+            ThumbThenFullHero(
+                thumbUrl = artworkUrl,
+                fullUrl = artworkUrl,
                 contentScale = ContentScale.Crop,
-                // The fade lives on the image, NOT the box: the merge band below
-                // is a sibling and must reach the join at full strength.
                 modifier = Modifier
                     .fillMaxSize()
                     .drawWithContent {
@@ -1292,15 +1297,6 @@ fun ArtistHeroImage(
     // progressively as it scrolls up, sharpening back on the way down.
     scrollBlurProgress: Float = 0f,
 ) {
-    val context = LocalContext.current
-    val heroRequest = remember(artworkUrl) {
-        artworkUrl?.takeIf { it.isNotBlank() }?.let {
-            ImageRequest.Builder(context)
-                .data(it.resize(1200, 1200))
-                .crossfade(Motion.MorphEnterMillis)
-                .build()
-        }
-    }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1311,11 +1307,13 @@ fun ArtistHeroImage(
                 compositingStrategy = CompositingStrategy.Offscreen
             },
     ) {
-        if (heroRequest != null) {
-            // Sharp plate, full-bleed.
-            AsyncImage(
-                model = heroRequest,
-                contentDescription = null,
+        if (!artworkUrl.isNullOrBlank()) {
+            // Sharp plate, full-bleed: thumb tier lands opaque frame one so the
+            // morph grows, 1200px fades over it like every other detail hero.
+            ThumbThenFullHero(
+                thumbUrl = artworkUrl,
+                fullUrl = artworkUrl,
+                fullPx = 1200,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )

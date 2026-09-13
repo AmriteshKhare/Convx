@@ -223,9 +223,7 @@ fun MiniPlayer(
     }
 }
 
-// ============================================================================
-// NEW MINI PLAYER DESIGN
-// ============================================================================
+// New mini player design.
 
 @Composable
 private fun NewMiniPlayer(
@@ -807,9 +805,7 @@ private fun NewMiniPlayerSongInfo(
     }
 }
 
-// ============================================================================
-// LEGACY MINI PLAYER DESIGN
-// ============================================================================
+// Legacy mini player design.
 
 @Composable
 private fun LegacyMiniPlayer(
@@ -1145,9 +1141,7 @@ private fun LegacyMiniMediaInfo(
     }
 }
 
-// ============================================================================
-// ISOLATED BUTTON COMPOSABLES - Prevent parent recomposition
-// ============================================================================
+// Isolated button composables to prevent parent recomposition.
 
 
 @Composable
@@ -1283,10 +1277,10 @@ internal fun MiniPlayerBackgroundLayer(
     when (style) {
         PlayerBackgroundStyle.BLUR -> {
             // Baked blur on the 128px decode (see Player.kt BLUR branch): same
-            // look as Modifier.blur(30.dp), zero per-frame RenderEffect cost.
+            // look as Modifier.blur(3.dp), zero per-frame RenderEffect cost.
             BlurredBackdropImage(
                 model = mediaMetadata?.thumbnailUrl,
-                screenBlurRadiusDp = 30f,
+                screenBlurRadiusDp = 3f,
                 decodeSize = 128,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -1401,7 +1395,7 @@ internal fun MiniPlayerBackgroundLayer(
                 val matrix = remember { ColorMatrix().apply { setToSaturation(1.6f) } }
                 BlurredBackdropImage(
                     model = mediaMetadata?.thumbnailUrl,
-                    screenBlurRadiusDp = 40f,
+                    screenBlurRadiusDp = 3f,
                     decodeSize = 128,
                     colorFilter = ColorFilter.colorMatrix(matrix),
                     modifier = Modifier

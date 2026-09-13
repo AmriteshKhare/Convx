@@ -146,6 +146,9 @@ import com.convx.music.ui.utils.plusStart
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.utils.LocalFolderIndex
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
+import com.convx.music.ui.utils.localPlaylistRoute
 import com.convx.music.ui.utils.onlinePlaylistRoute
 import com.convx.music.LocalDatabase
 import com.convx.music.LocalPlayerAwareWindowInsets
@@ -390,8 +393,8 @@ fun HomeScreen(
                 playerConnection.playQueue(YouTubeQueue.radio(localItem.toMediaMetadata()))
             }
 
-            is Album -> navController.navigate("album/${localItem.id}")
-            is Artist -> navController.navigate("artist/${localItem.id}")
+            is Album -> navController.navigate(albumRoute(localItem.id, localItem.thumbnailUrl))
+            is Artist -> navController.navigate(artistRoute(localItem.id, localItem.thumbnailUrl))
             // Matches localGridItem, which also renders no tap target for a playlist
             // here: this shelf is built from songs and albums only.
             is Playlist -> Unit
@@ -449,7 +452,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .combinedBounceClick(
                         onClick = {
-                            navController.navigate("album/${it.id}")
+                            navController.navigate(albumRoute(it.id, it.thumbnailUrl))
                         },
                         onLongClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -471,7 +474,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .combinedBounceClick(
                         onClick = {
-                            navController.navigate("artist/${it.id}")
+                            navController.navigate(artistRoute(it.id, it.thumbnailUrl))
                         },
                         onLongClick = {
                             haptic.performHapticFeedback(
@@ -1207,7 +1210,7 @@ private fun LazyListScope.localHomeContent(
                 shape = listItemShape(index, shownPlaylists.size),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .bounceClick { deps.navController.navigate("local_playlist/" + playlist.id) },
+                    .bounceClick { deps.navController.navigate(localPlaylistRoute(playlist.id, playlist.thumbnailUrl)) },
             )
         }
     }
@@ -1477,12 +1480,13 @@ private fun HomeSectionDeps.openYtItem(item: YTItem) {
         is SongItem -> playerConnection.playQueue(
             YouTubeQueue(item.endpoint ?: WatchEndpoint(videoId = item.id), item.toMediaMetadata())
         )
-        is AlbumItem -> navController.navigate("album/${item.id}")
-        is ArtistItem -> navController.navigate("artist/${item.id}")
+        is AlbumItem -> navController.navigate(albumRoute(item.id, item.thumbnail))
+        is ArtistItem -> navController.navigate(artistRoute(item.id, item.thumbnail))
         // A locally-created playlist (id prefixed "LP", see PlaylistEntity.generatePlaylistId)
         // is not a real YouTube playlist — online_playlist/ cannot resolve it.
         is PlaylistItem -> navController.navigate(
-            if (item.id.startsWith("LP")) "local_playlist/${item.id}" else "online_playlist/${item.id}"
+            if (item.id.startsWith("LP")) localPlaylistRoute(item.id, item.thumbnail)
+            else onlinePlaylistRoute(item.id, item.title, item.thumbnail)
         )
     }
 }
@@ -1969,9 +1973,9 @@ private fun LazyListScope.similarRecommendationsSection(
                 },
                 onClick = {
                     when (recommendation.title) {
-                        is Song -> deps.navController.navigate("album/${recommendation.title.album!!.id}")
-                        is Album -> deps.navController.navigate("album/${recommendation.title.id}")
-                        is Artist -> deps.navController.navigate("artist/${recommendation.title.id}")
+                        is Song -> deps.navController.navigate(albumRoute(recommendation.title.album!!.id, recommendation.title.thumbnailUrl))
+                        is Album -> deps.navController.navigate(albumRoute(recommendation.title.id, recommendation.title.thumbnailUrl))
+                        is Artist -> deps.navController.navigate(artistRoute(recommendation.title.id, recommendation.title.thumbnailUrl))
                         is Playlist -> {}
                     }
                 },

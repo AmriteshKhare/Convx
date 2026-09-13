@@ -330,8 +330,6 @@ private fun EqScreenContent(
     }
 }
 
-// --- HELPER COMPOSABLES ---
-
 @Composable
 private fun NoEqualizationItem(
     isSelected: Boolean,

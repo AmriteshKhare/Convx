@@ -61,7 +61,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import java.text.Collator
 import java.time.LocalDateTime
 import java.time.ZoneOffset
@@ -79,6 +78,13 @@ private val artistIdCache = ConcurrentHashMap<String, String>()
 
 private fun DatabaseDao.resolveArtistId(name: String): String? =
     artistIdCache[name] ?: artistByName(name)?.id?.also { artistIdCache[name] = it }
+
+/** Drop stale name->id entries (rename/delete). Call after artist mutations. */
+fun invalidateArtistCache(name: String? = null, id: String? = null) {
+    if (name != null) artistIdCache.remove(name)
+    else if (id != null) artistIdCache.entries.removeIf { it.value == id }
+    else artistIdCache.clear()
+}
 
 @Dao
 interface DatabaseDao {
@@ -600,6 +606,10 @@ interface DatabaseDao {
     @Transaction
     @Query("SELECT * FROM song WHERE id IN (:songIds)")
     suspend fun getSongsByIds(songIds: List<String>): List<Song>
+
+    @Transaction
+    @Query("SELECT * FROM song WHERE id IN (:songIds)")
+    fun getSongsByIdsBlocking(songIds: List<String>): List<Song>
 
     @Transaction
     @Query("SELECT * FROM song WHERE id IN (:songIds)")
@@ -1610,12 +1620,10 @@ interface DatabaseDao {
     /**
      * Increment by one the play count with today's year and month.
      */
-    fun incrementPlayCount(songId: String) {
+    @Transaction
+    suspend fun incrementPlayCount(songId: String) {
         val time = LocalDateTime.now().atOffset(ZoneOffset.UTC)
-        var oldCount: Int
-        runBlocking {
-            oldCount = getPlayCountByMonth(songId, time.year, time.monthValue).first()
-        }
+        val oldCount = getPlayCountByMonth(songId, time.year, time.monthValue).first()
 
         // add new
         if (oldCount <= 0) {
@@ -1779,10 +1787,11 @@ interface DatabaseDao {
         albumPage.songs
             .map(SongItem::toMediaMetadata)
             .onEach(::insert)
-            .onEach {
-                val existingSong = getSongByIdBlocking(it.id)
-                if (existingSong != null) {
-                    update(existingSong, it)
+            .also { metadatas ->
+                val existingById = getSongsByIdsBlocking(metadatas.map { it.id })
+                    .associateBy { it.song.id }
+                metadatas.forEach { song ->
+                    existingById[song.id]?.let { update(it, song) }
                 }
             }.mapIndexed { index, song ->
                 SongAlbumMap(
@@ -1901,10 +1910,11 @@ interface DatabaseDao {
         albumPage.songs
             .map(SongItem::toMediaMetadata)
             .onEach(::insert)
-            .onEach {
-                val existingSong = getSongByIdBlocking(it.id)
-                if (existingSong != null) {
-                    update(existingSong, it)
+            .also { metadatas ->
+                val existingById = getSongsByIdsBlocking(metadatas.map { it.id })
+                    .associateBy { it.song.id }
+                metadatas.forEach { song ->
+                    existingById[song.id]?.let { update(it, song) }
                 }
             }.mapIndexed { index, song ->
                 SongAlbumMap(

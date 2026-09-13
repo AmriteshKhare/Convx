@@ -25,10 +25,6 @@ import kotlin.math.sqrt
  * of the pixel read is the same arithmetic on the same values.
  */
 
-// ---------------------------------------------------------------------------
-// Pipeline models
-// ---------------------------------------------------------------------------
-
 /** A rectangle in normalised image coordinates, origin bottom-left (Vision's convention). */
 data class NormalizedRegion(val x: Double, val y: Double, val width: Double, val height: Double) {
     val maxX get() = x + width
@@ -88,10 +84,6 @@ data class ToneStatistics(
     val strongChromaticCoverage: Float,
     val chromaticConfidence: Float,
 )
-
-// ---------------------------------------------------------------------------
-// Sampling
-// ---------------------------------------------------------------------------
 
 /**
  * Centre-crops [source] to [maximumDimension]'s aspect and scales it down, then reads
@@ -263,10 +255,6 @@ internal fun makePixelPlane(pixels: IntArray, width: Int, height: Int): PixelPla
     return PixelPlane(width, height, points, alpha, fingerprint)
 }
 
-// ---------------------------------------------------------------------------
-// Weighting
-// ---------------------------------------------------------------------------
-
 /**
  * Stage 3: how much each pixel counts toward "what colour is this artwork".
  *
@@ -408,10 +396,6 @@ private fun textEdgeSupport(index: Int, plane: PixelPlane): Float {
     if (count == 0f) return 0f
     return smoothStep(4f, 28f, distance / count)
 }
-
-// ---------------------------------------------------------------------------
-// Tone statistics
-// ---------------------------------------------------------------------------
 
 /**
  * Stage 4: is this artwork dark or light, and how sure are we?

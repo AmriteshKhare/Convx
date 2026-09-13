@@ -102,7 +102,7 @@ object AppleMusicCanvasProvider {
         }
     }
 
-    // --- Live token refresh -------------------------------------------------
+    // Live token refresh.
     // The hardcoded APPLE_MUSIC_TOKEN above expires on its own schedule (its
     // "exp" claim); when it does, every request here starts failing with 401
     // until someone notices and hand-updates the constant. Instead, fetch the
@@ -289,7 +289,7 @@ object AppleMusicCanvasProvider {
                 val resultName = attributes["name"]?.jsonPrimitive?.contentOrNull ?: ""
                 val resultCollectionName = attributes["collectionName"]?.jsonPrimitive?.contentOrNull ?: ""
                 
-                // --- Playlist/Set List Filtering ---
+                // Playlist filtering.
                 // We should never use playlist animations as album canvas.
                 val nameLower = resultName.lowercase(Locale.ROOT)
                 val collectionLower = resultCollectionName.lowercase(Locale.ROOT)
@@ -464,7 +464,7 @@ object AppleMusicCanvasProvider {
             val albumName = attributes?.get("name")?.jsonPrimitive?.contentOrNull ?: ""
             val artistName = attributes?.get("artistName")?.jsonPrimitive?.contentOrNull ?: fallbackArtist
             
-            // --- Playlist/Station Filtering ---
+            // Playlist filtering.
             val nameLower = albumName.lowercase(Locale.ROOT)
             val isBlacklisted = nameLower.contains("playlist") || nameLower.contains("set list") ||
                     nameLower.contains("essentials") || nameLower.contains("dj mix") ||

@@ -106,17 +106,17 @@ class DjEngine(
         get() = creativePref && enabled
         set(value) { creativePref = value }
 
-    private val analyses = HashMap<String, TrackAnalysis>()
-    private val analyzers = HashMap<Player, TrackAnalyzerAudioProcessor>()
-    private val filters = HashMap<Player, DjFilterAudioProcessor>()
-    private val tails = HashMap<Player, DjTailAudioProcessor>()
+    private val analyses = java.util.concurrent.ConcurrentHashMap<String, TrackAnalysis>()
+    private val analyzers = java.util.concurrent.ConcurrentHashMap<Player, TrackAnalyzerAudioProcessor>()
+    private val filters = java.util.concurrent.ConcurrentHashMap<Player, DjFilterAudioProcessor>()
+    private val tails = java.util.concurrent.ConcurrentHashMap<Player, DjTailAudioProcessor>()
     /** Which track each player's analyzer is currently accumulating for.
      *  Per-player, not a single field on the service: the crossfade swaps which
      *  ExoPlayer object is "the" player, so one shared "previous media id"
      *  would end up filing the new player's energy profile under the old
      *  track. */
-    private val analyzingMediaId = HashMap<Player, String>()
-    private val delays = HashMap<Player, DelayAudioProcessor>()
+    private val analyzingMediaId = java.util.concurrent.ConcurrentHashMap<Player, String>()
+    private val delays = java.util.concurrent.ConcurrentHashMap<Player, DelayAudioProcessor>()
 
     /** Most-recent-first, so the selector can avoid repeating itself. */
     private val recentStyles = ArrayDeque<TransitionStyle>()
@@ -136,8 +136,6 @@ class DjEngine(
      *  has speed to unwind when the fade completes. */
     var activePlan: DjMixPlan? = null
         private set
-
-    // --- player registration ------------------------------------------------
 
     fun registerPlayer(
         player: Player,
@@ -293,8 +291,6 @@ class DjEngine(
         persist(mediaId, updated)
     }
 
-    // --- persistence --------------------------------------------------------
-
     /** Load cached analysis for upcoming queue items so a track that has been
      *  heard before needs no probe at all. */
     fun hydrate(mediaIds: List<String>) {
@@ -339,8 +335,6 @@ class DjEngine(
         }
     }
 
-    // --- pre-analysis probe -------------------------------------------------
-
     fun hasAnalysis(mediaId: String?): Boolean = mediaId != null && analyses.containsKey(mediaId)
 
     fun analysisFor(mediaId: String?): TrackAnalysis? = mediaId?.let { analyses[it] }
@@ -366,6 +360,8 @@ class DjEngine(
         currentMediaId: () -> String?,
     ) {
         if (afterMs <= 0L || hasAnalysis(item.mediaId)) return
+        probeJob?.cancel()
+        releaseProbe()
         probeJob = scope.launch {
             delay(afterMs)
             if (!isActive || currentMediaId() != guardMediaId) return@launch
@@ -402,8 +398,6 @@ class DjEngine(
         }
         probePlayer = null
     }
-
-    // --- decisions ----------------------------------------------------------
 
     /** Builds the plan for a transition, or null when DJ mixing is off. */
     fun planTransition(

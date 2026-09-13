@@ -9,6 +9,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.ui.utils.albumRoute
+import com.convx.music.ui.utils.artistRoute
 import com.convx.music.ui.utils.onlinePlaylistRoute
 
 import androidx.compose.foundation.layout.Box
@@ -314,11 +316,11 @@ fun OnlineSearchScreen(
                                     }
                                 }
                                 is AlbumItem -> {
-                                    navController.navigate("album/${item.id}")
+                                    navController.navigate(albumRoute(item.id, item.thumbnail))
                                     onDismiss()
                                 }
                                 is ArtistItem -> {
-                                    navController.navigate("artist/${item.id}")
+                                    navController.navigate(artistRoute(item.id, item.thumbnail))
                                     onDismiss()
                                 }
                                 is PlaylistItem -> {

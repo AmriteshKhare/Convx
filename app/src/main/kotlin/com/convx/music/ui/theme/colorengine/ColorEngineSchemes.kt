@@ -20,10 +20,6 @@ import kotlin.math.min
 
 private const val Epsilon = 1e-6f
 
-// ---------------------------------------------------------------------------
-// Style profile
-// ---------------------------------------------------------------------------
-
 class StyleProfile(style: ColorStyle) {
     val backgroundChroma: Double
     val textChroma: Double
@@ -68,10 +64,6 @@ private class MeshHueFamily(
     var weightedSupport: Float,
     var populationSupport: Float,
 )
-
-// ---------------------------------------------------------------------------
-// Role selection
-// ---------------------------------------------------------------------------
 
 internal fun selectRoles(clusters: List<Cluster>, identityClusters: List<Cluster>): RoleSelection {
     val largestPopulation = clusters.maxOfOrNull { it.populationShare } ?: 1f
@@ -219,10 +211,6 @@ private fun accentScore(cluster: Cluster, background: Cluster): Float {
         cluster.meanSaliency * 0.10f +
         cluster.textAffinity * 0.06f
 }
-
-// ---------------------------------------------------------------------------
-// Backgrounds
-// ---------------------------------------------------------------------------
 
 private fun backgroundIdentity(roles: RoleSelection): Cluster? {
     val candidates = ArrayList<Cluster>(2)
@@ -424,10 +412,6 @@ private fun refinedLightBackgroundChroma(color: LChColor): LChColor {
     val chromaScale = 1 + nearWhite * restrainedChroma * 0.12
     return fitToSRGBGamut(color.withChroma(min(82.0, color.c * chromaScale)))
 }
-
-// ---------------------------------------------------------------------------
-// Text, accent, scheme
-// ---------------------------------------------------------------------------
 
 private fun foregroundSource(roles: RoleSelection, background: LChColor): LChColor {
     val foreground = roles.foreground?.color?.toLCh()
@@ -641,10 +625,6 @@ internal fun makeScheme(
         meshColors = meshColors.map { it.toColor() },
     )
 }
-
-// ---------------------------------------------------------------------------
-// Mesh
-// ---------------------------------------------------------------------------
 
 private fun makeMeshHueFamilies(clusters: List<Cluster>): List<MeshHueFamily> {
     val families = ArrayList<MeshHueFamily>()
@@ -902,10 +882,6 @@ private fun neutralMesh(clusters: List<Cluster>, base: LChColor, tone: ImageTone
     return colors
 }
 
-// ---------------------------------------------------------------------------
-// Palette
-// ---------------------------------------------------------------------------
-
 internal fun makePalette(
     roles: RoleSelection,
     clusters: List<Cluster>,
@@ -929,10 +905,6 @@ internal fun makePalette(
         clusters = clusters.map { it.color },
     )
 }
-
-// ---------------------------------------------------------------------------
-// Reusable pieces for callers that already have a background
-// ---------------------------------------------------------------------------
 
 /**
  * The four text tiers — primary, secondary, tertiary, quaternary — for a background the

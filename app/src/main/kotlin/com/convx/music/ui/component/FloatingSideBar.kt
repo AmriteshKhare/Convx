@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import com.convx.music.ui.theme.isHueless
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.luminance
 import com.convx.music.LocalAmbientBackgroundColor
@@ -346,23 +347,35 @@ private fun SideNavTabs(
     val glassConfig = LocalGlassEffectConfig.current
     val appleMusicUi = LocalAppleMusicUi.current
 
-    val selectedContentColor = glassConfig.resolvedTextColor()
-    val unselectedContentColor = glassConfig.resolvedTextColor().copy(alpha = 0.75f)
-
-    // Same wash the phone puck uses: the configured colour, ambient mesh tint
-    // (lighter than the surface, hint of hue) on hero-art screens, or the
-    // app's current accent so an unset puck still tracks whatever is playing.
-    val sideAmbient = LocalAmbientBackgroundColor.current.value
     val sideThemeDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val sideAmbient = LocalAmbientBackgroundColor.current.value
+
+    val selectedContentColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = sideThemeDark,
+        isSelected = true,
+        isTitle = false,
+    )
+    val unselectedContentColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
+        isDark = sideThemeDark,
+        activeTint = sideAmbient,
+        isSelected = false,
+        isTitle = false,
+    )
+
     val puckWash = if (glassConfig.puckColor.isSpecified) {
         glassConfig.puckColor
-    } else if (sideAmbient.isSpecified) {
+    } else if (sideAmbient.isSpecified && !sideAmbient.isHueless()) {
         sideAmbient.asPuckTint(sideThemeDark)
     } else {
-        LocalAccentColor.current
+        com.convx.music.ui.theme.GlassTintTokens.neutralTintColor(sideThemeDark)
     }
-    val puckRestAlpha = if (!glassConfig.puckColor.isSpecified && sideAmbient.isSpecified) {
-        if (sideThemeDark) 0.80f else 0.70f
+    val isHeroContext = sideAmbient.isSpecified && !sideAmbient.isHueless()
+    val puckRestAlpha = if (!glassConfig.puckColor.isSpecified) {
+        if (sideThemeDark) {
+            if (isHeroContext) 0.80f else 0.55f
+        } else {
+            if (isHeroContext) 0.70f else 0.45f
+        }
     } else {
         glassConfig.puckOpacity.coerceIn(0f, 1f)
     }
@@ -427,9 +440,7 @@ private fun SideNavTabs(
                                     chromaticAberration = true,
                                 )
                             },
-                            highlight = {
-                                Highlight.Default.copy(alpha = PuckRestHighlightAlpha)
-                            },
+                            highlight = { null },
                             shadow = { Shadow(alpha = PuckRestShadowAlpha) },
                             onDrawSurface = { drawRect(puckWash.copy(alpha = puckRestAlpha)) },
                             frozen = frozen,

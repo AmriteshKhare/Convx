@@ -67,9 +67,9 @@ class GlassEffectConfigTest {
     }
 
     @Test
-    fun `surface tint defaults to dark grey`() {
+    fun `surface tint defaults to unspecified for adaptive theming`() {
         val config = GlassEffectConfig()
-        assertEquals(Color(0xFF1A1A1A), config.surfaceTintColor)
+        assertEquals(Color.Unspecified, config.surfaceTintColor)
     }
 
     @Test

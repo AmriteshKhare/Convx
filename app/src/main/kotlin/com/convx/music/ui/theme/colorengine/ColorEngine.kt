@@ -250,10 +250,6 @@ object ColorEngine {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Results
-// ---------------------------------------------------------------------------
-
 /** One appearance's worth of tokens, ready to hand to Compose. */
 data class ColorEngineScheme(
     val background: Color,

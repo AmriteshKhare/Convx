@@ -243,10 +243,15 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "album/{albumId}",
+        route = "album/{albumId}?thumb={thumb}",
         arguments = listOf(
             navArgument("albumId") {
                 type = NavType.StringType
+            },
+            navArgument("thumb") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
             },
         ),
     ) {
@@ -254,10 +259,15 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "artist/{artistId}",
+        route = "artist/{artistId}?thumb={thumb}",
         arguments = listOf(
             navArgument("artistId") {
                 type = NavType.StringType
+            },
+            navArgument("thumb") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
             },
         ),
     ) {
@@ -287,7 +297,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "artist/{artistId}/items?browseId={browseId}?params={params}",
+        route = "artist/{artistId}/items?browseId={browseId}&params={params}",
         arguments = listOf(
             navArgument("artistId") {
                 type = NavType.StringType
@@ -327,10 +337,15 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "local_playlist/{playlistId}",
+        route = "local_playlist/{playlistId}?thumb={thumb}",
         arguments = listOf(
             navArgument("playlistId") {
                 type = NavType.StringType
+            },
+            navArgument("thumb") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
             },
         ),
     ) {
@@ -355,10 +370,15 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "auto_playlist/{playlist}",
+        route = "auto_playlist/{playlist}?thumb={thumb}",
         arguments = listOf(
             navArgument("playlist") {
                 type = NavType.StringType
+            },
+            navArgument("thumb") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
             },
         ),
     ) {
@@ -366,10 +386,15 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "cache_playlist/{playlist}",
+        route = "cache_playlist/{playlist}?thumb={thumb}",
         arguments = listOf(
             navArgument("playlist") {
                 type = NavType.StringType
+            },
+            navArgument("thumb") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
             },
         ),
     ) {
