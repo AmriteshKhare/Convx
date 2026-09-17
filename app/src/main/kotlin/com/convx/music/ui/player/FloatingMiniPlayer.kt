@@ -398,14 +398,17 @@ fun FloatingMiniPlayer(
 
                     Spacer(Modifier.width(8.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        // One Plus layer for both lines rather than one each: the glyphs never
+                        // overlap, so adding them together is the same pixels at half the layers.
+                        modifier = Modifier.weight(1f).additiveChrome(useGlass && isDark),
+                    ) {
                         Text(
                             text = mediaMetadata?.title.orEmpty(),
                             style = AppTheme.typography.bodySmall,
                             color = contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -413,7 +416,6 @@ fun FloatingMiniPlayer(
                             color = contentColor.copy(alpha = 0.7f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                     }
                 }
@@ -478,14 +480,17 @@ fun FloatingMiniPlayer(
 
                     Spacer(Modifier.width(10.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        // One Plus layer for both lines rather than one each: the glyphs never
+                        // overlap, so adding them together is the same pixels at half the layers.
+                        modifier = Modifier.weight(1f).additiveChrome(useGlass && isDark),
+                    ) {
                         Text(
                             text = mediaMetadata?.title.orEmpty(),
                             style = AppTheme.typography.bodyMedium,
                             color = contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -493,7 +498,6 @@ fun FloatingMiniPlayer(
                             color = contentColor.copy(alpha = 0.7f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                     }
                 }
@@ -644,14 +648,17 @@ fun FloatingMiniPlayer(
 
                     Spacer(Modifier.width(12.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        // One Plus layer for both lines rather than one each: the glyphs never
+                        // overlap, so adding them together is the same pixels at half the layers.
+                        modifier = Modifier.weight(1f).additiveChrome(useGlass && isDark),
+                    ) {
                         Text(
                             text = mediaMetadata?.title.orEmpty(),
                             style = AppTheme.typography.bodyMedium,
                             color = contentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
@@ -659,7 +666,6 @@ fun FloatingMiniPlayer(
                             color = contentColor.copy(alpha = 0.7f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.additiveChrome(useGlass && isDark),
                         )
                     }
                 }

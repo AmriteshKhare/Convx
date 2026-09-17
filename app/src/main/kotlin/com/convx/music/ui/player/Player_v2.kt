@@ -18,6 +18,8 @@ import android.os.Looper
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -34,6 +36,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -67,6 +70,7 @@ import com.convx.music.constants.EnableGoogleCastKey
 import com.convx.music.models.MediaMetadata
 import com.convx.music.ui.component.BottomSheetState
 import com.convx.music.ui.component.DjReadout
+import com.convx.music.ui.component.BakedFootBlur
 import com.convx.music.ui.component.ElasticVolumeSlider
 import com.convx.music.ui.component.PlayerSliderTrack
 import com.convx.music.ui.theme.PlayerSliderColors
@@ -231,8 +235,43 @@ fun PlayerV2(
         if (playerState == PlayerInternalState.LYRICS) {
             delay(3000)
             controlsVisible = false
-        } else {
+        } else if (playerState != PlayerInternalState.QUEUE) {
             controlsVisible = true
+        }
+    }
+    // Queue: the transport controls follow the list's scroll direction, like Apple Music
+    // (60fps.design apple-music-player-controls-collapse) -- scrolling the queue up tucks
+    // them away to give the list the room, scrolling back down brings them straight back.
+    // A touch alone no longer re-shows them there, or every drag would flash them on.
+    LaunchedEffect(playerState) {
+        if (playerState == PlayerInternalState.QUEUE) controlsVisible = true
+    }
+    // Needs a real run of travel in one direction before it flips. Reacting to every
+    // 1px delta flipped the controls back and forth on finger jitter, and each flip
+    // restarted their enter/exit animation -- the reported jittery, too-fast hide.
+    val queueControlsFlipPx = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
+    val queueControlsScroll = remember(queueControlsFlipPx) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            var travel = 0f
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+            ): androidx.compose.ui.geometry.Offset {
+                if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) {
+                    val dy = consumed.y + available.y
+                    // Direction change restarts the run.
+                    if (dy != 0f && (travel == 0f || (dy < 0f) == (travel < 0f))) travel += dy else travel = dy
+                    if (travel <= -queueControlsFlipPx) {
+                        if (controlsVisible) controlsVisible = false
+                        travel = 0f
+                    } else if (travel >= queueControlsFlipPx) {
+                        if (!controlsVisible) controlsVisible = true
+                        travel = 0f
+                    }
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
         }
     }
     
@@ -361,12 +400,16 @@ fun PlayerV2(
         }
     }
     
-    LaunchedEffect(Unit) {
+    // Only this sheet's own slider and lyrics read position/duration, and both are off-screen
+    // while collapsed -- the mini player has its own state. Polling unconditionally kept a
+    // 20Hz recomposition running for as long as a track was loaded, paused or not.
+    LaunchedEffect(isPlaying, state.isCollapsed, mediaMetadata?.id) {
+        if (state.isCollapsed) return@LaunchedEffect
         while (isActive) {
             val rawDuration = playerConnection.player.duration
             position = playerConnection.player.currentPosition.coerceAtLeast(0L)
             duration = if (rawDuration == C.TIME_UNSET || rawDuration < 0) 0L else rawDuration
-            delay(50)
+            delay(if (isPlaying) 50L else 500L)
         }
     }
 
@@ -459,7 +502,7 @@ fun PlayerV2(
                         val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
                         if (event.changes.any { it.pressed }) {
                             lastInteractionTime = System.currentTimeMillis()
-                            controlsVisible = true
+                            if (playerState != PlayerInternalState.QUEUE) controlsVisible = true
                         }
                     }
                 }
@@ -553,24 +596,23 @@ fun PlayerV2(
 
                                 // Massive Apple Music Style Artwork -- Squared keeps the classic
                                 // centred square card; Hero Blend runs the artwork edge-to-edge
-                                // and fades its bottom into the controls below.
+                                // and fades its bottom into the controls below. Frame, blend
+                                // stops and foot are BYTE-identical to the classic APPLE_MUSIC
+                                // clear-art box: full width, 0.65 of the SCREEN height (not the
+                                // pane — the pane loses the bottom inset, which put this hero
+                                // ~20dp higher than classic with an earlier blend start), knee
+                                // 0.78, so both heroes read as the same image.
+                                val heroScreenHeight = LocalConfiguration.current.screenHeightDp.dp
                                 Box(
                                     modifier = if (isHeroLook) {
                                         Modifier
                                             .fillMaxWidth()
-                                            .fillMaxHeight(0.72f)
+                                            .height(heroScreenHeight * 0.65f)
                                             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                                             .drawWithContent {
                                                 drawContent()
                                                 drawRect(
-                                                    brush = Brush.verticalGradient(
-                                                        colorStops = arrayOf(
-                                                            0.00f to Color.Black,
-                                                            0.72f to Color.Black,
-                                                            0.92f to Color.Black.copy(alpha = 0.35f),
-                                                            1.00f to Color.Transparent,
-                                                        )
-                                                    ),
+                                                    brush = com.convx.music.ui.component.heroFadeOutBrush(),
                                                     blendMode = BlendMode.DstIn
                                                 )
                                             }
@@ -672,10 +714,15 @@ fun PlayerV2(
                                     // shrinking it on pause would tear it away from that fixed
                                     // frame, so only Squared's floating card does the pause-shrink.
                                     val heroScale by animateFloatAsState(
-                                        targetValue = if (isPlaying || isHeroLook) 1f else 0.94f,
+                                        // Measured off 60fps.design apple-music-play-pause (60fps):
+                                        // artwork 667px playing, 486px paused (0.729). Play overshoots
+                                        // ~11% of the travel then settles; pause glides in with no
+                                        // undershoot. Both fit a 0.5s-response spring (stiffness 160),
+                                        // damping 0.6 growing and 0.95 shrinking.
+                                        targetValue = if (isPlaying || isHeroLook) 1f else 0.729f,
                                         animationSpec = spring(
-                                            dampingRatio = 0.72f,
-                                            stiffness = 520f,
+                                            dampingRatio = if (isPlaying || isHeroLook) 0.6f else 0.95f,
+                                            stiffness = 160f,
                                         ),
                                         label = "heroScale",
                                     )
@@ -704,9 +751,21 @@ fun PlayerV2(
                                             crossfadeMillis = heroCrossfadeMs.takeIf { it > 0 }?.toInt() ?: 200,
                                             modifier = Modifier.fillMaxSize(),
                                         )
+                                        // Same baked progressive foot as artist/classic player
+                                        // (byte-identical stops): stills grow blur down the band;
+                                        // under canvas video it is the poster until the first
+                                        // frame. No Haze — Haze can't sample TextureView video.
+                                        // Hero Blend only: the squared card is a plain cover, no foot blur.
+                                        if (isHeroLook) {
+                                            BakedFootBlur(
+                                                artworkUrl = mediaMetadata?.thumbnailUrl,
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        }
                                         PlayerV2Canvas(
                                             mediaMetadata = mediaMetadata,
-                                            isPlaying = isPlaying,
+                                            // Collapsed sheet stays composed: pause the canvas decoder.
+                                            isPlaying = isPlaying && !state.isCollapsed,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     }
@@ -722,13 +781,11 @@ fun PlayerV2(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(
+                                        FadeSwapText(
                                             mediaMetadata?.title ?: "Unknown",
                                             style = AppTheme.typography.headlineSmall, 
                                             color = adaptivePrimary,
                                             fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.sharedBounds(
                                                 rememberSharedContentState(key = "title"),
                                                 animatedVisibilityScope = this@AnimatedContent
@@ -738,7 +795,7 @@ fun PlayerV2(
                                             }
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
+                                        FadeSwapText(
                                             mediaMetadata?.artists?.firstOrNull()?.name ?: "Unknown",
                                             style = AppTheme.typography.titleMedium,
                                             // Same extra dimming UpNextSong applies to its own
@@ -746,8 +803,6 @@ fun PlayerV2(
                                             // so both artist-name reads land at the same weight.
                                             color = adaptiveSecondary.copy(alpha = 0.7f),
                                             fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.sharedBounds(
                                                 rememberSharedContentState(key = "artist"),
                                                 animatedVisibilityScope = this@AnimatedContent
@@ -791,7 +846,7 @@ fun PlayerV2(
                                                 // adaptivePrimary either way -- filled vs outline glyph is
                                                 // what signals liked, not a colour swap.
                                                 tint = adaptivePrimary,
-                                                modifier = Modifier.size(28.dp),
+                                                modifier = Modifier.size(28.dp).likePop(isLiked, currentSong?.song?.id),
                                                 contentDescription = "Like",
                                             )
                                         }
@@ -890,7 +945,8 @@ fun PlayerV2(
                                         )
                                         PlayerV2Canvas(
                                             mediaMetadata = mediaMetadata,
-                                            isPlaying = isPlaying,
+                                            // Collapsed sheet stays composed: pause the canvas decoder.
+                                            isPlaying = isPlaying && !state.isCollapsed,
                                             modifier = Modifier.fillMaxSize()
                                         )
                                     }
@@ -942,7 +998,7 @@ fun PlayerV2(
                                                 painter = painterResource(if (isLiked) R.drawable.flamingo_favorited else R.drawable.flamingo_favorite),
                                                 contentDescription = "Like",
                                                 tint = adaptivePrimary,
-                                                modifier = Modifier.size(24.dp)
+                                                modifier = Modifier.size(24.dp).likePop(isLiked, currentSong?.song?.id)
                                             )
                                         }
                                         
@@ -1001,12 +1057,26 @@ fun PlayerV2(
                                             enter = slideInVertically(animationSpec = Motion.appear()) { it } + fadeIn(Motion.appear()),
                                             exit = fadeOut(animationSpec = Motion.appearExit()) + slideOutVertically(animationSpec = Motion.appearExit()) { it }
                                         )
+                                        .then(
+                                            if (targetState == PlayerInternalState.QUEUE) {
+                                                Modifier.nestedScroll(queueControlsScroll)
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
                                 ) {
                                     if (targetState == PlayerInternalState.LYRICS) {
                                         Lyrics(
                                             sliderPositionProvider = { sliderPosition ?: position },
                                             showLyrics = true,
                                             modifier = Modifier.fillMaxSize()
+                                        )
+                                        SingControl(
+                                            engine = playerConnection.service.karaoke,
+                                            tint = adaptivePrimary,
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(end = 20.dp, bottom = 12.dp),
                                         )
                                     } else {
                                         val queueSheetState = rememberBottomSheetState(
@@ -1088,12 +1158,12 @@ fun PlayerV2(
             // Persistent Controls Array (Always at the bottom)
             AnimatedVisibility(
                     visible = controlsVisible,
-                    enter = fadeIn(animationSpec = Motion.appear()) +
-                            slideInVertically(animationSpec = Motion.appear()) { it / 2 } +
-                            androidx.compose.animation.expandVertically(animationSpec = Motion.appear()),
-                    exit = fadeOut(animationSpec = Motion.appearExit()) +
-                           slideOutVertically(animationSpec = Motion.appearExit()) { it / 2 } +
-                           androidx.compose.animation.shrinkVertically(animationSpec = Motion.appearExit())
+                    enter = fadeIn(animationSpec = ControlsShowSpec()) +
+                            slideInVertically(animationSpec = ControlsShowSpec()) { it / 2 } +
+                            androidx.compose.animation.expandVertically(animationSpec = ControlsShowSpec()),
+                    exit = fadeOut(animationSpec = ControlsHideSpec()) +
+                           slideOutVertically(animationSpec = ControlsHideSpec()) { it / 2 } +
+                           androidx.compose.animation.shrinkVertically(animationSpec = ControlsHideSpec())
                 ) {
                     Column(
                         modifier = Modifier
@@ -1168,7 +1238,9 @@ fun PlayerV2(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(makeTimeString(currentPos), color = adaptiveTime, style = AppTheme.typography.labelSmall, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
-                        AudioQualityBadge(playerConnection, adaptivePrimary, isPlaying)
+                        // Collapsed-gated too: this sheet stays composed behind the mini player,
+                        // and the badge's infinite spin kept the whole app drawing every vsync.
+                        AudioQualityBadge(playerConnection, adaptivePrimary, isPlaying && !state.isCollapsed)
                         Text("-" + makeTimeString(maxOf(0L, duration - currentPos)), color = adaptiveTime, style = AppTheme.typography.labelSmall, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
                     }
 
@@ -1200,14 +1272,14 @@ fun PlayerV2(
                             interactionSource = previousInteraction,
                             modifier = Modifier
                                 .size(61.dp)
-                                .flamingoPressScale(previousInteraction)
+                                .transportPressDisc(previousInteraction, adaptivePrimary.copy(alpha = 0.16f))
                                 .alpha(if (isListenTogetherGuest || !canSkipPrevious) 0.4f else 1f)
                         ) {
                             PlayerGlyph(
                                 slot = PlayerIconSlot.V2_PREVIOUS,
                                 fallback = R.drawable.flamingo_rewind,
                                 tint = if (additiveChrome) adaptivePrimary else adaptivePrimary.copy(alpha = 0.8f),
-                                modifier = Modifier.size(41.dp),
+                                modifier = Modifier.size(41.dp).skipGlyphPress(previousInteraction, direction = -1f),
                                 contentDescription = "Previous",
                             )
                         }
@@ -1226,7 +1298,7 @@ fun PlayerV2(
                             interactionSource = playInteraction,
                             modifier = Modifier
                                 .size(58.5.dp)
-                                .flamingoPressScale(playInteraction)
+                                .transportPressDisc(playInteraction, adaptivePrimary.copy(alpha = 0.16f))
                         ) {
                             if (isListenTogetherGuest) {
                                 Icon(
@@ -1237,6 +1309,7 @@ fun PlayerV2(
                                 )
                             } else {
                                 AnimatedPlayerGlyph(
+                                    modifier = Modifier.playGlyphPress(playInteraction),
                                     isPlaying = isPlaying,
                                     playSlot = PlayerIconSlot.V2_PLAY,
                                     pauseSlot = PlayerIconSlot.V2_PAUSE,
@@ -1260,14 +1333,14 @@ fun PlayerV2(
                             interactionSource = nextInteraction,
                             modifier = Modifier
                                 .size(61.dp)
-                                .flamingoPressScale(nextInteraction)
+                                .transportPressDisc(nextInteraction, adaptivePrimary.copy(alpha = 0.16f))
                                 .alpha(if (isListenTogetherGuest || !canSkipNext) 0.4f else 1f)
                         ) {
                             PlayerGlyph(
                                 slot = PlayerIconSlot.V2_NEXT,
                                 fallback = R.drawable.flamingo_fforward,
                                 tint = if (additiveChrome) adaptivePrimary else adaptivePrimary.copy(alpha = 0.8f),
-                                modifier = Modifier.size(41.dp),
+                                modifier = Modifier.size(41.dp).skipGlyphPress(nextInteraction, direction = 1f),
                                 contentDescription = "Next",
                             )
                         }
@@ -1321,12 +1394,12 @@ fun PlayerV2(
             // Bottom Utility Action Bar
             AnimatedVisibility(
                 visible = controlsVisible,
-                enter = fadeIn(animationSpec = Motion.appear()) +
-                        slideInVertically(animationSpec = Motion.appear()) { it / 2 } +
-                        androidx.compose.animation.expandVertically(animationSpec = Motion.appear()),
-                exit = fadeOut(animationSpec = Motion.appearExit()) +
-                       slideOutVertically(animationSpec = Motion.appearExit()) { it / 2 } +
-                       androidx.compose.animation.shrinkVertically(animationSpec = Motion.appearExit())
+                enter = fadeIn(animationSpec = ControlsShowSpec()) +
+                        slideInVertically(animationSpec = ControlsShowSpec()) { it / 2 } +
+                        androidx.compose.animation.expandVertically(animationSpec = ControlsShowSpec()),
+                exit = fadeOut(animationSpec = ControlsHideSpec()) +
+                       slideOutVertically(animationSpec = ControlsHideSpec()) { it / 2 } +
+                       androidx.compose.animation.shrinkVertically(animationSpec = ControlsHideSpec())
             ) {
                 Row(
                     modifier = Modifier
@@ -1665,16 +1738,277 @@ private const val AdditiveChromeContentAlpha = 0.45f
  * flashing a ripple. Needs the same [interactionSource] the button is given, so the scale
  * tracks the real press rather than a second gesture detector layered over it.
  */
+/**
+ * Apple Music's transport press, read off designRefrence/GVRecorder_1788117512105~3.mp4 (a
+ * real device capture): a translucent disc snaps in under the finger as the press lands,
+ * growing from ~0.85x, holds while the finger is down, and fades ~150ms after release.
+ */
 @Composable
-private fun Modifier.flamingoPressScale(interactionSource: MutableInteractionSource): Modifier {
+private fun Modifier.transportPressDisc(
+    interactionSource: MutableInteractionSource,
+    color: androidx.compose.ui.graphics.Color,
+): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val disc by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = if (pressed) tween(60) else tween(150, delayMillis = 60),
+        label = "transportDisc",
+    )
+    return drawBehind {
+        if (disc > 0f) {
+            drawCircle(
+                color = color,
+                radius = size.minDimension / 2f * (0.85f + 0.15f * disc),
+                alpha = disc,
+            )
+        }
+    }
+}
+
+/**
+ * Play/pause glyph under the finger: shrinks toward 0.2x over ~200ms while held; on release
+ * the swapped glyph springs back up (AnimatedPlayerGlyph's enter). Same capture as above.
+ */
+@Composable
+private fun Modifier.playGlyphPress(interactionSource: MutableInteractionSource): Modifier {
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.88f else 1f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
-        label = "flamingoPressScale",
+        targetValue = if (pressed) 0.2f else 1f,
+        animationSpec = if (pressed) {
+            tween(220, easing = FastOutSlowInEasing)
+        } else {
+            spring(dampingRatio = 0.75f, stiffness = 500f)
+        },
+        label = "playGlyphPress",
     )
     return graphicsLayer {
         scaleX = scale
         scaleY = scale
+    }
+}
+
+/**
+ * Skip glyph: dips slightly under the finger, and on release nudges in the skip direction
+ * and back -- the reference's arrows step forward rather than scale.
+ */
+@Composable
+private fun Modifier.skipGlyphPress(interactionSource: MutableInteractionSource, direction: Float): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.88f else 1f,
+        animationSpec = spring(dampingRatio = 1f, stiffness = 900f),
+        label = "skipGlyphScale",
+    )
+    val nudge = remember { androidx.compose.animation.core.Animatable(0f) }
+    var wasPressed by remember { mutableStateOf(false) }
+    LaunchedEffect(pressed) {
+        if (wasPressed && !pressed) {
+            nudge.animateTo(0f, keyframes {
+                durationMillis = 260
+                0f at 0
+                1f at 110 using FastOutSlowInEasing
+                0f at 260 using FastOutSlowInEasing
+            })
+        }
+        wasPressed = pressed
+    }
+    val nudgePx = with(androidx.compose.ui.platform.LocalDensity.current) { 8.dp.toPx() }
+    return graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+        translationX = nudge.value * nudgePx * direction
+    }
+}
+
+/**
+ * Apple Music's favourite pop, keyframed off 60fps.design apple-music-animated-favourite-icon
+ * (60fps, glyph bbox per frame, outline star = 25px):
+ *  - 0..100ms: glyph crossfades outline -> filled, nearly invisible at ~60ms, 0.88x -> 1.08x
+ *  - 100..283ms: swells to 1.56x, ease-out (27,31,32,34,35,36,36,38,38,39px)
+ *  - 283..517ms: holds
+ *  - 517..700ms: settles back to 1x
+ * The same timeline plays on unliking (user ask), onto the outline glyph. The first
+ * composition, and a song change, stay still.
+ */
+@Composable
+private fun Modifier.likePop(isLiked: Boolean, songId: String?): Modifier {
+    val scale = remember { androidx.compose.animation.core.Animatable(1f) }
+    val alpha = remember { androidx.compose.animation.core.Animatable(1f) }
+    // Re-keyed per song: skipping to a song with a different liked state is not a tap.
+    var previous by remember(songId) { mutableStateOf(isLiked) }
+    LaunchedEffect(isLiked, songId) {
+        val changed = previous != isLiked
+        previous = isLiked
+        if (!changed) return@LaunchedEffect
+        launch {
+            scale.animateTo(1f, keyframes {
+                durationMillis = 700
+                0.88f at 0
+                1.08f at 100 using LinearEasing
+                1.56f at 283 using CubicBezierEasing(0.2f, 0.8f, 0.3f, 1f)
+                1.56f at 517 using LinearEasing
+                1f at 700 using FastOutSlowInEasing
+            })
+        }
+        launch {
+            alpha.animateTo(1f, keyframes {
+                durationMillis = 110
+                1f at 0
+                0.08f at 60 using LinearEasing
+                1f at 110 using LinearEasing
+            })
+        }
+    }
+    return graphicsLayer {
+        scaleX = scale.value
+        scaleY = scale.value
+        this.alpha = alpha.value
+    }
+}
+
+// Transport controls leaving / returning (queue scroll, lyrics idle), timed off
+// 60fps.design apple-music-player-controls-collapse (60fps): hide runs ~217ms, show ~383ms.
+private fun <T> ControlsHideSpec(): FiniteAnimationSpec<T> = tween(220, easing = FastOutSlowInEasing)
+private fun <T> ControlsShowSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 250f)
+
+/**
+ * Now Playing title/artist as Apple Music draws them (designRefrence/GVRecorder_1788117512105~3.mp4):
+ * on a track change the old line fades out, a blank beat, then the new one fades in; a line
+ * too long for its row scrolls instead of ellipsizing.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun FadeSwapText(
+    text: String,
+    style: androidx.compose.ui.text.TextStyle,
+    color: androidx.compose.ui.graphics.Color,
+    fontWeight: FontWeight,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.animation.AnimatedContent(
+        targetState = text,
+        transitionSpec = {
+            fadeIn(tween(220, delayMillis = 90)) togetherWith fadeOut(tween(90))
+        },
+        contentAlignment = Alignment.CenterStart,
+        label = "fadeSwapText",
+        modifier = modifier,
+    ) { value ->
+        Text(
+            value,
+            style = style,
+            color = color,
+            fontWeight = fontWeight,
+            maxLines = 1,
+            modifier = Modifier.basicMarquee(
+                iterations = Int.MAX_VALUE,
+                initialDelayMillis = 1200,
+            ),
+        )
+    }
+}
+
+/**
+ * Apple Music Sing's control (60fps.design apple-music-sing, 60fps): a small rounded mic button
+ * in the lyrics view that springs up into a tall capsule slider while held or dragged, the fill
+ * rising from the bottom with the vocal level, the glyph turning dark once the fill covers it,
+ * then sinks back into the button about a second after release.
+ *
+ * Tap toggles Sing (tapping it on also opens the slider once, so the level is discoverable);
+ * press-and-drag adjusts the level. Nothing runs until the first tap -- see KaraokeEngine.
+ */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun SingControl(
+    engine: com.convx.music.playback.karaoke.KaraokeEngine,
+    tint: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+) {
+    val state by engine.state.collectAsState()
+    var expanded by remember { mutableStateOf(false) }
+    var dragging by remember { mutableStateOf(false) }
+    val expansion = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            // Overshoots ~10% of its height on the way up, like the capture.
+            expansion.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = 380f))
+        } else {
+            expansion.animateTo(0f, spring(dampingRatio = 1f, stiffness = 90f))
+        }
+    }
+    LaunchedEffect(expanded, dragging) {
+        if (expanded && !dragging) {
+            delay(1400)
+            expanded = false
+        }
+    }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val collapsedW = 36.dp; val collapsedH = 36.dp
+    val expandedW = 58.dp; val expandedH = 150.dp
+    val e = expansion.value
+    val w = androidx.compose.ui.unit.lerp(collapsedW, expandedW, e.coerceAtLeast(0f))
+    val h = androidx.compose.ui.unit.lerp(collapsedH, expandedH, e)
+    val fill = if (state.enabled) state.level else 0f
+    val animatedFill by animateFloatAsState(fill, spring(dampingRatio = 1f, stiffness = 900f), label = "singFill")
+    val corner = androidx.compose.ui.unit.lerp(10.dp, 22.dp, e.coerceIn(0f, 1f))
+    val shape = RoundedCornerShape(corner)
+    val iconDark = state.enabled && e > 0.3f && animatedFill > 0.22f
+
+    Box(
+        modifier = modifier
+            .size(width = w, height = h)
+            .clip(shape)
+            .background(tint.copy(alpha = if (state.enabled) 0.22f else 0.12f))
+            .drawBehind {
+                if (e > 0.02f && animatedFill > 0f) {
+                    val fh = size.height * animatedFill
+                    drawRect(tint, topLeft = androidx.compose.ui.geometry.Offset(0f, size.height - fh),
+                        size = androidx.compose.ui.geometry.Size(size.width, fh))
+                }
+            }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = {
+                        if (!engine.state.value.enabled) engine.setEnabled(true)
+                        dragging = true; expanded = true
+                    },
+                    onDragEnd = { dragging = false },
+                    onDragCancel = { dragging = false },
+                ) { change, dragAmount ->
+                    change.consume()
+                    val travel = with(density) { expandedH.toPx() }
+                    engine.setLevel(engine.state.value.level - dragAmount / travel)
+                }
+            }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {
+                val on = !engine.state.value.enabled
+                engine.setEnabled(on)
+                expanded = on
+            },
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.mic),
+            contentDescription = "Sing",
+            tint = if (iconDark) androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.8f) else tint,
+            modifier = Modifier
+                .padding(bottom = androidx.compose.ui.unit.lerp(8.dp, 14.dp, e.coerceIn(0f, 1f)))
+                .size(androidx.compose.ui.unit.lerp(20.dp, 26.dp, e.coerceIn(0f, 1f))),
+        )
+        // Analysis still running for this track: a thin ring of progress under the button edge.
+        if (state.enabled && state.progress < 1f && e < 0.5f) {
+            androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+                drawArc(
+                    color = tint,
+                    startAngle = -90f,
+                    sweepAngle = 360f * state.progress,
+                    useCenter = false,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()),
+                )
+            }
+        }
     }
 }

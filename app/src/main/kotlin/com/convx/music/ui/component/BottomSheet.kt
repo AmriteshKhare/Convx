@@ -42,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import com.convx.music.ui.player.PlayerMorph
-import com.convx.music.ui.player.easeOutCubic
 import com.convx.music.ui.player.SCREEN_CORNER_EXPANSION_MILLIS
 import com.convx.music.ui.player.recordPlayerLayer
 import com.convx.music.ui.player.sharedContainerCornerRadius
@@ -168,13 +167,12 @@ fun BottomSheet(
             .graphicsLayer {
                 // background fades during about 10%-61% progress
                 alpha = if (morphEnabled && PlayerMorph.active) {
-                    // The full-bleed artwork is the one thing that must NOT arrive with
-                    // the rest of the player. The container overlay fades the whole
-                    // recording in over the first quarter, which for a full-screen image
-                    // reads as it appearing in a single frame; easing it across the WHOLE
-                    // flight instead lets the cover and controls land first and the
-                    // artwork wash bloom in behind them.
-                    easeOutCubic(state.progress)
+                    // Opaque for the whole flight. Easing it in with progress left the
+                    // recorded card mostly see-through right where the backing plate under
+                    // it had already faded out (the handoff at 0.25) -- the "black gap" that
+                    // got the morph switched off. iOS 27's card shows the player's own
+                    // background from its first frame (designRefrence/threadsdownloader.com_0805d3.mp4).
+                    1f
                 } else {
                     (1.4f * (state.progress.coerceAtLeast(0.1f) - 0.1f).pow(0.5f)).coerceIn(0f, 1f)
                 }
@@ -386,7 +384,9 @@ class BottomSheetState(
         val seed = bounceSeedVelocity(velocityPxPerSec)
         collapse(
             spring(
-                dampingRatio = 0.68f,
+                // Reference release lands on its anchor without a bounce; the fling's
+                // velocity still carries in through the seed.
+                dampingRatio = 1f,
                 stiffness = bounceStiffnessFor(seed),
             ),
             initialVelocity = with(density) { seed.toDp() },
@@ -397,7 +397,9 @@ class BottomSheetState(
         val seed = bounceSeedVelocity(velocityPxPerSec)
         expand(
             spring(
-                dampingRatio = 0.68f,
+                // Reference release lands on its anchor without a bounce; the fling's
+                // velocity still carries in through the seed.
+                dampingRatio = 1f,
                 stiffness = bounceStiffnessFor(seed),
             ),
             initialVelocity = with(density) { seed.toDp() },
@@ -405,21 +407,23 @@ class BottomSheetState(
     }
 
     fun collapseSoft() {
-        // iOS drawer feel: responsive spring with subtle micro-bounce (~260ms settle).
+        // iOS 27 mini player <-> Now Playing, measured off designRefrence/threadsdownloader.com_0805d3.mp4
+        // (card top edge per frame): 40/61/77/86/92/95/97% at 33..233ms, no overshoot --
+        // a critically damped spring at stiffness ~440. The old 0.76/520 bounced.
         collapse(
             spring(
-                dampingRatio = 0.76f,
-                stiffness = 520f,
+                dampingRatio = 1f,
+                stiffness = 440f,
             ),
         )
     }
 
     fun expandSoft() {
-        // iOS drawer feel: responsive spring with subtle micro-bounce (~260ms settle).
+        // See collapseSoft: same measured spring both ways.
         expand(
             spring(
-                dampingRatio = 0.76f,
-                stiffness = 520f,
+                dampingRatio = 1f,
+                stiffness = 440f,
             ),
         )
     }

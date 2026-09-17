@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
 
 /**
@@ -132,6 +134,10 @@ fun PlayerContainerMorphOverlay(
                         translate(left = rect.left, top = rect.top) {
                             if (miniLayer.size.width > 0 && fraction < PLAYER_LAYER_HANDOFF_PROGRESS) {
                                 miniLayer.alpha = playerSheetBarAlpha(fraction)
+                                // iOS 27 blurs the mini's content away as the card grows rather
+                                // than just fading it (designRefrence/threadsdownloader.com_0805d3.mp4).
+                                val blur = MiniBlurMaxDp.toPx() * (fraction / PLAYER_LAYER_HANDOFF_PROGRESS)
+                                miniLayer.renderEffect = if (blur > 0.5f) BlurEffect(blur, blur) else null
                                 drawLayer(miniLayer)
                             }
                             val scale = rect.width / fullLayer.size.width.toFloat()
@@ -145,3 +151,5 @@ fun PlayerContainerMorphOverlay(
             },
     )
 }
+
+private val MiniBlurMaxDp = 10.dp

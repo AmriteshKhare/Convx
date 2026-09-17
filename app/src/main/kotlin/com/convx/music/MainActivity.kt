@@ -187,7 +187,6 @@ import com.convx.music.constants.MiniPlayerHeight
 import com.convx.music.constants.DockedAccessoryHeight
 import com.convx.music.constants.NavigationBarAnimationSpec
 import com.convx.music.constants.NavigationBarHeight
-import com.convx.music.constants.OverlayMenuStyleKey
 import com.convx.music.constants.PauseListenHistoryKey
 import com.convx.music.constants.LiquidGlassGlobalEnabledKey
 import com.convx.music.constants.LiquidGlassMiniPlayerEnabledKey
@@ -255,6 +254,15 @@ import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalAppBackdropFrozen
 import com.convx.music.ui.component.GlassStyle
 import com.convx.music.ui.component.glassContentColorFor
+import com.convx.music.ui.component.backdrop.GlassPoolScale
+import com.convx.music.ui.component.backdrop.rememberGlassPool
+import com.convx.music.ui.component.backdrop.glassPool
+import com.convx.music.ui.component.backdrop.BackdropEffectScope
+import com.convx.music.ui.component.backdrop.effects.blur
+import com.convx.music.ui.component.backdrop.effects.colorControls
+import com.convx.music.ui.component.PooledGlass
+import com.convx.music.ui.component.LocalPooledGlass
+import com.convx.music.ui.component.glassSaturation
 import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.AppFloatingNowPlayingPill
 import com.convx.music.ui.component.FloatingMiniPlayerWidthFraction
@@ -268,7 +276,6 @@ import com.convx.music.ui.component.SideBarCollapsedWidth
 import com.convx.music.ui.component.SideBarLink
 import com.convx.music.ui.component.SideBarSection
 import com.convx.music.ui.component.TabletWidthThreshold
-import com.convx.music.ui.component.BottomSheetMenu
 import com.convx.music.ui.component.OverlayMenu
 import com.convx.music.ui.component.BottomSheetPage
 import com.convx.music.ui.component.ListenTogetherOverlay
@@ -485,6 +492,14 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ev.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+            com.convx.music.ui.component.MenuAnchor.lastDown =
+                androidx.compose.ui.geometry.Offset(ev.x, ev.y)
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -910,6 +925,39 @@ class MainActivity : ComponentActivity() {
                 // API level + low-RAM gate, hoisted so the backdrop capture below can
                 // be skipped entirely on devices that can never render glass.
                 val glassAllowed = isGlassAllowed()
+
+                // One blurred copy of the screen, shared by every glass surface, instead of
+                // each of them saturating and blurring its own slice. Home carries eight
+                // surfaces; at ~5 offscreen passes each that was the frame's whole budget.
+                val glassPoolBackdrop = rememberGlassPool()
+                val poolSaturation = glassSaturation(glassEffectConfig.vibrancy)
+                val poolBlurPx = with(LocalDensity.current) {
+                    glassEffectConfig.blurRadius.dp.toPx()
+                } * GlassPoolScale
+                val poolEffects: BackdropEffectScope.() -> Unit =
+                    remember(poolSaturation, poolBlurPx) {
+                        {
+                            if (poolSaturation != 1f) colorControls(saturation = poolSaturation)
+                            if (poolBlurPx > 0f) blur(poolBlurPx)
+                        }
+                    }
+                val pooledGlass = remember(
+                    glassPoolBackdrop,
+                    glassEffectConfig.blurRadius,
+                    glassEffectConfig.vibrancy,
+                    glassAllowed,
+                    glassEffectConfig.anyComponentEnabled,
+                ) {
+                    if (glassAllowed && glassEffectConfig.anyComponentEnabled) {
+                        PooledGlass(
+                            backdrop = glassPoolBackdrop,
+                            blurRadiusDp = glassEffectConfig.blurRadius,
+                            vibrancy = glassEffectConfig.vibrancy,
+                        )
+                    } else {
+                        null
+                    }
+                }
 
                 val (useNewMiniPlayerDesign) = rememberPreference(UseNewMiniPlayerDesignKey, defaultValue = true)
                 val defaultOpenTab = remember {
@@ -1511,17 +1559,18 @@ class MainActivity : ComponentActivity() {
 
                     // The screen a sheet is covering shrinks back behind it, the way
                     // iOS presents one card over another.
+                    // Menus are popups now and leave the page where it is (iOS 27); only the
+                    // sheet-style pages still present as a card.
                     val menuPresentation = rememberSheetPresentation(
-                        LocalMenuState.current.isVisible,
                         LocalBottomSheetPageState.current.isVisible,
                     )
 
-                    // The Scaffold shrinks for BOTH the player expansion and any menu.
+                    // The Scaffold shrinks only for a menu. It used to shrink for the player
+                    // too (the iOS 18 card stack); iOS 27's Now Playing grows over a page that
+                    // stays put (designRefrence/threadsdownloader.com_0805d3.mp4), and the
+                    // user asked for the shrink to go.
                     // The player layer ONLY shrinks for a menu (it is the card in front).
-                    val scaffoldPresentation = {
-                        val playerProgress = playerBottomSheetState.progress
-                        maxOf(menuPresentation, playerProgress)
-                    }
+                    val scaffoldPresentation = { menuPresentation }
                     val playerLayerPresentation = { menuPresentation }
 
                     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -2221,6 +2270,22 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
+                                if (pooledGlass != null) {
+                                    // Draws nothing: it only keeps the shared blur current,
+                                    // and must run after the content records and before the
+                                    // chrome samples it.
+                                    Box(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .glassPool(
+                                                source = appBackdrop,
+                                                pooled = glassPoolBackdrop,
+                                                effects = poolEffects,
+                                                scale = GlassPoolScale,
+                                            )
+                                    )
+                                }
+
                                 Box(
                                     modifier = Modifier.zIndex(if (playerAboveBars) 1f else 0f),
                                 ) {
@@ -2231,39 +2296,46 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                AppFloatingNavBar(
-                                    navigationItems = floatingNavigationItems,
-                                    currentRoute = effectiveRoute,
-                                    onItemClick = onNavItemClick,
-                                    scrollConnection = floatingNavBarScrollConnection,
-                                    pureBlack = pureBlack,
-                                    showPlayerAccessory = hasDockedPlayerAccessory,
-                                    onAccessoryClick = { playerBottomSheetState.expandSoft() },
-                                    onAccessoryLyricsClick = {
-                                        playerBottomSheetState.expandSoft()
-                                        playerConnection?.requestShowLyrics?.value = true
-                                    },
-                                    onAccessoryQueueClick = {
-                                        playerBottomSheetState.expandSoft()
-                                        playerConnection?.requestShowQueue?.value = true
-                                    },
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .widthIn(max = 500.dp)
-                                        .padding(horizontal = AppleTokens.Gutter)
-                                        .padding(bottom = bottomInset + 8.dp)
-                                        .graphicsLayer {
-                                            val hiddenOffset =
-                                                size.height + (bottomInset + 8.dp).toPx()
-                                            val navBarHeightPx = navigationBarHeight.toPx()
-                                            translationY = if (navBarHeightPx == 0f) {
-                                                hiddenOffset
-                                            } else {
-                                                hiddenOffset * (1 - navBarHeightPx / NavigationBarHeight.toPx())
-                                            }
+                                // The shared blur is safe here and only here: this chrome is a
+                                // sibling of the recorded content, not inside it. A glass surface
+                                // within the content that sampled a backdrop containing that same
+                                // content closes a RenderNode cycle -- HWUI recurses through
+                                // prepareTree until it crashes.
+                                CompositionLocalProvider(LocalPooledGlass provides pooledGlass) {
+                                    AppFloatingNavBar(
+                                        navigationItems = floatingNavigationItems,
+                                        currentRoute = effectiveRoute,
+                                        onItemClick = onNavItemClick,
+                                        scrollConnection = floatingNavBarScrollConnection,
+                                        pureBlack = pureBlack,
+                                        showPlayerAccessory = hasDockedPlayerAccessory,
+                                        onAccessoryClick = { playerBottomSheetState.expandSoft() },
+                                        onAccessoryLyricsClick = {
+                                            playerBottomSheetState.expandSoft()
+                                            playerConnection?.requestShowLyrics?.value = true
+                                        },
+                                        onAccessoryQueueClick = {
+                                            playerBottomSheetState.expandSoft()
+                                            playerConnection?.requestShowQueue?.value = true
+                                        },
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .widthIn(max = 500.dp)
+                                            .padding(horizontal = AppleTokens.Gutter)
+                                            .padding(bottom = bottomInset + 8.dp)
+                                            .graphicsLayer {
+                                                val hiddenOffset =
+                                                    size.height + (bottomInset + 8.dp).toPx()
+                                                val navBarHeightPx = navigationBarHeight.toPx()
+                                                translationY = if (navBarHeightPx == 0f) {
+                                                    hiddenOffset
+                                                } else {
+                                                    hiddenOffset * (1 - navBarHeightPx / NavigationBarHeight.toPx())
+                                                }
 
-                                        }
-                                )
+                                            }
+                                    )
+                                }
                             }
                         } else {
                             if (currentRoute != "wrapped" && currentRoute != "update" && currentRoute != "listen_together/chat" && currentRoute != "ambient_mode") {
@@ -2289,18 +2361,14 @@ class MainActivity : ComponentActivity() {
                     }
                 } // Box end
 
-                // One preference decides the presentation for every long-press menu
-                    // in the app. Both hosts read the same MenuState, so the ~30 call
-                    // sites are untouched either way.
-                    val (overlayMenuStyle) = rememberPreference(OverlayMenuStyleKey, defaultValue = false)
-                    if (overlayMenuStyle) {
-                        OverlayMenu(state = LocalMenuState.current)
-                    } else {
-                        BottomSheetMenu(
-                            state = LocalMenuState.current,
-                            modifier = Modifier.align(Alignment.BottomCenter)
-                        )
-                    }
+                // Every long-press / "more" menu is the iOS 27 glass popup now (replaces the
+                    // bottom sheet everywhere; the old overlayMenuStyle preference is no longer
+                    // read). Glass only while the player is down: over the expanded player the
+                    // app backdrop it samples is the page underneath, not the player.
+                    OverlayMenu(
+                        state = LocalMenuState.current,
+                        glass = !playerBottomSheetState.isExpanded,
+                    )
 
                     BottomSheetPage(
                         state = LocalBottomSheetPageState.current,

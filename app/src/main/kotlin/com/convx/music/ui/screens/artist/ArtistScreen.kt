@@ -6,12 +6,21 @@
 package com.convx.music.ui.screens.artist
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.ui.unit.Dp
+import com.convx.music.ui.theme.AppleColors
+import com.convx.music.ui.component.GlassPillRow
+import com.convx.music.ui.component.StretchPillIcon
+import com.convx.music.ui.component.pillGlassBackground
+import com.convx.music.ui.component.LocalGlassEffectConfig
+import com.convx.music.ui.component.resolvedTextColor
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.ui.utils.albumRoute
@@ -110,10 +119,11 @@ import com.composables.sfsymbols.monochrome.SFInfoCircle
 import com.composables.sfsymbols.monochrome.SFLink
 import com.composables.sfsymbols.monochrome.SFMusicMicrophone
 import com.composables.sfsymbols.monochrome.SFPlus
+import com.composables.sfsymbols.monochrome.SFStar
+import com.composables.sfsymbols.monochrome.SFChevronRight
 import com.convx.music.LocalTabView
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import com.convx.music.ui.component.ArtistBlendStart
 import com.convx.music.ui.component.ArtistHeroImage
 import com.convx.music.ui.component.HeroCardHeader
 import com.convx.music.ui.component.TopFadeBlur
@@ -134,9 +144,6 @@ import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.convx.music.constants.AppBarHeight
 import com.convx.music.constants.HideExplicitKey
-import com.convx.music.constants.ShowArtistDescriptionKey
-import com.convx.music.constants.ShowArtistSubscriberCountKey
-import com.convx.music.constants.ShowMonthlyListenersKey
 import com.convx.music.db.entities.ArtistEntity
 import com.convx.music.extensions.toMediaItem
 import com.convx.music.models.toMediaMetadata
@@ -145,7 +152,6 @@ import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.ui.component.AlbumGridItem
 import com.convx.music.ui.component.ExpandableText
-import com.convx.music.ui.component.ContrastCircleButton
 import com.convx.music.ui.component.GlassCircleButton
 import com.convx.music.ui.component.HideOnScrollFAB
 import com.convx.music.ui.component.LinkSegment
@@ -192,32 +198,19 @@ import com.convx.music.viewmodels.ArtistViewModel
 import com.valentinilk.shimmer.shimmer
 import com.convx.music.artistvideo.ArtistVideo
 import com.convx.music.constants.DataSaverEnabledKey
-import com.convx.music.constants.ShowArtistVideoKey
 import com.convx.music.constants.ShowArtistBackgroundVideoKey
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.convx.music.canvas.AppleMusicArtistBackgroundProvider
 import com.convx.music.ui.component.floatingtabbar.gooey
-import com.convx.music.ui.player.MeshGradientBackground
-import com.convx.music.ui.player.dimmed
-import com.convx.music.ui.player.rememberArtworkMeshPalette
 
-/**
- * Flat white type tiers over the mesh, exactly like the player: BITCHORD_MESH/LIVE_MESH
- * force plain white chrome rather than a per-artwork computed contrast colour, because
- * the mesh itself is always dark enough for white to read. A WCAG-searched hue ladder
- * used to sit here instead — it guaranteed contrast, but the darkening scrim it required
- * to make that guarantee (bounding the mesh's brightest point) crushed the same
- * saturation boost it was applied to, so the page read flat next to the player's raw
- * mesh off the same artwork. Matching the player wins.
- */
-private val MeshWhiteTiers = listOf(
+/** Apple Music artist page type: white, with the secondary tiers as plain alpha steps. */
+private val ArtistTextTiers = listOf(
     Color.White,
+    Color.White.copy(alpha = 0.6f),
     Color.White.copy(alpha = 0.35f),
-    Color.White.copy(alpha = 0.30f),
     Color.White.copy(alpha = 0.24f),
 )
 
@@ -242,15 +235,8 @@ fun ArtistScreen(
     val libraryArtist by viewModel.libraryArtist.collectAsState()
     val librarySongs by viewModel.librarySongs.collectAsState()
     val libraryAlbums by viewModel.libraryAlbums.collectAsState()
-    val artistVideoUrl by viewModel.artistVideoUrl.collectAsState()
-    val artistVideoSong by viewModel.artistVideoSong.collectAsState()
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
-    val showArtistDescription by rememberPreference(key = ShowArtistDescriptionKey, defaultValue = true)
-    val showArtistSubscriberCount by rememberPreference(key = ShowArtistSubscriberCountKey, defaultValue = true)
-    val showMonthlyListeners by rememberPreference(key = ShowMonthlyListenersKey, defaultValue = true)
     val dataSaverEnabled by rememberPreference(key = DataSaverEnabledKey, defaultValue = false)
-    val showArtistVideoPref by rememberPreference(key = ShowArtistVideoKey, defaultValue = true)
-    val showArtistVideo = if (dataSaverEnabled) false else showArtistVideoPref
     val showArtistBackgroundVideoPref by rememberPreference(key = ShowArtistBackgroundVideoKey, defaultValue = true)
     val showArtistBackgroundVideo = if (dataSaverEnabled) false else showArtistBackgroundVideoPref
 
@@ -290,21 +276,15 @@ fun ArtistScreen(
         showLocal = libraryArtist?.artist?.isLocal == true
     }
 
-    // Apple Music style: a single dominant color pulled from the artist's own
-    // artwork washes the screen instead of a flat Material surface. The
-    // floating back/share chrome stays real liquid glass sampling this screen's
-    // own content behind it; the play-row buttons (info/play/subscribe) and the
-    // subscriber/listener pills are a flat fill in the tint's own contrast
-    // color instead — see ContrastCircleButton below.
-    // Instant seed: route thumb arg -> live tile thumb -> DB/page. Paints hero +
-    // mesh bg on frame one; page/DB overwrites when it lands.
+    // Instant seed: route thumb arg -> live tile thumb -> DB/page. Paints the hero on frame
+    // one; Apple's image and the page/DB overwrite when they land.
     val artistThumbnail = artistPage?.artist?.thumbnail ?: libraryArtist?.artist?.thumbnailUrl
     val instantArtistThumb = com.convx.music.ui.component.detailSeed(
         viewModel.thumbArg,
         com.convx.music.ui.utils.pendingSharedArtworkThumbFor(viewModel.artistId),
         artistThumbnail,
     )
-    val artistChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 1)
+    val artistChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 2)
 
     // Glass chrome (back/share buttons, chips) samples LocalAppBackdrop. The app
     // root's backdrop (MainActivity's Modifier.layerBackdrop(appBackdrop)) captures
@@ -328,19 +308,24 @@ fun ArtistScreen(
     // outside the NavHost turned out not to be necessary).
     val heroZoom = rememberHeroZoom()
 
-    // The BitChord player's own mesh extraction (Palette-based, four blobs) — same call
-    // as Player.kt's BITCHORD_MESH style, raw, so this screen's mesh matches the
-    // player's for the same artwork instead of running its own extra saturation pass.
-    val meshPalette = rememberArtworkMeshPalette(instantArtistThumb ?: artistThumbnail)
-    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
+    // Apple Music colours. The page is Apple's server-computed artwork bgColor darkened by the
+    // rule fitted on the reference screenshots (AppleColors.pageBackground, 99%); artists Apple
+    // has no entry for fall back to the on-device estimate of that bgColor.
+    val appleArtistState = com.convx.music.utils.rememberAppleArtist(
+        artistPage?.artist?.title ?: libraryArtist?.artist?.name,
+    )
+    val appleLoading = appleArtistState.loading
+    val appleArtist = appleArtistState.artist
+    // Only estimate from YouTube's art once Apple has settled without a match.
+    val estimatedArtworkBg = com.convx.music.utils.rememberEstimatedArtworkBg(
+        (instantArtistThumb ?: artistThumbnail).takeIf { !appleLoading && appleArtist == null },
+    )
+    val artworkBgRgb = appleArtist?.hero?.bgColor ?: estimatedArtworkBg ?: 0x1C1C1E
+    val pageBgRgb = AppleColors.pageBackground(artworkBgRgb)
+    val tint by androidx.compose.animation.animateColorAsState(AppleColors.color(pageBgRgb), label = "artistPage")
     com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Same flat white every icon/text reads in the player on an artwork
-    // background, rather than a per-artwork computed contrast colour.
     val onTint = Color.White
-
-    // Flat white tiers, like the player — see [MeshWhiteTiers].
-    val textTiers = MeshWhiteTiers
-    val chromeIconColor = textTiers[0]
+    val textTiers = ArtistTextTiers
     val chromeTextColor = textTiers[1]
 
     // Fills the screen tint into the capture BEFORE the content, exactly like
@@ -368,11 +353,6 @@ fun ArtistScreen(
             .background(tint)
             .hazeSource(hazeState)
     ) {
-    MeshGradientBackground(
-        palette = meshPalette,
-        trackKey = instantArtistThumb ?: artistThumbnail,
-        modifier = Modifier.matchParentSize(),
-    )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
       // HeroTintedContent derives its colours from the flat `tint` plane, which on
       // this screen is only the mesh's dimmed base — the blobs drawn over it are what
@@ -448,20 +428,14 @@ fun ArtistScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(1.1f),
+                                .aspectRatio(1f),
                         ) {
-                            if (instantArtistThumb != null) {
-                                com.convx.music.ui.component.SeededShimmerHero(
-                                    thumbUrl = instantArtistThumb,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .fadingEdge(
-                                            top = systemBarsTopPadding + AppBarHeight,
-                                            bottom = 200.dp,
-                                        ),
-                                    ratio = 1.1f,
-                                )
-                            }
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .shimmer()
+                                    .background(Color.White.copy(alpha = 0.08f)),
+                            )
                         }
                     ShimmerHost {
                         // Artist Name and Controls Section
@@ -529,78 +503,117 @@ fun ArtistScreen(
                 item(key = "header") {
                     val thumbnail = artistPage?.artist?.thumbnail ?: libraryArtist?.artist?.thumbnailUrl
                     val artistName = artistPage?.artist?.title ?: libraryArtist?.artist?.name
+                    val displayArtistName = artistName?.titlecaseWords() ?: "Unknown"
+                    val tabView = LocalTabView.current
+                    val artistId = artistPage?.artist?.id
+                    // YouTube queue items often carry no (or a different) artist id, so an id match
+                    // alone left the button on "play" while this page's own queue was playing.
+                    val queueTitle by playerConnection.queueTitle.collectAsState()
+                    val currentIsThisArtist =
+                        (artistId != null && mediaMetadata?.artists?.any { it.id == artistId } == true) ||
+                            (artistName != null && (queueTitle == artistName ||
+                                mediaMetadata?.artists?.any { it.name.equals(artistName, ignoreCase = true) } == true))
+                    val isPlayingThisArtist = isPlaying && currentIsThisArtist
+                    val isSubscribed = libraryArtist?.artist?.bookmarkedAt != null
+                    val featured = remember(artistPage) { artistPage?.sections?.featuredRelease() }
+                    var showAbout by rememberSaveable { mutableStateOf(false) }
 
-                    var backgroundVideoUrl by remember { mutableStateOf<String?>(null) }
-                    LaunchedEffect(artistName, showArtistBackgroundVideo) {
-                        if (artistName != null && showArtistBackgroundVideo) {
-                            withContext(Dispatchers.IO) {
-                                backgroundVideoUrl = AppleMusicArtistBackgroundProvider.getByArtistName(artistName)
+                    val onPlay: () -> Unit = {
+                        if (isPlayingThisArtist) {
+                            playerConnection.player.pause()
+                        } else if (currentIsThisArtist) {
+                            playerConnection.player.play()
+                        } else {
+                            val items = artistPage?.sections
+                                ?.find { it.items.firstOrNull() is SongItem }
+                                ?.items?.filterIsInstance<SongItem>()
+                            if (!items.isNullOrEmpty()) {
+                                playerConnection.playQueue(
+                                    ListQueue(title = artistName ?: "Artist", items = items.map { it.toMediaItem() }),
+                                )
+                            } else {
+                                artistPage?.artist?.radioEndpoint?.let { playerConnection.playQueue(YouTubeQueue(it)) }
+                            }
+                        }
+                    }
+                    val onSubscribe: () -> Unit = {
+                        database.transaction {
+                            val artist = libraryArtist?.artist
+                            if (artist != null) {
+                                update(artist.toggleLike())
+                            } else {
+                                artistPage?.artist?.let {
+                                    insert(
+                                        ArtistEntity(
+                                            id = it.id,
+                                            name = it.title,
+                                            channelId = it.channelId,
+                                            thumbnailUrl = it.thumbnail,
+                                        ).toggleLike(),
+                                    )
+                                }
                             }
                         }
                     }
 
-                    Box {
-                        // Wide layout: the full-bleed square would eat the whole
-                        // fold, so the portrait becomes a bounded card with the
-                        // artist name set beside it (see HeroCardHeader).
-                        val tabView = LocalTabView.current
+                    // Hero scroll blur: fully climbed after ~90% of the photo has scrolled away.
+                    // Read by the hero in its draw phase, so it is not quantised.
+                    val heroBlurRangePx = LocalResources.current.displayMetrics.widthPixels * 0.9f
+                    val heroScrollBlur by remember(lazyListState, heroBlurRangePx) {
+                        derivedStateOf {
+                            val raw = if (lazyListState.firstVisibleItemIndex == 0) {
+                                lazyListState.firstVisibleItemScrollOffset / heroBlurRangePx
+                            } else {
+                                1f
+                            }
+                            raw.coerceIn(0f, 1f)
+                        }
+                    }
 
-                        // BitChord-style hero: full-bleed photo (height = width /
-                        // 0.95), progressive blur ramping from the blend start so
-                        // the foot smears into the page colour instead of meeting
-                        // it at an edge. The name block below sits on that blend
-                        // start and the rest follows it up.
-                        if (!tabView && (thumbnail != null || backgroundVideoUrl != null || instantArtistThumb != null)) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (!tabView) {
+                            // Square hero: YouTube's art immediately, Apple's own artist image
+                            // crossfades over it the moment it resolves -- never blocks on the
+                            // lookup when a fallback is already known.
+                            val fallbackArtworkUrl = thumbnail ?: instantArtistThumb
                             ArtistHeroImage(
-                                artworkUrl = thumbnail ?: instantArtistThumb,
+                                artworkUrl = fallbackArtworkUrl,
+                                appleArtworkUrl = appleArtist?.hero?.sized(1200),
                                 pageColor = tint,
-                                // Baked join: static blur plates + eased foot wash
-                                // dissolve the edge. No Haze here — the live band
-                                // sampled the list and ghosted over it. No scroll
-                                // blur either — the photo stays crisp on scroll.
-                                hazeState = null,
                                 heroScale = heroZoom.scale,
-                                modifier = Modifier.offset {
-                                    IntOffset(x = 0, y = headerOffset)
-                                },
+                                loading = appleLoading && fallbackArtworkUrl.isNullOrBlank(),
+                                liveOverlay = appleArtist?.motionVideoUrl != null && showArtistBackgroundVideo,
+                                scrollBlur = { heroScrollBlur },
+                                modifier = Modifier.offset { IntOffset(x = 0, y = headerOffset) },
                                 overlay = {
-                                    if (backgroundVideoUrl != null && showArtistBackgroundVideo) {
-                                        ArtistVideo(
-                                            videoUrl = backgroundVideoUrl!!,
-                                            modifier = Modifier.fillMaxSize(),
-                                            onClick = { }
-                                        )
+                                    val motion = appleArtist?.motionVideoUrl
+                                    if (motion != null && showArtistBackgroundVideo) {
+                                        ArtistVideo(videoUrl = motion, modifier = Modifier.fillMaxSize(), onClick = {})
                                     }
                                 },
                             )
-                        }
-
-                        // Artist Name and Controls Section - positioned at bottom of image
-
-                        if (tabView) {
+                        } else {
                             HeroCardHeader(
-                                artworkUrl = thumbnail,
+                                artworkUrl = appleArtist?.hero?.sized(800) ?: thumbnail,
                                 circular = true,
                                 title = {
                                     Text(
-                                        text = artistName?.titlecaseWords() ?: "Unknown",
+                                        text = displayArtistName,
                                         style = AppTheme.typography.headlineLarge,
                                         fontFamily = rememberCustomArtistFontFamily() ?: rememberBrandFontFamily(),
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = LocalAccentTextColor.current,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                         fontSize = 42.sp,
                                     )
                                 },
-                                subtitle = artistPage?.subscriberCountText?.takeIf {
-                                    showArtistSubscriberCount
-                                }?.let { subscribers ->
+                                subtitle = artistPage?.subscriberCountText?.let { subscribers ->
                                     {
                                         Text(
                                             text = subscribers,
                                             style = AppTheme.typography.titleMedium,
-                                            color = AppTheme.colorScheme.onSurfaceVariant,
+                                            color = textTiers[1],
                                             maxLines = 1,
                                         )
                                     }
@@ -608,289 +621,81 @@ fun ArtistScreen(
                             )
                         }
 
+                        // Geometry measured on the iOS 27 references (402pt screen): wordmark box
+                        // 96 tall ending 10 above the hero foot, buttons 12 below it, card 32 below them.
+                        val heroSide = with(density) { LocalResources.current.displayMetrics.widthPixels.toDp() }
+                        val itemTopOnScreen = with(density) { (-headerOffset).toDp() }
                         Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(
-                                    top = if (thumbnail != null && !tabView) {
-                                        // The name sits on the blend start — the same
-                                        // fraction the hero's blur ramps from — and the
-                                        // buttons/stats/about follow it up in the same
-                                        // column, so the whole block reads as a caption
-                                        // dissolving out of the picture, not part of it.
-                                        LocalResources.current.displayMetrics.widthPixels.let { screenWidth ->
-                                            with(density) {
-                                                (screenWidth / 0.95f).toDp() * ArtistBlendStart
-                                            }
-                                        }
-                                    } else {
+                                    top = if (tabView) {
                                         16.dp
-                                    }
-                                )
+                                    } else {
+                                        (heroSide - ArtistWordmarkFootInset - ArtistWordmarkHeight - itemTopOnScreen)
+                                            .coerceAtLeast(0.dp)
+                                    },
+                                ),
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    // 20.dp: rows below sit on the same gutter, so
-                                    // the name/buttons line up with the song list.
-                                    .padding(horizontal = 20.dp)
-                            ) {
-                                // The name moves into HeroCardHeader in tab view.
-                                if (!tabView) Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
+                            if (!tabView) {
+                                Box(
+                                    contentAlignment = Alignment.BottomCenter,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(bottom = 12.dp)
+                                        .height(ArtistWordmarkHeight)
+                                        .padding(horizontal = 20.dp),
                                 ) {
+                                    // No name while Apple settles, so a logo never replaces text mid-view.
+                                    if (!appleLoading) ArtistWordmark(logo = appleArtist?.logo, name = displayArtistName)
+                                }
+                                Spacer(modifier = Modifier.height(ArtistWordmarkFootInset + 2.dp))
+                            }
 
-                                    //artist video
-                                    if (showArtistVideo && !(showArtistBackgroundVideo && backgroundVideoUrl != null)) {
-                                        artistVideoUrl?.let { videoUrl ->
-                                            artistPage?.artist?.radioEndpoint?.let { radioEndpoint ->
-                                                Spacer(modifier = Modifier.width(5.dp))
-                                                ArtistVideo(
-                                                    videoUrl = videoUrl,
-                                                    modifier = Modifier
-                                                        .height(45.dp)
-                                                        .aspectRatio(16f / 9f),
-                                                    onClick = {
-                                                        val watchEndpoint = artistVideoSong?.endpoint
-                                                            ?: artistPage?.artist?.radioEndpoint
-                                                        watchEndpoint?.let {
-                                                            playerConnection.playQueue(YouTubeQueue(it))
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
+                            ArtistActionRow(
+                                keyColor = appleArtist?.keyColor,
+                                pageBgRgb = pageBgRgb,
+                                isPlaying = isPlayingThisArtist,
+                                isSubscribed = isSubscribed,
+                                onInfo = { showAbout = !showAbout },
+                                onPlay = onPlay,
+                                onSubscribe = onSubscribe,
+                            )
 
-                                    Spacer(modifier = Modifier.width(5.dp))
-
-                                    // Artist Name — drop-cap style, first letter bigger than the rest.
-                                    val displayArtistName = artistName?.titlecaseWords() ?: "Unknown"
-                                    Text(
-                                        text = buildAnnotatedString {
-                                            if (displayArtistName.isNotEmpty()) {
-                                                withStyle(SpanStyle(fontSize = 60.sp)) {
-                                                    append(displayArtistName.first().uppercase())
-                                                }
-                                                append(displayArtistName.drop(1))
-                                            } else {
-                                                append(displayArtistName)
-                                            }
+                            val description = artistPage?.description
+                            val descriptionRuns = artistPage?.descriptionRuns
+                            AnimatedVisibility(
+                                visible = showAbout && (!description.isNullOrEmpty() || !descriptionRuns.isNullOrEmpty()),
+                            ) {
+                                CompositionLocalProvider(
+                                    androidx.compose.material3.LocalContentColor provides textTiers[1],
+                                ) {
+                                    ExpandableText(
+                                        text = description.orEmpty(),
+                                        runs = descriptionRuns?.map {
+                                            LinkSegment(text = it.text, url = it.navigationEndpoint?.urlEndpoint?.url)
                                         },
-                                        style = AppTheme.typography.headlineLarge,
-                                        fontFamily = rememberCustomArtistFontFamily() ?: rememberBrandFontFamily(),
-                                        fontWeight = FontWeight.SemiBold,
-                                        // The page's biggest heading: carries the artwork
-                                        // tint plainly rather than flat content colour.
-                                        color = LocalAccentTextColor.current,
-                                        // Two lines: a long name was ellipsed away on one
-                                        // ("Metro Boomin" clipped mid-word behind the share
-                                        // button) rather than wrapping into the space the
-                                        // header already has.
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.Center,
-                                        fontSize = 44.sp,
-                                        modifier = Modifier.weight(1f, fill = false).artistTitleChrome()
+                                        collapsedMaxLines = 6,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 20.dp, end = 20.dp, top = 20.dp),
                                     )
                                 }
-
-
-                                // Buttons Row — starts on the fade: tight under the
-                                // name so it sits on the hero's blurred foot,
-                                // not below it on flat tint.
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    // Info Button (Left) — sits a touch lower than the
-                                    // bigger center Play button, not perfectly centered
-                                    // with it, so it reads as "grounded" beside it.
-                                    ContrastCircleButton(
-                                        onTint = onTint,
-                                        onClick = { /* Could show description or bio */ },
-                                        size = 48.dp,
-                                        modifier = Modifier.offset(y = 8.dp),
-                                    ) {
-                                        Icon(
-                                            imageVector = SfSymbols.Monochrome.SFInfoCircle,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-
-                                    // Primary Play Button (Center - Large)
-                                    val artistId = artistPage?.artist?.id
-                                    val isPlayingThisArtist = isPlaying && artistId != null &&
-                                        mediaMetadata?.artists?.any { it.id == artistId } == true
-                                    ContrastCircleButton(
-                                        onTint = onTint,
-                                        filled = true,
-                                        onClick = {
-                                             if (isPlayingThisArtist) {
-                                                 playerConnection.player.pause()
-                                             } else if (artistId != null &&
-                                                 mediaMetadata?.artists?.any { it.id == artistId } == true
-                                             ) {
-                                                 playerConnection.player.play()
-                                             } else {
-                                                 val songSection = artistPage?.sections?.find { section ->
-                                                     section.items.firstOrNull() is SongItem
-                                                 }
-                                                 val items = songSection?.items?.filterIsInstance<SongItem>()
-                                                 if (!items.isNullOrEmpty()) {
-                                                     playerConnection.playQueue(
-                                                         ListQueue(
-                                                             title = artistName ?: "Artist",
-                                                             items = items.map { it.toMediaItem() }
-                                                         )
-                                                     )
-                                                 } else {
-                                                     artistPage?.artist?.radioEndpoint?.let {
-                                                         playerConnection.playQueue(YouTubeQueue(it))
-                                                     }
-                                                 }
-                                             }
-                                         },
-                                         size = 72.dp,
-                                     ) {
-                                         AnimatedPlayPauseIcon(
-                                             isPlaying = isPlayingThisArtist,
-                                             tint = if (onTint == Color.White) Color.Black else Color.White,
-                                             size = 32.dp,
-                                         )
-                                    }
-
-                                    // Favorite/Subscribe Button (Right)
-                                    val isSubscribed = libraryArtist?.artist?.bookmarkedAt != null
-                                    ContrastCircleButton(
-                                        onTint = onTint,
-                                        onClick = {
-                                            database.transaction {
-                                                val artist = libraryArtist?.artist
-                                                if (artist != null) {
-                                                    update(artist.toggleLike())
-                                                } else {
-                                                    artistPage?.artist?.let {
-                                                        insert(
-                                                            ArtistEntity(
-                                                                id = it.id,
-                                                                name = it.title,
-                                                                channelId = it.channelId,
-                                                                thumbnailUrl = it.thumbnail,
-                                                            ).toggleLike()
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        size = 48.dp,
-                                        modifier = Modifier.offset(y = 8.dp),
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isSubscribed) SfSymbols.Monochrome.SFHeartFill else SfSymbols.Monochrome.SFHeart,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(20.dp),
-                                            tint = if (isSubscribed) AppTheme.colorScheme.error else LocalContentColor.current
-                                        )
-                                    }
-                                }
-
-                                // Subscriber counts and the artist blurb sit BELOW the play
-                                // controls: the buttons are what the page is for, and a long
-                                // description pushed them off the fold.
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 12.dp, bottom = 16.dp)
-                                ) {
-                                    if (showArtistSubscriberCount) {
-                                        artistPage?.subscriberCountText?.let { subscribers ->
-                                            // Flat faded pill + plain text, like the heart
-                                            // button beside the play trio — no glass, no icon.
-                                            Text(
-                                                text = "${subscribers.split(' ').firstOrNull() ?: ""} ${stringResource(R.string.subscribers)}",
-                                                style = AppTheme.typography.labelLarge,
-                                                color = chromeTextColor,
-                                                fontWeight = FontWeight.Medium,
-                                                modifier = Modifier
-                                                    .clip(CircleShape)
-                                                    .background(onTint.copy(alpha = 0.16f))
-                                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                                                    .artistChrome(),
-                                            )
-                                        }
-                                    }
-
-                                    if (showMonthlyListeners) {
-                                        artistPage?.monthlyListenerCount?.let { monthlyListeners ->
-                                            Text(
-                                                text = "${monthlyListeners.split(' ').firstOrNull() ?: ""} ${stringResource(R.string.monthly_listeners)}",
-                                                style = AppTheme.typography.labelLarge,
-                                                color = chromeTextColor,
-                                                fontWeight = FontWeight.Medium,
-                                                modifier = Modifier
-                                                    .clip(CircleShape)
-                                                    .background(onTint.copy(alpha = 0.16f))
-                                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                                                    .artistChrome(),
-                                            )
-                                        }
-                                    }
-                                }
-
-                                if (!showLocal && showArtistDescription && artistPage != null) {
-                                    val description = artistPage?.description
-                                    val descriptionRuns = artistPage?.descriptionRuns
-                                    
-                                    if (!description.isNullOrEmpty() || !descriptionRuns.isNullOrEmpty()) {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(bottom = 16.dp)
-                                        ) {
-                                            Text(
-                                                text = stringResource(R.string.about_artist),
-                                                style = AppTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = chromeTextColor,
-                                                modifier = Modifier.padding(bottom = 8.dp).artistChrome()
-                                            )
-                                            
-                                            androidx.compose.runtime.CompositionLocalProvider(
-                                                // Engine-derived secondary tier, not the
-                                                // heading colour: contrast-checked against
-                                                // the mesh this screen actually paints.
-                                                androidx.compose.material3.LocalContentColor provides textTiers[1],
-                                            ) {
-                                                ExpandableText(
-                                                    text = description.orEmpty(),
-                                                    runs = descriptionRuns?.map {
-                                                        LinkSegment(
-                                                            text = it.text,
-                                                            url = it.navigationEndpoint?.urlEndpoint?.url
-                                                        )
-                                                    },
-                                                    collapsedMaxLines = 3,
-                                                    modifier = Modifier.artistChrome(),
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
                             }
-                            // Breathing room between the hero tail and the first
-                            // section, so Top Songs starts clear of the photo.
-                            Spacer(modifier = Modifier.height(36.dp))
+
+                            if (featured != null) {
+                                Spacer(modifier = Modifier.height(32.dp))
+                                FeaturedReleaseCard(
+                                    album = featured.second,
+                                    caption = featured.second.year?.toString() ?: featured.first,
+                                    pageBgRgb = pageBgRgb,
+                                    onClick = {
+                                        navController.navigate(albumRoute(featured.second.id, featured.second.thumbnail))
+                                    },
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(14.dp))
                         }
                     }
                 }
@@ -899,7 +704,7 @@ fun ArtistScreen(
                 if (showLocal) {
                     if (librarySongs.isNotEmpty()) {
                         item(key = "local_songs_title") {
-                            NavigationTitle(
+                            ArtistSectionHeader(
                                 title = stringResource(R.string.songs),
                                 modifier = Modifier.animateItem().artistTitleChrome(),
                                 onClick = {
@@ -946,15 +751,14 @@ fun ArtistScreen(
                                                 )
                                             }
                                         },
+                                        modifier = Modifier.additiveChrome(),
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Filled.MoreVert,
+                                            painter = painterResource(R.drawable.more_horiz),
                                             contentDescription = null,
-                                            tint = LocalContentColor.current,
+                                            tint = Color.White.copy(alpha = 0.6f),
                                             modifier = Modifier
-                                                .size(22.dp)
-                                                .additiveChrome()
-                                                .graphicsLayer { alpha = 0.45f },
+                                                .size(22.dp),
                                         )
                                     }
                                 },
@@ -992,7 +796,7 @@ fun ArtistScreen(
 
                     if (libraryAlbums.isNotEmpty()) {
                         item(key = "local_albums_title") {
-                            NavigationTitle(
+                            ArtistSectionHeader(
                                 title = stringResource(R.string.albums),
                                 modifier = Modifier.animateItem().artistTitleChrome(),
                                 onClick = {
@@ -1046,10 +850,10 @@ fun ArtistScreen(
                     }
                 } else {
                     artistPage?.sections?.fastForEach { section ->
-                        if (section.items.isNotEmpty()) {
+                        if (section.items.isNotEmpty() && !section.isFeaturedLatest()) {
                             item(key = "section_${section.title}") {
                                 // Redesigned header to match mockup "Section >" style
-                                NavigationTitle(
+                                ArtistSectionHeader(
                                     title = when (section.title) {
                                         "Songs" -> "Top Songs"
                                         "Popular" -> "Popular"
@@ -1067,17 +871,8 @@ fun ArtistScreen(
                             }
                         }
 
-                        // Check if this is a "Latest Release" style section to render as a card
-                        val firstItem = section.items.firstOrNull()
-                        if (section.title.contains("Latest", ignoreCase = true) && firstItem is AlbumItem) {
-                            item(key = "featured_release") {
-                                FeaturedReleaseCard(
-                                    album = firstItem,
-                                    onTint = onTint,
-                                    onClick = { navController.navigate(albumRoute(firstItem.id, firstItem.thumbnail)) },
-                                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp).animateItem()
-                                )
-                            }
+                        if (section.isFeaturedLatest()) {
+                            // Drawn as the featured card in the header.
                         } else if ((section.items.firstOrNull() as? SongItem)?.album != null) {
                             // Was also recomputed inside every row's listItemShape(...),
                             // i.e. a full distinctBy pass per row.
@@ -1088,6 +883,7 @@ fun ArtistScreen(
                             ) { index, song ->
                                 YouTubeListItem(
                                     item = song as SongItem,
+                                    subtitle = (song as SongItem).album?.name,
                                     isActive = mediaMetadata?.id == song.id,
                                     isPlaying = isPlaying,
                                     shape = listItemShape(index, distinctSongs.size),
@@ -1114,15 +910,14 @@ fun ArtistScreen(
                                                     )
                                                 }
                                             },
+                                            modifier = Modifier.additiveChrome(),
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Filled.MoreVert,
+                                                painter = painterResource(R.drawable.more_horiz),
                                                 contentDescription = null,
-                                                tint = LocalContentColor.current,
+                                                tint = Color.White.copy(alpha = 0.6f),
                                                 modifier = Modifier
-                                                    .size(22.dp)
-                                                    .additiveChrome()
-                                                    .graphicsLayer { alpha = 0.45f },
+                                                    .size(22.dp),
                                             )
                                         }
                                     },
@@ -1334,23 +1129,53 @@ fun ArtistScreen(
                 )
             }
 
-            GlassCircleButton(
-                onClick = {
-                    viewModel.artistPage?.artist?.shareLink?.let { link ->
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Artist Link", link)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, R.string.link_copied, Toast.LENGTH_SHORT).show()
-                    }
-                },
-                modifier = with(artistChrome) {
-                    Modifier.iconEnter(0).then(com.convx.music.ui.component.backExitModifier())
-                },
+            // Share + more in one glass capsule, 44 tall, as on iOS.
+            GlassPillRow(
+                modifier = with(artistChrome) { Modifier.containerEnter() }
+                    .height(44.dp)
+                    .then(pillGlassBackground(ArtistCapsuleShape))
+                    .padding(horizontal = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.link),
-                    contentDescription = null,
-                )
+                CompositionLocalProvider(
+                    LocalContentColor provides LocalGlassEffectConfig.current.resolvedTextColor(),
+                ) {
+                    StretchPillIcon(
+                        entrance = artistChrome,
+                        index = 0,
+                        modifier = Modifier.clickable {
+                            viewModel.artistPage?.artist?.shareLink?.let { link ->
+                                val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                                    .setType("text/plain")
+                                    .putExtra(android.content.Intent.EXTRA_TEXT, link)
+                                context.startActivity(android.content.Intent.createChooser(send, null))
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ios_share),
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    StretchPillIcon(
+                        entrance = artistChrome,
+                        index = 1,
+                        modifier = Modifier.clickable {
+                            viewModel.artistPage?.artist?.let { artist ->
+                                menuState.show {
+                                    YouTubeArtistMenu(artist = artist, onDismiss = menuState::dismiss)
+                                }
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.more_horiz),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                }
             }
             }
         }
@@ -1360,68 +1185,239 @@ fun ArtistScreen(
     }
 }
 
+/** Wordmark box on the iOS 27 artist page: logos fit inside 288×96, bottom-aligned. */
+private val ArtistWordmarkHeight = 96.dp
+private val ArtistWordmarkMaxWidth = 288.dp
+
+/** Gap between the wordmark box and the hero foot. */
+private val ArtistWordmarkFootInset = 10.dp
+
+private val ArtistCapsuleShape = com.convx.music.ui.component.shapes.ContinuousRoundedRectangle(percent = 50)
+
+private fun com.music.innertube.pages.ArtistSection.isFeaturedLatest(): Boolean =
+    title.contains("Latest", ignoreCase = true) && items.firstOrNull() is AlbumItem
+
+/**
+ * (section title, album) of the release the header card features: YouTube's "Latest release"
+ * when the page has one, otherwise the first album/single shelf's lead item — iOS always shows
+ * the card, and plenty of YouTube artist pages carry no "Latest" shelf.
+ */
+private fun List<com.music.innertube.pages.ArtistSection>.featuredRelease(): Pair<String, AlbumItem>? =
+    (firstOrNull { it.isFeaturedLatest() } ?: firstOrNull { it.items.firstOrNull() is AlbumItem })
+        ?.let { it.title to it.items.first() as AlbumItem }
+
+/** The artist's Apple Music logo when they have one, the name set large otherwise. */
 @Composable
-fun FeaturedReleaseCard(
-    album: AlbumItem,
-    onTint: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun ArtistWordmark(logo: com.convx.music.canvas.AppleArtwork?, name: String) {
+    var logoFailed by remember(logo) { mutableStateOf(false) }
+    if (logo != null && !logoFailed) {
+        AsyncImage(
+            model = logo.sized(1000, png = true),
+            contentDescription = name,
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.BottomCenter,
+            onError = { logoFailed = true },
+            modifier = Modifier
+                .widthIn(max = ArtistWordmarkMaxWidth)
+                .fillMaxSize(),
+        )
+    } else {
+        Text(
+            text = name,
+            color = Color.White,
+            fontSize = 34.sp,
+            lineHeight = 38.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = rememberCustomArtistFontFamily(),
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * Info / play / favourite: 48, 72, 48 with 24 between. Play is filled with the artist's key
+ * colour (white without one) and its glyph is the page colour pulled 30% to black; the side
+ * buttons are an 8% white wash with the key colour as their glyph.
+ */
+@Composable
+private fun ArtistActionRow(
+    keyColor: Int?,
+    pageBgRgb: Int,
+    isPlaying: Boolean,
+    isSubscribed: Boolean,
+    onInfo: () -> Unit,
+    onPlay: () -> Unit,
+    onSubscribe: () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.Black.copy(alpha = 0.2f)
+    val accent = AppleColors.color(AppleColors.playFill(keyColor))
+    val controlFill = Color.White.copy(alpha = AppleColors.CONTROL_FILL_ALPHA)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = album.thumbnail.resize(400, 400),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
+        ArtistControlCircle(size = 48.dp, fill = controlFill, onClick = onInfo) {
+            Text(
+                text = "i",
+                color = accent,
+                fontSize = 25.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
             )
+        }
+        ArtistControlCircle(size = 72.dp, fill = accent, onClick = onPlay) {
+            AnimatedPlayPauseIcon(
+                isPlaying = isPlaying,
+                tint = AppleColors.color(AppleColors.playGlyph(pageBgRgb)),
+                size = 30.dp,
+            )
+        }
+        ArtistControlCircle(size = 48.dp, fill = controlFill, onClick = onSubscribe) {
+            Icon(
+                imageVector = if (isSubscribed) Icons.Filled.Star else SfSymbols.Monochrome.SFStar,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
 
-            Spacer(Modifier.width(16.dp))
+@Composable
+private fun ArtistControlCircle(
+    size: Dp,
+    fill: Color,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(fill)
+            .clickable(onClick = onClick),
+    ) {
+        content()
+    }
+}
 
-            Column(modifier = Modifier.weight(1f)) {
+/**
+ * Featured release card: 120 tall, 24 corners, 12 padding, 96 artwork with 10 corners, caption
+ * and subtitle 15pt at 60% white around a 17pt semibold title, and a 32pt add button. The fill
+ * is the measured white wash for this page colour ([AppleColors.cardFillAlpha]).
+ */
+@Composable
+private fun FeaturedReleaseCard(
+    album: AlbumItem,
+    caption: String,
+    pageBgRgb: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(24.dp)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .clip(shape)
+            .background(Color.White.copy(alpha = AppleColors.cardFillAlpha(pageBgRgb)))
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+    ) {
+        AsyncImage(
+            model = album.thumbnail?.resize(300, 300),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(96.dp)
+                .clip(RoundedCornerShape(10.dp)),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = caption,
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = album.title,
+                color = Color.White,
+                fontSize = 17.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            album.description?.takeIf { it.isNotBlank() }?.let { subtitle ->
                 Text(
-                    text = album.year?.toString() ?: "Latest Release",
-                    style = AppTheme.typography.labelMedium,
-                    color = onTint.copy(alpha = 0.6f),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.artistChrome(),
-                )
-                Text(
-                    text = album.title,
-                    style = AppTheme.typography.titleMedium,
-                    color = onTint,
-                    fontWeight = FontWeight.Bold,
+                    text = subtitle,
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.artistTitleChrome(),
-                )
-                Text(
-                    text = "Album",
-                    style = AppTheme.typography.bodySmall,
-                    color = onTint.copy(alpha = 0.5f),
-                    maxLines = 1,
-                    modifier = Modifier.artistChrome(),
                 )
             }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.14f)),
+        ) {
+            Icon(
+                imageVector = SfSymbols.Monochrome.SFPlus,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+    }
+}
 
-            IconButton(onClick = onClick) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFPlus,
-                    contentDescription = null,
-                    tint = onTint,
-                    modifier = Modifier.size(20.dp).artistChrome()
-                )
-            }
+/** "Top Songs ›": 22pt bold on the 20pt gutter, chevron only when the section opens. */
+@Composable
+private fun ArtistSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 10.dp),
+    ) {
+        Text(
+            text = title,
+            color = Color.White,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        if (onClick != null) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Icon(
+                imageVector = SfSymbols.Monochrome.SFChevronRight,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }

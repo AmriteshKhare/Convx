@@ -309,6 +309,17 @@ class MusicService :
 
     private var crossfade: CrossfadeController? = null
     private var trackAnalyzer: TrackAnalyzer? = null
+
+    /** Apple Music Sing. Idle (no thread, no model) until the UI turns it on. */
+    val karaoke by lazy { com.convx.music.playback.karaoke.KaraokeEngine(this) }
+
+    private val playerKaraokeProcessors = HashMap<Player, com.convx.music.playback.karaoke.KaraokeAudioProcessor>()
+
+    private fun karaokePosition(p: Player = player) {
+        val id = p.currentMediaItem?.mediaId
+        playerKaraokeProcessors[p]?.rebase(id, p.currentPosition)
+        karaoke.onPosition(id, p.duration.coerceAtLeast(0L), p.currentPosition)
+    }
     private var sparePlayer: ExoPlayer? = null
 
     // SupervisorJob, not Job: a plain Job cancels every sibling the instant ANY
@@ -1209,6 +1220,8 @@ class MusicService :
         val djTail = DjTailAudioProcessor()
         val djDelay = DelayAudioProcessor()
         val spatialProcessor = SpatialAudioProcessor()
+        val karaokeProcessor = com.convx.music.playback.karaoke.KaraokeAudioProcessor()
+        karaoke.register(karaokeProcessor)
 
         // Set initial state from the cached mirrors (kept fresh by the
         // dataStore.data collectors in onCreate) rather than blocking here â€”
@@ -1222,7 +1235,7 @@ class MusicService :
             .setRenderersFactory(
                 createRenderersFactory(
                     eqProcessor, silenceProcessor, stallWatchdog, bpmAnalyzer, spatialProcessor,
-                    djFilter, djTail, djDelay,
+                    djFilter, djTail, djDelay, karaokeProcessor,
                 )
             )
             .setLoadControl(
@@ -1252,6 +1265,7 @@ class MusicService :
         playerSilenceProcessors[player] = silenceProcessor
         playerStallWatchdogs[player] = stallWatchdog
         playerSpatialProcessors[player] = spatialProcessor
+        playerKaraokeProcessors[player] = karaokeProcessor
         djEngine.registerPlayer(player, bpmAnalyzer, djFilter, djTail, djDelay)
 
         player.apply {
@@ -2186,6 +2200,7 @@ class MusicService :
         mediaItem: MediaItem?,
         reason: Int,
     ) {
+        karaokePosition()
         Timber.tag(TAG).d(
             "SKIP_DEBUG onMediaItemTransition: reason=$reason (0=REPEAT,1=AUTO,2=SEEK,3=PLAYLIST_CHANGED) " +
                 "newIndex=${player.currentMediaItemIndex} newId=${mediaItem?.mediaId} " +
@@ -2290,6 +2305,7 @@ class MusicService :
         // checked it (first play with no preload buffer). By STATE_READY the
         // resolver has definitely run for the current item.
         if (playbackState == Player.STATE_READY) {
+            karaokePosition()
             player.currentMediaItem?.mediaId?.let { mediaId ->
                 playerStallWatchdogs[player]?.armed = losslessStreamMediaIds.contains(mediaId)
             }
@@ -3640,6 +3656,7 @@ class MusicService :
         djFilter: DjFilterAudioProcessor,
         djTail: DjTailAudioProcessor,
         djDelay: DelayAudioProcessor,
+        karaokeProcessor: com.convx.music.playback.karaoke.KaraokeAudioProcessor,
     ) =
         object : NextRenderersFactory(this@MusicService) {
             override fun buildAudioSink(
@@ -3658,6 +3675,9 @@ class MusicService :
                             silenceProcessor,
                             stallWatchdog,
                             bpmAnalyzer,
+                            // Straight after the analyzer (which must hear the real mix), before
+                            // spatial/DJ effects: the vocal mask was computed on the dry track.
+                            karaokeProcessor,
                             // After the analyzer so BPM/key detection still sees the
                             // untouched mix, before the DJ chain so a transition's own
                             // low end isn't fed back in by the widener's crossfeed.
@@ -3865,12 +3885,14 @@ class MusicService :
         djEngine.release()
         crossfade?.release()
         trackAnalyzer?.release()
+        karaoke.release()
         sparePlayer?.release()
         mediaSession.release()
         player.removeListener(this)
         player.removeListener(sleepTimer)
         playerSilenceProcessors.remove(player)
         playerSpatialProcessors.remove(player)
+        playerKaraokeProcessors.remove(player)
         // Note: equalizerService audio processors are cleared in equalizerService.release() if needed,
         // or we can't easily reference the specific processor created in createExoPlayer here without storing it.
         // But since we are destroying the service, it's fine.
@@ -4102,6 +4124,7 @@ class MusicService :
                 "oldId=${oldPosition.mediaItem?.mediaId} newIndex=${newPosition.mediaItemIndex} " +
                 "newId=${newPosition.mediaItem?.mediaId}"
         )
+        karaokePosition()
     }
 
     /**
@@ -4121,6 +4144,7 @@ class MusicService :
         // Swap roles
         player = incoming
         sparePlayer = outgoing
+        karaokePosition(incoming)
         _crossfadeDurationMs.value = fadeMs
         _playerFlow.value = player
 

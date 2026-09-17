@@ -76,8 +76,12 @@ object Motion {
      * morph and the push behind it stay on one clock. Body staggers 70ms after.
      * Value-duplicates PushEasing below: forward ref illegal in object init order.
      */
-    const val MorphEnterMillis = 320
-    val MorphEnterEasing: Easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
+    const val MorphEnterMillis = 340
+    // Fitted 2026-09-16 to the iOS 27 beta 5 capture (designRefrence/shared transition
+    // animation.mp4), card edge per frame: 21/43/56/74/83/93/97% at 33..233ms open,
+    // 32/55/73/85/93/98% at 33..200ms close. The old (0.32, 0.72, 0, 1) curve hit 69% at
+    // 67ms -- front-loaded ~1.6x versus the reference. One easing, two durations.
+    val MorphEnterEasing: Easing = CubicBezierEasing(0.3f, 0.5f, 0.4f, 1f)
 
     fun <T> morphEnter(): FiniteAnimationSpec<T> = tween(MorphEnterMillis, easing = MorphEnterEasing)
 
@@ -87,7 +91,7 @@ object Motion {
      * scrub-safe tween is fine. See SharedArtwork.MorphBoundsTransform.
      */
     const val MorphExitMillis = 260
-    val MorphExitEasing: Easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f)
+    val MorphExitEasing: Easing = CubicBezierEasing(0.3f, 0.5f, 0.4f, 1f)
 
     fun <T> morphExit(): FiniteAnimationSpec<T> = tween(MorphExitMillis, easing = MorphExitEasing)
 
@@ -128,7 +132,7 @@ object Motion {
      */
     const val AppearExitMillis = 240
 
-    fun <T> appearExit(): FiniteAnimationSpec<T> = tween(AppearExitMillis, easing = MorphExitEasing)
+    fun <T> appearExit(): FiniteAnimationSpec<T> = tween(AppearExitMillis, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
 
     // The overscroll bounce-back deliberately lives in `IosOverscroll.kt` instead of
     // here: it is velocity-adaptive (a hard flick gets a longer arc), which no single

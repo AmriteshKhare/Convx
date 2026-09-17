@@ -38,9 +38,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.convx.music.extensions.filterVideoSongs as filterVideoSongsLocal
-import com.convx.music.artistvideo.ArtistVideoCanvasProvider
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -52,13 +49,7 @@ class ArtistViewModel @Inject constructor(
     val artistId = requireNotNull(savedStateHandle.get<String>("artistId")) { "Missing artistId" }
     val thumbArg = savedStateHandle.get<String>("thumb")?.takeIf { it.isNotEmpty() }
     var artistPage by mutableStateOf<ArtistPage?>(null)
-    
-    private val _artistVideoUrl = MutableStateFlow<String?>(null)
-    val artistVideoUrl: StateFlow<String?> = _artistVideoUrl
 
-    private val _artistVideoSong = MutableStateFlow<com.music.innertube.models.SongItem?>(null)
-    val artistVideoSong: StateFlow<com.music.innertube.models.SongItem?> = _artistVideoSong
-    
     val libraryArtist = database.artist(artistId)
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
     val librarySongs = context.dataStore.data
@@ -108,22 +99,6 @@ class ArtistViewModel @Inject constructor(
                         .filter { section -> section.items.isNotEmpty() }
 
                     artistPage = page.copy(sections = filteredSections)
-                    
-                    // Try to fetch artist video canvas from top songs
-                    val topSongsSection = page.sections.find { it.items.firstOrNull() is com.music.innertube.models.SongItem }
-                    topSongsSection?.items?.forEach { item ->
-                        if (item is com.music.innertube.models.SongItem) {
-                            val canvas = ArtistVideoCanvasProvider.getBySongArtist(
-                                song = item.title,
-                                artist = page.artist?.title ?: ""
-                            )
-                            if (canvas?.preferredAnimationUrl != null) {
-                                _artistVideoUrl.value = canvas.preferredAnimationUrl
-                                _artistVideoSong.value = item
-                                return@forEach
-                            }
-                        }
-                    }
                 }.onFailure {
                     reportException(it)
                 }

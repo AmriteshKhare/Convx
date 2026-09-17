@@ -221,6 +221,7 @@ import com.convx.music.vivimusic.isBuds
 import com.convx.music.vivimusic.isSpeaker
 import com.convx.music.vivimusic.AudioDeviceBottomSheet
 import com.convx.music.ui.component.DjReadout
+import com.convx.music.ui.component.BakedFootBlur
 import com.convx.music.ui.component.BlurredBackdropImage
 import com.convx.music.ui.component.BottomSheet
 import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
@@ -1224,8 +1225,7 @@ fun BottomSheetPlayer(
     BottomSheet(
         state = state,
         modifier = modifier,
-        // Off for now -- see PlayerMorph.enabled. Plain slide-up sheet until the
-        // handoff's black-gap flash is redone.
+        // iOS 27 container morph: the player grows out of the mini player as one card.
         morphEnabled = PlayerMorph.enabled,
         // The DIY editor mounts this same BottomSheetPlayer as a forced-open preview
         // (editorPlayerState) sitting behind its own sticker-editing overlay. Without
@@ -1594,9 +1594,9 @@ fun BottomSheetPlayer(
                                         .graphicsLayer { alpha = backgroundAlpha() }
                                         .backdropStaticRegion(playerBackdrop)
                                 ) {
-                                    // Layer 1: Full-Screen Blurred Background — baked into
-                                    // the 48px decode (see BLUR branch note); the ~22x
-                                    // upscale hides the source entirely under the frost.
+                                    // Layer 1: Full-Screen Blurred Background — baked still only. The
+                                    // title below the clear box reads off this frost + the foot wash;
+                                    // no extra scrim (artist-page treatment).
                                     BlurredBackdropImage(
                                         model = thumbnailUrl,
                                         screenBlurRadiusDp = 150f,
@@ -1604,14 +1604,16 @@ fun BottomSheetPlayer(
                                         modifier = Modifier.fillMaxSize(),
                                     )
 
-                                    // Layer 2: Clear Artwork (Limited to top 60% of screen)
-                                    // Fades out when lyrics are shown to provide a full-screen blur
+                                    // Layer 2: Clear Artwork (top 65%) with the shared foot knee 0.78:
+                                    // opaque to 0.78, eased out by 1.0 — same seam as artist/V2 heroes.
                                     val clearArtworkAlpha by animateFloatAsState(
                                         targetValue = if (showInlineLyrics) 0f else 1f,
                                         animationSpec = tween(500),
                                         label = "clearArtworkAlpha"
                                     )
-                                    
+
+                                    // Identical hero frame to V2 HERO: full width, 65% of the
+                                    // screen height, blend starts at 0.78 of the box in both.
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1622,16 +1624,8 @@ fun BottomSheetPlayer(
                                             }
                                             .drawWithContent {
                                                 drawContent()
-                                                // Fade the bottom edge of the clear box for a cloudy blend
                                                 drawRect(
-                                                    brush = Brush.verticalGradient(
-                                                        colorStops = arrayOf(
-                                                            0.00f to Color.Black,
-                                                            0.75f to Color.Black,
-                                                            0.92f to Color.Black.copy(alpha = 0.4f),
-                                                            1.00f to Color.Transparent,
-                                                        )
-                                                    ),
+                                                    brush = com.convx.music.ui.component.heroFadeOutBrush(),
                                                     blendMode = BlendMode.DstIn
                                                 )
                                             }
@@ -1647,15 +1641,20 @@ fun BottomSheetPlayer(
                                             modifier = Modifier.fillMaxSize()
                                         )
 
+                                        // Baked progressive foot (knee 0.78, same bake as artist):
+                                        // stills dissolve with real blur growth, not a sharp cut;
+                                        // under video it is the poster until the first frame.
+                                        BakedFootBlur(
+                                            artworkUrl = thumbnailUrl,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+
                                         if (enableCanvas && canvasArtwork != null && backgroundVisible) {
                                             BackgroundVideoView(
                                                 mediaId = mediaMetadata?.id ?: "",
                                                 videoUrl = canvasArtwork?.animated ?: canvasArtwork?.videoUrl ?: "",
                                                 isPlaying = isPlaying,
                                                 onError = {
-                                                    // This candidate's video doesn't actually play (dead
-                                                    // link, unsupported format, ...) — try the next one
-                                                    // in priority order instead of just going blank.
                                                     println("CanvasFallback: onError fired at index=$canvasCandidateIndex of ${canvasCandidates.size} candidates")
                                                     if (canvasCandidateIndex < canvasCandidates.lastIndex) {
                                                         canvasCandidateIndex++
@@ -1677,20 +1676,6 @@ fun BottomSheetPlayer(
                                             )
                                         }
                                     }
-
-                                    // Layer 3: Dynamic overlay for depth
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    listOf(
-                                                        Color.Black.copy(alpha = 0.05f),
-                                                        Color.Black.copy(alpha = 0.4f)
-                                                    )
-                                                )
-                                            )
-                                    )
                                 }
                             }
                         }
@@ -2773,7 +2758,7 @@ fun BottomSheetPlayer(
                                     // sweep kept awaiting a frame for as long as the player was
                                     // on screen — the whole app redrew every vsync, paused
                                     // included. Spin it only while something is actually playing.
-                                    val animatedRotation = if (isPlaying) {
+                                    val animatedRotation = if (isPlaying && !state.isCollapsed) {
                                         val infiniteTransition =
                                             rememberInfiniteTransition(label = "QualityIconTransition")
                                         infiniteTransition.animateFloat(

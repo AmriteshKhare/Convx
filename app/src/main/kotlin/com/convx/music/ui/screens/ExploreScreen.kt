@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.utils.sharedArtworkSource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -927,6 +928,7 @@ private fun MoodAlbumSection(
                         title = album.title,
                         subtitle = album.artists.orEmpty().joinToString(", ") { it.name },
                         onClick = { onAlbumClick(album.id) },
+                        modifier = Modifier.sharedArtworkSource(album.id, album.thumbnail),
                     )
                 }
             }

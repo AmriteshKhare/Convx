@@ -185,6 +185,8 @@ inline fun ListItem(
      * (white content added onto the backdrop, player-style) instead of plain
      * alpha white — for artwork-tinted screens. Trailing chrome stays with the
      * caller's trailingContent. The title only gets a hint ([TitleChromeAlpha]).
+     * Costs 2 offscreen saveLayer passes per row (see [Modifier.additiveChrome]) —
+     * opt in per screen, don't default it on for plain scrolling lists.
      */
     secondaryAdditiveChrome: Boolean = false,
     /**
@@ -215,6 +217,17 @@ inline fun ListItem(
     val titleChrome =
         if (secondaryAdditiveChrome) Modifier.additiveChrome().graphicsLayer { alpha = TitleChromeAlpha }
         else Modifier
+    // Top-songs shell when flat: thumbs flush on the gutter (text-leading dividers,
+    // full-bleed highlight). Non-flat rows (menus, cards) keep their nested step + pill.
+    val effectiveThumbStart = if (flat) 0.dp else thumbnailStartInset
+    val highlight = when {
+        isActive -> onSurface.copy(alpha = 0.15f)
+        isSelected == true && drawHighlight -> onSurface.copy(alpha = 0.1f)
+        else -> Color.Transparent
+    }
+    // Transparent draws the same nothing as not drawing at all -- skip the FillRectOp
+    // for the (vast majority of) rows that aren't active/selected, every list, every screen.
+    val hasHighlight = highlight != Color.Transparent
     Column(modifier) {
         if (flat && leadingDivider) {
             HorizontalDivider(
@@ -223,27 +236,30 @@ inline fun ListItem(
                 thickness = 0.75.dp,
             )
         }
+        // Full-bleed highlight when flat: bg on the outer full-width box, content
+        // keeps the gutter. Non-flat keeps the inset pill with its shape.
+        androidx.compose.foundation.layout.Box(
+            modifier = if (flat && hasHighlight) Modifier.background(highlight) else Modifier,
+        ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .padding(vertical = 2.dp)
                 .height(ListItemHeight)
                 .padding(horizontal = AppleTokens.Gutter)
-                .clip(if (flat) RectangleShape else shape)
-                .background(
-                    color = when {
-                        isActive -> onSurface.copy(alpha = 0.15f)
-                        isSelected == true && drawHighlight -> onSurface.copy(alpha = 0.1f)
-                        else -> Color.Transparent
+                .then(
+                    when {
+                        flat -> Modifier
+                        hasHighlight -> Modifier.clip(shape).background(highlight)
+                        else -> Modifier.clip(shape)
                     }
                 )
         ) {
             Box(
                 modifier = Modifier.padding(
-                    start = thumbnailStartInset,
-                    top = 6.dp,
+                    start = effectiveThumbStart,
+                    top = 5.dp,
                     end = 6.dp,
-                    bottom = 6.dp
+                    bottom = 5.dp
                 ),
                 contentAlignment = Alignment.Center
             ) {
@@ -306,11 +322,16 @@ inline fun ListItem(
                 trailingContent()
             }
         }
+        }
         if (flat) {
+            // Internal divider starts under the artist-name text (thumbnail + gaps),
+            // ends at the same gutter; null stays the full outer rule. Top/bottom
+            // outer rules keep their full width.
+            val textLeading = AppleTokens.Gutter + effectiveThumbStart + ListThumbnailSize + 12.dp
             HorizontalDivider(
                 modifier = Modifier
                     .padding(
-                        start = trailingDividerInset ?: AppleTokens.Gutter,
+                        start = if (trailingDividerInset == null) AppleTokens.Gutter else textLeading,
                         end = AppleTokens.Gutter,
                     )
                     .then(secondaryChrome),
@@ -1422,13 +1443,15 @@ fun YouTubeListItem(
     trailingDividerInset: Dp? = null,
     /** See the base ListItem: gap between the row gutter and the thumbnail. */
     thumbnailStartInset: Dp = 12.dp,
+    /** Replaces the generated subtitle (e.g. iOS artist pages show the album, not the artists). */
+    subtitle: String? = null,
 ) {
     val swipeEnabled = LocalItemPrefs.current.swipeToSong
 
     val content: @Composable () -> Unit = {
         ListItem(
             title = item.title,
-            subtitle = when (item) {
+            subtitle = subtitle ?: when (item) {
                 is SongItem -> joinByBullet(item.artists.joinToString { it.name }, makeTimeString(item.duration?.times(1000L)))
                 is AlbumItem -> joinByBullet(item.artists?.joinToString { it.name }, item.year?.toString())
                 is ArtistItem -> null
@@ -1717,8 +1740,9 @@ fun ItemThumbnail(
     val cropAlbumArt = forceContentScale == ContentScale.Crop || (forceContentScale == null && cropAlbumArtPref)
     val context = LocalContext.current
     val actualTargetSizePx = targetSizePx
-    val imageRequest = remember(thumbnailUrl, actualTargetSizePx) {
-        val resolvedUrl = thumbnailUrl?.resize(actualTargetSizePx, actualTargetSizePx)
+    val displayUrl = thumbnailUrl
+    val imageRequest = remember(displayUrl, actualTargetSizePx) {
+        val resolvedUrl = displayUrl?.resize(actualTargetSizePx, actualTargetSizePx)
         ImageRequest.Builder(context)
             .data(resolvedUrl)
             // Keyed on the resolved (quality-tier) URL actually being fetched, not
@@ -1804,13 +1828,13 @@ fun ItemThumbnail(
             showPausedIcon = showPausedPlayIcon,
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    color = if (albumIndex != null)
-                        Color.Transparent
-                    else
-                        Color.Black.copy(alpha = ActiveBoxAlpha),
-                    shape = shape
-                )
+                // Transparent draws the same nothing as no background at all -- skip the
+                // shape-fill op for numbered album-track rows (albumIndex != null), every
+                // track, every album screen.
+                .let {
+                    if (albumIndex != null) it
+                    else it.background(color = Color.Black.copy(alpha = ActiveBoxAlpha), shape = shape)
+                }
         )
     }
 }

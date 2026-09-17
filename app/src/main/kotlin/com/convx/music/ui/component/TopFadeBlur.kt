@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.convx.music.constants.ReduceDynamicBlurKey
 import com.convx.music.utils.rememberPreference
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -58,6 +60,7 @@ private const val SCRIM_PEAK = 0.42f
 /** Enough stops that the ramp does not band across a near-flat colour. */
 private const val SCRIM_STOPS = 12
 
+
 /**
  * Ported from BitChord's `TopFadeBlur` — the glass behind every top bar: full
  * blur along the top edge, ramping to nothing on the way down.
@@ -73,7 +76,7 @@ private const val SCRIM_STOPS = 12
  * [ReduceDynamicBlurKey] as the escape hatch) — same material, different
  * shape of ramp and with a readability scrim layered on top.
  */
-@OptIn(ExperimentalHazeMaterialsApi::class)
+@OptIn(ExperimentalHazeMaterialsApi::class, ExperimentalHazeApi::class)
 @Composable
 fun TopFadeBlur(
     hazeState: HazeState,
@@ -141,6 +144,11 @@ fun TopFadeBlur(
                 // Uniform across the layer, so it would show as texture over
                 // the untouched foot of the ramp — the edge being hidden.
                 noiseFactor = 0f
+                // Progressive blur on 13+ is Haze's SkSL loop: one texture tap per
+                // pixel of radius, two passes, over this whole strip, every scroll
+                // frame. Auto samples it at half size (Haze's own pick for
+                // progressive), cutting that work ~8x for the same ramp.
+                inputScale = HazeInputScale.Auto
             },
     )
 

@@ -14,16 +14,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.abs
@@ -61,15 +61,19 @@ private const val AdditiveChromePasses = 2
 
 fun Modifier.additiveChrome(enabled: Boolean = true): Modifier =
     if (!enabled) this else drawWithCache {
-        val plusPaint = Paint().apply { blendMode = BlendMode.Plus }
-        val bounds = Rect(0f, 0f, size.width, size.height)
+        // Recorded once and composited twice, rather than one saveLayer per pass.
+        // The result is the same pixels (dst + L + L), at half the render targets --
+        // and they leave the window's own render pass, which a saveLayer splits in
+        // two. Home was spending ~1.6ms/frame on 15 such splits, each drawing one
+        // icon-sized rect, because every chrome glyph here wraps itself in two.
+        val layer = obtainGraphicsLayer().apply { blendMode = BlendMode.Plus }
+        val layerSize = IntSize(
+            size.width.toInt().coerceAtLeast(1),
+            size.height.toInt().coerceAtLeast(1),
+        )
         onDrawWithContent {
-            val canvas = drawContext.canvas
-            repeat(AdditiveChromePasses) {
-                canvas.saveLayer(bounds, plusPaint)
-                drawContent()
-                canvas.restore()
-            }
+            layer.record(layerSize) { this@onDrawWithContent.drawContent() }
+            repeat(AdditiveChromePasses) { drawLayer(layer) }
         }
     }
 

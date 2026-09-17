@@ -93,7 +93,7 @@ fun Modifier.iosGlass(
 ): Modifier {
     val colors = IosTheme.colors
     val isDark = colors.isDark
-    val baseSurfaceColor = com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark)
+    val baseSurfaceColor = com.convx.music.ui.theme.GlassTintTokens.glassBaseColor(isDark)
     val baseOpacity = if (isDark) {
         com.convx.music.ui.theme.GlassTintTokens.BaseSurfaceOpacityDark
     } else {

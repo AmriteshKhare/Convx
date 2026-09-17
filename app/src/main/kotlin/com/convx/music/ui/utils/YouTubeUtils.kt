@@ -56,5 +56,12 @@ fun String.resize(
         return "${this.split("=")[0]}=w$w-h$h-p-l90-rj"
     }
 
+    // Apple Music (mzstatic) artwork: the size is the filename, "bb" = fit inside the box
+    // keeping aspect, so a 16:9 editorial image asked for as a square is not cropped.
+    if (this.contains("mzstatic.com")) {
+        val px = maxOf(width ?: 0, height ?: 0)
+        return this.replace(Regex("""/\d+x\d+[a-z]*\.(jpg|jpeg|png|webp)$"""), "/${px}x${px}bb.jpg")
+    }
+
     return this
 }

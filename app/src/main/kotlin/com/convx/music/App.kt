@@ -73,6 +73,7 @@ class App : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        com.convx.music.canvas.AppleMusicCatalog.cacheDir = filesDir.resolve("apple_catalog")
 
         // StrictMode: debug-only, catches main-thread IO before it ships.
         // Release untouched — zero behavior change there.
@@ -362,6 +363,19 @@ class App : Application(), SingletonImageLoader.Factory {
                 .collect { ipVersion ->
                     YouTube.ipVersion = ipVersion?.toEnum(defaultValue = IpVersion.AUTO) ?: IpVersion.AUTO
                 }
+        }
+
+        // Renew the Apple Music web token up front: a cold renewal takes several seconds, and
+        // the first artist page would otherwise spend its whole wait on it.
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching { com.convx.music.canvas.AppleMusicToken.get() }
+        }
+
+        applicationScope.launch(Dispatchers.IO) {
+            dataStore.data
+                .map { (it[AppleArtworkKey] ?: true) && it[DataSaverEnabledKey] != true }
+                .distinctUntilChanged()
+                .collect { com.convx.music.utils.AppleArt.enabled = it }
         }
     }
 

@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.utils.sharedArtworkSource
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
@@ -1817,6 +1818,8 @@ private fun LazyListScope.keepListeningSection(
                             title = localItem.title,
                             subtitle = localItem.spotlightSubtitle(),
                             onClick = { deps.onLocalItemClick(localItem) },
+                            // The card is the artwork here, so it is the morph source.
+                            modifier = Modifier.sharedArtworkSource(localItem.id, localItem.thumbnailUrl),
                         )
                     }
                 }

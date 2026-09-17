@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens
 
+import com.valentinilk.shimmer.shimmer
 import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.activity.compose.BackHandler
@@ -183,9 +184,6 @@ import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.utils.fadingEdge
 import com.convx.music.ui.player.CanvasArtworkPlayer
-import com.convx.music.ui.player.MeshGradientBackground
-import com.convx.music.ui.player.dimmed
-import com.convx.music.ui.player.rememberArtworkMeshPalette
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.rememberHeroTint
 import com.convx.music.ui.component.rememberHeroTopBlur
@@ -366,15 +364,29 @@ fun AlbumScreen(
         ?: albumWithSongs?.album?.thumbnailUrl
     val bgUrl = instantThumbUrl ?: albumWithSongs?.album?.thumbnailUrl
 
-    // Same mesh backdrop as ArtistScreen/OnlinePlaylistScreen/the player's BITCHORD_MESH
-    // style, not the flat single-swatch wash rememberHeroPalette+HeroMeshWash used to
-    // paint here.
-    val meshPalette = rememberArtworkMeshPalette(bgUrl)
-    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
+    // Apple Music colours, unified with the artist page: Apple's server-computed bgColor
+    // through pageBackground (99% path); unmatched albums fall back to the on-device
+    // estimateDirect of that bgColor. Flat white text — the foot wash does the contrast work.
+    val appleAlbumState = com.convx.music.utils.rememberAppleAlbum(
+        albumWithSongs?.album?.title,
+        albumWithSongs?.artists?.firstOrNull()?.name,
+    )
+    val appleAlbumLoading = appleAlbumState.loading
+    val appleAlbum = appleAlbumState.art
+    // Only estimate from YouTube's art once Apple has settled without a match.
+    val estimatedArtworkBg = com.convx.music.utils.rememberEstimatedArtworkBg(
+        bgUrl.takeIf { !appleAlbumLoading && appleAlbum == null },
+    )
+    val tint by androidx.compose.animation.animateColorAsState(
+        com.convx.music.ui.theme.AppleColors.color(
+            com.convx.music.ui.theme.AppleColors.pageBackground(
+                appleAlbum?.bgColor ?: estimatedArtworkBg ?: 0x1C1C1E,
+            ),
+        ),
+        label = "albumPage",
+    )
     com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Same flat white every icon/text reads in the player on a mesh background,
-    // rather than a per-artwork computed contrast colour.
-    val onTint = Color.White
+    val onTint = androidx.compose.ui.graphics.Color.White
 
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
@@ -422,11 +434,6 @@ fun AlbumScreen(
             .background(tint)
             .hazeSource(hazeState)
     ) {
-    MeshGradientBackground(
-        palette = meshPalette,
-        trackKey = albumWithSongs?.album?.thumbnailUrl,
-        modifier = Modifier.matchParentSize(),
-    )
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
     // Pills paint fixed-style liquidGlass (see pillGlassBackground) inside this
     // provider so they sample the list backdrop, not the root appBackdrop —
@@ -470,8 +477,7 @@ fun AlbumScreen(
                     -(systemBarsTopPadding + AppBarHeight).roundToPx()
                 }
 
-                val tintHeader = tint
-                val onTintHeader = com.convx.music.ui.theme.AppleTokens.onColor(tintHeader)
+                val onTintHeader = androidx.compose.ui.graphics.Color.White
 
                 val albumInfoText = buildString {
                     append(stringResource(R.string.album_text))
@@ -501,80 +507,35 @@ fun AlbumScreen(
                     // own so the merge band below can align to the ARTWORK's bottom edge --
                     // the outer Box's height is driven by the content column underneath it,
                     // which is nowhere near the join.
+                    // Pixel-copy of the artist hero: same W x 1.36h foot, knee 0.78 wash,
+                    // full-live canvas tail + baked poster. Replaces the old square +
+                    // MergeBand pair so album shares one seam with artist/player/V2.
                     if (!tabView) Box(modifier = Modifier.fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .offset {
-                                IntOffset(x = 0, y = headerOffset)
-                            }
-                            .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-                            .drawWithContent {
-                                drawContent()
-                                drawRect(
-                                    brush = Brush.verticalGradient(
-                                        0.55f to Color.Black,
-                                        1.00f to Color.Transparent,
-                                    ),
-                                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
-                                )
-                            }
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    scaleX = heroZoom.scale
-                                    scaleY = heroZoom.scale
+                        // YouTube's art immediately, Apple's crossfades over it the moment it
+                        // resolves -- never blocks on the lookup when a fallback is known.
+                        val fallbackHeroUrl = instantThumbUrl ?: albumWithSongs.album.thumbnailUrl
+                        com.convx.music.ui.component.ArtistHeroImage(
+                            artworkUrl = fallbackHeroUrl,
+                            appleArtworkUrl = appleAlbum?.sized(1200),
+                            pageColor = tint,
+                            heroScale = heroZoom.scale,
+                            loading = appleAlbumLoading && fallbackHeroUrl.isNullOrBlank(),
+                            liveOverlay = albumCanvasEnabled && canvasArtwork != null,
+                            scrollBlur = { heroTopBlurProgress },
+                            modifier = Modifier.offset { IntOffset(x = 0, y = headerOffset) },
+                            overlay = {
+                                if (albumCanvasEnabled && canvasArtwork != null) {
+                                    CanvasArtworkPlayer(
+                                        primaryUrl = canvasArtwork.animated,
+                                        fallbackUrl = canvasArtwork.videoUrl,
+                                        isPlaying = true,
+                                        onExhausted = albumCanvas.onError,
+                                        onReady = albumCanvas.onReady,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
                                 }
-                        ) {
-                            // Target half of the artwork morph: the tapped tile on the
-                            // previous screen grows into this header rather than the two
-                            // screens cross-fading past each other.
-                            ThumbThenFullHero(
-                                thumbUrl = instantThumbUrl ?: albumWithSongs.album.thumbnailUrl,
-                                fullUrl = albumWithSongs.album.thumbnailUrl,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-
-                            if (albumCanvasEnabled && canvasArtwork != null) {
-                                CanvasArtworkPlayer(
-                                    primaryUrl = canvasArtwork.animated,
-                                    fallbackUrl = canvasArtwork.videoUrl,
-                                    isPlaying = true,
-                                    onExhausted = albumCanvas.onError,
-                                    onReady = albumCanvas.onReady,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                        }
-                        // Scroll-driven progressive blur over the artwork: very
-                        // blurred at full scroll, sharp again on the way down.
-                        // Lives inside the masked container, so it inherits the
-                        // foot fade. Inert (draws nothing) at rest.
-                        HeroScrollBlur(
-                            artworkUrl = albumWithSongs.album.thumbnailUrl,
-                            progress = heroTopBlurProgress,
+                            },
                         )
-                    }
-
-                    // BitChord-style join: on Android 13+ a Haze pane blurs the whole
-                    // screen across the seam, carrying the artwork's colour down into the
-                    // page and the page's colour up into it. Below 13 it falls back to a
-                    // plain crossfade gradient so the hero still dissolves into the tint.
-                    // Rides `headerOffset` with the artwork so the two never separate
-                    // while the header parallaxes.
-                    HeroMergeBand(
-                        artworkUrl = albumWithSongs.album.thumbnailUrl,
-                        heroRatio = 1f,
-                        pageColor = tint,
-                        hazeState = hazeState,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .offset { IntOffset(x = 0, y = headerOffset) }
-                            .offset(y = HeroMergeBandHeight / 2),
-                    )
                     }
 
                     // Content column positioned at bottom part of the image
@@ -1116,46 +1077,12 @@ fun AlbumScreen(
 
                 Box(modifier = Modifier.fillMaxWidth()) {
                     if (!tabView && instantThumbUrl != null) Box(modifier = Modifier.fillMaxWidth()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f)
-                                .offset { IntOffset(x = 0, y = headerOffset) }
-                                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-                                .drawWithContent {
-                                    drawContent()
-                                    drawRect(
-                                        brush = Brush.verticalGradient(
-                                            0.55f to Color.Black,
-                                            1.00f to Color.Transparent,
-                                        ),
-                                        blendMode = androidx.compose.ui.graphics.BlendMode.DstIn
-                                    )
-                                }
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer {
-                                        scaleX = heroZoom.scale
-                                        scaleY = heroZoom.scale
-                                    }
-                            ) {
-                                SeededShimmerHero(
-                                    thumbUrl = instantThumbUrl,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            }
-                        }
-                        HeroMergeBand(
+                        com.convx.music.ui.component.ArtistHeroImage(
                             artworkUrl = instantThumbUrl,
-                            heroRatio = 1f,
                             pageColor = tint,
-                            hazeState = hazeState,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .offset { IntOffset(x = 0, y = headerOffset) }
-                                .offset(y = HeroMergeBandHeight / 2),
+                            heroScale = heroZoom.scale,
+                            loading = false,
+                            modifier = Modifier.offset { IntOffset(x = 0, y = headerOffset) },
                         )
                     }
 

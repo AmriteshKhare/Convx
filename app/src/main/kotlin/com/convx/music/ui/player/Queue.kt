@@ -1323,11 +1323,19 @@ fun Queue(
 
                     itemsIndexed(
                         items = mutableQueueWindows,
-                        key = { _, item -> item.uid },
+                        // Timeline.Window.uid is typed Any -- ExoPlayer's own stable
+                        // per-period identity, but Compose's LazyList key must be
+                        // something it can put in a Bundle (for scroll/saveable-state
+                        // restoration), and a bare Object throws
+                        // "Type of the key ... is not supported" the moment a forced
+                        // re-measure (e.g. lazyListState.scrollToItem on a track change)
+                        // actually exercises it. toString() keeps the same stable
+                        // identity in a Bundle-safe String.
+                        key = { _, item -> item.uid.toString() },
                     ) { index, window ->
                         ReorderableItem(
                             state = reorderableState,
-                            key = window.uid,
+                            key = window.uid.toString(),
                         ) {
                             val currentItem by rememberUpdatedState(window)
                             val isActive = window.uid == currentPlayingUid

@@ -40,7 +40,7 @@ object PlayerMorph {
      * `morphEnabled && PlayerMorph.active` check goes false too, without each of them
      * needing their own flag. Flip back to true to re-enable once the handoff is redone.
      */
-    @JvmField var enabled: Boolean = false
+    @JvmField var enabled: Boolean = true
     @JvmField var miniLayer: GraphicsLayer? = null
     @JvmField var fullLayer: GraphicsLayer? = null
 
@@ -123,6 +123,7 @@ fun Modifier.recordPlayerLayer(
     target.record { this@drawWithContent.drawContent() }
     if (drawInPlace()) {
         target.alpha = 1f
+        target.renderEffect = null
         drawLayer(target)
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -197,6 +198,16 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
+
+
+/**
+ * Auto-scroll to the sung line. Measured off 60fps.design apple-music-lyrics-interaction
+ * (60fps): the list settles on the new line in ~450ms with no overshoot -- a critically
+ * damped spring at iOS's default 0.5s response -- with the active line resting a third of
+ * the way down the pane rather than centred. The old 1500ms tween was still travelling
+ * when the next line arrived.
+ */
+private val LyricScrollSpec = spring<Float>(dampingRatio = 1f, stiffness = 160f)
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedBoxWithConstraintsScope", "StringFormatInvalid")
@@ -664,7 +675,7 @@ fun Lyrics(
         }
     }
 
-    suspend fun performSmoothPageScroll(targetIndex: Int, duration: Int = 1500) {
+    suspend fun performSmoothPageScroll(targetIndex: Int) {
         if (isAnimating) return // Prevent multiple animations
         isAnimating = true
         try {
@@ -673,13 +684,13 @@ fun Lyrics(
             if (itemInfo != null) {
                 // Item is visible, animate directly to center without sudden jumps
                 val viewportHeight = lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
-                val center = lazyListState.layoutInfo.viewportStartOffset + (viewportHeight / 2)
+                val center = lazyListState.layoutInfo.viewportStartOffset + (viewportHeight / 3)
                 val itemCenter = itemInfo.offset + itemInfo.size / 2
                 val offset = itemCenter - center
                 if (kotlin.math.abs(offset) > 10) {
                     lazyListState.animateScrollBy(
                         value = offset.toFloat(),
-                        animationSpec = tween(durationMillis = duration)
+                        animationSpec = LyricScrollSpec
                     )
                 }
             } else {
@@ -697,7 +708,7 @@ fun Lyrics(
             shouldScrollToFirstLine = false
             // Initial scroll to center the first line with medium animation (600ms)
             val initialCenterIndex = kotlin.math.max(0, currentLineIndex)
-            performSmoothPageScroll(initialCenterIndex, 800) // Initial scroll duration
+            performSmoothPageScroll(initialCenterIndex) // Initial scroll duration
             if(!isAppMinimized) {
                 initialScrollDone = true
             }
@@ -706,13 +717,13 @@ fun Lyrics(
             if (isSeeking) {
                 // Fast scroll for seeking to center the target line (300ms)
                 val seekCenterIndex = kotlin.math.max(0, currentLineIndex)
-                performSmoothPageScroll(seekCenterIndex, 500) // Fast seek duration
+                performSmoothPageScroll(seekCenterIndex) // Fast seek duration
             } else if ((lastPreviewTime == 0L || currentLineIndex != previousLineIndex) && scrollLyrics) {
                 // Auto-scroll when lyrics settings allow it
                 if (currentLineIndex != previousLineIndex) {
                     // Calculate which line should be at the top to center the active group
                     val centerTargetIndex = currentLineIndex
-                    performSmoothPageScroll(centerTargetIndex, 1500) // Auto scroll duration
+                    performSmoothPageScroll(centerTargetIndex) // Auto scroll duration
                 }
             }
         }
@@ -1010,13 +1021,13 @@ fun Lyrics(
                                         val itemInfo = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
                                         if (itemInfo != null) {
                                             val viewportHeight = lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
-                                            val center = lazyListState.layoutInfo.viewportStartOffset + (viewportHeight / 2)
+                                            val center = lazyListState.layoutInfo.viewportStartOffset + (viewportHeight / 3)
                                             val itemCenter = itemInfo.offset + itemInfo.size / 2
                                             val offset = itemCenter - center
                                             if (kotlin.math.abs(offset) > 10) {
                                                 lazyListState.animateScrollBy(
                                                     value = offset.toFloat(),
-                                                    animationSpec = tween(durationMillis = 1500)
+                                                    animationSpec = LyricScrollSpec
                                                 )
                                             }
                                         }
@@ -1089,13 +1100,13 @@ fun Lyrics(
                                         val itemInfo = lazyListState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
                                         if (itemInfo != null) {
                                             val viewportHeight = lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
-                                            val center = lazyListState.layoutInfo.viewportStartOffset + (viewportHeight / 2)
+                                            val center = lazyListState.layoutInfo.viewportStartOffset + (viewportHeight / 3)
                                             val itemCenter = itemInfo.offset + itemInfo.size / 2
                                             val offset = itemCenter - center
                                             if (kotlin.math.abs(offset) > 10) {
                                                 lazyListState.animateScrollBy(
                                                     value = offset.toFloat(),
-                                                    animationSpec = tween(durationMillis = 1500)
+                                                    animationSpec = LyricScrollSpec
                                                 )
                                             }
                                         }
@@ -1153,14 +1164,14 @@ fun Lyrics(
                                             val viewportHeight =
                                                 lazyListState.layoutInfo.viewportEndOffset - lazyListState.layoutInfo.viewportStartOffset
                                             val center =
-                                                lazyListState.layoutInfo.viewportStartOffset + (viewportHeight / 2)
+                                                lazyListState.layoutInfo.viewportStartOffset + (viewportHeight / 3)
                                             val itemCenter = itemInfo.offset + itemInfo.size / 2
                                             val offset = itemCenter - center
 
                                             if (kotlin.math.abs(offset) > 10) { // Only animate if not already centered
                                                 lazyListState.animateScrollBy(
                                                     value = offset.toFloat(),
-                                                    animationSpec = tween(durationMillis = 1500) // Reduced to half speed
+                                                    animationSpec = LyricScrollSpec
                                                 )
                                             }
                                         }
@@ -1885,7 +1896,7 @@ fun Lyrics(
         ) {
             FilledTonalButton(onClick = {
                 scope.launch {
-                    performSmoothPageScroll(currentLineIndex, 1500)
+                    performSmoothPageScroll(currentLineIndex)
                 }
                 isAutoScrollEnabled = true
             }) {

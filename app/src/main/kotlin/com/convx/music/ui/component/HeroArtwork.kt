@@ -2,6 +2,7 @@ package com.convx.music.ui.component
 
 import android.content.Context
 import android.os.Build
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -37,6 +38,12 @@ import androidx.compose.ui.unit.dp
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
+import kotlin.math.roundToInt
+import kotlin.math.pow
+import androidx.compose.runtime.produceState
+import com.valentinilk.shimmer.shimmer
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,6 +91,8 @@ import kotlinx.coroutines.withContext
 import com.convx.music.ui.theme.colorengine.textHierarchyOn
 import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.utils.resize
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -189,7 +198,7 @@ fun HeroMergeBand(
     // that used to separate the two has no content left to be a line between.
     // The band's own edges are hidden by a vertical alpha mask so there is no
     // moment where the blur starts or stops.
-    @OptIn(ExperimentalHazeMaterialsApi::class)
+    @OptIn(ExperimentalHazeMaterialsApi::class, ExperimentalHazeApi::class)
     Box(
         modifier
             .fillMaxWidth()
@@ -257,7 +266,7 @@ fun HeroTopBlur(
         return
     }
 
-    @OptIn(ExperimentalHazeMaterialsApi::class)
+    @OptIn(ExperimentalHazeMaterialsApi::class, ExperimentalHazeApi::class)
     Box(
         modifier
             .fillMaxWidth()
@@ -268,6 +277,9 @@ fun HeroTopBlur(
             ) {
                 blurRadius = 36.dp
                 noiseFactor = 0f
+                // Half-size input (see TopFadeBlur): the progressive SkSL blur costs
+                // one tap per pixel of radius, so full size was the frame budget.
+                inputScale = HazeInputScale.Auto
                 // The whole strip's intensity follows scroll: zero blur when the
                 // hero is fully visible, full when it has scrolled under the bar.
                 alpha = progress.coerceIn(0f, 1f)
@@ -759,95 +771,18 @@ fun AlbumStyleHeroImage(
     // progressively as it scrolls up, sharpening back on the way down.
     scrollBlurProgress: Float = 0f,
 ) {
-    val topInset = androidx.compose.foundation.layout.WindowInsets.systemBars
-        .asPaddingValues().calculateTopPadding()
-    val density = LocalDensity.current
-    val pullUpPx = with(density) { (topInset + extraPullUp).roundToPx() }
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            // Report a shorter height and draw shifted up: the image top tucks
-            // under the status bar and following content sits tight (no gap).
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                val h = (placeable.height - pullUpPx).coerceAtLeast(0)
-                layout(placeable.width, h) {
-                    placeable.place(0, -pullUpPx)
-                }
-            }
-            .graphicsLayer {
-                scaleX = heroScale
-                scaleY = heroScale
-                compositingStrategy = CompositingStrategy.Offscreen
-            },
-    ) {
-        if (!artworkUrl.isNullOrBlank()) {
-            // Thumb-then-full: tile-sized bitmap lands opaque frame one (morph
-            // grows, never swaps), 1024px fades over it. Fade lives on the box,
-            // NOT the image: the merge band below is a sibling and must reach
-            // the join at full strength.
-            ThumbThenFullHero(
-                thumbUrl = artworkUrl,
-                fullUrl = artworkUrl,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color.Black, Color.Transparent),
-                                startY = size.height * 0.55f,
-                                endY = size.height,
-                            ),
-                            blendMode = BlendMode.DstIn,
-                        )
-                    },
-            )
-        } else {
-            Image(
-                painter = painterResource(R.drawable.music_note),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize(0.4f)
-                    .align(Alignment.Center)
-                    .graphicsLayer { alpha = 0.3f },
-            )
-        }
-
-        // Scroll-driven progressive blur over the artwork, same foot fade so the
-        // plates dissolve where the art does. Inert at rest.
-        HeroScrollBlur(
-            artworkUrl = artworkUrl,
-            progress = scrollBlurProgress,
-            modifier = Modifier.drawWithContent {
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Black, Color.Transparent),
-                        startY = size.height * 0.55f,
-                        endY = size.height,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            },
-        )
-
-        // BitChord-style join: a blurred copy of the artwork centred on the
-        // foot, so picture and page colour smear into one another instead of
-        // meeting at an edge. Hangs half below the box, under the header text.
-        HeroMergeBand(
-            artworkUrl = artworkUrl,
-            heroRatio = 1f,
-            pageColor = pageColor,
-            hazeState = hazeState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = HeroMergeBandHeight / 2),
-        )
-    }
+    // Pixel-copy of the artist hero (W x 1.36h foot, knee 0.78 wash): one seam
+    // everywhere. extraPullUp/hazeState kept for call-site compat — the foot's own
+    // baked blur + wash already dissolve the join, no pull-up or merge band needed.
+    ArtistHeroImage(
+        artworkUrl = artworkUrl,
+        pageColor = pageColor,
+        modifier = modifier,
+        heroScale = heroScale,
+        loading = false,
+        liveOverlay = false,
+        scrollBlur = { scrollBlurProgress },
+    )
 }
 
 /**
@@ -1258,144 +1193,428 @@ fun HeroCardHeader(
 }
 
 /**
- * Where the hero's blend zone starts, as a fraction of the photo height: above
- * this the plate stays sharp, below it blur and colour fade ramp to full at the
- * foot. Shared with the screen's header math so the title sits on the blend
- * start rather than somewhere up the sharp photo or down the flat tint.
- */
-const val ArtistBlendStart = 0.85f
-
-/**
- * BitChord-style artist hero: the photo full-bleed, very slightly taller than
- * wide, with a progressive blur running from zero at [ArtistBlendStart] to
- * [blurRadius] at the foot — sharp where the face is, increasingly smeared
- * where the page begins — so the picture dissolves into the page colour
- * instead of meeting it at an edge. The ramp is three plates at growing radii
- * over the same height (like the top bar's own progressive glass), not one
- * mask, so no single gradient edge survives to read as a line. A
- * full-strength foot wash in [pageColor] settles the join before
- * [HeroMergeBand]'s glass goes over it (a blur averages what it is given and
- * cannot invent agreement), and a static top shade keeps the floating
- * back/share chrome legible while the hero is fully visible, before the
- * scroll-driven scrim takes over.
+ * Apple Music (iOS 27) artist hero, fitted row by row on the seven full-frame reference
+ * screenshots (rms error 1-2/255 per band): the square photo from the top of the screen,
+ * extended past its foot by its own bottom row, blurred progressively ([artistFootBlurPt]) and
+ * washed toward [pageColor] until the page takes over at [ArtistHeroExtent] × the width.
  *
- * Below Android S RenderEffect blur is a no-op and the blurred plates simply
- * stop contributing; the wash plus the band's own plain-gradient fallback
- * still dissolve the edge, so the fallback is a fade, not a cut.
+ * Cheap at runtime: the blurred foot is baked once per artwork on a small CPU copy and cached;
+ * the wash is a plain gradient, so an animating page colour never re-bakes anything, and
+ * scrolling only moves layers.
  */
 @Composable
 fun ArtistHeroImage(
     artworkUrl: String?,
     pageColor: Color,
-    hazeState: HazeState?,
     modifier: Modifier = Modifier,
-    heroRatio: Float = 0.95f,
-    blurRadius: Dp = 56.dp,
     heroScale: Float = 1f,
+    /**
+     * Apple's art, once resolved -- layered over [artworkUrl] and cross-faded in by Coil's own
+     * transition, WITHOUT ever touching [artworkUrl]'s own AsyncImage. Swapping [artworkUrl]
+     * itself from YouTube's URL to Apple's would make Coil treat it as a brand new image load
+     * (placeholder flash, then fade), instead of one seamless step from YouTube's art straight
+     * to Apple's.
+     */
+    appleArtworkUrl: String? = null,
+    /** Apple's lookup has not settled: draw a shimmer instead of an image that may be replaced. */
+    loading: Boolean = false,
+    /**
+     * [overlay] is moving (the artist's motion video). A foot baked from the still frame would
+     * meet the playing video at a visible seam, so the photo's lower band is blurred live from
+     * the video itself and the baked copy only takes over past the foot, where both are soft.
+     */
+    liveOverlay: Boolean = false,
+    /**
+     * 0..1 scroll progress. The same soft blur climbs the photo from its foot to its top as the
+     * page scrolls, eased with the hero's own smooth ramp, and recedes on the way back down.
+     */
+    scrollBlur: () -> Float = { 0f },
     overlay: @Composable BoxScope.() -> Unit = {},
-    // 0..1 scroll progress (e.g. from rememberHeroTopBlur): the photo blurs
-    // progressively as it scrolls up, sharpening back on the way down.
-    scrollBlurProgress: Float = 0f,
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(heroRatio)
-            .graphicsLayer {
-                scaleX = heroScale
-                scaleY = heroScale
-                compositingStrategy = CompositingStrategy.Offscreen
-            },
-    ) {
-        if (!artworkUrl.isNullOrBlank()) {
-            // Sharp plate, full-bleed: thumb tier lands opaque frame one so the
-            // morph grows, 1200px fades over it like every other detail hero.
-            ThumbThenFullHero(
-                thumbUrl = artworkUrl,
-                fullUrl = artworkUrl,
-                fullPx = 1200,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-            // Foot wash: the photo stays fully sharp to its foot — the eased
-            // wash alone dissolves the edge into the page colour. Edge only
-            // (from 0.85): eased stops so no single gradient edge survives
-            // to read as a line.
+    val context = LocalContext.current
+    // No Haze here by design: Haze samples the Compose layer, which excludes AndroidView
+    // video (TextureView) — the old live band drew a frozen still-blur over moving video
+    // (the hard line). The baked foot below is the blend for stills and video alike.
+    val foot by produceState(artworkUrl?.let { artistFootCache.get(it) }, artworkUrl) {
+        if (artworkUrl.isNullOrBlank() || value != null) return@produceState
+        value = withContext(Dispatchers.Default) {
+            runCatching { bakeArtistFoot(context, artworkUrl) }.getOrNull()
+                ?.also { artistFootCache.put(artworkUrl, it) }
+        }
+    }
+    // No drift: scaling this layer shifts its fade boundary against the live video
+    // below, which stays static size -- the mismatch reads as a seam that visibly
+    // grows and shrinks as the scale oscillates. Kept static so the hand-off point
+    // never moves.
+    val footDrift = 1f
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val side = maxWidth
+        Box(
+            Modifier
+                .width(side)
+                .height(side * ArtistHeroExtent)
+                .graphicsLayer {
+                    scaleX = heroScale
+                    scaleY = heroScale
+                },
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(side),
+            ) {
+                if (loading) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .shimmer()
+                            .background(Color.White.copy(alpha = 0.08f)),
+                    )
+                } else if (!artworkUrl.isNullOrBlank()) {
+                    ThumbThenFullHero(
+                        thumbUrl = artworkUrl,
+                        fullUrl = artworkUrl,
+                        fullPx = 1200,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    // No placeholder: fully transparent (letting the layer below show through)
+                    // until Apple's art is actually ready, then Coil's own crossfade fades it
+                    // in -- one seamless step, YouTube's art straight to Apple's.
+                    if (!appleArtworkUrl.isNullOrBlank()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(appleArtworkUrl)
+                                .diskCacheKey(appleArtworkUrl)
+                                .crossfade(600)
+                                .build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    overlay()
+                } else {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Brush.verticalGradient(0f to Color(0xFF3A3A3C), 1f to pageColor)),
+                    )
+                    Image(
+                        painter = painterResource(R.drawable.music_note),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize(0.3f)
+                            .align(Alignment.Center)
+                            .graphicsLayer { alpha = 0.3f },
+                    )
+                }
+            }
+            if (!loading) {
+                if (!artworkUrl.isNullOrBlank()) {
+                    // Still photo: baked once, kept composed (so the first scroll doesn't wait on a
+                    // bake), fully masked out at rest.
+                    BlurredBackdropImage(
+                        model = artworkUrl,
+                        screenBlurRadiusDp = ArtistScrollBlurDp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(side)
+                            // Progress is read here, in the draw phase: scrolling redraws this
+                            // layer continuously instead of recomposing the header in steps.
+                            .graphicsLayer {
+                                alpha = if (scrollBlur() > 0.001f) 1f else 0f
+                                compositingStrategy = CompositingStrategy.Offscreen
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(brush = scrollBlurMask(scrollBlur()), blendMode = BlendMode.DstIn)
+                            },
+                    )
+                }
+            }
+            foot?.takeUnless { loading }?.let { baked ->
+                // Takes over where the fitted blur is still ~0, so the hand-off from the
+                // sharp photo (or the playing video above it) is invisible. Same fade for
+                // stills and video: one seam, no swap step.
+                Image(
+                    bitmap = baked,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer {
+                            scaleX = footDrift
+                            scaleY = footDrift
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
+                        }
+                        .heroBandMask(ArtistFootFadeInStart / ArtistHeroExtent, ArtistFootFadeInEnd / ArtistHeroExtent),
+                )
+            }
             Box(
                 Modifier
                     .matchParentSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = Array(12) { i ->
-                                val t = i / 11f
-                                val eased = androidx.compose.animation.core.EaseOutCubic.transform(
-                                    ((t - 0.85f) / 0.15f).coerceIn(0f, 1f),
-                                )
-                                t to pageColor.copy(alpha = eased)
-                            },
-                        ),
-                    ),
-            )
-
-            // Scroll-driven progressive blur over the photo. The outer box already
-            // renders offscreen, so the plates blend cleanly. Inert at rest.
-            HeroScrollBlur(
-                artworkUrl = artworkUrl,
-                progress = scrollBlurProgress,
-                blurRadius = blurRadius,
-            )
-        } else {
-            // Stand-in while there is no photo: a neutral wash, not flat tint,
-            // so the fade structure still reads in previews and offline.
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color(0xFF6B5B73),
-                            1f to pageColor,
-                        ),
-                    ),
-            )
-            Image(
-                painter = painterResource(R.drawable.music_note),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize(0.3f)
-                    .align(Alignment.Center)
-                    .graphicsLayer { alpha = 0.3f },
+                    .background(Brush.verticalGradient(colorStops = artistWashStops(pageColor))),
             )
         }
+    }
+}
 
-        // Static shade under the glass bar, BitChord's own: the scroll scrim
-        // only arrives once the list moves, and at rest the buttons sit on raw
-        // photo without it.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.28f)
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.35f),
-                        1f to Color.Transparent,
-                    ),
-                ),
-        )
+/**
+ * Shared baked progressive foot for non-artist boxes (classic APPLE_MUSIC player clear-art,
+ * V2 hero): the artist bake with `extent = 1f`, so the SAME 0→48pt growth lands inside the
+ * visible frame (knee ≈0.57, peak ≈0.90) instead of being cut off below it like the tall
+ * artist bake would be. Masked 0.50→0.85, then the caller's eased outer fade
+ * ([heroFadeOutBrush]) dissolves it — rich blur first, transparency second, no line.
+ * No wash — the caller blends into its own background (L1 frost, mesh, tint).
+ * Baked once per artwork on a 320px copy and cached ([playerFootCache]); video callers layer
+ * it UNDER the video as the poster, with [drift] keeping the tail alive (Haze can't sample
+ * TextureView video).
+ *
+ * Fail path per spec: null bake draws nothing, so the sharp art + outer fade remain — the
+ * same color-fade seam, minus blur. Never a placeholder, never black.
+ */
+private val playerFootCache = android.util.LruCache<String, ImageBitmap>(6)
 
-        overlay()
-
-        // The join itself: blurred colour centred on the foot, title/buttons
-        // hang onto what it leaves behind. Sibling of the plates above, never a
-        // parent — the glass must reach the join at full strength.
-        HeroMergeBand(
-            artworkUrl = artworkUrl,
-            heroRatio = heroRatio,
-            pageColor = pageColor,
-            hazeState = hazeState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = HeroMergeBandHeight / 2),
+@Composable
+fun BakedFootBlur(
+    artworkUrl: String?,
+    modifier: Modifier = Modifier,
+    fadeStart: Float = 0.50f,
+    fadeEnd: Float = 0.85f,
+) {
+    if (artworkUrl.isNullOrBlank()) return
+    val context = LocalContext.current
+    val foot by produceState(playerFootCache.get(artworkUrl), artworkUrl) {
+        if (value != null) return@produceState
+        value = withContext(Dispatchers.Default) {
+            runCatching { bakeArtistFoot(context, artworkUrl, extent = 1f) }.getOrNull()
+                ?.also { playerFootCache.put(artworkUrl, it) }
+        }
+    }
+    // No drift: scaling this layer shifts its fade boundary against the unscaled art/video
+    // around it (a seam that visibly grows and shrinks), and its infinite transition kept the
+    // app drawing every vsync for as long as the player sheet was composed -- collapsed and
+    // paused included.
+    foot?.let { baked ->
+        Image(
+            bitmap = baked,
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = modifier.heroBandMask(fadeStart, fadeEnd),
         )
     }
 }
+
+/** Hero column height as a multiple of its width: the square photo plus the smeared tail below it. */
+const val ArtistHeroExtent = 1.36f
+
+/**
+ * Page-colour wash at [fraction] × the hero side. The middle is the fitted line (0 at 0.507,
+ * 90% at 1.2); both ends are eased so there is no slope break anywhere for the eye to read as an
+ * edge: a quadratic ease-in over the first 0.06, and a quadratic ease-out whose slope reaches
+ * exactly zero as the wash reaches 100% (at ~1.354, just inside [ArtistHeroExtent]).
+ */
+fun artistWash(fraction: Float): Float {
+    val start = 0.507f
+    val knee = 1.20f
+    val atKnee = 0.90f
+    val slope = atKnee / (knee - start)
+    val easeIn = 0.06f
+    val tail = 2f * (1f - atKnee) / slope
+    return when {
+        fraction <= start - easeIn / 2f -> 0f
+        fraction < start + easeIn / 2f -> {
+            // Quadratic blend from 0 into the line: value and slope match at both ends.
+            val t = fraction - (start - easeIn / 2f)
+            slope * t * t / (2f * easeIn)
+        }
+        fraction <= knee -> slope * (fraction - start)
+        fraction < knee + tail -> {
+            val t = fraction - knee
+            atKnee + slope * t - slope * t * t / (2f * tail)
+        }
+        else -> 1f
+    }.coerceIn(0f, 1f)
+}
+
+private fun artistWashStops(pageColor: Color): Array<Pair<Float, Color>> {
+    val steps = 32
+    return Array(steps + 1) { i ->
+        val position = i / steps.toFloat()
+        position to pageColor.copy(alpha = artistWash(position * ArtistHeroExtent))
+    }
+}
+
+/**
+ * Where the baked blurred copy takes over from the sharp photo. Wide and eased on purpose: the
+ * baked copy comes from a 320px decode, so a short linear hand-off showed its softer edge.
+ */
+private const val ArtistFootFadeInStart = 0.60f
+private const val ArtistFootFadeInEnd = 0.88f
+
+/**
+ * Where the scroll blur covers the photo (fractions of its height) at scroll progress [p]: a
+ * smooth front rising from below the foot to past the top, multiplied by a fade over the photo's
+ * last 10%. The layer is exactly photo-height, so without that fade its bottom edge sat as a hard
+ * line over the smeared tail, which showed as a flickering line while scrolling.
+ */
+private fun scrollBlurMask(p: Float): Brush {
+    val riseStart = 1.1f + (-0.35f - 1.1f) * p
+    val riseEnd = 1.3f + (0.25f - 1.3f) * p
+    val steps = 24
+    return Brush.verticalGradient(
+        colorStops = Array(steps + 1) { i ->
+            val y = i / steps.toFloat()
+            val coverage = smoothstep(riseStart, riseEnd, y) * (1f - smoothstep(0.90f, 1f, y))
+            y to Color.Black.copy(alpha = coverage)
+        },
+    )
+}
+
+private fun smoothstep(edge0: Float, edge1: Float, x: Float): Float {
+    val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
+/** Blur strength of the scroll blur once it has climbed the whole photo. */
+private const val ArtistScrollBlurDp = 28f
+
+/** Kept for the preview's header offset math. */
+const val ArtistBlendStart = 0.85f
+
+/**
+ * Fitted blur σ, in points of a 402pt-wide screen, at [fraction] × the hero side. A power curve
+ * through Apple's measured points (≈12pt at the foot, 48pt by 1.23): it leaves 0 at 0.78 with
+ * zero slope, so there is no row where blur visibly "begins". The earlier doubling curve jumped
+ * from 0 to 2pt at its knee, and that step read as a line across the photo.
+ */
+fun artistFootBlurPt(fraction: Float): Float =
+    if (fraction <= ArtistBlurKnee) 0f else minOf(48f, 207f * (fraction - ArtistBlurKnee).pow(1.855f))
+
+private const val ArtistBlurKnee = 0.78f
+
+// Not lower: near the knee the blur is ~0, and at 160 the 6.75x upscale showed as a visible
+// pixel grid through the blend band.
+private const val ArtistFootPx = 320
+private val ArtistFootLevelsPt = floatArrayOf(0f, 2f, 4f, 8f, 16f, 32f, 48f)
+private val artistFootCache = android.util.LruCache<String, ImageBitmap>(6)
+
+/** Stack blur radius whose triangle kernel has standard deviation [sigmaPx] (variance r(r+2)/6). */
+private fun stackRadiusFor(sigmaPx: Float): Int =
+    (-1.0 + kotlin.math.sqrt(1.0 + 6.0 * sigmaPx * sigmaPx)).roundToInt()
+
+/**
+ * The hero foot as Apple draws it: the artwork centre-cropped square, its bottom row repeated to
+ * [extent] × the width, each row blurred at [artistFootBlurPt] (interpolated between a handful of
+ * whole-image blur levels). Runs once per artwork, a few tens of ms on a 320px copy.
+ *
+ * [extent] compresses the SAME curve into shorter boxes: the artist hero uses [ArtistHeroExtent]
+ * (knee at 0.78, 48pt at 1.23); player boxes use 1f, so the full 0→48pt growth lands inside the
+ * visible frame (knee ≈0.57, peak ≈0.90) instead of being cut off below it. Caching stays split
+ * per extent ([artistFootCache] / [playerFootCache]) — different bitmaps, same recipe.
+ */
+private suspend fun bakeArtistFoot(context: Context, url: String, extent: Float = ArtistHeroExtent): ImageBitmap? {
+    // Same resolved URL + size + cache key as ThumbThenFullHero's own full-res request for
+    // this exact artwork (fullPx=1200, fired concurrently on the same page) -- Coil
+    // coalesces/reuses that decode instead of this bake firing its own independent
+    // network fetch at a size nothing else ever requests. Downscaled to ArtistFootPx below.
+    val heroFullUrl = url.resize(1200, 1200)
+    val request = ImageRequest.Builder(context)
+        .data(heroFullUrl)
+        .diskCacheKey(heroFullUrl)
+        .size(1200)
+        .allowHardware(false)
+        .build()
+    val decoded = (coil3.SingletonImageLoader.get(context).execute(request) as? coil3.request.SuccessResult)
+        ?.image?.toBitmap() ?: return null
+    val w = ArtistFootPx
+    val h = (w * extent).roundToInt().coerceAtLeast(w)
+    val crop = minOf(decoded.width, decoded.height)
+    val square = android.graphics.Bitmap.createBitmap(
+        decoded, (decoded.width - crop) / 2, (decoded.height - crop) / 2, crop, crop,
+    )
+    val scaled = android.graphics.Bitmap.createScaledBitmap(square, w, w, true)
+    val base = IntArray(w * h)
+    scaled.getPixels(base, 0, w, 0, 0, w, w)
+    for (y in w until h) System.arraycopy(base, (w - 1) * w, base, y * w, w)
+
+    val pxPerPt = w / 402f
+    val levels = Array(ArtistFootLevelsPt.size) { i ->
+        val sigma = ArtistFootLevelsPt[i]
+        if (sigma == 0f) base else base.copyOf().also {
+            com.convx.music.ui.utils.stackBlurPixels(it, w, h, stackRadiusFor(sigma * pxPerPt).coerceAtLeast(1))
+        }
+    }
+    val out = IntArray(w * h)
+    val squash = ArtistHeroExtent / extent
+    for (y in 0 until h) {
+        val sigma = artistFootBlurPt(y.toFloat() / w * squash)
+        var hi = ArtistFootLevelsPt.indexOfFirst { it >= sigma }
+        if (hi < 0) hi = ArtistFootLevelsPt.lastIndex
+        val lo = maxOf(hi - 1, 0)
+        val t = if (hi == lo) 1f else ((sigma - ArtistFootLevelsPt[lo]) / (ArtistFootLevelsPt[hi] - ArtistFootLevelsPt[lo])).coerceIn(0f, 1f)
+        val a = levels[lo]
+        val b = levels[hi]
+        val row = y * w
+        for (x in 0 until w) {
+            val ca = a[row + x]
+            val cb = b[row + x]
+            val r = (((ca shr 16) and 0xFF) * (1 - t) + ((cb shr 16) and 0xFF) * t).roundToInt()
+            val g = (((ca shr 8) and 0xFF) * (1 - t) + ((cb shr 8) and 0xFF) * t).roundToInt()
+            val bl = ((ca and 0xFF) * (1 - t) + (cb and 0xFF) * t).roundToInt()
+            out[row + x] = (0xFF shl 24) or (r shl 16) or (g shl 8) or bl
+        }
+    }
+    return android.graphics.Bitmap.createBitmap(out, w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        .asImageBitmap()
+}
+
+/**
+ * Vertical alpha ramp, transparent above [start] and opaque below [end], eased with smoothstep so
+ * neither end of the ramp has a slope break the eye can pick out as a line.
+ */
+private fun smoothRamp(start: Float, end: Float): Brush {
+    val steps = 12
+    return Brush.verticalGradient(
+        colorStops = Array(steps + 2) { i ->
+            when (i) {
+                0 -> 0f to Color.Transparent
+                steps + 1 -> 1f to Color.Black
+                else -> {
+                    val t = (i - 1) / (steps - 1f)
+                    val eased = t * t * (3f - 2f * t)
+                    (start + (end - start) * t).coerceIn(0f, 1f) to Color.Black.copy(alpha = eased)
+                }
+            }
+        },
+    )
+}
+
+/**
+ * Outer dissolve for player hero boxes (classic APPLE_MUSIC clear-art, V2 HERO): opaque to
+ * [start], then an eased ramp to transparent at [end] over [steps] stops. Same zero-slope
+ * joints as the artist wash (smoothstep both ends) — the old 4-stop gradient had a slope
+ * break at the knee that read as a blend line. Pair with [BakedFootBlur] (arrives 0.60→0.88)
+ * so blur growth hands to transparency with no seam, exactly like the artist foot.
+ */
+fun heroFadeOutBrush(start: Float = 0.78f, end: Float = 1f, steps: Int = 24): Brush {
+    val stops = ArrayList<Pair<Float, Color>>(steps + 2)
+    stops.add(0f to Color.Black)
+    stops.add(start to Color.Black)
+    for (i in 0..steps) {
+        val t = i / steps.toFloat()
+        val eased = t * t * (3f - 2f * t)
+        (start + (end - start) * t).coerceIn(0f, 1f) to Color.Black.copy(alpha = 1f - eased)
+    }
+    return Brush.verticalGradient(colorStops = stops.toTypedArray())
+}
+
+/** Shows this layer only from [start] (transparent) to [end] (opaque) of its height, eased. */
+private fun Modifier.heroBandMask(start: Float, end: Float): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            drawRect(brush = smoothRamp(start, end), blendMode = BlendMode.DstIn)
+        }

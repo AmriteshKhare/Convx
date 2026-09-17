@@ -154,6 +154,8 @@ val EnableUnisonKey = booleanPreferencesKey("enableUnison")
 val HideExplicitKey = booleanPreferencesKey("hideExplicit")
 val HideVideoSongsKey = booleanPreferencesKey("hideVideoSongs")
 val DataSaverEnabledKey = booleanPreferencesKey("dataSaverEnabled")
+/** Prefer Apple Music artwork, logos and colours where an item matches; YouTube art otherwise. */
+val AppleArtworkKey = booleanPreferencesKey("appleArtwork")
 
 // Local-only mode: one switch that rewires Home, Library and Search to the
 // on-device library. The screens and routes stay exactly where they are — only
@@ -170,10 +172,6 @@ val LocalExcludedFoldersKey = stringPreferencesKey("localExcludedFolders") // de
 val ListenBrainzEnabledKey = booleanPreferencesKey("listenbrainz_enabled")
 val ListenBrainzTokenKey = stringPreferencesKey("listenbrainz_token")
 val HideYoutubeShortsKey = booleanPreferencesKey("hideYoutubeShorts")
-val ShowArtistDescriptionKey = booleanPreferencesKey("showArtistDescription")
-val ShowArtistSubscriberCountKey = booleanPreferencesKey("showArtistSubscriberCount")
-val ShowMonthlyListenersKey = booleanPreferencesKey("showMonthlyListeners")
-val ShowArtistVideoKey = booleanPreferencesKey("showArtistVideo")
 val ShowArtistBackgroundVideoKey = booleanPreferencesKey("showArtistBackgroundVideo")
 val ProxyEnabledKey = booleanPreferencesKey("proxyEnabled")
 val ProxyUrlKey = stringPreferencesKey("proxyUrl")

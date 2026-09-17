@@ -31,7 +31,8 @@ val MiniPlayerBottomSpacing = 8.dp // Space between MiniPlayer and NavigationBar
 val QueuePeekHeight = 64.dp
 val AppBarHeight = 64.dp
 
-val ListItemHeight = 64.dp
+/** iOS list row: 48 artwork + 5 above and below. */
+val ListItemHeight = 58.dp
 val SuggestionItemHeight = 56.dp
 val SearchFilterHeight = 48.dp
 val ListThumbnailSize = 48.dp

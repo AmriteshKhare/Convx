@@ -108,6 +108,14 @@ class LayerBackdrop internal constructor(
      */
     internal val hasRecording: Boolean get() = contentVersion > 0
 
+    /**
+     * Fraction of screen resolution [graphicsLayer] was recorded at. A pooled glass
+     * source (see `glassPool`) records the whole screen once, already blurred, at a
+     * fraction of its size; sampling surfaces still work in full-screen coordinates,
+     * so the offset is converted here and the layer drawn back up to size.
+     */
+    internal var sourceScale: Float = 1f
+
     private var inverseLayerScope: InverseLayerScope? = null
 
     override fun DrawScope.drawBackdrop(
@@ -117,6 +125,7 @@ class LayerBackdrop internal constructor(
     ) {
         val coordinates = coordinates ?: return
         val layerCoordinates = layerCoordinates ?: return
+        val sourceScale = sourceScale
         withTransform({
             if (layerBlock != null) {
                 with(obtainInverseLayerScope()) { inverseTransform(density, layerBlock) }
@@ -129,6 +138,12 @@ class LayerBackdrop internal constructor(
                     coordinates.positionInWindow() - layerCoordinates.positionInWindow()
                 }
             translate(-offset.x, -offset.y)
+            if (sourceScale != 1f) {
+                // Concatenated after the translate, so a layer pixel p lands at p / scale
+                // - offset: scale up to screen space first, then shift. The offset is in
+                // screen pixels and must not be scaled itself.
+                scale(1f / sourceScale, 1f / sourceScale, androidx.compose.ui.geometry.Offset.Zero)
+            }
         }) {
             drawLayer(graphicsLayer)
         }

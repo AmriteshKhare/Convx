@@ -29,11 +29,13 @@ object GlassTintTokens {
     val SurfaceBaseLight = Color(0xFFF5F5F7)       // #F5F5F7, rgb: 245, 245, 247
 
     // §3.3. Neutral Tint Tokens (Fallback / non-hero screens)
-    val TintNeutralDark = Color(0xFFEBEBF5).copy(alpha = 0.06f)   // rgba(235, 235, 245, 0.06)
+    // Dark: the white lift is carried by the glass base below (measured), not a second wash.
+    val TintNeutralDark = Color(0xFFEBEBF5).copy(alpha = 0f)
     val TintNeutralLight = Color(0xFF3C3C43).copy(alpha = 0.05f)  // rgba(60, 60, 67, 0.05)
 
     // §3.2. Hero Tint Opacity (+10 percentage points over baseline)
-    const val HeroTintOpacityDark = 0.30f  // was 0.20, +10% -> 0.30
+    // iOS 26/27 glass is not tinted by the page it floats over (dark): measured 0 on artist pages.
+    const val HeroTintOpacityDark = 0f
     const val HeroTintOpacityLight = 0.25f // was 0.15, +10% -> 0.25
 
     // §4.4. Accent Selected Red Tokens (iOS systemRed)
@@ -88,7 +90,14 @@ object GlassTintTokens {
     const val OtherLensAmount = 0.40f
 
     // §2 & §5B. Base Surface Opacities
-    const val BaseSurfaceOpacityDark = 0.50f // spec default
+    /**
+     * Dark glass is a white lift, not a dark smoke: on the iOS 27 reference screenshots the
+     * tab bar capsule over a luminance-104 list reads 124 = +13% white, the same value the
+     * common CSS recreation lands on (rgba(255,255,255,.13) + blur 12px + saturate 170%).
+     */
+    // 0.15, not the measured 0.13: blur and saturation spread the lift, and on device the
+    // surface read 0.09-0.11 at 0.13 (measured on SM-M346B screenshots, 2026-09-14).
+    const val BaseSurfaceOpacityDark = 0.15f
     const val BaseSurfaceOpacityLight = 0.40f // spec default
 
     const val NavPillFillOpacityDark = 0.55f
@@ -116,7 +125,10 @@ object GlassTintTokens {
     val ShadowColorDark = Color(0x59000000)  // 0 8px 24px rgba(0,0,0,0.35)
     val ShadowColorLight = Color(0x1F000000) // 0 4px 16px rgba(0,0,0,0.12)
 
-    /** Returns the base surface color (#171717 dark, #F5F5F7 light). */
+    /** Base of a live liquid-glass surface: white lift in dark (see [BaseSurfaceOpacityDark]), #F5F5F7 in light. */
+    fun glassBaseColor(isDark: Boolean): Color = if (isDark) Color.White else SurfaceBaseLight
+
+    /** Returns the base surface color (#171717 dark, #F5F5F7 light) — opaque/fallback fills. */
     fun baseSurfaceColor(isDark: Boolean): Color =
         if (isDark) SurfaceBaseDark else SurfaceBaseLight
 

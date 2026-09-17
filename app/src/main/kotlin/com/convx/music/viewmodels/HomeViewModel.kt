@@ -490,14 +490,6 @@ class HomeViewModel @Inject constructor(
     private suspend fun loadLocalDataPhase() {
         val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false) || context.dataStore.get(DataSaverEnabledKey, false)
 
-        getQuickPicks()
-
-        // On-device tracks are the whole of local-only mode, which is a separate Home
-        // (see localHomeContent). Leaking them into the online feed put files with no
-        // artwork and no metadata beside YouTube rows that have both, so every shelf
-        // they landed in looked broken.
-        quickPicks.value = quickPicks.value?.filterNot { it.song.isLocal }
-
         forgottenFavorites.value = database.forgottenFavorites().first()
             .filterVideoSongs(hideVideoSongs).filterNot { it.song.isLocal }.shuffled().take(20)
 
@@ -513,6 +505,25 @@ class HomeViewModel @Inject constructor(
         topSongs.value = database.mostPlayedSongs(fromTimeStamp, limit = 10, offset = 0).first()
             .filterVideoSongs(hideVideoSongs).filterNot { it.song.isLocal }
 
+        publishAllLocalItems()
+    }
+
+    /**
+     * Quick picks waits on a YouTube round-trip, so [load] runs this beside the other phases
+     * instead of making Home's spinner and every network section wait for it.
+     */
+    private suspend fun loadQuickPicks() {
+        getQuickPicks()
+        // On-device tracks are the whole of local-only mode, which is a separate Home
+        // (see localHomeContent). Leaking them into the online feed put files with no
+        // artwork and no metadata beside YouTube rows that have both, so every shelf
+        // they landed in looked broken.
+        quickPicks.value = quickPicks.value?.filterNot { it.song.isLocal }
+        publishAllLocalItems()
+    }
+
+    /** Called by both phases; whichever finishes last includes everything. */
+    private fun publishAllLocalItems() {
         allLocalItems.value = (quickPicks.value.orEmpty() + forgottenFavorites.value.orEmpty() + keepListening.value.orEmpty())
             .filter { it is Song || it is Album }
     }
@@ -673,11 +684,14 @@ class HomeViewModel @Inject constructor(
         }
 
         // Phase 1: Local DB only â€” UI renders immediately after this
-        loadLocalDataPhase()
-        isLoading.value = false
+        kotlinx.coroutines.coroutineScope {
+            launch { loadQuickPicks() }
+            loadLocalDataPhase()
+            isLoading.value = false
 
-        // Phase 2: All network sections in parallel â€” streams in progressively
-        loadNetworkDataPhase()
+            // Phase 2: All network sections in parallel â€” streams in progressively
+            loadNetworkDataPhase()
+        }
     }
 
     /** Pull-to-refresh in local-only mode rescans the device instead of the network. */

@@ -82,7 +82,6 @@ private fun ArtistScreenPreview() {
             ArtistHeroImage(
                 artworkUrl = null,
                 pageColor = tint,
-                hazeState = null,
             )
             // Blend-start mirror: the real header starts at foot × ArtistBlendStart,
             // so this hangs (1 - ArtistBlendStart) of the hero height past the foot.

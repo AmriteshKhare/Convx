@@ -248,6 +248,69 @@ class VocalTracker(private val context: Context) {
         return curve
     }
 
+    /**
+     * Per-frame, per-band vocal mask for karaoke: `target / mix` clamped to [0, 1], averaged over
+     * both channels and over the model bins falling in each of [KaraokeBands] log bands, quantized
+     * to a byte. Index `frame * KaraokeBands.COUNT + band`. Frames run at
+     * [VocalSpectrogram.frameRate] from the window's first sample.
+     *
+     * Band-reduced rather than per-bin so a whole song's mask is a few MB, and so the real-time
+     * processor (which runs its own, smaller STFT at the stream rate) can look it up by Hz.
+     */
+    fun separationMask(left: FloatArray, right: FloatArray, rate: Double): Pair<ByteArray, Int>? {
+        if (!VocalSpectrogram.available) return null
+        val resampledLeft = MelSpectrogram.resample(left, rate, VocalSpectrogram.sampleRate) ?: return null
+        val resampledRight = MelSpectrogram.resample(right, rate, VocalSpectrogram.sampleRate) ?: return null
+        val spectrogram = VocalSpectrogram.compute(resampledLeft, resampledRight) ?: return null
+        val frames = spectrogram.frames.coerceAtMost(FIXED_FRAMES)
+        val active = session() ?: return null
+        return runCatching {
+            val bins = spectrogram.bins
+            val backing = ByteBuffer
+                .allocateDirect(VocalSpectrogram.CHANNELS * bins * FIXED_FRAMES * Float.SIZE_BYTES)
+                .order(ByteOrder.nativeOrder())
+            if (spectrogram.frames > FIXED_FRAMES) {
+                // Caller windows to FIXED_FRAMES; a hair over (resampler rounding) is truncated.
+                val into = backing.asFloatBuffer()
+                for (channel in 0 until VocalSpectrogram.CHANNELS) for (bin in 0 until bins) {
+                    into.put(spectrogram.values, (channel * bins + bin) * spectrogram.frames, FIXED_FRAMES)
+                }
+            } else {
+                fillFixedFrames(backing.asFloatBuffer(), spectrogram.values, bins, spectrogram.frames)
+            }
+            val shape = longArrayOf(1, VocalSpectrogram.CHANNELS.toLong(), bins.toLong(), FIXED_FRAMES.toLong())
+            OnnxTensor.createTensor(OrtEnvironment.getEnvironment(), backing.asFloatBuffer(), shape).use { tensor ->
+                active.run(mapOf(active.inputNames.first() to tensor)).use { outputs ->
+                    val target = (outputs.get(0) as OnnxTensor).floatBuffer
+                    val mix = backing.asFloatBuffer()
+                    val bandOfBin = KaraokeBands.bandOfBin(bins, VocalSpectrogram.sampleRate, VocalSpectrogram.fftSize)
+                    val out = ByteArray(frames * KaraokeBands.COUNT)
+                    val sum = FloatArray(KaraokeBands.COUNT)
+                    val count = IntArray(KaraokeBands.COUNT)
+                    for (frame in 0 until frames) {
+                        sum.fill(0f); count.fill(0)
+                        for (channel in 0 until VocalSpectrogram.CHANNELS) {
+                            for (bin in 0 until bins) {
+                                val band = bandOfBin[bin]
+                                if (band < 0) continue
+                                val index = (channel * bins + bin) * FIXED_FRAMES + frame
+                                val m = mix.get(index)
+                                if (m <= 1e-6f) continue
+                                sum[band] += (target.get(index) / m).coerceIn(0f, 1f)
+                                count[band]++
+                            }
+                        }
+                        for (band in 0 until KaraokeBands.COUNT) {
+                            val v = if (count[band] > 0) sum[band] / count[band] else 0f
+                            out[frame * KaraokeBands.COUNT + band] = (v * 255f + 0.5f).toInt().toByte()
+                        }
+                    }
+                    out to frames
+                }
+            }
+        }.onFailure { Log.w(TAG, "Karaoke mask failed", it) }.getOrNull()
+    }
+
     fun release() {
         synchronized(lock) {
             runCatching { session?.close() }
@@ -267,4 +330,32 @@ class VocalTracker(private val context: Context) {
         private const val LOW_HZ = 200.0
         private const val HIGH_HZ = 4000.0
     }
+}
+
+/**
+ * Bands the karaoke mask is stored in, shared by the offline mask ([VocalTracker]) and the
+ * real-time processor so both agree on what band a frequency is in.
+ *
+ * Fine enough that the mask stays a *vocal* mask: 21.5 Hz linear bands (two model bins) up to
+ * 2 kHz, where voice harmonics sit a few tens of Hz from kick, bass and snare body, then 100 log
+ * bands (~2% wide) to 16 kHz. Coarser bands would average a hi-hat or snare in with the voice
+ * sharing its band and dim it too. Below 60 Hz nothing is touched.
+ */
+object KaraokeBands {
+    private const val LINEAR_HZ = 44_100.0 / 4096.0 * 2.0
+    private const val SPLIT_HZ = 2_000.0
+    private const val TOP_HZ = 16_000.0
+    private val LINEAR = (SPLIT_HZ / LINEAR_HZ).toInt()
+    private const val LOG = 100
+    val COUNT = LINEAR + LOG
+
+    fun bandOf(hz: Double): Int = when {
+        hz < 60.0 -> -1
+        hz < SPLIT_HZ -> (hz / LINEAR_HZ).toInt().coerceAtMost(LINEAR - 1)
+        else -> LINEAR + (kotlin.math.ln(hz / SPLIT_HZ) / kotlin.math.ln(TOP_HZ / SPLIT_HZ) * LOG)
+            .toInt().coerceIn(0, LOG - 1)
+    }
+
+    fun bandOfBin(bins: Int, sampleRate: Double, fftSize: Int): IntArray =
+        IntArray(bins) { bandOf(it * sampleRate / fftSize) }
 }

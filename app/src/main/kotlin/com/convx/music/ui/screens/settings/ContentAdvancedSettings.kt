@@ -78,10 +78,6 @@ import com.convx.music.constants.ProxyUsernameKey
 import com.convx.music.constants.QuickPicks
 import com.convx.music.constants.QuickPicksKey
 import com.convx.music.constants.ShowArtistBackgroundVideoKey
-import com.convx.music.constants.ShowArtistDescriptionKey
-import com.convx.music.constants.ShowArtistSubscriberCountKey
-import com.convx.music.constants.ShowArtistVideoKey
-import com.convx.music.constants.ShowMonthlyListenersKey
 import com.convx.music.constants.TopSize
 import com.convx.music.lyrics.LyricsProviderRegistry
 import com.convx.music.ui.component.DraggableLyricsProviderItem
@@ -117,10 +113,6 @@ fun ContentAdvancedSettings(
 ) {
     val context = LocalContext.current
 
-    val (showArtistDescription, onShowArtistDescriptionChange) = rememberPreference(key = ShowArtistDescriptionKey, defaultValue = true)
-    val (showArtistSubscriberCount, onShowArtistSubscriberCountChange) = rememberPreference(key = ShowArtistSubscriberCountKey, defaultValue = true)
-    val (showMonthlyListeners, onShowMonthlyListenersChange) = rememberPreference(key = ShowMonthlyListenersKey, defaultValue = true)
-    val (showArtistVideo, onShowArtistVideoChange) = rememberPreference(key = ShowArtistVideoKey, defaultValue = true)
     val (showArtistBackgroundVideo, onShowArtistBackgroundVideoChange) = rememberPreference(key = ShowArtistBackgroundVideoKey, defaultValue = true)
 
     val (proxyEnabled, onProxyEnabledChange) = rememberPreference(key = ProxyEnabledKey, defaultValue = false)
@@ -563,42 +555,6 @@ fun ContentAdvancedSettings(
         IosSettingsGroup(
             title = stringResource(R.string.artist_page_settings),
             items = listOf(
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.info),
-                    title = { Text(stringResource(R.string.show_artist_description)) },
-                    trailingContent = {
-                        Switch(checked = showArtistDescription, onCheckedChange = onShowArtistDescriptionChange)
-                    },
-                    onClick = { onShowArtistDescriptionChange(!showArtistDescription) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.person),
-                    title = { Text(stringResource(R.string.show_artist_subscriber_count)) },
-                    trailingContent = {
-                        Switch(
-                            checked = showArtistSubscriberCount,
-                            onCheckedChange = onShowArtistSubscriberCountChange
-                        )
-                    },
-                    onClick = { onShowArtistSubscriberCountChange(!showArtistSubscriberCount) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.person),
-                    title = { Text(stringResource(R.string.show_artist_monthly_listeners)) },
-                    trailingContent = {
-                        Switch(checked = showMonthlyListeners, onCheckedChange = onShowMonthlyListenersChange)
-                    },
-                    onClick = { onShowMonthlyListenersChange(!showMonthlyListeners) }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.slow_motion_video),
-                    title = { Text(stringResource(R.string.show_artist_video)) },
-                    description = { Text(stringResource(R.string.show_artist_video_desc)) },
-                    trailingContent = {
-                        Switch(checked = showArtistVideo, onCheckedChange = onShowArtistVideoChange)
-                    },
-                    onClick = { onShowArtistVideoChange(!showArtistVideo) }
-                ),
                 IosSettingsItem(
                     icon = painterResource(R.drawable.slow_motion_video),
                     title = { Text(stringResource(R.string.show_artist_background_video)) },

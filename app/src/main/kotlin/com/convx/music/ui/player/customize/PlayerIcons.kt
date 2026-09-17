@@ -12,6 +12,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -284,11 +285,12 @@ fun AnimatedPlayerGlyph(
     AnimatedContent(
         targetState = isPlaying,
         transitionSpec = {
-            // 0.3 rather than a polite 0.85: at this scale the pop is the whole gesture, and
-            // a small one is indistinguishable from a plain cut.
-            (scaleIn(tween(200, easing = FastOutSlowInEasing), initialScale = 0.3f) + fadeIn(tween(200)))
+            // Apple Music (designRefrence/GVRecorder_1788117512105~3.mp4): the outgoing glyph is
+            // already shrunk under the finger and just goes; the incoming one springs up from
+            // ~0.2x with a slight settle while the press disc fades behind it.
+            (scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.2f) + fadeIn(tween(120)))
                 .togetherWith(
-                    scaleOut(tween(160, easing = FastOutSlowInEasing), targetScale = 0.3f) + fadeOut(tween(160)),
+                    scaleOut(tween(100, easing = FastOutSlowInEasing), targetScale = 0.2f) + fadeOut(tween(90)),
                 )
                 .using(SizeTransform(clip = false))
         },
@@ -327,11 +329,12 @@ fun AnimatedPlayerGlyph(
     AnimatedContent(
         targetState = isPlaying,
         transitionSpec = {
-            // 0.3 rather than a polite 0.85: at this scale the pop is the whole gesture, and
-            // a small one is indistinguishable from a plain cut.
-            (scaleIn(tween(200, easing = FastOutSlowInEasing), initialScale = 0.3f) + fadeIn(tween(200)))
+            // Apple Music (designRefrence/GVRecorder_1788117512105~3.mp4): the outgoing glyph is
+            // already shrunk under the finger and just goes; the incoming one springs up from
+            // ~0.2x with a slight settle while the press disc fades behind it.
+            (scaleIn(spring(dampingRatio = 0.75f, stiffness = 500f), initialScale = 0.2f) + fadeIn(tween(120)))
                 .togetherWith(
-                    scaleOut(tween(160, easing = FastOutSlowInEasing), targetScale = 0.3f) + fadeOut(tween(160)),
+                    scaleOut(tween(100, easing = FastOutSlowInEasing), targetScale = 0.2f) + fadeOut(tween(90)),
                 )
                 .using(SizeTransform(clip = false))
         },

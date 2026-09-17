@@ -472,6 +472,7 @@ private class DrawBackdropNode(
             val newLayer = requireGraphicsContext().createGraphicsLayer()
             recordLayer(this@DrawBackdropNode, newLayer, size = recordSize, block = recordBackdropBlock)
             newLayer.renderEffect = effectScope.renderEffect
+            newLayer.colorFilter = effectScope.compositeColorFilter
             newLayer
         }
         if (pool.size > LoopPoolMaxSize) {
@@ -627,6 +628,7 @@ private class DrawBackdropNode(
 
         effectScope.apply(effects)
         graphicsLayer?.renderEffect = effectScope.renderEffect
+        graphicsLayer?.colorFilter = effectScope.compositeColorFilter
         val newPadding = effectScope.padding
         if (newPadding != padding) {
             padding = newPadding

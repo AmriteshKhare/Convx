@@ -25,11 +25,12 @@ import androidx.compose.ui.graphics.isSpecified
 import com.convx.music.ui.theme.isHueless
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
+import com.convx.music.ui.component.backdrop.Backdrop
 import com.convx.music.ui.component.backdrop.BackdropEffectScope
+import com.convx.music.ui.component.backdrop.backdrops.LayerBackdrop
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.component.backdrop.Backdrop
 import com.convx.music.ui.component.backdrop.drawBackdrop
 import com.convx.music.ui.component.backdrop.isRenderEffectSupported
 import com.convx.music.ui.component.backdrop.effects.blur
@@ -352,6 +353,21 @@ fun GlassEffectConfig.resolvedTextColor(
 val LocalAppBackdrop = staticCompositionLocalOf<Backdrop> { error("No AppBackdrop provided") }
 
 /**
+ * The screen, already saturated and blurred once for everything that wants it at
+ * [blurRadiusDp] — see `Modifier.glassPool`. A surface asking for exactly this
+ * treatment samples it instead of running its own saturate+blur, which is the
+ * difference between five offscreen passes per glass surface and two.
+ */
+@Stable
+class PooledGlass(
+    val backdrop: LayerBackdrop,
+    val blurRadiusDp: Float,
+    val vibrancy: Float,
+)
+
+val LocalPooledGlass = staticCompositionLocalOf<PooledGlass?> { null }
+
+/**
  * Whether app-level motion (scroll, fling, nav transition) is currently in flight.
  *
  * Chrome that owns a SECOND [layerBackdrop] of its own -- the floating tab bar captures
@@ -440,9 +456,17 @@ fun Modifier.liquidGlass(
     rimTintColor: Color = Color.Unspecified,
 ): Modifier {
     if (!isGlassAllowed()) return this
-    val backdrop = LocalAppBackdrop.current
+    val pool = LocalPooledGlass.current
+    // Only when the pool holds this exact treatment; a caller that asked for its own
+    // radius (the full player's heavier blur) still runs its own chain.
+    val usePool = pool != null &&
+        blurRadiusDp == pool.blurRadiusDp &&
+        config.vibrancy == pool.vibrancy
+    val backdrop = if (usePool && pool != null) pool.backdrop else LocalAppBackdrop.current
     val density = LocalDensity.current
-    val resolutionScale = backdropScale.coerceIn(0.05f, 1f)
+    // The pool is already blurred, so its sample is taken at full surface resolution --
+    // there is nothing left for a reduced capture to save, and the lens reads sharper.
+    val resolutionScale = if (usePool) 1f else backdropScale.coerceIn(0.05f, 1f)
     // Pixel-sized effect parameters operate on the backdrop layer at its recorded
     // resolution, so they are pre-multiplied by the resolution scale to keep the
     // same visual size.
@@ -452,7 +476,7 @@ fun Modifier.liquidGlass(
     val lensAmountPx = with(density) { (config.lensAmount * LENS_MAX_DP).dp.toPx() } * resolutionScale
     val ambientColor = LocalAmbientBackgroundColor.current.value
     val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
-    val baseSurfaceColor = com.convx.music.ui.theme.GlassTintTokens.baseSurfaceColor(isDark)
+    val baseSurfaceColor = com.convx.music.ui.theme.GlassTintTokens.glassBaseColor(isDark)
     val baseSurfaceOpacity = if (isDark) {
         com.convx.music.ui.theme.GlassTintTokens.BaseSurfaceOpacityDark
     } else {
@@ -529,12 +553,13 @@ fun Modifier.liquidGlass(
         lensAmountPx,
         config.depthEffect,
         config.chromaticAberration,
+        usePool,
     ) {
         {
-            if (saturation != 1f) {
+            if (!usePool && saturation != 1f) {
                 colorControls(saturation = saturation)
             }
-            if (blurPx > 0f) {
+            if (!usePool && blurPx > 0f) {
                 blur(blurPx)
             }
             if (!plainBlur &&

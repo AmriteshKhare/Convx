@@ -42,6 +42,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
@@ -271,7 +273,9 @@ fun FloatingTabBar(
     // fade this bar had before — melt costs a real offscreen blur pass on every
     // transition, so lower-end devices or anyone who just doesn't like the look
     // can drop back to the cheap crossfade.
-    val meltTransitionEnabled by rememberPreference(NavBarMeltTransitionKey, defaultValue = true)
+    // Off by default: iOS 27 keeps the mini player sharp through the morph and only blurs the
+    // tab labels (animateEnterExitTab), which a whole-bar gooey pass cannot do.
+    val meltTransitionEnabled by rememberPreference(NavBarMeltTransitionKey, defaultValue = false)
     val gooeyBlurPx = with(LocalDensity.current) { GooeyPeakBlur.toPx() }
     // Liquid "gooey" merge/split (see GooeyTransition.kt): peaks mid-crossfade
     // and returns to 0 at rest, on every transition regardless of direction —
@@ -309,7 +313,14 @@ fun FloatingTabBar(
                 transition.currentState != transition.targetState || scrollConnection.isScrolling()
             }
         }
-        CompositionLocalProvider(LocalTabBarBackdropFrozen provides frozenWhileAnimating) {
+        val collapsing = transition.targetState == FloatingTabBarVisual.INLINE
+        val boundsTransforms = remember(collapsing) {
+            if (collapsing) BarBoundsTransforms.Collapse else BarBoundsTransforms.Expand
+        }
+        CompositionLocalProvider(
+            LocalTabBarBackdropFrozen provides frozenWhileAnimating,
+            LocalBarBoundsTransforms provides boundsTransforms,
+        ) {
             // Shape morph, not a crossfade: SizeTransform makes the container itself
             // grow/shrink between the inline and expanded bounds (clip = false, so
             // per-item elastic stretch can protrude past the animating rect) — that
@@ -327,13 +338,16 @@ fun FloatingTabBar(
             ) {
                 transition.AnimatedContent(
                     transitionSpec = {
-                        // Calm morph, no bounce: the bar shrinks/grows with the same
-                        // gooey fade + size tween in both directions.
-                        (fadeIn(tween(GooeyDurationMs, easing = FastOutSlowInEasing)) togetherWith
-                            fadeOut(tween(GooeyDurationMs, easing = FastOutSlowInEasing)))
+                        // iOS 27 (designRefrence/threadsdownloader.com_0805d3.mp4, mini title y per
+                        // frame): collapsing fits a critically damped spring at stiffness 440
+                        // (~270ms), expanding a stiffer ~700 (~200ms). No bounce either way.
+                        val collapsing = targetState == FloatingTabBarVisual.INLINE
+                        val stiffness = if (collapsing) 440f else 700f
+                        (fadeIn(spring(dampingRatio = 1f, stiffness = stiffness)) togetherWith
+                            fadeOut(spring(dampingRatio = 1f, stiffness = stiffness)))
                             .using(
                                 SizeTransform(clip = false) { _, _ ->
-                                    tween(GooeyDurationMs, easing = FastOutSlowInEasing)
+                                    spring(dampingRatio = 1f, stiffness = stiffness)
                                 }
                             )
                     },
@@ -753,6 +767,7 @@ private fun SharedTransitionScope.InlineTab(
             .sharedElement(
                 sharedContentState = rememberSharedContentState("tabGroup"),
                 animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = LocalBarBoundsTransforms.current.bar,
                 zIndexInOverlay = 1f
             )
             .shadow(
@@ -783,6 +798,7 @@ private fun SharedTransitionScope.InlineTab(
                     Modifier.sharedElement(
                         sharedContentState = rememberSharedContentState("tab#${inlineTab.key}-icon"),
                         animatedVisibilityScope = animatedVisibilityScope,
+                        boundsTransform = LocalBarBoundsTransforms.current.bar,
                         zIndexInOverlay = 1f
                     )
                 ) {
@@ -827,6 +843,7 @@ private fun SharedTransitionScope.InlineStandaloneTab(
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
                 animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = LocalBarBoundsTransforms.current.bar,
                 zIndexInOverlay = 1f
             )
             .shadow(
@@ -870,7 +887,8 @@ private fun SharedTransitionScope.InlineAccessory(
                     if (isAccessoryShared) {
                         Modifier.sharedElement(
                             sharedContentState = rememberSharedContentState("accessory"),
-                            animatedVisibilityScope = animatedVisibilityScope
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            boundsTransform = LocalBarBoundsTransforms.current.accessory,
                         )
                     } else {
                         Modifier.animateEnterExitAccessory(
@@ -1104,6 +1122,7 @@ private fun SharedTransitionScope.SearchExpandedBar(
                     .sharedElement(
                         sharedContentState = rememberSharedContentState("standaloneTab"),
                         animatedVisibilityScope = animatedVisibilityScope,
+                        boundsTransform = LocalBarBoundsTransforms.current.bar,
                         zIndexInOverlay = 1f
                     )
                     .then(searchStretch.gestureModifier)
@@ -1147,6 +1166,7 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
                 animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = LocalBarBoundsTransforms.current.bar,
                 zIndexInOverlay = 1f
             )
             .shadow(
@@ -1188,7 +1208,8 @@ private fun SharedTransitionScope.ExpandedAccessory(
                 if (isAccessoryShared) {
                     Modifier.sharedElement(
                         sharedContentState = rememberSharedContentState("accessory"),
-                        animatedVisibilityScope = animatedVisibilityScope
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        boundsTransform = LocalBarBoundsTransforms.current.accessory,
                     )
                 } else {
                     Modifier.animateEnterExitAccessory(
@@ -1442,6 +1463,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                 .sharedElement(
                     sharedContentState = rememberSharedContentState("tabGroup"),
                     animatedVisibilityScope = animatedVisibilityScope,
+                    boundsTransform = LocalBarBoundsTransforms.current.bar,
                     zIndexInOverlay = 1f
                 )
                 .shadow(
@@ -1481,6 +1503,7 @@ private fun SharedTransitionScope.ExpandedTabs(
                                         Modifier.sharedElement(
                                             sharedContentState = rememberSharedContentState("tab#${tab.key}-icon"),
                                             animatedVisibilityScope = animatedVisibilityScope,
+                                            boundsTransform = LocalBarBoundsTransforms.current.bar,
                                             zIndexInOverlay = 1f
                                         )
                                     } else {
@@ -2148,3 +2171,35 @@ object FloatingTabBarDefaults {
         expandedElevation = expandedElevation,
     )
 }
+
+/**
+ * iOS 27 tab bar collapse/expand choreography, measured off
+ * designRefrence/threadsdownloader.com_0805d3.mp4 (30fps, bar extents and mini title y per frame):
+ *
+ * - Collapse: the tab pill shrinks into the selected tab and Search detaches first; the mini
+ *   player follows ~90ms later, travelling down into the gap between them. Critically damped,
+ *   the mini's travel fitting a stiffness-440 spring (~320ms).
+ * - Expand: the reverse lead -- the mini rises first (~200ms, stiffness ~700), the pill grows
+ *   out of the tab ~70ms behind it.
+ *
+ * Springs can't be delayed, so each trailing half is a tween on the curve that matches that
+ * spring's shape.
+ */
+internal class BarBoundsTransforms(val bar: BoundsTransform, val accessory: BoundsTransform) {
+    companion object {
+        private val CritSpring440Easing = CubicBezierEasing(0.25f, 0.75f, 0.35f, 1f)
+        private fun <T> spring440() = spring<T>(dampingRatio = 1f, stiffness = 440f)
+        private fun <T> spring700() = spring<T>(dampingRatio = 1f, stiffness = 700f)
+
+        val Collapse = BarBoundsTransforms(
+            bar = BoundsTransform { _, _ -> spring440() },
+            accessory = BoundsTransform { _, _ -> tween(320, delayMillis = 90, easing = CritSpring440Easing) },
+        )
+        val Expand = BarBoundsTransforms(
+            bar = BoundsTransform { _, _ -> tween(230, delayMillis = 70, easing = CritSpring440Easing) },
+            accessory = BoundsTransform { _, _ -> spring700() },
+        )
+    }
+}
+
+internal val LocalBarBoundsTransforms = staticCompositionLocalOf { BarBoundsTransforms.Collapse }
