@@ -1919,6 +1919,31 @@ fun BottomSheetPlayer(
                         zFilter = { it < 0 },
                     )
                 }
+                // Flight glass veil: liquid glass over the style layers while the
+                // card travels, dissolving as the player UI resolves (reverse on
+                // close). Gated on flight boundaries only -- two recompositions
+                // per flight; the fade itself is draw-phase. Lives in the
+                // background slot so the card clip contains it and content
+                // resolves over it.
+                val morphVeilOn by remember(state) {
+                    derivedStateOf { PlayerMorph.enabled && state.progress > 0f && state.progress < 1f }
+                }
+                if (morphVeilOn) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .liquidGlass(
+                                config = glassConfig,
+                                applyEdgeEffects = false,
+                                blurRadiusDp = (glassConfig.blurRadius * PLAYER_BLUR_MULTIPLIER)
+                                    .coerceAtMost(100f),
+                            )
+                            .graphicsLayer {
+                                val flightProgress = PlayerMorph.progress
+                                alpha = (1f - unifiedContentAlpha(flightProgress)).coerceIn(0f, 1f)
+                            }
+                    )
+                }
             }
         },
         onDismiss = {

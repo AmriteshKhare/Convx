@@ -228,19 +228,10 @@ fun FloatingMiniPlayer(
             // travel reads at pill size -- same as bar pills elsewhere.
             .graphicsLayer(elasticStretchLayerBlock(glow, magnitude = if (isInline) 1f else 2f))
             .then(modifier)
-            // Source end of the mini-to-full container morph. Outside .then(modifier)
-            // so it measures the pill as the nav bar actually places it.
+            // Source end of the shared container morph: measures the pill as the
+            // nav bar places it for the live card to grow out of. Live tree --
+            // the pill draws in place; the travelling card covers it.
             .registerMiniContainerRect()
-            // Source end of the shared container morph. Recorded here and drawn by the
-            // overlay instead of in place, so the pill does not sit in the nav bar while
-            // a copy of it is expanding across the screen.
-            .recordPlayerLayer(
-                // Only records while the morph is enabled -- see PlayerMorph.enabled --
-                // so this doesn't pay for a GraphicsLayer capture every frame for a morph
-                // that's currently off.
-                layer = { if (PlayerMorph.enabled) PlayerMorph.miniLayer else null },
-                drawInPlace = { !PlayerMorph.active },
-            )
             .onSizeChanged { measuredHeightPx = it.height }
             // Finger-following glow, same as the search pill.
             .then(glow.gestureModifier)

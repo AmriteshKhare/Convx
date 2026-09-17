@@ -43,8 +43,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import com.convx.music.ui.player.PlayerMorph
 import com.convx.music.ui.player.SCREEN_CORNER_EXPANSION_MILLIS
-import com.convx.music.ui.player.recordPlayerLayer
+import com.convx.music.ui.player.morphLiveCard
 import com.convx.music.ui.player.sharedContainerCornerRadius
+import com.convx.music.ui.player.unifiedContentResolve
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.pointer.pointerInput
@@ -70,7 +71,7 @@ import kotlin.math.pow
  * Progress at which the collapsed layer hands over.
  *
  * Mini player fully faded out here; the full player's own content resolves
- * later (see PLAYER_CONTENT_RESOLVE_START) as a blurred ghost to crisp.
+ * later ([unifiedContentResolve]) as a blurred ghost to crisp.
  */
 internal const val PLAYER_LAYER_HANDOFF_PROGRESS = 0.25f
 
@@ -133,15 +134,18 @@ fun BottomSheet(
     /**
      * Hands this sheet's drawing to the shared container morph (see [PlayerMorph]).
      *
-     * While the morph is running the sheet is recorded and NOT drawn where it sits, and
-     * it stops translating -- the container overlay draws the recording scaled into the
-     * rect that grows out of the mini player. Only the player passes this; every other
-     * caller keeps the plain slide-up sheet.
+     * While the morph runs the sheet's own nodes travel inside the interpolated
+     * card ([morphLiveCard], draw-phase scale/translate/clip) and stop sliding;
+     * content resolves late ([unifiedContentResolve]). Only the player passes
+     * this; every other caller keeps the plain slide-up sheet.
      */
     morphEnabled: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
+    // Static capture for the live-tree content resolve (graphicsLayer has no
+    // Density; the per-frame value derives draw-phase inside the modifier).
+    val contentBlurMaxPx = with(density) { 8.dp.toPx() }
 
     // Second stage of the corner treatment: once the sheet has settled at full size, its
     // corners open out to square over a short beat of their own, so the player ends up
@@ -156,23 +160,16 @@ fun BottomSheet(
         )
     }
 
-    // One wrapper around BOTH halves of the sheet (its full-bleed background and its
-    // draggable content) so the morph records the player as it actually looks. Recording
-    // only the content would hand the container overlay a player with no artwork wash
-    // behind it. Plain fillMaxSize: both children already fill, so this adds a node and
-    // changes no layout.
+    // Live-tree morph: the sheet's own nodes travel inside the interpolated
+    // card (scale/translate/clip, draw-phase only). No recordings. Off-flight
+    // this is a passthrough. Plain fillMaxSize otherwise: both children already
+    // fill, so this adds a node and changes no layout.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .then(
-                if (morphEnabled) {
-                    Modifier.recordPlayerLayer(
-                        layer = { PlayerMorph.fullLayer },
-                        drawInPlace = { !PlayerMorph.active },
-                    )
-                } else {
-                    Modifier
-                },
+            .morphLiveCard(
+                morphEnabled = morphEnabled,
+                expandedCornerRadius = expandedCornerRadius,
             ),
     ) {
     Box(
@@ -266,6 +263,16 @@ fun BottomSheet(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
+                    // Live-tree late resolve (ghost alpha + blur) while the card
+                    // owns the frame; passthrough otherwise. Sits outside the
+                    // slide-mode alpha below so the two multiply, never fight.
+                    .then(
+                        if (morphEnabled) {
+                            Modifier.unifiedContentResolve(morphEnabled, contentBlurMaxPx)
+                        } else {
+                            Modifier
+                        },
+                    )
                     .graphicsLayer {
                         // Starts where the mini player has finished leaving, not before
                         // it. The two used to overlap between 0.15 and 0.25, so for that

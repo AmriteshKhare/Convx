@@ -12,16 +12,10 @@ import androidx.compose.ui.unit.Dp
 /**
  * Q2 lock: the single host owning the mini <-> full morph flight.
  *
- * One composition driven by one [progress] source, composing (in z order):
- * the interpolated container ([PlayerContainerMorphOverlay]) with the mini
- * recording fading out early and the full recording resolving late as a
- * blurred ghost to crisp, then the artwork ([PlayerArtworkMorphOverlay]) --
- * travelling rect for squared cards, shrink+fade in place for hero / bleed /
- * vinyl / clover.
- *
- * Mini and full UI becoming states of one tree (rather than two recorded
- * roots) lands here next, behind [PlayerMorph.enabled]; the overlay contract
- * -- progress in, draw-phase reads only -- stays identical.
+ * Live tree: the travelling card is the sheet's own nodes ([morphLiveCard]),
+ * so this host only carries what cannot live in the sheet -- the artwork
+ * flight ([PlayerArtworkMorphOverlay]), which spans the mini's bar slot and
+ * the sheet's hero rect. One progress source, draw-phase reads only.
  */
 @Composable
 fun BoxScope.PlayerMorphHost(
@@ -30,13 +24,6 @@ fun BoxScope.PlayerMorphHost(
     containerColor: Color,
     expandedCornerRadius: Dp,
 ) {
-    // Container first, artwork on top of it: the artwork travels across the
-    // same window and has to ride above the surface it is growing out of.
-    PlayerContainerMorphOverlay(
-        progress = progress,
-        color = containerColor,
-        expandedCornerRadius = expandedCornerRadius,
-    )
     PlayerArtworkMorphOverlay(
         thumbnailUrl = thumbnailUrl,
         progress = progress,

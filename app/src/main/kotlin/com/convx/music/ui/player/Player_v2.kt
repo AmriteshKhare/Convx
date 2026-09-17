@@ -734,16 +734,22 @@ fun PlayerV2(
                                     // and a quick default dissolve otherwise, in one persistent
                                     // composable instead of tearing down/rebuilding per track id.
                                     val heroCrossfadeMs by playerConnection.crossfadeDurationMs.collectAsState()
+                                    // Q6 writer: pause-shrink tracked with zero embedding
+                                    // cost -- snapshotFlow subscribes outside composition,
+                                    // overlay subscribes in composition. Frozen in flight.
+                                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                                        snapshotFlow { heroScale }.collect {
+                                            if (!PlayerMorph.active) artworkRestScaleState.floatValue = it
+                                        }
+                                    }
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .graphicsLayer {
-                                                // Q6: pause-shrink frozen while the morph owns
-                                                // the frame -- the overlay flies to this frozen
-                                                // size as its target, no second driver mid-flight.
-                                                if (!PlayerMorph.active) fullArtworkRestScale = heroScale
-                                                scaleX = fullArtworkRestScale
-                                                scaleY = fullArtworkRestScale
+                                                // Q6: artwork rides the snapshot holder, live at
+                                                // rest (draw-phase read), frozen mid-flight.
+                                                scaleX = artworkRestScaleState.floatValue
+                                                scaleY = artworkRestScaleState.floatValue
                                             }
                                             .customSoftShadow(
                                                 elevation = playerThumbnailShadowElevation.dp,

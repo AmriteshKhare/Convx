@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
-import kotlin.jvm.JvmField
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -71,14 +70,16 @@ private val miniArtworkRadius = androidx.compose.runtime.mutableFloatStateOf(0f)
 private val fullArtworkRadius = androidx.compose.runtime.mutableFloatStateOf(0f)
 
 /**
- * Q6 lock: V2's pause-shrink (0.729x) frozen while the morph owns the frame.
+ * Q6 lock: V2's pause-shrink (0.729x), live at rest, frozen in flight.
  *
- * Plain field, draw-phase only (same contract as [PlayerMorph]'s own fields):
- * written from the artwork's graphicsLayer when at rest, read by the overlay
- * as part of its measured target. The flight therefore lands on the live
- * shrunk size instead of snapping full→shrunk at the handoff.
+ * Snapshot state (not a plain field): the overlay reads it in composition and
+ * must see the settled pause value the moment a flight starts -- a plain
+ * field never recomposes the overlay, so the flight targeted a stale size and
+ * the art visibly shrank AFTER landing. Written only from a snapshotFlow
+ * collector (no composition subscription, no recompose storm); never written
+ * while [PlayerMorph.active], so the flight target is stable.
  */
-@JvmField var fullArtworkRestScale: Float = 1f
+internal val artworkRestScaleState = androidx.compose.runtime.mutableFloatStateOf(1f)
 
 fun Modifier.registerMiniArtworkRect(cornerRadiusPx: Float = 0f): Modifier = onGloballyPositioned {
     miniArtworkRadius.floatValue = cornerRadiusPx
@@ -156,8 +157,8 @@ fun PlayerArtworkMorphOverlay(
     }
 
     // Q6: shrink the measured target about its own center when paused-shrunk.
-    // fullArtworkRestScale only moves at rest, so the flight target is stable.
-    val shrink = fullArtworkRestScale.coerceIn(0.1f, 1f)
+    // Snapshot-subscribed: always current at flight start, frozen in flight.
+    val shrink = artworkRestScaleState.floatValue.coerceIn(0.1f, 1f)
     val target = if (shrink >= 1f) full else Rect(
         left = full.center.x - full.width * shrink / 2f,
         top = full.center.y - full.height * shrink / 2f,
@@ -286,7 +287,7 @@ fun Modifier.hideFullArtworkWhileMorphing(travelEnabled: Boolean): Modifier = gr
     } else if (travelEnabled) {
         0f
     } else {
-        easeOutCubic(((fraction - PLAYER_CONTENT_RESOLVE_START) / (1f - PLAYER_CONTENT_RESOLVE_START)).coerceIn(0f, 1f))
+        easeOutCubic(((fraction - UNIFIED_CONTENT_RESOLVE_START) / (1f - UNIFIED_CONTENT_RESOLVE_START)).coerceIn(0f, 1f))
     }
 }
 fun Modifier.hideWhileArtworkMorphing(progress: () -> Float): Modifier = graphicsLayer {
