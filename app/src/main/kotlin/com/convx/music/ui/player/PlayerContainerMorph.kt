@@ -187,11 +187,13 @@ fun PlayerContainerMorphOverlay(
 }
 
 /**
- * Mini recording drawn as two tracked halves. The layer sits at the travelling
- * corner, so the title side needs no offset -- it rides the corner. The
- * controls half shifts right by [sharedMiniPlayerControlsShift], keeping its
- * right inset as the card outgrows the pill. Falls back to one plain draw
- * until both bounds report.
+ * Mini recording drawn as two tracked halves (Melox clip split, pill-origin
+ * layer, inside the caller's translate to the container origin).
+ *
+ * Title side compensates the corner travel so it stays absolute while the
+ * card grows around it; the controls half adds the edge shift, keeping its
+ * right inset and breaking away rightward. Falls back to one plain draw
+ * until the controls bounds report.
  */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrackedMiniLayer(
     miniLayer: androidx.compose.ui.graphics.layer.GraphicsLayer,
@@ -204,20 +206,26 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrackedMiniLaye
         return
     }
     // Layer-space x of the split: controls' left edge relative to the pill.
-    // (Inside the caller's translate to the container origin, so layer and
-    // destination x coincide here.)
-    val controlsLeft = controls.left - mini.left
-    val shift = sharedMiniPlayerControlsShift(
+    val split = controls.left - mini.left
+    val titleShift = sharedMiniPlayerTitleShift(
+        sourcePlayerBounds = mini,
+        animatedPlayerBounds = container,
+    )
+    val edgeShift = sharedMiniPlayerControlsShift(
         sourcePlayerBounds = mini,
         animatedPlayerBounds = container,
         controlsBounds = controls,
     )
-    clipRect(right = controlsLeft) {
-        drawLayer(miniLayer)
-    }
-    clipRect(left = controlsLeft + shift) {
+    clipRect(right = titleShift + split) {
         withTransform({
-            translate(left = shift, top = 0f)
+            translate(left = titleShift, top = 0f)
+        }) {
+            drawLayer(miniLayer)
+        }
+    }
+    clipRect(left = titleShift + split + edgeShift) {
+        withTransform({
+            translate(left = titleShift + edgeShift, top = 0f)
         }) {
             drawLayer(miniLayer)
         }

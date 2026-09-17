@@ -70,21 +70,26 @@ fun sharedContainerRect(source: Rect, target: Rect, progress: Float): Rect {
 }
 
 /**
- * Where the mini player's controls sit inside the animating container.
+ * Where the mini player's halves sit inside the animating container (Melox
+ * clip split, pill-origin recording, fullscreen coords).
  *
- * The layer is drawn at the travelling corner, so the title side needs no
- * offset at all -- it rides the corner. The controls half shifts right by the
- * amount the card outgrew the pill, keeping its right inset: play/next
- * visibly travel with the edge instead of stretching or fading.
+ * Title side: x compensates the corner travel so the title stays absolute
+ * while the card grows around it; y rides the card top. Controls side adds
+ * [sharedMiniPlayerControlsShift] so play/next keep their right inset and
+ * break away rightward with the edge.
  */
+fun sharedMiniPlayerTitleShift(
+    sourcePlayerBounds: Rect,
+    animatedPlayerBounds: Rect,
+): Float = sourcePlayerBounds.left - animatedPlayerBounds.left
+
 fun sharedMiniPlayerControlsShift(
     sourcePlayerBounds: Rect,
     animatedPlayerBounds: Rect,
     controlsBounds: Rect,
 ): Float {
     val sourceRightInset = sourcePlayerBounds.right - controlsBounds.right
-    val controlsRightInLayer = controlsBounds.right - sourcePlayerBounds.left
-    return animatedPlayerBounds.width - sourceRightInset - controlsRightInLayer
+    return animatedPlayerBounds.right - sourceRightInset - controlsBounds.right
 }
 
 /**

@@ -44,20 +44,20 @@ class PlayerSheetMotionTest {
     }
 
     @Test
-    fun `mini controls keep their right inset while the card grows`() {
+    fun `mini title stays absolute while controls ride the right edge`() {
         val source = Rect(left = 16f, top = 900f, right = 400f, bottom = 964f)
         val controls = Rect(left = 320f, top = 908f, right = 392f, bottom = 956f)
-        // At rest the shift is zero: the layer already sits at the corner.
-        assertEquals(
-            0f,
-            sharedMiniPlayerControlsShift(source, source, controls),
-            0.01f,
-        )
+        // At rest both shifts are zero: the layer already sits at the corner.
+        assertEquals(0f, sharedMiniPlayerTitleShift(source, source), 0.01f)
+        assertEquals(0f, sharedMiniPlayerControlsShift(source, source, controls), 0.01f)
         val animated = sharedContainerRect(source, full, 0.5f)
-        val shift = sharedMiniPlayerControlsShift(source, animated, controls)
+        // Title compensates the corner travel exactly: absolute x is restored.
+        val titleShift = sharedMiniPlayerTitleShift(source, animated)
+        assertEquals(source.left, animated.left + titleShift, 0.01f)
+        // Controls right edge lands on the travelling right edge minus inset.
         val sourceInset = source.right - controls.right
-        // Layer controls-right lands exactly on the travelling right edge.
-        val landedRight = animated.left + shift + (controls.right - source.left)
+        val shift = sharedMiniPlayerControlsShift(source, animated, controls)
+        val landedRight = animated.left + titleShift + shift + (controls.right - source.left)
         assertEquals(animated.right - sourceInset, landedRight, 0.01f)
     }
 
