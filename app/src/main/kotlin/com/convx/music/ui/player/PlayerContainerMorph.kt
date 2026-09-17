@@ -14,7 +14,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -28,7 +27,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import com.convx.music.ui.component.PLAYER_CONTENT_APPEAR_END
 import com.convx.music.ui.component.PLAYER_CONTENT_APPEAR_START
-import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
 import com.convx.music.ui.component.PLAYER_MINI_FADE_END
 
 /**
@@ -97,10 +95,6 @@ fun Modifier.registerMiniControlsPlayRect(): Modifier = onGloballyPositioned {
 fun Modifier.registerMiniControlsNextRect(): Modifier = onGloballyPositioned {
     if (it.isAttached) miniControlsNextRect.value = it.boundsInRoot()
 }
-
-/** Mini chrome (plate + bar) hands over across the first fifth of the flight. */
-fun playerSheetBarAlpha(progress: Float): Float =
-    1f - easeOutCubic((progress / PLAYER_LAYER_HANDOFF_PROGRESS).coerceIn(0f, 1f))
 
 /** Mini title/buttons track across the first three tenths, then hand over. */
 fun playerSheetMiniContentAlpha(progress: Float): Float =
@@ -173,15 +167,10 @@ fun PlayerContainerMorphOverlay(
                     clipPath.reset()
                     clipPath.addRoundRect(RoundRect(rect, CornerRadius(radius, radius)))
                     clipPath(clipPath) {
-                        // Under both recordings: without this the first frames are
-                        // see-through. Faded on the bar curve (not flat): the full
-                        // recording is opaque from a tenth, so a flat plate would
-                        // sit behind it for the rest of the flight and read dead.
-                        drawRect(
-                            color = color.copy(alpha = color.alpha * playerSheetBarAlpha(fraction)),
-                            topLeft = Offset(rect.left, rect.top),
-                            size = Size(rect.width, rect.height),
-                        )
+                        // No flat plate (Melox draws no plate either): the mini
+                        // recording carries its own live glass for the first
+                        // fifth, and the full recording is opaque from a tenth.
+                        // A plate would sit behind translucent glass and read dead.
                         translate(left = rect.left, top = rect.top) {
                             if (miniLayer.size.width > 0 && fraction < PLAYER_MINI_FADE_END) {
                                 miniLayer.alpha = playerSheetMiniContentAlpha(fraction)

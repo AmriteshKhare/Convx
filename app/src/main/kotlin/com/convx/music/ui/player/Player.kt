@@ -1919,31 +1919,6 @@ fun BottomSheetPlayer(
                         zFilter = { it < 0 },
                     )
                 }
-                // Flight glass veil: transient late-flight liquid glass over the
-                // style layers -- 0 early, peaks ~0.8, hands back to the player
-                // bg at rest. Symmetric, so close plays the exact reverse. Live
-                // sampling (unfrozen) so it reads alive, not static.
-                val morphVeilOn by remember(state) {
-                    derivedStateOf { PlayerMorph.enabled && state.progress > 0f && state.progress < 1f }
-                }
-                if (morphVeilOn) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .liquidGlass(
-                                config = glassConfig,
-                                applyEdgeEffects = false,
-                                blurRadiusDp = (glassConfig.blurRadius * PLAYER_BLUR_MULTIPLIER)
-                                    .coerceAtMost(100f),
-                            )
-                            .graphicsLayer {
-                                val flightProgress = PlayerMorph.progress
-                                val up = easeOutCubic(((flightProgress - 0.55f) / 0.25f).coerceIn(0f, 1f))
-                                val down = easeOutCubic(((flightProgress - 0.8f) / 0.2f).coerceIn(0f, 1f))
-                                alpha = (up * (1f - down)).coerceIn(0f, 1f)
-                            }
-                    )
-                }
             }
         },
         onDismiss = {

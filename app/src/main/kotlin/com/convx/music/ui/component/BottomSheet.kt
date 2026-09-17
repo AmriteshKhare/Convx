@@ -429,23 +429,22 @@ class BottomSheetState(
     }
 
     fun collapseSoft() {
-        // iOS 27 mini player <-> Now Playing, measured off designRefrence/threadsdownloader.com_0805d3.mp4
-        // (card top edge per frame): 40/61/77/86/92/95/97% at 33..233ms, no overshoot --
-        // a critically damped spring at stiffness ~440. The old 0.76/520 bounced.
+        // Melox PlayerSheetTransition.animateToTarget: critically damped
+        // (NoBouncy), stiffness 360, velocity-seeded on fling release.
         collapse(
             spring(
-                dampingRatio = 1f,
-                stiffness = 440f,
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = 360f,
             ),
         )
     }
 
     fun expandSoft() {
-        // See collapseSoft: same measured spring both ways.
+        // See collapseSoft: Melox settles both ways on the same spring.
         expand(
             spring(
-                dampingRatio = 1f,
-                stiffness = 440f,
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = 360f,
             ),
         )
     }
