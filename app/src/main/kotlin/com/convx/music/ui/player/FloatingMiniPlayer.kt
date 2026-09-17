@@ -220,6 +220,9 @@ fun FloatingMiniPlayer(
     // first frame is already correct (or within a pixel of it) instead of
     // popping from the clamp floor on every single expand.
     var measuredHeightPx by remember { mutableIntStateOf(with(density) { 64.dp.roundToPx() }) }
+    // Input owner (Melox): taps open only while the mini owns input -- mid-flight
+    // taps would otherwise fight the settling spring. Event-time read, always current.
+    val tryOpenPlayer = { if (PlayerMorph.miniAcceptsInput) onClick() }
     // Tracked-split morph bounds go stale when the mini switches layout branch
     // (tab style, inline): clear so the new branch re-reports the same frame.
     LaunchedEffect(tabStyle, isInline) {
@@ -338,7 +341,7 @@ fun FloatingMiniPlayer(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = onClick,
+                onClick = tryOpenPlayer,
             )
     ) {
         // Fixed sizes for both phone accessory strips (isInline and the default
@@ -378,7 +381,7 @@ fun FloatingMiniPlayer(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = onClick,
+                            onClick = tryOpenPlayer,
                         ),
                 ) {
                     AsyncImage(
@@ -464,7 +467,7 @@ fun FloatingMiniPlayer(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = onClick,
+                            onClick = tryOpenPlayer,
                         ),
                 ) {
                     AsyncImage(
@@ -638,7 +641,7 @@ fun FloatingMiniPlayer(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = onClick,
+                            onClick = tryOpenPlayer,
                         ),
                 ) {
                     AsyncImage(

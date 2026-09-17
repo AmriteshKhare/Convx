@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import com.convx.music.ui.component.PLAYER_CONTENT_APPEAR_END
 import com.convx.music.ui.component.PLAYER_CONTENT_APPEAR_START
+import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
 import com.convx.music.ui.component.PLAYER_MINI_FADE_END
 
 /**
@@ -100,6 +101,10 @@ fun playerSheetPageAlpha(progress: Float): Float =
             ).coerceIn(0f, 1f),
     )
 
+/** Full-player background leads across the first fifth, ease-in. */
+fun playerSheetBackgroundAlpha(progress: Float): Float =
+    easeInCubic((progress / PLAYER_LAYER_HANDOFF_PROGRESS).coerceIn(0f, 1f))
+
 /**
  * The one surface the whole morph happens inside (Melox PlayerSheetContentOverlay).
  *
@@ -137,23 +142,23 @@ fun PlayerContainerMorphOverlay(
                     // settles.
                     if (mini.width <= 0f || mini.height <= 0f) return@onDrawBehind
                     val miniLayer = PlayerMorph.miniLayer ?: return@onDrawBehind
-                    val fullLayer = PlayerMorph.fullLayer ?: return@onDrawBehind
-                    if (fullLayer.size.width <= 0) return@onDrawBehind
+                    val fullBackgroundLayer = PlayerMorph.fullBackgroundLayer ?: return@onDrawBehind
+                    val fullContentLayer = PlayerMorph.fullContentLayer ?: return@onDrawBehind
+                    if (fullBackgroundLayer.size.width <= 0 || fullContentLayer.size.width <= 0) return@onDrawBehind
 
                     // The full player is the recorded screen itself, so its rect IS this
                     // overlay's own size. Nothing to register at that end, nothing to go
                     // stale.
                     val full = Rect(0f, 0f, size.width, size.height)
                     val rect = sharedContainerRect(mini, full, fraction)
-                    val radius = sharedContainerCornerRadius(
+                    val radius = sharedContainerCornerRadii(
                         // The nav bar draws the pill as a 50%-rounded capsule, so its radius
                         // is half its height by definition. Derived rather than passed in, so
                         // restyling the pill cannot leave the two out of step.
-                        collapsedCornerRadius = mini.height / 2f,
-                        expandedCornerRadius = expandedCornerRadius.toPx(),
+                        source = SharedContainerCornerRadii.uniform(mini.height / 2f),
+                        target = SharedContainerCornerRadii.uniform(expandedCornerRadius.toPx()),
                         progress = fraction,
-                        screenCornerExpansionProgress = 0f,
-                    )
+                    ).topStart
 
                     clipPath.reset()
                     clipPath.addRoundRect(RoundRect(rect, CornerRadius(radius, radius)))
@@ -165,18 +170,28 @@ fun PlayerContainerMorphOverlay(
                         translate(left = rect.left, top = rect.top) {
                             if (miniLayer.size.width > 0 && fraction < PLAYER_MINI_FADE_END) {
                                 miniLayer.alpha = playerSheetMiniContentAlpha(fraction)
+                                miniLayer.renderEffect = null
                                 drawTrackedMiniLayer(
                                     miniLayer = miniLayer,
                                     mini = mini,
                                     container = rect,
                                 )
                             }
-                            val scale = rect.width / fullLayer.size.width.toFloat()
-                            if (fraction > PLAYER_CONTENT_APPEAR_START) {
-                                fullLayer.alpha = playerSheetPageAlpha(fraction)
-                                fullLayer.renderEffect = null
+                            // Background leads (first fifth), content follows (tenth
+                            // to six tenths): two recordings, staged like Melox.
+                            val scale = rect.width / size.width
+                            if (fraction > 0f) {
+                                fullBackgroundLayer.alpha = playerSheetBackgroundAlpha(fraction)
+                                fullBackgroundLayer.renderEffect = null
                                 scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero) {
-                                    drawLayer(fullLayer)
+                                    drawLayer(fullBackgroundLayer)
+                                }
+                            }
+                            if (fraction > PLAYER_CONTENT_APPEAR_START) {
+                                fullContentLayer.alpha = playerSheetPageAlpha(fraction)
+                                fullContentLayer.renderEffect = null
+                                scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero) {
+                                    drawLayer(fullContentLayer)
                                 }
                             }
                         }

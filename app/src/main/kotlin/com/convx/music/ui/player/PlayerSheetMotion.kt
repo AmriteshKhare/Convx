@@ -70,6 +70,32 @@ fun sharedContainerRect(source: Rect, target: Rect, progress: Float): Rect {
 }
 
 /**
+ * Who owns finger input during the flight (Melox PlayerInputOwner).
+ *
+ * While dragging, the end the drag started from owns input so a close gesture
+ * can reverse from the current frame. At rest the mini owns input only before
+ * the handoff; the full player owns it once settled or its layers are ready.
+ * In between, neither does -- taps would fight the settling spring.
+ */
+internal enum class PlayerInputOwner { MINI, FULL, NONE }
+
+internal const val PLAYER_INPUT_MINI_END_PROGRESS = 0.2f
+
+internal fun playerSheetInputOwner(
+    targetOpen: Boolean,
+    isDragging: Boolean,
+    dragStartedFromMiniPlayer: Boolean,
+    progress: Float,
+    sharedLayersReady: Boolean,
+): PlayerInputOwner = when {
+    isDragging -> if (dragStartedFromMiniPlayer) PlayerInputOwner.MINI else PlayerInputOwner.FULL
+    !targetOpen && progress.coerceIn(0f, 1f) <= PLAYER_INPUT_MINI_END_PROGRESS ->
+        PlayerInputOwner.MINI
+    sharedLayersReady || targetOpen && progress >= 1f -> PlayerInputOwner.FULL
+    else -> PlayerInputOwner.NONE
+}
+
+/**
  * Where the mini player's halves sit inside the animating container (Melox
  * clip split, pill-origin recording, fullscreen coords).
  *
@@ -134,6 +160,51 @@ fun sharedArtworkRect(source: Rect, target: Rect, progress: Float): Rect {
  * corners square for the entire time the sheet is actually at rest.
  */
 const val CORNER_EXPANSION_PROGRESS_BAND = 0.02f
+
+/**
+ * Per-corner radii of the travelling card (Melox SharedContainerCornerRadii).
+ * Uniform in practice; the struct keeps the door open for squircle-style
+ * per-corner treatment without reshaping the call chain.
+ */
+internal data class SharedContainerCornerRadii(
+    val topStart: Float,
+    val topEnd: Float,
+    val bottomEnd: Float,
+    val bottomStart: Float,
+) {
+    companion object {
+        fun uniform(cornerRadius: Float): SharedContainerCornerRadii =
+            SharedContainerCornerRadii(
+                topStart = cornerRadius,
+                topEnd = cornerRadius,
+                bottomEnd = cornerRadius,
+                bottomStart = cornerRadius,
+            )
+    }
+}
+
+/**
+ * Corner radii mid-flight, exactly 0 at full expansion: the card's own curve
+ * ends where the screen glass takes over.
+ */
+internal fun sharedContainerCornerRadii(
+    source: SharedContainerCornerRadii,
+    target: SharedContainerCornerRadii,
+    progress: Float,
+): SharedContainerCornerRadii {
+    val fraction = progress.coerceIn(0f, 1f)
+    fun interpolate(sourceRadius: Float, targetRadius: Float): Float = if (fraction < 1f) {
+        lerp(sourceRadius, targetRadius, fraction)
+    } else {
+        0f
+    }
+    return SharedContainerCornerRadii(
+        topStart = interpolate(source.topStart, target.topStart),
+        topEnd = interpolate(source.topEnd, target.topEnd),
+        bottomEnd = interpolate(source.bottomEnd, target.bottomEnd),
+        bottomStart = interpolate(source.bottomStart, target.bottomStart),
+    )
+}
 
 /**
  * Corner radius for the sheet at [progress].

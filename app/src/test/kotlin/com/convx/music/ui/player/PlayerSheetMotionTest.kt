@@ -44,6 +44,22 @@ class PlayerSheetMotionTest {
     }
 
     @Test
+    fun `card corners resolve to zero exactly at full expansion`() {        val radii = sharedContainerCornerRadii(
+            source = SharedContainerCornerRadii.uniform(32f),
+            target = SharedContainerCornerRadii.uniform(28f),
+            progress = 1f,
+        )
+        assertEquals(0f, radii.topStart, 0.001f)
+        assertEquals(0f, radii.bottomEnd, 0.001f)
+        val mid = sharedContainerCornerRadii(
+            source = SharedContainerCornerRadii.uniform(32f),
+            target = SharedContainerCornerRadii.uniform(28f),
+            progress = 0.5f,
+        )
+        assertEquals(30f, mid.topStart, 0.01f)
+    }
+
+    @Test
     fun `mini title stays absolute while controls ride the right edge`() {
         val source = Rect(left = 16f, top = 900f, right = 400f, bottom = 964f)
         val controls = Rect(left = 320f, top = 908f, right = 392f, bottom = 956f)
@@ -140,6 +156,64 @@ class PlayerSheetMotionTest {
                 1080, 2400, 1080, 2400,
                 isInMultiWindowMode = false,
                 isInPictureInPictureMode = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `drag owner follows the end the drag started from`() {
+        assertEquals(
+            PlayerInputOwner.MINI,
+            playerSheetInputOwner(
+                targetOpen = true,
+                isDragging = true,
+                dragStartedFromMiniPlayer = true,
+                progress = 0.5f,
+                sharedLayersReady = true,
+            ),
+        )
+        assertEquals(
+            PlayerInputOwner.FULL,
+            playerSheetInputOwner(
+                targetOpen = false,
+                isDragging = true,
+                dragStartedFromMiniPlayer = false,
+                progress = 0.5f,
+                sharedLayersReady = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `mid-flight taps own nobody once the mini handed over`() {
+        assertEquals(
+            PlayerInputOwner.MINI,
+            playerSheetInputOwner(
+                targetOpen = false,
+                isDragging = false,
+                dragStartedFromMiniPlayer = false,
+                progress = 0.1f,
+                sharedLayersReady = false,
+            ),
+        )
+        assertEquals(
+            PlayerInputOwner.NONE,
+            playerSheetInputOwner(
+                targetOpen = true,
+                isDragging = false,
+                dragStartedFromMiniPlayer = false,
+                progress = 0.5f,
+                sharedLayersReady = false,
+            ),
+        )
+        assertEquals(
+            PlayerInputOwner.FULL,
+            playerSheetInputOwner(
+                targetOpen = true,
+                isDragging = false,
+                dragStartedFromMiniPlayer = false,
+                progress = 1f,
+                sharedLayersReady = false,
             ),
         )
     }

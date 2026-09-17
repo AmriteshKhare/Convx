@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -42,7 +41,8 @@ object PlayerMorph {
      */
     @JvmField var enabled: Boolean = true
     @JvmField var miniLayer: GraphicsLayer? = null
-    @JvmField var fullLayer: GraphicsLayer? = null
+    @JvmField var fullBackgroundLayer: GraphicsLayer? = null
+    @JvmField var fullContentLayer: GraphicsLayer? = null
 
     /** Set by the player; the sheet's own 0..1 drag/settle progress. */
     @JvmField var progressProvider: () -> Float = { 0f }
@@ -51,14 +51,33 @@ object PlayerMorph {
      * The sheet's drag entry points, published for the mini player.
      *
      * The pill lives in the nav bar and has no way to reach the sheet's state through the
-     * tree, but Melox's mini player can be dragged open, not only tapped -- and a drag is
+     * tree, but the mini player can be dragged open, not only tapped -- and a drag is
      * the only way to see the morph at a progress you choose.
      */
+    @JvmField var onDragStart: (fromMiniPlayer: Boolean) -> Unit = {}
     @JvmField var onDragDelta: (Float) -> Unit = {}
     @JvmField var onDragEnd: (Float) -> Unit = {}
     @JvmField var onDragCancel: () -> Unit = {}
 
     val progress: Float get() = progressProvider().coerceIn(0f, 1f)
+
+    /** Mirrors of the sheet state for input ownership (Melox target/isDragging). */
+    @JvmField var targetOpen: Boolean = false
+    @JvmField var isDragging: Boolean = false
+    @JvmField var dragFromMiniPlayer: Boolean = false
+
+    /** Who owns finger input right now; taps elsewhere would fight the spring. */
+    internal val inputOwner: PlayerInputOwner
+        get() = playerSheetInputOwner(
+            targetOpen = targetOpen,
+            isDragging = isDragging,
+            dragStartedFromMiniPlayer = dragFromMiniPlayer,
+            progress = progress,
+            sharedLayersReady = sharedLayersReady,
+        )
+
+    /** Tap-to-open is only honored while the mini owns input. */
+    internal val miniAcceptsInput: Boolean get() = inputOwner == PlayerInputOwner.MINI
 
     /**
      * True while the shared container owns the drawing.
@@ -71,14 +90,22 @@ object PlayerMorph {
             if (!enabled) return false
             val fraction = progress
             if (fraction <= 0f || fraction >= 1f) return false
-            if (miniLayer == null || fullLayer == null) return false
+            if (miniLayer == null || fullBackgroundLayer == null || fullContentLayer == null) return false
             val mini = miniPlayerContainerRect ?: return false
             return mini.width > 0f && mini.height > 0f
         }
 
-    val fullPlayerRect: Rect?
-        get() = fullLayer?.takeIf { it.size.width > 0 && it.size.height > 0 }?.let {
-            Rect(0f, 0f, it.size.width.toFloat(), it.size.height.toFloat())
+    /**
+     * All three recordings present with a usable pill: the overlay may draw.
+     * Melox gates the shared layers on measured-size agreement; the size gate
+     * lives at the record sites (degenerate bounds never publish).
+     */
+    val sharedLayersReady: Boolean
+        get() {
+            if (!enabled) return false
+            if (miniLayer == null || fullBackgroundLayer == null || fullContentLayer == null) return false
+            val mini = miniPlayerContainerRect ?: return false
+            return mini.width > 0f && mini.height > 0f
         }
 }
 
@@ -92,13 +119,16 @@ object PlayerMorph {
 @Composable
 fun InstallPlayerMorphLayers() {
     val mini = rememberGraphicsLayer()
-    val full = rememberGraphicsLayer()
-    DisposableEffect(mini, full) {
+    val fullBackground = rememberGraphicsLayer()
+    val fullContent = rememberGraphicsLayer()
+    DisposableEffect(mini, fullBackground, fullContent) {
         PlayerMorph.miniLayer = mini
-        PlayerMorph.fullLayer = full
+        PlayerMorph.fullBackgroundLayer = fullBackground
+        PlayerMorph.fullContentLayer = fullContent
         onDispose {
             PlayerMorph.miniLayer = null
-            PlayerMorph.fullLayer = null
+            PlayerMorph.fullBackgroundLayer = null
+            PlayerMorph.fullContentLayer = null
         }
     }
 }

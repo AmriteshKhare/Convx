@@ -33,6 +33,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -162,25 +163,9 @@ fun BottomSheet(
         )
     }
 
-    // One wrapper around BOTH halves of the sheet (its full-bleed background and its
-    // draggable content) so the morph records the player as it actually looks. Recording
-    // only the content would hand the container overlay a player with no artwork wash
-    // behind it. Plain fillMaxSize: both children already fill, so this adds a node and
-    // changes no layout.
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(
-                if (morphEnabled) {
-                    Modifier.recordPlayerLayer(
-                        layer = { PlayerMorph.fullLayer },
-                        drawInPlace = { !PlayerMorph.active },
-                    )
-                } else {
-                    Modifier
-                },
-            ),
-    ) {
+    // The sheet's two halves record SEPARATELY (Melox background/content
+    // layers): the overlay fades bg in over the first fifth and content from
+    // a tenth to six tenths. One combined recording could not stage the two.
     Box(
         modifier = modifier
             .graphicsLayer {
@@ -196,7 +181,17 @@ fun BottomSheet(
                     (1.4f * (state.progress.coerceAtLeast(0.1f) - 0.1f).pow(0.5f)).coerceIn(0f, 1f)
                 }
             }
-            .fillMaxSize(),
+            .fillMaxSize()
+            .then(
+                if (morphEnabled) {
+                    Modifier.recordPlayerLayer(
+                        layer = { PlayerMorph.fullBackgroundLayer },
+                        drawInPlace = { !PlayerMorph.active },
+                    )
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Box(
             // Always full-bleed — see contentMaxWidth's doc above.
@@ -223,6 +218,7 @@ fun BottomSheet(
                 val velocityTracker = VelocityTracker()
 
                 detectVerticalDragGestures(
+                    onDragStart = { state.onDragStart(fromMiniPlayer = false) },
                     onVerticalDrag = { change, dragAmount ->
                         state.dragClockNs[0] = System.nanoTime()
                         velocityTracker.addPointerInputChange(change)
@@ -272,6 +268,16 @@ fun BottomSheet(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(
+                        if (morphEnabled) {
+                            Modifier.recordPlayerLayer(
+                                layer = { PlayerMorph.fullContentLayer },
+                                drawInPlace = { !PlayerMorph.active },
+                            )
+                        } else {
+                            Modifier
+                        },
+                    )
                     .graphicsLayer {
                         // Starts where the mini player has finished leaving, not before
                         // it. The two used to overlap between 0.15 and 0.25, so for that
@@ -322,8 +328,6 @@ fun BottomSheet(
         }
     }
 
-    }
-
     // Sibling of the translated sheet Box above, not a child of it -- see the
     // parameter doc. Unaffected by the sheet's own drag translationY, so the
     // overlay's own translations (root-relative rects it was handed) land where
@@ -350,6 +354,31 @@ class BottomSheetState(
     // every write would re-invalidate the frame forever (the trap documented
     // at MainActivity.kt:1253 and BackdropFreeze.kt:21-23).
     internal val dragClockNs = longArrayOf(0L)
+
+    /** True between drag start and fling/cancel settle (Melox isDragging). */
+    var isDragging by mutableStateOf(false)
+        private set
+
+    /** Which anchor the sheet is settling toward (Melox targetOpen). */
+    var targetOpen by mutableStateOf(false)
+        private set
+
+    /** Marks a gesture start and which end owns it; mirrored to [PlayerMorph]. */
+    fun onDragStart(fromMiniPlayer: Boolean) {
+        isDragging = true
+        PlayerMorph.isDragging = true
+        PlayerMorph.dragFromMiniPlayer = fromMiniPlayer
+    }
+
+    private fun endDragState() {
+        isDragging = false
+        PlayerMorph.isDragging = false
+    }
+
+    private fun publishTarget(open: Boolean) {
+        targetOpen = open
+        PlayerMorph.targetOpen = open
+    }
 
     /** Pass to a `background` slot's [layerBackdrop] to skip re-recording it
      *  while this sheet is being dragged, mirroring [BackdropFreeze]. */
@@ -382,6 +411,7 @@ class BottomSheetState(
 
     fun collapse(animationSpec: AnimationSpec<Dp>, initialVelocity: Dp = 0.dp) {
         onAnchorChanged(collapsedAnchor)
+        publishTarget(false)
         coroutineScope.launch {
             animatable.animateTo(collapsedBound, animationSpec, initialVelocity)
         }
@@ -389,6 +419,7 @@ class BottomSheetState(
 
     fun expand(animationSpec: AnimationSpec<Dp>, initialVelocity: Dp = 0.dp) {
         onAnchorChanged(expandedAnchor)
+        publishTarget(true)
         coroutineScope.launch {
             animatable.animateTo(expandedBound, animationSpec, initialVelocity)
         }
@@ -431,6 +462,7 @@ class BottomSheetState(
     fun collapseSoft() {
         // Melox PlayerSheetTransition.animateToTarget: critically damped
         // (NoBouncy), stiffness 360, velocity-seeded on fling release.
+        endDragState()
         collapse(
             spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
@@ -441,6 +473,7 @@ class BottomSheetState(
 
     fun expandSoft() {
         // See collapseSoft: Melox settles both ways on the same spring.
+        endDragState()
         expand(
             spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
@@ -451,6 +484,8 @@ class BottomSheetState(
 
     fun dismiss() {
         onAnchorChanged(dismissedAnchor)
+        endDragState()
+        publishTarget(false)
         coroutineScope.launch {
             animatable.animateTo(dismissedBound)
         }
@@ -458,16 +493,21 @@ class BottomSheetState(
     
     suspend fun dismissAndWait() {
         onAnchorChanged(dismissedAnchor)
+        endDragState()
+        publishTarget(false)
         animatable.animateTo(dismissedBound)
     }
 
     fun snapTo(value: Dp) {
+        endDragState()
+        publishTarget(value >= expandedBound)
         coroutineScope.launch {
             animatable.snapTo(value)
         }
     }
 
     fun performFling(velocity: Float, onDismiss: (() -> Unit)?) {
+        endDragState()
         if (velocity > 250) {
             expand(velocity)
         } else if (velocity < -250) {

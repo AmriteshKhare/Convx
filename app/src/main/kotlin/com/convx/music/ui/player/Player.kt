@@ -1211,11 +1211,13 @@ fun BottomSheetPlayer(
     // draw phase (see PlayerMorph), so nothing recomposes per frame because of it.
     DisposableEffect(state) {
         PlayerMorph.progressProvider = { state.progress }
+        PlayerMorph.onDragStart = { fromMini -> state.onDragStart(fromMini) }
         PlayerMorph.onDragDelta = { state.dispatchRawDelta(it) }
         PlayerMorph.onDragEnd = { state.performFling(it, null) }
         PlayerMorph.onDragCancel = { state.snapTo(state.collapsedBound) }
         onDispose {
             PlayerMorph.progressProvider = { 0f }
+            PlayerMorph.onDragStart = {}
             PlayerMorph.onDragDelta = {}
             PlayerMorph.onDragEnd = {}
             PlayerMorph.onDragCancel = {}
