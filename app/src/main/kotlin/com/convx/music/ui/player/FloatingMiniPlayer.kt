@@ -408,7 +408,6 @@ fun FloatingMiniPlayer(
                         // overlap, so adding them together is the same pixels at half the layers.
                         modifier = Modifier
                             .weight(1f)
-                            .registerMiniContentRect()
                             .additiveChrome(useGlass && isDark),
                     ) {
                         Text(
@@ -495,7 +494,6 @@ fun FloatingMiniPlayer(
                         // overlap, so adding them together is the same pixels at half the layers.
                         modifier = Modifier
                             .weight(1f)
-                            .registerMiniContentRect()
                             .additiveChrome(useGlass && isDark),
                     ) {
                         Text(

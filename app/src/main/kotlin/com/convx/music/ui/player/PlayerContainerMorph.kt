@@ -49,19 +49,15 @@ fun Modifier.registerMiniContainerRect(): Modifier = onGloballyPositioned {
 }
 
 /**
- * Mini title block + transport cluster, in root coordinates (Melox
- * miniPlayerContentBounds / miniPlayerControlsBounds).
+ * Mini transport cluster, in root coordinates (Melox miniPlayerControlsBounds).
  *
- * The overlay draws the mini recording twice -- title side pinned to the
- * source offsets, controls translated to keep their right inset -- so both
+ * The overlay draws the mini recording twice -- title side riding the
+ * travelling corner, controls shifted to keep their right inset -- so both
  * visibly travel instead of crossfading. Controls report per-button and read
  * back the union: variants mount exclusively, so at most one set is live.
  */
-private val miniContentRect = mutableStateOf<Rect?>(null)
 private val miniControlsPlayRect = mutableStateOf<Rect?>(null)
 private val miniControlsNextRect = mutableStateOf<Rect?>(null)
-
-internal val miniPlayerContentRect: Rect? get() = miniContentRect.value
 
 internal val miniPlayerControlsRect: Rect?
     get() {
@@ -79,13 +75,8 @@ internal val miniPlayerControlsRect: Rect?
 
 /** Clears stale variant bounds when the mini switches layout (tab style, inline). */
 internal fun clearMiniContentControlsRects() {
-    miniContentRect.value = null
     miniControlsPlayRect.value = null
     miniControlsNextRect.value = null
-}
-
-fun Modifier.registerMiniContentRect(): Modifier = onGloballyPositioned {
-    if (it.isAttached) miniContentRect.value = it.boundsInRoot()
 }
 
 fun Modifier.registerMiniControlsPlayRect(): Modifier = onGloballyPositioned {
@@ -196,45 +187,37 @@ fun PlayerContainerMorphOverlay(
 }
 
 /**
- * Mini recording drawn as two tracked halves: title side pinned to the source
- * offsets, controls translated to keep their right inset (Melox clip split).
- * Falls back to one plain draw until both bounds report.
+ * Mini recording drawn as two tracked halves. The layer sits at the travelling
+ * corner, so the title side needs no offset -- it rides the corner. The
+ * controls half shifts right by [sharedMiniPlayerControlsShift], keeping its
+ * right inset as the card outgrows the pill. Falls back to one plain draw
+ * until both bounds report.
  */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrackedMiniLayer(
     miniLayer: androidx.compose.ui.graphics.layer.GraphicsLayer,
     mini: Rect,
     container: Rect,
 ) {
-    val content = miniPlayerContentRect
     val controls = miniPlayerControlsRect
-    if (content == null || controls == null ||
-        content.width <= 0f || content.height <= 0f ||
-        controls.width <= 0f || controls.height <= 0f
-    ) {
+    if (controls == null || controls.width <= 0f || controls.height <= 0f) {
         drawLayer(miniLayer)
         return
     }
-    val contentOffset = sharedMiniPlayerContentOffset(
-        sourcePlayerBounds = mini,
-        animatedPlayerBounds = container,
-        contentBounds = content,
-    )
+    // Layer-space x of the split: controls' left edge relative to the pill.
+    // (Inside the caller's translate to the container origin, so layer and
+    // destination x coincide here.)
     val controlsLeft = controls.left - mini.left
-    val controlsTranslationX = sharedMiniPlayerControlsTranslationX(
+    val shift = sharedMiniPlayerControlsShift(
         sourcePlayerBounds = mini,
         animatedPlayerBounds = container,
         controlsBounds = controls,
     )
     clipRect(right = controlsLeft) {
-        withTransform({
-            translate(left = contentOffset.x, top = contentOffset.y)
-        }) {
-            drawLayer(miniLayer)
-        }
+        drawLayer(miniLayer)
     }
-    clipRect(left = controlsLeft + controlsTranslationX) {
+    clipRect(left = controlsLeft + shift) {
         withTransform({
-            translate(left = contentOffset.x + controlsTranslationX, top = contentOffset.y)
+            translate(left = shift, top = 0f)
         }) {
             drawLayer(miniLayer)
         }

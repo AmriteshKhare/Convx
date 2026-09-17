@@ -4,7 +4,6 @@
  */
 package com.convx.music.ui.player
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.util.lerp
 
@@ -73,33 +72,20 @@ fun sharedContainerRect(source: Rect, target: Rect, progress: Float): Rect {
 /**
  * Where the mini player's controls sit inside the animating container.
  *
- * The controls keep their right inset from the source pill as the card grows
- * (Melox sharedMiniPlayerControlsTranslationX): they ride rightward with the
- * edge instead of stretching or fading, so play/next visibly travel.
+ * The layer is drawn at the travelling corner, so the title side needs no
+ * offset at all -- it rides the corner. The controls half shifts right by the
+ * amount the card outgrew the pill, keeping its right inset: play/next
+ * visibly travel with the edge instead of stretching or fading.
  */
-fun sharedMiniPlayerControlsTranslationX(
+fun sharedMiniPlayerControlsShift(
     sourcePlayerBounds: Rect,
     animatedPlayerBounds: Rect,
     controlsBounds: Rect,
 ): Float {
     val sourceRightInset = sourcePlayerBounds.right - controlsBounds.right
-    val targetControlsLeft = animatedPlayerBounds.right - sourceRightInset - controlsBounds.width
-    return targetControlsLeft - controlsBounds.left
+    val controlsRightInLayer = controlsBounds.right - sourcePlayerBounds.left
+    return animatedPlayerBounds.width - sourceRightInset - controlsRightInLayer
 }
-
-/**
- * Where the mini player's title block sits inside the animating container.
- * Pins to the source's left/top offsets so it travels with the card's growth
- * rather than crossfading in place.
- */
-fun sharedMiniPlayerContentOffset(
-    sourcePlayerBounds: Rect,
-    animatedPlayerBounds: Rect,
-    contentBounds: Rect,
-): Offset = Offset(
-    x = contentBounds.left - animatedPlayerBounds.left,
-    y = contentBounds.top - sourcePlayerBounds.top,
-)
 
 /**
  * The artwork's bounds at [progress].

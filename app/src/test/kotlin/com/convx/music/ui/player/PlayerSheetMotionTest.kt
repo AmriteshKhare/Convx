@@ -47,21 +47,18 @@ class PlayerSheetMotionTest {
     fun `mini controls keep their right inset while the card grows`() {
         val source = Rect(left = 16f, top = 900f, right = 400f, bottom = 964f)
         val controls = Rect(left = 320f, top = 908f, right = 392f, bottom = 956f)
+        // At rest the shift is zero: the layer already sits at the corner.
+        assertEquals(
+            0f,
+            sharedMiniPlayerControlsShift(source, source, controls),
+            0.01f,
+        )
         val animated = sharedContainerRect(source, full, 0.5f)
-        val translationX = sharedMiniPlayerControlsTranslationX(source, animated, controls)
+        val shift = sharedMiniPlayerControlsShift(source, animated, controls)
         val sourceInset = source.right - controls.right
-        val landedRight = controls.right + translationX
+        // Layer controls-right lands exactly on the travelling right edge.
+        val landedRight = animated.left + shift + (controls.right - source.left)
         assertEquals(animated.right - sourceInset, landedRight, 0.01f)
-    }
-
-    @Test
-    fun `mini content pins to source offsets inside the card`() {
-        val source = Rect(left = 16f, top = 900f, right = 400f, bottom = 964f)
-        val content = Rect(left = 80f, top = 908f, right = 300f, bottom = 956f)
-        val animated = sharedContainerRect(source, full, 0.5f)
-        val offset = sharedMiniPlayerContentOffset(source, animated, content)
-        assertEquals(content.left - animated.left, offset.x, 0.01f)
-        assertEquals(content.top - source.top, offset.y, 0.01f)
     }
 
     @Test
