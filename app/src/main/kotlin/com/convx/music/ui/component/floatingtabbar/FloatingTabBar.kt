@@ -136,6 +136,7 @@ import com.convx.music.ui.component.backdrop.highlight.Highlight
 import com.convx.music.ui.component.backdrop.shadow.InnerShadow
 import com.convx.music.ui.component.backdrop.shadow.Shadow
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.player.PlayerMorph
 import com.convx.music.ui.theme.isHueless
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -310,7 +311,11 @@ fun FloatingTabBar(
         // the glass -- was the one case not covered.
         val frozenWhileAnimating = remember(transition, scrollConnection) {
             {
-                transition.currentState != transition.targetState || scrollConnection.isScrolling()
+                transition.currentState != transition.targetState || scrollConnection.isScrolling() ||
+                    // PLAN 4 + Q3: bar is covered by the morph card, re-sampling
+                    // under it is wasted work. Unfreezes at 0.75 so the capture
+                    // is live before the glass resolves at the end of flight.
+                    (PlayerMorph.active && PlayerMorph.progress < 0.75f)
             }
         }
         val collapsing = transition.targetState == FloatingTabBarVisual.INLINE
@@ -793,18 +798,10 @@ private fun SharedTransitionScope.InlineTab(
             .padding(sizes.tabInlineContentPadding)
     ) {
         Tab(
-            icon = {
-                Box(
-                    Modifier.sharedElement(
-                        sharedContentState = rememberSharedContentState("tab#${inlineTab.key}-icon"),
-                        animatedVisibilityScope = animatedVisibilityScope,
-                        boundsTransform = LocalBarBoundsTransforms.current.bar,
-                        zIndexInOverlay = 1f
-                    )
-                ) {
-                    inlineTab.icon()
-                }
-            },
+            // Q1 fix: no per-icon sharedElement -- the icon rides the tabGroup's
+            // own shared bounds. A nested shared node double-drove the icon
+            // (overlay bounds inside overlay bounds) = self-readjust glitch.
+            icon = { inlineTab.icon() },
             title = { inlineTab.title() },
             isInline = true
         )
@@ -1499,19 +1496,13 @@ private fun SharedTransitionScope.ExpandedTabs(
                                     compositingStrategy = CompositingStrategy.ModulateAlpha
                                 }
                                 .then(
-                                    if (tab.key == selectedTabKey) {
-                                        Modifier.sharedElement(
-                                            sharedContentState = rememberSharedContentState("tab#${tab.key}-icon"),
-                                            animatedVisibilityScope = animatedVisibilityScope,
-                                            boundsTransform = LocalBarBoundsTransforms.current.bar,
-                                            zIndexInOverlay = 1f
-                                        )
-                                    } else {
-                                        Modifier.animateEnterExitTab(
-                                            sharedTransitionScope = this@ExpandedTabs,
-                                            animatedVisibilityScope = animatedVisibilityScope
-                                        )
-                                    }
+                                    // Q1 fix: selected icon rides the tabGroup like
+                                    // every other icon -- its own shared node nested
+                                    // inside the group's node read as readjusting.
+                                    Modifier.animateEnterExitTab(
+                                        sharedTransitionScope = this@ExpandedTabs,
+                                        animatedVisibilityScope = animatedVisibilityScope
+                                    )
                                 )
                         ) {
                             tab.icon()
@@ -2196,7 +2187,10 @@ internal class BarBoundsTransforms(val bar: BoundsTransform, val accessory: Boun
             accessory = BoundsTransform { _, _ -> tween(320, delayMillis = 90, easing = CritSpring440Easing) },
         )
         val Expand = BarBoundsTransforms(
-            bar = BoundsTransform { _, _ -> tween(230, delayMillis = 70, easing = CritSpring440Easing) },
+            // Q1 lock: bar/icons ride the container spring with zero delay so the
+            // sharedElement overlay and the SizeTransform never double-drive the
+            // icons mid-flight. Stagger lives on the accessory only (Collapse).
+            bar = BoundsTransform { _, _ -> spring700() },
             accessory = BoundsTransform { _, _ -> spring700() },
         )
     }

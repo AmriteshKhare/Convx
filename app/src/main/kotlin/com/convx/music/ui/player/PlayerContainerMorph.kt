@@ -26,7 +26,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
+import com.convx.music.ui.component.PLAYER_MINI_FADE_END
 
 /**
  * Where the mini player's own pill sits on screen, in root coordinates.
@@ -47,13 +47,15 @@ fun Modifier.registerMiniContainerRect(): Modifier = onGloballyPositioned {
     if (it.isAttached) miniContainerRect.value = it.boundsInRoot()
 }
 
-/** The mini player's recording fades out across the first quarter of the flight. */
+/** The mini player's own pill sits on the travelling card past the handoff. */
 fun playerSheetBarAlpha(progress: Float): Float =
-    1f - easeOutCubic((progress / PLAYER_LAYER_HANDOFF_PROGRESS).coerceIn(0f, 1f))
+    1f - easeOutCubic((progress / PLAYER_MINI_FADE_END).coerceIn(0f, 1f))
 
-/** ...and the full player's recording fades in over exactly the same slice. */
+/** ...and the full player's recording resolves late, over the final stretch only. */
+const val PLAYER_CONTENT_RESOLVE_START = 0.65f
+
 fun playerSheetPageAlpha(progress: Float): Float =
-    easeInCubic((progress / PLAYER_LAYER_HANDOFF_PROGRESS).coerceIn(0f, 1f))
+    easeOutCubic(((progress - PLAYER_CONTENT_RESOLVE_START) / (1f - PLAYER_CONTENT_RESOLVE_START)).coerceIn(0f, 1f))
 
 /**
  * The one surface the whole morph happens inside.
@@ -132,16 +134,22 @@ fun PlayerContainerMorphOverlay(
                             size = Size(rect.width, rect.height),
                         )
                         translate(left = rect.left, top = rect.top) {
-                            if (miniLayer.size.width > 0 && fraction < PLAYER_LAYER_HANDOFF_PROGRESS) {
+                            if (miniLayer.size.width > 0 && fraction < PLAYER_MINI_FADE_END) {
                                 miniLayer.alpha = playerSheetBarAlpha(fraction)
                                 // iOS 27 blurs the mini's content away as the card grows rather
                                 // than just fading it (designRefrence/threadsdownloader.com_0805d3.mp4).
-                                val blur = MiniBlurMaxDp.toPx() * (fraction / PLAYER_LAYER_HANDOFF_PROGRESS)
+                                val blur = MiniBlurMaxDp.toPx() * (fraction / PLAYER_MINI_FADE_END)
                                 miniLayer.renderEffect = if (blur > 0.5f) BlurEffect(blur, blur) else null
                                 drawLayer(miniLayer)
                             }
                             val scale = rect.width / fullLayer.size.width.toFloat()
+                            // Late resolve: full content arrives as a soft blurred ghost
+                            // that sharpens to crisp over the final stretch, never
+                            // double-drawing against the mini layer mid-flight.
                             fullLayer.alpha = playerSheetPageAlpha(fraction)
+                            val fullBlur = FullBlurMaxDp.toPx() *
+                                (1f - ((fraction - PLAYER_CONTENT_RESOLVE_START) / (1f - PLAYER_CONTENT_RESOLVE_START)).coerceIn(0f, 1f))
+                            fullLayer.renderEffect = if (fullBlur > 0.5f) BlurEffect(fullBlur, fullBlur) else null
                             scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero) {
                                 drawLayer(fullLayer)
                             }
@@ -153,3 +161,4 @@ fun PlayerContainerMorphOverlay(
 }
 
 private val MiniBlurMaxDp = 10.dp
+private val FullBlurMaxDp = 8.dp

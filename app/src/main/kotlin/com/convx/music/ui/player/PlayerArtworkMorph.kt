@@ -24,10 +24,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
+import kotlin.jvm.JvmField
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Size as CoilSize
+import com.convx.music.constants.PlayerArtworkStyle
+import com.convx.music.constants.PlayerArtworkStyleKey
+import com.convx.music.constants.PlayerLook
+import com.convx.music.constants.PlayerLookKey
+import com.convx.music.ui.component.PLAYER_MINI_FADE_END
+import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.ui.utils.resize
 
 /**
@@ -62,6 +69,16 @@ private val fullArtworkRect = mutableStateOf<Rect?>(null)
  */
 private val miniArtworkRadius = androidx.compose.runtime.mutableFloatStateOf(0f)
 private val fullArtworkRadius = androidx.compose.runtime.mutableFloatStateOf(0f)
+
+/**
+ * Q6 lock: V2's pause-shrink (0.729x) frozen while the morph owns the frame.
+ *
+ * Plain field, draw-phase only (same contract as [PlayerMorph]'s own fields):
+ * written from the artwork's graphicsLayer when at rest, read by the overlay
+ * as part of its measured target. The flight therefore lands on the live
+ * shrunk size instead of snapping full→shrunk at the handoff.
+ */
+@JvmField var fullArtworkRestScale: Float = 1f
 
 fun Modifier.registerMiniArtworkRect(cornerRadiusPx: Float = 0f): Modifier = onGloballyPositioned {
     miniArtworkRadius.floatValue = cornerRadiusPx
@@ -112,6 +129,11 @@ fun PlayerArtworkMorphOverlay(
     thumbnailUrl: String?,
     progress: () -> Float,
 ) {
+    // Q5 lock: only a squared card travels. Hero/bleed/vinyl/clover shapes never
+    // lerp rects between mismatched geometry -- they shrink+fade in place.
+    val (playerLook) = rememberEnumPreference(PlayerLookKey, defaultValue = PlayerLook.SQUARED)
+    val (artworkStyle) = rememberEnumPreference(PlayerArtworkStyleKey, defaultValue = PlayerArtworkStyle.CARD)
+    val travelEnabled = playerLook == PlayerLook.SQUARED && artworkStyle == PlayerArtworkStyle.CARD
     val mini = miniArtworkRect.value
     val full = fullArtworkRect.value
     if (mini == null || full == null || thumbnailUrl == null) return
@@ -125,16 +147,34 @@ fun PlayerArtworkMorphOverlay(
     // <= 0, and full.width/height fed CoilSize directly with no floor.
     if (mini.width <= 0f || mini.height <= 0f || full.width <= 0f || full.height <= 0f) return
 
+    if (!travelEnabled) {
+        FancyArtworkFadeOverlay(
+            thumbnailUrl = thumbnailUrl,
+            progress = progress,
+        )
+        return
+    }
+
+    // Q6: shrink the measured target about its own center when paused-shrunk.
+    // fullArtworkRestScale only moves at rest, so the flight target is stable.
+    val shrink = fullArtworkRestScale.coerceIn(0.1f, 1f)
+    val target = if (shrink >= 1f) full else Rect(
+        left = full.center.x - full.width * shrink / 2f,
+        top = full.center.y - full.height * shrink / 2f,
+        right = full.center.x + full.width * shrink / 2f,
+        bottom = full.center.y + full.height * shrink / 2f,
+    )
+
     val density = LocalDensity.current
-    val boxWidthDp = with(density) { full.width.toDp() }
-    val boxHeightDp = with(density) { full.height.toDp() }
+    val boxWidthDp = with(density) { target.width.toDp() }
+    val boxHeightDp = with(density) { target.height.toDp() }
 
     Box(
         modifier = Modifier
             .offset {
                 IntOffset(
-                    full.left.roundToInt(),
-                    full.top.roundToInt(),
+                    target.left.roundToInt(),
+                    target.top.roundToInt(),
                 )
             }
             .size(boxWidthDp, boxHeightDp)
@@ -145,17 +185,17 @@ fun PlayerArtworkMorphOverlay(
                     return@graphicsLayer
                 }
                 alpha = 1f
-                val rect = sharedArtworkRect(mini, full, fraction)
+                val rect = sharedArtworkRect(mini, target, fraction)
                 transformOrigin = TransformOrigin(0f, 0f)
-                translationX = rect.left - full.left
-                translationY = rect.top - full.top
-                val artworkScaleX = rect.width / full.width.coerceAtLeast(1f)
-                val artworkScaleY = rect.height / full.height.coerceAtLeast(1f)
+                translationX = rect.left - target.left
+                translationY = rect.top - target.top
+                val artworkScaleX = rect.width / target.width.coerceAtLeast(1f)
+                val artworkScaleY = rect.height / target.height.coerceAtLeast(1f)
                 scaleX = artworkScaleX
                 scaleY = artworkScaleY
                 val radius = androidx.compose.ui.util.lerp(
                     miniArtworkRadius.floatValue,
-                    fullArtworkRadius.floatValue,
+                    fullArtworkRadius.floatValue * shrink,
                     fraction,
                 )
                 val localRadius = if (artworkScaleX > 0f) (radius / artworkScaleX).toDp() else radius.toDp()
@@ -182,13 +222,73 @@ fun PlayerArtworkMorphOverlay(
 }
 
 /**
- * Hides the full player's own artwork while [PlayerArtworkMorphOverlay] is in flight.
- *
- * The overlay draws the cover for the whole 0..1 journey, but the sheet's content is
- * already opaque from the handoff onward -- so without this, both are on screen from a
- * quarter of the way in: the real one sitting at its final position while the travelling
- * one is still climbing towards it.
+ * Q5 fancy path: hero/bleed/vinyl/clover never travel. The mini-anchored copy
+ * shrinks (1 -> 0.85) and fades across the first quarter; the real full artwork
+ * reveals late via [hideFullArtworkWhileMorphing]. Two layers, no rect lerp,
+ * no jitter between mismatched shapes.
  */
+@Composable
+private fun FancyArtworkFadeOverlay(
+    thumbnailUrl: String,
+    progress: () -> Float,
+) {
+    val mini = miniArtworkRect.value ?: return
+    if (mini.width <= 0f || mini.height <= 0f) return
+    val density = LocalDensity.current
+    val boxWidthDp = with(density) { mini.width.toDp() }
+    val boxHeightDp = with(density) { mini.height.toDp() }
+    val miniRadiusDp = with(density) { miniArtworkRadius.floatValue.toDp() }
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(mini.left.roundToInt(), mini.top.roundToInt()) }
+            .size(boxWidthDp, boxHeightDp)
+            .graphicsLayer {
+                val fraction = progress().coerceIn(0f, 1f)
+                if (fraction <= 0f || fraction >= PLAYER_MINI_FADE_END) {
+                    alpha = 0f
+                    return@graphicsLayer
+                }
+                val fade = easeOutCubic((fraction / PLAYER_MINI_FADE_END).coerceIn(0f, 1f))
+                alpha = 1f - fade
+                val shrinkScale = 1f - 0.15f * fade
+                scaleX = shrinkScale
+                scaleY = shrinkScale
+                transformOrigin = TransformOrigin.Center
+                shape = RoundedCornerShape(miniRadiusDp)
+                clip = true
+            }
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(thumbnailUrl.resize(1200, 1200))
+                .size(CoilSize.ORIGINAL)
+                .crossfade(false)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(boxWidthDp, boxHeightDp),
+        )
+    }
+}
+
+/**
+ * Full-artwork visibility while the morph owns the frame.
+ *
+ * Travel mode: overlay carries the cover the whole flight, real copy stays
+ * hidden until the handoff. Fancy mode: real copy resolves late
+ * (0.65 -> 1, ghost to crisp) behind the mini shrink+fade.
+ * Draw-phase reads only -- see [hideWhileArtworkMorphing].
+ */
+fun Modifier.hideFullArtworkWhileMorphing(travelEnabled: Boolean): Modifier = graphicsLayer {
+    val fraction = PlayerMorph.progress
+    alpha = if (fraction <= 0f || fraction >= 1f) {
+        1f
+    } else if (travelEnabled) {
+        0f
+    } else {
+        easeOutCubic(((fraction - PLAYER_CONTENT_RESOLVE_START) / (1f - PLAYER_CONTENT_RESOLVE_START)).coerceIn(0f, 1f))
+    }
+}
 fun Modifier.hideWhileArtworkMorphing(progress: () -> Float): Modifier = graphicsLayer {
     // Lambda, not a Float: this modifier sits deep inside the player's content (under
     // AnimatedContent and a shared-element LookaheadScope on the V2 player). Taking the

@@ -685,10 +685,11 @@ fun PlayerV2(
                                             .registerFullArtworkRect(
                                                 with(androidx.compose.ui.platform.LocalDensity.current) { 12.dp.toPx() }
                                             )
-                                            // The overlay owns the cover for the whole
-                                            // flight; without this both are on screen from
-                                            // the handoff onward.
-                                            .hideWhileMorphing()
+                                            // Q5: squared travels (overlay owns the cover all
+                                            // flight); fancy looks resolve late in place.
+                                            .hideFullArtworkWhileMorphing(
+                                                travelEnabled = playerLook == PlayerLook.SQUARED,
+                                            )
                                             // Deliberately no background/clip/shadow here any more, and no
                                             // scale either -- this Box is only the morph's stable measurement
                                             // anchor now. Everything that actually paints (shadow, rounded
@@ -736,7 +737,14 @@ fun PlayerV2(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .graphicsLayer { scaleX = heroScale; scaleY = heroScale }
+                                            .graphicsLayer {
+                                                // Q6: pause-shrink frozen while the morph owns
+                                                // the frame -- the overlay flies to this frozen
+                                                // size as its target, no second driver mid-flight.
+                                                if (!PlayerMorph.active) fullArtworkRestScale = heroScale
+                                                scaleX = fullArtworkRestScale
+                                                scaleY = fullArtworkRestScale
+                                            }
                                             .customSoftShadow(
                                                 elevation = playerThumbnailShadowElevation.dp,
                                                 cornerRadius = if (isHeroLook) 0.dp else 12.dp,

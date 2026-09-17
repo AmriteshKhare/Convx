@@ -1241,20 +1241,14 @@ fun BottomSheetPlayer(
         // its corners sit on the glass rather than near it, then opens out to square once
         // settled. 0.dp on a device that reports no rounded corners, or in split screen.
         expandedCornerRadius = rememberScreenCornerRadius(),
-        // Mini-to-full artwork morph (registerMiniArtworkRect/registerFullArtworkRect
-        // above mark the two ends; see PlayerArtworkMorphOverlay's own doc for why this
-        // draws a fresh AsyncImage rather than a captured GraphicsLayer).
+        // Mini-to-full morph flight (see PlayerMorphHost): container owns the
+        // card, artwork rides above it.
         overlayContent = {
-            // Container first, artwork on top of it: the artwork is travelling across
-            // the same window and has to ride above the surface it is growing out of.
-            PlayerContainerMorphOverlay(
+            PlayerMorphHost(
                 progress = { state.progress },
-                color = AppTheme.colorScheme.surfaceContainer,
-                expandedCornerRadius = rememberScreenCornerRadius(),
-            )
-            PlayerArtworkMorphOverlay(
                 thumbnailUrl = mediaMetadata?.thumbnailUrl,
-                progress = { state.progress },
+                containerColor = AppTheme.colorScheme.surfaceContainer,
+                expandedCornerRadius = rememberScreenCornerRadius(),
             )
 
             // A plain, unshifted sibling of the sheet's own draggable content (see this

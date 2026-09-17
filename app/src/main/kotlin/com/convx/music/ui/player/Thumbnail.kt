@@ -752,7 +752,11 @@ private fun ThumbnailItem(
                         }
                     }
                 )
-                .hideWhileMorphing()
+                // Q5: squared card travels (hidden all flight); vinyl/clover
+                // resolve late in place behind the mini shrink+fade.
+                .hideFullArtworkWhileMorphing(
+                    travelEnabled = artworkStyle == PlayerArtworkStyle.CARD,
+                )
                 .graphicsLayer {
                     rotationZ = rotation.value
                 }

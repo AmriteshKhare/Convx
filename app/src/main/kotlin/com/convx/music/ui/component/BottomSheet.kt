@@ -67,12 +67,25 @@ import kotlin.math.pow
 /** Mirrors BackdropFreeze.kt's identical constant: a safety net for drags that
  *  never deliver onDragEnd/onDragCancel (e.g. gesture stolen elsewhere). */
 /**
- * Progress at which the collapsed and expanded layers hand over.
+ * Progress at which the collapsed layer hands over.
  *
- * One value for both halves so they cannot drift into overlapping again: the mini player
- * is fully faded out here, and the expanded content starts fading in here.
+ * Mini player fully faded out here; the full player's own content resolves
+ * later (see PLAYER_CONTENT_RESOLVE_START) as a blurred ghost to crisp.
  */
 internal const val PLAYER_LAYER_HANDOFF_PROGRESS = 0.25f
+
+/**
+ * Mini recording fade-out end: the mini stays on the travelling card past the
+ * handoff so the card never flies empty before the full layer resolves.
+ */
+internal const val PLAYER_MINI_FADE_END = 0.45f
+
+/**
+ * Q3 lock: backdrop sampling stays frozen through the morph flight and goes
+ * live here, ahead of the glass/content resolve, so the first live capture
+ * is already warm when the glass fades in instead of popping a stale frame.
+ */
+internal const val PLAYER_GLASS_UNFREEZE_PROGRESS = 0.75f
 
 private const val BackdropFreezeSafetyNs = 900_000_000L
 
@@ -336,7 +349,10 @@ class BottomSheetState(
      *  while this sheet is being dragged, mirroring [BackdropFreeze]. */
     val backdropFrozen: () -> Boolean = {
         val started = dragClockNs[0]
-        started != 0L && System.nanoTime() - started < BackdropFreezeSafetyNs
+        (started != 0L && System.nanoTime() - started < BackdropFreezeSafetyNs) ||
+            // Q3 lock: tap-driven open/close runs no drag, so without this the
+            // backdrop re-samples every animation frame into the morph recording.
+            (PlayerMorph.active && PlayerMorph.progress < PLAYER_GLASS_UNFREEZE_PROGRESS)
     }
 
     val value by animatable.asState()
