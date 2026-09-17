@@ -287,7 +287,7 @@ fun Modifier.hideFullArtworkWhileMorphing(travelEnabled: Boolean): Modifier = gr
     } else if (travelEnabled) {
         0f
     } else {
-        easeOutCubic(((fraction - UNIFIED_CONTENT_RESOLVE_START) / (1f - UNIFIED_CONTENT_RESOLVE_START)).coerceIn(0f, 1f))
+        playerSheetPageAlpha(fraction)
     }
 }
 fun Modifier.hideWhileArtworkMorphing(progress: () -> Float): Modifier = graphicsLayer {

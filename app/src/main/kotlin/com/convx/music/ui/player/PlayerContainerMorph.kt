@@ -4,18 +4,39 @@
  */
 package com.convx.music.ui.player
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.Dp
+import com.convx.music.ui.component.PLAYER_CONTENT_APPEAR_END
+import com.convx.music.ui.component.PLAYER_CONTENT_APPEAR_START
+import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
+import com.convx.music.ui.component.PLAYER_MINI_FADE_END
 
 /**
  * Where the mini player's own pill sits on screen, in root coordinates.
  *
  * Module-level state for the same reason the artwork rects are: the pill lives in the
  * floating nav bar, the sheet lives in the player, they are far apart in the tree, and
- * only the live card ([morphLiveCard]) -- drawn once per frame, draw-phase -- reads it.
+ * only the overlay -- drawn once, in between -- reads it.
  */
 private val miniContainerRect = mutableStateOf<Rect?>(null)
 
@@ -27,4 +48,206 @@ internal val miniPlayerContainerRect: Rect? get() = miniContainerRect.value
  */
 fun Modifier.registerMiniContainerRect(): Modifier = onGloballyPositioned {
     if (it.isAttached) miniContainerRect.value = it.boundsInRoot()
+}
+
+/**
+ * Mini title block + transport cluster, in root coordinates (Melox
+ * miniPlayerContentBounds / miniPlayerControlsBounds).
+ *
+ * The overlay draws the mini recording twice -- title side pinned to the
+ * source offsets, controls translated to keep their right inset -- so both
+ * visibly travel instead of crossfading. Controls report per-button and read
+ * back the union: variants mount exclusively, so at most one set is live.
+ */
+private val miniContentRect = mutableStateOf<Rect?>(null)
+private val miniControlsPlayRect = mutableStateOf<Rect?>(null)
+private val miniControlsNextRect = mutableStateOf<Rect?>(null)
+
+internal val miniPlayerContentRect: Rect? get() = miniContentRect.value
+
+internal val miniPlayerControlsRect: Rect?
+    get() {
+        val play = miniControlsPlayRect.value
+        val next = miniControlsNextRect.value
+        if (play == null) return next
+        if (next == null) return play
+        return Rect(
+            left = minOf(play.left, next.left),
+            top = minOf(play.top, next.top),
+            right = maxOf(play.right, next.right),
+            bottom = maxOf(play.bottom, next.bottom),
+        )
+    }
+
+/** Clears stale variant bounds when the mini switches layout (tab style, inline). */
+internal fun clearMiniContentControlsRects() {
+    miniContentRect.value = null
+    miniControlsPlayRect.value = null
+    miniControlsNextRect.value = null
+}
+
+fun Modifier.registerMiniContentRect(): Modifier = onGloballyPositioned {
+    if (it.isAttached) miniContentRect.value = it.boundsInRoot()
+}
+
+fun Modifier.registerMiniControlsPlayRect(): Modifier = onGloballyPositioned {
+    if (it.isAttached) miniControlsPlayRect.value = it.boundsInRoot()
+}
+
+fun Modifier.registerMiniControlsNextRect(): Modifier = onGloballyPositioned {
+    if (it.isAttached) miniControlsNextRect.value = it.boundsInRoot()
+}
+
+/** Mini chrome (plate + bar) hands over across the first fifth of the flight. */
+fun playerSheetBarAlpha(progress: Float): Float =
+    1f - easeOutCubic((progress / PLAYER_LAYER_HANDOFF_PROGRESS).coerceIn(0f, 1f))
+
+/** Mini title/buttons track across the first three tenths, then hand over. */
+fun playerSheetMiniContentAlpha(progress: Float): Float =
+    1f - easeOutCubic((progress / PLAYER_MINI_FADE_END).coerceIn(0f, 1f))
+
+/** Full-player recording fades in from a tenth to six tenths, ease-in. */
+fun playerSheetPageAlpha(progress: Float): Float =
+    easeInCubic(
+        (
+            (progress - PLAYER_CONTENT_APPEAR_START) /
+                (PLAYER_CONTENT_APPEAR_END - PLAYER_CONTENT_APPEAR_START)
+            ).coerceIn(0f, 1f),
+    )
+
+/**
+ * The one surface the whole morph happens inside (Melox PlayerSheetContentOverlay).
+ *
+ * Positioned at the interpolated container rect -- the pill's bounds at progress 0, the
+ * whole screen at 1 -- it draws BOTH recordings:
+ *
+ * - the mini player's, drawn TWICE with a clip split: the title side pinned to
+ *   the source offsets, the controls translated to keep their right inset as
+ *   the card grows. Title/artist/buttons visibly TRAVEL instead of fading;
+ * - the full player's, scaled by `container width / full width`, appearing
+ *   from a tenth to six tenths while the mini hands over.
+ *
+ * ENTIRELY draw-phase. An earlier version sized a real Box from progress read in
+ * composition; it composed once, at progress 0.0004, and never again -- so the container
+ * sat at pill size for the whole gesture while the sheet it had replaced was no longer
+ * drawing itself either. Reading progress here means the frame that changes it is the
+ * frame that redraws this, with no recomposition at all.
+ */
+@Composable
+fun PlayerContainerMorphOverlay(
+    progress: () -> Float,
+    color: Color,
+    expandedCornerRadius: Dp,
+) {
+    Spacer(
+        modifier = Modifier
+            .fillMaxSize()
+            .drawWithCache {
+                val clipPath = Path()
+                onDrawBehind {
+                    val fraction = progress().coerceIn(0f, 1f)
+                    if (fraction <= 0f || fraction >= 1f) return@onDrawBehind
+                    val mini = miniContainerRect.value ?: return@onDrawBehind
+                    // onGloballyPositioned can fire once with a degenerate size before layout
+                    // settles.
+                    if (mini.width <= 0f || mini.height <= 0f) return@onDrawBehind
+                    val miniLayer = PlayerMorph.miniLayer ?: return@onDrawBehind
+                    val fullLayer = PlayerMorph.fullLayer ?: return@onDrawBehind
+                    if (fullLayer.size.width <= 0) return@onDrawBehind
+
+                    // The full player is the recorded screen itself, so its rect IS this
+                    // overlay's own size. Nothing to register at that end, nothing to go
+                    // stale.
+                    val full = Rect(0f, 0f, size.width, size.height)
+                    val rect = sharedContainerRect(mini, full, fraction)
+                    val radius = sharedContainerCornerRadius(
+                        // The nav bar draws the pill as a 50%-rounded capsule, so its radius
+                        // is half its height by definition. Derived rather than passed in, so
+                        // restyling the pill cannot leave the two out of step.
+                        collapsedCornerRadius = mini.height / 2f,
+                        expandedCornerRadius = expandedCornerRadius.toPx(),
+                        progress = fraction,
+                        screenCornerExpansionProgress = 0f,
+                    )
+
+                    clipPath.reset()
+                    clipPath.addRoundRect(RoundRect(rect, CornerRadius(radius, radius)))
+                    clipPath(clipPath) {
+                        // Under both recordings: without this the first frames are
+                        // see-through. Faded on the bar curve (not flat): the full
+                        // recording is opaque from a tenth, so a flat plate would
+                        // sit behind it for the rest of the flight and read dead.
+                        drawRect(
+                            color = color.copy(alpha = color.alpha * playerSheetBarAlpha(fraction)),
+                            topLeft = Offset(rect.left, rect.top),
+                            size = Size(rect.width, rect.height),
+                        )
+                        translate(left = rect.left, top = rect.top) {
+                            if (miniLayer.size.width > 0 && fraction < PLAYER_MINI_FADE_END) {
+                                miniLayer.alpha = playerSheetMiniContentAlpha(fraction)
+                                drawTrackedMiniLayer(
+                                    miniLayer = miniLayer,
+                                    mini = mini,
+                                    container = rect,
+                                )
+                            }
+                            val scale = rect.width / fullLayer.size.width.toFloat()
+                            if (fraction > PLAYER_CONTENT_APPEAR_START) {
+                                fullLayer.alpha = playerSheetPageAlpha(fraction)
+                                fullLayer.renderEffect = null
+                                scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero) {
+                                    drawLayer(fullLayer)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+    )
+}
+
+/**
+ * Mini recording drawn as two tracked halves: title side pinned to the source
+ * offsets, controls translated to keep their right inset (Melox clip split).
+ * Falls back to one plain draw until both bounds report.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrackedMiniLayer(
+    miniLayer: androidx.compose.ui.graphics.layer.GraphicsLayer,
+    mini: Rect,
+    container: Rect,
+) {
+    val content = miniPlayerContentRect
+    val controls = miniPlayerControlsRect
+    if (content == null || controls == null ||
+        content.width <= 0f || content.height <= 0f ||
+        controls.width <= 0f || controls.height <= 0f
+    ) {
+        drawLayer(miniLayer)
+        return
+    }
+    val contentOffset = sharedMiniPlayerContentOffset(
+        sourcePlayerBounds = mini,
+        animatedPlayerBounds = container,
+        contentBounds = content,
+    )
+    val controlsLeft = controls.left - mini.left
+    val controlsTranslationX = sharedMiniPlayerControlsTranslationX(
+        sourcePlayerBounds = mini,
+        animatedPlayerBounds = container,
+        controlsBounds = controls,
+    )
+    clipRect(right = controlsLeft) {
+        withTransform({
+            translate(left = contentOffset.x, top = contentOffset.y)
+        }) {
+            drawLayer(miniLayer)
+        }
+    }
+    clipRect(left = controlsLeft + controlsTranslationX) {
+        withTransform({
+            translate(left = contentOffset.x + controlsTranslationX, top = contentOffset.y)
+        }) {
+            drawLayer(miniLayer)
+        }
+    }
 }

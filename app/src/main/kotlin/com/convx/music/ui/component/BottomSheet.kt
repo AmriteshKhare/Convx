@@ -43,9 +43,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import com.convx.music.ui.player.PlayerMorph
 import com.convx.music.ui.player.SCREEN_CORNER_EXPANSION_MILLIS
-import com.convx.music.ui.player.morphLiveCard
+import com.convx.music.ui.player.recordPlayerLayer
 import com.convx.music.ui.player.sharedContainerCornerRadius
-import com.convx.music.ui.player.unifiedContentResolve
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.pointer.pointerInput
@@ -68,18 +67,24 @@ import kotlin.math.pow
 /** Mirrors BackdropFreeze.kt's identical constant: a safety net for drags that
  *  never deliver onDragEnd/onDragCancel (e.g. gesture stolen elsewhere). */
 /**
- * Progress at which the collapsed layer hands over.
+ * Progress at which the collapsed and expanded layers hand over (Melox
+ * PLAYER_LAYER_HANDOFF_END_PROGRESS).
  *
- * Mini player fully faded out here; the full player's own content resolves
- * later ([unifiedContentResolve]) as a blurred ghost to crisp.
+ * Mini content is fully faded out just after, at [PLAYER_MINI_FADE_END]; the
+ * full player's own content starts appearing at [PLAYER_CONTENT_APPEAR_START]
+ * and is fully in by [PLAYER_CONTENT_APPEAR_END]. One value per band so the
+ * halves cannot drift into overlapping again.
  */
-internal const val PLAYER_LAYER_HANDOFF_PROGRESS = 0.25f
+internal const val PLAYER_LAYER_HANDOFF_PROGRESS = 0.2f
 
-/**
- * Mini recording fade-out end: the mini stays on the travelling card past the
- * handoff so the card never flies empty before the full layer resolves.
- */
-internal const val PLAYER_MINI_FADE_END = 0.45f
+/** Mini recording fully faded out here (Melox MINI_CONTENT_FADE_END 0.3). */
+internal const val PLAYER_MINI_FADE_END = 0.3f
+
+/** Full-player content starts appearing here (Melox CONTENT_APPEAR_START 0.1). */
+internal const val PLAYER_CONTENT_APPEAR_START = 0.1f
+
+/** Full-player content fully visible here (Melox CONTENT_APPEAR_END 0.6). */
+internal const val PLAYER_CONTENT_APPEAR_END = 0.6f
 
 /**
  * Q3 lock: backdrop sampling stays frozen through the morph flight and goes
@@ -134,18 +139,15 @@ fun BottomSheet(
     /**
      * Hands this sheet's drawing to the shared container morph (see [PlayerMorph]).
      *
-     * While the morph runs the sheet's own nodes travel inside the interpolated
-     * card ([morphLiveCard], draw-phase scale/translate/clip) and stop sliding;
-     * content resolves late ([unifiedContentResolve]). Only the player passes
-     * this; every other caller keeps the plain slide-up sheet.
+     * While the morph is running the sheet is recorded and NOT drawn where it sits, and
+     * it stops translating -- the container overlay draws the recording scaled into the
+     * rect that grows out of the mini player. Only the player passes this; every other
+     * caller keeps the plain slide-up sheet.
      */
     morphEnabled: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
-    // Static capture for the live-tree content resolve (graphicsLayer has no
-    // Density; the per-frame value derives draw-phase inside the modifier).
-    val contentBlurMaxPx = with(density) { 8.dp.toPx() }
 
     // Second stage of the corner treatment: once the sheet has settled at full size, its
     // corners open out to square over a short beat of their own, so the player ends up
@@ -160,16 +162,23 @@ fun BottomSheet(
         )
     }
 
-    // Live-tree morph: the sheet's own nodes travel inside the interpolated
-    // card (scale/translate/clip, draw-phase only). No recordings. Off-flight
-    // this is a passthrough. Plain fillMaxSize otherwise: both children already
-    // fill, so this adds a node and changes no layout.
+    // One wrapper around BOTH halves of the sheet (its full-bleed background and its
+    // draggable content) so the morph records the player as it actually looks. Recording
+    // only the content would hand the container overlay a player with no artwork wash
+    // behind it. Plain fillMaxSize: both children already fill, so this adds a node and
+    // changes no layout.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .morphLiveCard(
-                morphEnabled = morphEnabled,
-                expandedCornerRadius = expandedCornerRadius,
+            .then(
+                if (morphEnabled) {
+                    Modifier.recordPlayerLayer(
+                        layer = { PlayerMorph.fullLayer },
+                        drawInPlace = { !PlayerMorph.active },
+                    )
+                } else {
+                    Modifier
+                },
             ),
     ) {
     Box(
@@ -263,16 +272,6 @@ fun BottomSheet(
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    // Live-tree late resolve (ghost alpha + blur) while the card
-                    // owns the frame; passthrough otherwise. Sits outside the
-                    // slide-mode alpha below so the two multiply, never fight.
-                    .then(
-                        if (morphEnabled) {
-                            Modifier.unifiedContentResolve(morphEnabled, contentBlurMaxPx)
-                        } else {
-                            Modifier
-                        },
-                    )
                     .graphicsLayer {
                         // Starts where the mini player has finished leaving, not before
                         // it. The two used to overlap between 0.15 and 0.25, so for that

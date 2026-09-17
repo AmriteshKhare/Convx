@@ -1,14 +1,16 @@
 package com.convx.music.ui.player
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.util.lerp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The point of this transition is that the axes do NOT move together. A straight lerp
- * would pass any "does it end up in the right place" check, so these pin the asymmetry
- * itself — that is the part a refactor would silently flatten.
+ * The container itself interpolates linearly (Melox PlayerSheetGeometry) -- the
+ * spring driving progress shapes the motion, so the rect adds no second curve.
+ * Asymmetry lives in the artwork path and the tracked mini offsets below, and
+ * those are what these pin: a refactor must not silently flatten them.
  */
 class PlayerSheetMotionTest {
 
@@ -31,14 +33,35 @@ class PlayerSheetMotionTest {
     }
 
     @Test
-    fun `container grows tall before it grows wide`() {
+    fun `container interpolates linearly edge to edge`() {
         val mid = sharedContainerRect(mini, full, 0.5f)
         val heightFraction = (mid.height - mini.height) / (full.height - mini.height)
         val widthFraction = (mid.width - mini.width) / (full.width - mini.width)
-        // easeInCubic(0.5) = 0.125 against a linear 0.5.
         assertEquals(0.5f, heightFraction, 0.01f)
-        assertEquals(0.125f, widthFraction, 0.01f)
-        assertTrue("width must lag height", widthFraction < heightFraction)
+        assertEquals(0.5f, widthFraction, 0.01f)
+        assertEquals(lerp(mini.left, full.left, 0.5f), mid.left, 0.01f)
+        assertEquals(lerp(mini.top, full.top, 0.5f), mid.top, 0.01f)
+    }
+
+    @Test
+    fun `mini controls keep their right inset while the card grows`() {
+        val source = Rect(left = 16f, top = 900f, right = 400f, bottom = 964f)
+        val controls = Rect(left = 320f, top = 908f, right = 392f, bottom = 956f)
+        val animated = sharedContainerRect(source, full, 0.5f)
+        val translationX = sharedMiniPlayerControlsTranslationX(source, animated, controls)
+        val sourceInset = source.right - controls.right
+        val landedRight = controls.right + translationX
+        assertEquals(animated.right - sourceInset, landedRight, 0.01f)
+    }
+
+    @Test
+    fun `mini content pins to source offsets inside the card`() {
+        val source = Rect(left = 16f, top = 900f, right = 400f, bottom = 964f)
+        val content = Rect(left = 80f, top = 908f, right = 300f, bottom = 956f)
+        val animated = sharedContainerRect(source, full, 0.5f)
+        val offset = sharedMiniPlayerContentOffset(source, animated, content)
+        assertEquals(content.left - animated.left, offset.x, 0.01f)
+        assertEquals(content.top - source.top, offset.y, 0.01f)
     }
 
     @Test

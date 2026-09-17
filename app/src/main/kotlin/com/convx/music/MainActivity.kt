@@ -291,6 +291,8 @@ import com.convx.music.ui.component.rememberBottomSheetState
 import com.convx.music.ui.component.shimmer.ShimmerTheme
 import com.convx.music.ui.menu.YouTubeSongMenu
 import com.convx.music.ui.player.BottomSheetPlayer
+import com.convx.music.ui.player.InstallPlayerMorphLayers
+import com.convx.music.ui.player.PlayerMorph
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.rememberPagerState
 import com.convx.music.ui.screens.Screens
@@ -1155,9 +1157,10 @@ class MainActivity : ComponentActivity() {
                     expandedBound = maxHeight,
                 )
 
-                // Live-tree morph: no recordings, nothing to install -- the
-                // sheet's own nodes travel ([morphLiveCard]) and the artwork
-                // flight reads the bar/hero rects directly.
+                // Both ends of the mini-to-full morph are recorded into GraphicsLayers
+                // owned here, above both the player and the nav bar the pill docks into --
+                // remembering them any lower would release them mid-gesture.
+                InstallPlayerMorphLayers()
 
                 // See the zIndex on the player below.
                 val playerAboveBars by remember(playerBottomSheetState) {

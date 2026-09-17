@@ -4,6 +4,7 @@
  */
 package com.convx.music.ui.player
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.util.lerp
 
@@ -55,21 +56,50 @@ fun easeOutCubic(value: Float): Float {
 /**
  * The sheet container's bounds at [progress], 0 being [source] (the mini player) and 1
  * being [target] (the full player).
+ *
+ * Plain linear edge interpolation (Melox PlayerSheetGeometry): the spring driving
+ * progress already shapes the motion, so the rect itself adds no second curve.
  */
 fun sharedContainerRect(source: Rect, target: Rect, progress: Float): Rect {
     val fraction = progress.coerceIn(0f, 1f)
-    val centerX = lerp(source.center.x, target.center.x, fraction)
-    val centerY = lerp(source.center.y, target.center.y, fraction)
-    // Width lags behind height on purpose — see the class doc.
-    val width = lerp(source.width, target.width, easeInCubic(fraction))
-    val height = lerp(source.height, target.height, fraction)
     return Rect(
-        left = centerX - width / 2f,
-        top = centerY - height / 2f,
-        right = centerX + width / 2f,
-        bottom = centerY + height / 2f,
+        left = lerp(source.left, target.left, fraction),
+        top = lerp(source.top, target.top, fraction),
+        right = lerp(source.right, target.right, fraction),
+        bottom = lerp(source.bottom, target.bottom, fraction),
     )
 }
+
+/**
+ * Where the mini player's controls sit inside the animating container.
+ *
+ * The controls keep their right inset from the source pill as the card grows
+ * (Melox sharedMiniPlayerControlsTranslationX): they ride rightward with the
+ * edge instead of stretching or fading, so play/next visibly travel.
+ */
+fun sharedMiniPlayerControlsTranslationX(
+    sourcePlayerBounds: Rect,
+    animatedPlayerBounds: Rect,
+    controlsBounds: Rect,
+): Float {
+    val sourceRightInset = sourcePlayerBounds.right - controlsBounds.right
+    val targetControlsLeft = animatedPlayerBounds.right - sourceRightInset - controlsBounds.width
+    return targetControlsLeft - controlsBounds.left
+}
+
+/**
+ * Where the mini player's title block sits inside the animating container.
+ * Pins to the source's left/top offsets so it travels with the card's growth
+ * rather than crossfading in place.
+ */
+fun sharedMiniPlayerContentOffset(
+    sourcePlayerBounds: Rect,
+    animatedPlayerBounds: Rect,
+    contentBounds: Rect,
+): Offset = Offset(
+    x = contentBounds.left - animatedPlayerBounds.left,
+    y = contentBounds.top - sourcePlayerBounds.top,
+)
 
 /**
  * The artwork's bounds at [progress].

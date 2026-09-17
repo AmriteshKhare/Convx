@@ -220,6 +220,11 @@ fun FloatingMiniPlayer(
     // first frame is already correct (or within a pixel of it) instead of
     // popping from the clamp floor on every single expand.
     var measuredHeightPx by remember { mutableIntStateOf(with(density) { 64.dp.roundToPx() }) }
+    // Tracked-split morph bounds go stale when the mini switches layout branch
+    // (tab style, inline): clear so the new branch re-reports the same frame.
+    LaunchedEffect(tabStyle, isInline) {
+        clearMiniContentControlsRects()
+    }
     Box(
         contentAlignment = Alignment.CenterStart,
         modifier = Modifier
@@ -228,10 +233,19 @@ fun FloatingMiniPlayer(
             // travel reads at pill size -- same as bar pills elsewhere.
             .graphicsLayer(elasticStretchLayerBlock(glow, magnitude = if (isInline) 1f else 2f))
             .then(modifier)
-            // Source end of the shared container morph: measures the pill as the
-            // nav bar places it for the live card to grow out of. Live tree --
-            // the pill draws in place; the travelling card covers it.
+            // Source end of the mini-to-full container morph. Outside .then(modifier)
+            // so it measures the pill as the nav bar actually places it.
             .registerMiniContainerRect()
+            // Source end of the shared container morph. Recorded here and drawn by the
+            // overlay instead of in place, so the pill does not sit in the nav bar while
+            // a copy of it is expanding across the screen.
+            .recordPlayerLayer(
+                // Only records while the morph is enabled -- see PlayerMorph.enabled --
+                // so this doesn't pay for a GraphicsLayer capture every frame for a morph
+                // that's currently off.
+                layer = { if (PlayerMorph.enabled) PlayerMorph.miniLayer else null },
+                drawInPlace = { !PlayerMorph.active },
+            )
             .onSizeChanged { measuredHeightPx = it.height }
             // Finger-following glow, same as the search pill.
             .then(glow.gestureModifier)
@@ -392,7 +406,10 @@ fun FloatingMiniPlayer(
                     Column(
                         // One Plus layer for both lines rather than one each: the glyphs never
                         // overlap, so adding them together is the same pixels at half the layers.
-                        modifier = Modifier.weight(1f).additiveChrome(useGlass && isDark),
+                        modifier = Modifier
+                            .weight(1f)
+                            .registerMiniContentRect()
+                            .additiveChrome(useGlass && isDark),
                     ) {
                         Text(
                             text = mediaMetadata?.title.orEmpty(),
@@ -413,7 +430,9 @@ fun FloatingMiniPlayer(
 
                 IconButton(
                     onClick = { playerConnection.player.togglePlayPause() },
-                    modifier = Modifier.size(controlSize),
+                    modifier = Modifier
+                        .size(controlSize)
+                        .registerMiniControlsPlayRect(),
                 ) {
                     // No additiveChrome here: its saveLayer clips to the Box's measured
                     // size, and this content cross-fades between two different sizes
@@ -474,7 +493,10 @@ fun FloatingMiniPlayer(
                     Column(
                         // One Plus layer for both lines rather than one each: the glyphs never
                         // overlap, so adding them together is the same pixels at half the layers.
-                        modifier = Modifier.weight(1f).additiveChrome(useGlass && isDark),
+                        modifier = Modifier
+                            .weight(1f)
+                            .registerMiniContentRect()
+                            .additiveChrome(useGlass && isDark),
                     ) {
                         Text(
                             text = mediaMetadata?.title.orEmpty(),
@@ -518,7 +540,9 @@ fun FloatingMiniPlayer(
 
                 IconButton(
                     onClick = { playerConnection.player.togglePlayPause() },
-                    modifier = Modifier.size(controlSize),
+                    modifier = Modifier
+                        .size(controlSize)
+                        .registerMiniControlsPlayRect(),
                 ) {
                     AnimatedPlayPauseIcon(
                         isPlaying = isPlaying,
@@ -529,7 +553,9 @@ fun FloatingMiniPlayer(
                 IconButton(
                     onClick = { playerConnection.seekToNext() },
                     enabled = canSkipNext,
-                    modifier = Modifier.size(controlSize),
+                    modifier = Modifier
+                        .size(controlSize)
+                        .registerMiniControlsNextRect(),
                 ) {
                     PlayerGlyph(
                         slot = PlayerIconSlot.NEXT,

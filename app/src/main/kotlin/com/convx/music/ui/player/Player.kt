@@ -1919,12 +1919,10 @@ fun BottomSheetPlayer(
                         zFilter = { it < 0 },
                     )
                 }
-                // Flight glass veil: liquid glass over the style layers while the
-                // card travels, dissolving as the player UI resolves (reverse on
-                // close). Gated on flight boundaries only -- two recompositions
-                // per flight; the fade itself is draw-phase. Lives in the
-                // background slot so the card clip contains it and content
-                // resolves over it.
+                // Flight glass veil: transient late-flight liquid glass over the
+                // style layers -- 0 early, peaks ~0.8, hands back to the player
+                // bg at rest. Symmetric, so close plays the exact reverse. Live
+                // sampling (unfrozen) so it reads alive, not static.
                 val morphVeilOn by remember(state) {
                     derivedStateOf { PlayerMorph.enabled && state.progress > 0f && state.progress < 1f }
                 }
@@ -1940,7 +1938,9 @@ fun BottomSheetPlayer(
                             )
                             .graphicsLayer {
                                 val flightProgress = PlayerMorph.progress
-                                alpha = (1f - unifiedContentAlpha(flightProgress)).coerceIn(0f, 1f)
+                                val up = easeOutCubic(((flightProgress - 0.55f) / 0.25f).coerceIn(0f, 1f))
+                                val down = easeOutCubic(((flightProgress - 0.8f) / 0.2f).coerceIn(0f, 1f))
+                                alpha = (up * (1f - down)).coerceIn(0f, 1f)
                             }
                     )
                 }

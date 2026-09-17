@@ -734,7 +734,7 @@ fun PlayerV2(
                                     // and a quick default dissolve otherwise, in one persistent
                                     // composable instead of tearing down/rebuilding per track id.
                                     val heroCrossfadeMs by playerConnection.crossfadeDurationMs.collectAsState()
-                                    // Q6 writer: pause-shrink tracked with zero embedding
+                                    // Q6 writer: pause-shrink tracked with zero composition
                                     // cost -- snapshotFlow subscribes outside composition,
                                     // overlay subscribes in composition. Frozen in flight.
                                     androidx.compose.runtime.LaunchedEffect(Unit) {
