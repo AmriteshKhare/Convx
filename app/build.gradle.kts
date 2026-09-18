@@ -323,7 +323,10 @@ dependencies {
 
     implementation(libs.room.runtime)
     implementation(libs.kuromoji.ipadic)
-    implementation(libs.tinypinyin)
+    // Vendored: JitPack serves an empty 295-byte jar for com.github.promeG:tinypinyin:2.0.3
+    // (upstream build broke), so the real jar (compiled from v2.0.3 sources) + its
+    // aho-corasick dep live in app/libs. Do not switch back to libs.tinypinyin.
+    implementation(files("libs/tinypinyin-2.0.3.jar", "libs/ahocorasick-0.3.0.jar"))
     ksp(libs.room.compiler)
     implementation(libs.room.ktx)
 

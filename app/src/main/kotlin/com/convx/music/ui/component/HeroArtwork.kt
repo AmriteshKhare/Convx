@@ -28,6 +28,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.unit.toIntSize
 import androidx.compose.ui.graphics.lerp as lerpColor
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
@@ -89,6 +96,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.convx.music.ui.theme.colorengine.textHierarchyOn
+import com.convx.music.ui.component.backdrop.internal.recordLayer
+import androidx.compose.ui.node.requireGraphicsContext
 import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.utils.resize
 import dev.chrisbanes.haze.ExperimentalHazeApi
@@ -1195,13 +1204,16 @@ fun HeroCardHeader(
 /**
  * Apple Music (iOS 27) artist hero, fitted row by row on the seven full-frame reference
  * screenshots (rms error 1-2/255 per band): the square photo from the top of the screen,
- * extended past its foot by its own bottom row, blurred progressively ([artistFootBlurPt]) and
+ * dissolving into a live GPU-blurred foot (same 0.60→0.88 ramp the bake used) and
  * washed toward [pageColor] until the page takes over at [ArtistHeroExtent] × the width.
  *
- * Cheap at runtime: the blurred foot is baked once per artwork on a small CPU copy and cached;
- * the wash is a plain gradient, so an animating page colour never re-bakes anything, and
- * scrolling only moves layers.
+ * Cheap at runtime: the foot is the hero subtree redrawn once more inside two
+ * foot-sized offscreens (blur + ramp mask) — no CPU bake, no bitmap cache. It appears
+ * with the content, follows the Apple-art swap, costs nothing static (the GPU keeps
+ * the last frame until something invalidates: scroll, video frames), and runs live
+ * for video since the blur rides the composited subtree including the TextureView.
  */
+@OptIn(ExperimentalHazeApi::class)
 @Composable
 fun ArtistHeroImage(
     artworkUrl: String?,
@@ -1232,37 +1244,31 @@ fun ArtistHeroImage(
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val context = LocalContext.current
-    // No Haze here by design: Haze samples the Compose layer, which excludes AndroidView
-    // video (TextureView) — the old live band drew a frozen still-blur over moving video
-    // (the hard line). The baked foot below is the blend for stills and video alike.
-    val foot by produceState(artworkUrl?.let { artistFootCache.get(it) }, artworkUrl) {
-        if (artworkUrl.isNullOrBlank() || value != null) return@produceState
-        value = withContext(Dispatchers.Default) {
-            runCatching { bakeArtistFoot(context, artworkUrl) }.getOrNull()
-                ?.also { artistFootCache.put(artworkUrl, it) }
-        }
-    }
-    // No drift: scaling this layer shifts its fade boundary against the live video
-    // below, which stays static size -- the mismatch reads as a seam that visibly
-    // grows and shrinks as the scale oscillates. Kept static so the hand-off point
-    // never moves.
-    val footDrift = 1f
     androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val side = maxWidth
-        Box(
-            Modifier
-                .width(side)
-                .height(side * ArtistHeroExtent)
-                .graphicsLayer {
-                    scaleX = heroScale
-                    scaleY = heroScale
-                },
-        ) {
             Box(
                 Modifier
-                    .fillMaxWidth()
-                    .height(side),
+                    .width(side)
+                    .height(side * ArtistHeroExtent)
+                    .graphicsLayer {
+                        scaleX = heroScale
+                        scaleY = heroScale
+                    }
+                    // Live foot (see FootBlurNode): sharp subtree + blurred replay
+                    // with the bottom strip stretched below the square — the live
+                    // version of the bake's bottom-row repeat — ramp-masked after
+                    // the blur so the edge lands crisp. GPU-side, no bake/cache.
+                    .heroFootBlur(
+                        enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !loading,
+                        live = liveOverlay,
+                        contentKey = artworkUrl,
+                    ),
             ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(side),
+                ) {
                 if (loading) {
                     Box(
                         Modifier
@@ -1333,24 +1339,6 @@ fun ArtistHeroImage(
                             },
                     )
                 }
-            }
-            foot?.takeUnless { loading }?.let { baked ->
-                // Takes over where the fitted blur is still ~0, so the hand-off from the
-                // sharp photo (or the playing video above it) is invisible. Same fade for
-                // stills and video: one seam, no swap step.
-                Image(
-                    bitmap = baked,
-                    contentDescription = null,
-                    contentScale = ContentScale.FillBounds,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .graphicsLayer {
-                            scaleX = footDrift
-                            scaleY = footDrift
-                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
-                        }
-                        .heroBandMask(ArtistFootFadeInStart / ArtistHeroExtent, ArtistFootFadeInEnd / ArtistHeroExtent),
-                )
             }
             Box(
                 Modifier
@@ -1618,3 +1606,118 @@ private fun Modifier.heroBandMask(start: Float, end: Float): Modifier =
             drawContent()
             drawRect(brush = smoothRamp(start, end), blendMode = BlendMode.DstIn)
         }
+
+/**
+ * Live foot replay for the artist hero square: sharp subtree plus one blurred,
+ * ramp-masked replay of the same pixels. The replay re-records only when the
+ * content key/size changes (photos: once) or every frame while [live] (video),
+ * so static art costs one extra layer draw and motion stays live. Same
+ * 0.60→0.88 ramp the bake used; constant 14dp radius ≈ its in-square peak.
+ */
+private fun Modifier.heroFootBlur(enabled: Boolean, live: Boolean, contentKey: Any?): Modifier =
+    this then FootBlurElement(enabled, live, contentKey)
+
+private data class FootBlurElement(
+    val enabled: Boolean,
+    val live: Boolean,
+    val contentKey: Any?,
+) : androidx.compose.ui.node.ModifierNodeElement<FootBlurNode>() {
+    override fun create(): FootBlurNode = FootBlurNode(enabled, live, contentKey)
+    override fun update(node: FootBlurNode) {
+        node.enabled = enabled
+        node.live = live
+        node.contentKey = contentKey
+    }
+}
+
+private class FootBlurNode(
+    var enabled: Boolean,
+    var live: Boolean,
+    var contentKey: Any?,
+) : Modifier.Node(), androidx.compose.ui.node.DrawModifierNode {
+    private var sharp: androidx.compose.ui.graphics.layer.GraphicsLayer? = null
+    private var blurred: androidx.compose.ui.graphics.layer.GraphicsLayer? = null
+    private var effect: androidx.compose.ui.graphics.RenderEffect? = null
+    private var lastSize: androidx.compose.ui.unit.IntSize = androidx.compose.ui.unit.IntSize.Zero
+    private var lastKey: Any? = Unit
+
+    override fun onAttach() {
+        val context = requireGraphicsContext()
+        sharp = context.createGraphicsLayer()
+        blurred = context.createGraphicsLayer()
+    }
+
+    override fun onDetach() {
+        val context = requireGraphicsContext()
+        sharp?.let { context.releaseGraphicsLayer(it) }
+        blurred?.let { context.releaseGraphicsLayer(it) }
+        sharp = null
+        blurred = null
+        effect = null
+        lastSize = androidx.compose.ui.unit.IntSize.Zero
+        lastKey = Unit
+    }
+
+    override fun ContentDrawScope.draw() {
+        drawContent()
+        val sharp = sharp ?: return
+        val blurred = blurred ?: return
+        if (!enabled) return
+        val size = size.toIntSize()
+        if (live || size != lastSize || contentKey != lastKey) {
+            if (effect == null) {
+                val px = 14.dp.toPx()
+                effect = androidx.compose.ui.graphics.BlurEffect(
+                    px, px, androidx.compose.ui.graphics.TileMode.Clamp,
+                ).also { blurred.renderEffect = it }
+            }
+            // Sharp pixels first; the blur replays them masked, so the ramp edge
+            // is crisp exactly where the bake put it — no upward bleed.
+            recordLayer(this@FootBlurNode, sharp, size) {
+                paintSharp(this@draw)
+            }
+            recordLayer(this@FootBlurNode, blurred, size) {
+                // Transparent start every record: re-records (video frames) must
+                // never accumulate veil/mask over previous generations.
+                drawRect(color = Color.Transparent, blendMode = BlendMode.Clear)
+                drawLayer(sharp)
+                // Below-square extension: the bottom strip re-drawn stretched to
+                // the tall box bottom — the live bottom-row repeat. Heavy blur
+                // turns either into the same mush the bake made, then the wash
+                // dissolves it into the page. Clip first in raw coords; the
+                // translate+scale below must not move the clip itself.
+                val sqH = size.height / ArtistHeroExtent
+                val stripTop = sqH * 0.75f
+                val sy = (size.height - sqH) / (sqH - stripTop)
+                withTransform({
+                    clipRect(
+                        left = 0f, top = sqH,
+                        right = size.width.toFloat(), bottom = size.height.toFloat(),
+                    )
+                    translate(top = sqH - stripTop * sy)
+                    scale(
+                        scaleX = 1f, scaleY = sy,
+                        pivot = androidx.compose.ui.geometry.Offset(0f, stripTop),
+                    )
+                }) {
+                    drawLayer(sharp)
+                }
+                // Frost veil, ramped with the blur so it never reads as a flat sheet.
+                drawRect(color = Color.White.copy(alpha = 0.06f))
+                // Hero fractions, like the old mask: dissolve into the bg below.
+                drawRect(
+                    brush = smoothRamp(ArtistFootFadeInStart / ArtistHeroExtent, 1.00f),
+                    topLeft = androidx.compose.ui.geometry.Offset.Zero,
+                    blendMode = BlendMode.DstIn,
+                )
+            }
+            lastSize = size
+            lastKey = contentKey
+        }
+        drawLayer(blurred)
+    }
+
+    private val paintSharp: ContentDrawScope.() -> Unit = {
+        drawContent()
+    }
+}
