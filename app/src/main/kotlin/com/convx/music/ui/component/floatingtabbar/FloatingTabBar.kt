@@ -125,7 +125,12 @@ import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.component.backdrop.Backdrop
 import com.convx.music.ui.component.backdrop.catalog.utils.DampedDragAnimation
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
+import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
+import com.convx.music.ui.component.backdrop.backdrops.rememberCombinedBackdrop
+import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.component.backdrop.drawBackdrop
+import com.convx.music.ui.component.backdrop.highlight.Highlight
+import com.convx.music.ui.component.backdrop.shadow.InnerShadow
 import com.convx.music.ui.component.backdrop.effects.blur
 import com.convx.music.ui.component.backdrop.effects.lens
 import com.convx.music.ui.component.backdrop.effects.vibrancy
@@ -1397,6 +1402,14 @@ private fun SharedTransitionScope.ExpandedTabs(
             }
         )
     }
+    // Press-only glass: see the hidden row below. rememberLayerBackdrop is just a
+    // holder; nothing records into it until that row is composed.
+    val tabsBackdrop = rememberLayerBackdrop()
+    val combinedBackdrop = if (backdrop != null) rememberCombinedBackdrop(backdrop, tabsBackdrop) else null
+    val pressed by remember(dampedDragAnimation) {
+        derivedStateOf { dampedDragAnimation.pressProgress > 0f }
+    }
+
     Box(modifier.width(with(density) { totalWidthPx.toDp() })) {
         Row(
             Modifier
@@ -1474,6 +1487,61 @@ private fun SharedTransitionScope.ExpandedTabs(
             }
         }
 
+        // Press-only glass (Melox's liquid pill). While the puck is held or settling,
+        // an invisible accent-tinted copy of the tabs is recorded and the puck lenses
+        // it together with the page behind the bar. At rest none of this is composed,
+        // so an idle or scrolling screen pays nothing for it -- that per-frame cost is
+        // why the always-on version was removed in 03df0494.
+        if (backdrop != null && pressed) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clearAndSetSemantics {}
+                    .alpha(0f)
+                    .layerBackdrop(tabsBackdrop)
+                    .graphicsLayer { translationX = panelOffset }
+                    // Before drawBackdrop so it insets this row's own bounds, exactly
+                    // once, matching the visible row -- or the sampled icons drift.
+                    .padding(sizes.tabBarContentPadding)
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { shapes.tabBarShape },
+                        effects = {
+                            vibrancy()
+                            blur(4f.dp.toPx())
+                            lens(24f.dp.toPx(), 24f.dp.toPx())
+                        },
+                        highlight = null,
+                        shadow = null,
+                        onDrawSurface = { drawRect(colors.backgroundColor) },
+                    )
+                    .then(interactiveHighlight.modifier)
+                    // After drawBackdrop: tints only the icons, not the glass sample.
+                    .graphicsLayer(colorFilter = ColorFilter.tint(accentColor)),
+                horizontalArrangement = Arrangement.spacedBy(sizes.tabSpacing)
+            ) {
+                allTabs.forEachIndexed { index, tab ->
+                    Tab(
+                        icon = tab.icon,
+                        title = tab.title,
+                        isInline = false,
+                        isStandalone = false,
+                        // Must zoom in sync with the visible row or the copy ghosts.
+                        contentScale = if (index == currentIndex) {
+                            lerp(1f, 1.12f, dampedDragAnimation.pressProgress)
+                        } else {
+                            1f
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .skipToLookaheadSize()
+                            .padding(sizes.tabExpandedContentPadding)
+                    )
+                }
+            }
+        }
+
         // The draggable selection puck. Position and press/velocity-driven
         // scale come from dampedDragAnimation; tapping a tab still works via
         // each tab's own clickable — the puck only intercepts drags.
@@ -1495,15 +1563,56 @@ private fun SharedTransitionScope.ExpandedTabs(
                 .width(sizes.tabWidth)
                 .fillMaxHeight()
                 .then(
-                    // Melox/BitChord-style puck: a flat tinted fill, no lens/backdrop
-                    // sampling of its own — the "liquid" read comes entirely from the
-                    // stretch/squash deformation below, riding on the bar's own glass
-                    // surface underneath it. This used to be a full drawBackdrop chain
-                    // (lens + highlight + inner shadow, sampling a dedicated invisible
-                    // tint-recording pass) costing 2 extra offscreen passes every scroll
-                    // frame for a live-refraction effect; that pass and its backing
-                    // tabsBackdrop/combinedBackdrop are gone along with it.
-                    Modifier
+                    if (combinedBackdrop != null && pressed) {
+                        // Melox's pressed pill: lens + dispersion over the page and the
+                        // tinted tab copy, specular rim and inner shadow, all scaled by
+                        // press progress so it grows out of the flat rest state below.
+                        Modifier.drawBackdrop(
+                            backdrop = combinedBackdrop,
+                            shape = { shapes.tabShape },
+                            effects = {
+                                val progress = dampedDragAnimation.pressProgress
+                                lens(
+                                    refractionHeight = 10f.dp.toPx() * progress,
+                                    refractionAmount = 14f.dp.toPx() * progress,
+                                    depthEffect = true,
+                                    chromaticAberration = true,
+                                    chromaticAberrationAmount = 0.5f,
+                                )
+                            },
+                            highlight = {
+                                Highlight(width = 1.dp, alpha = dampedDragAnimation.pressProgress)
+                            },
+                            shadow = null,
+                            innerShadow = {
+                                val progress = dampedDragAnimation.pressProgress
+                                if (progress > 0f) {
+                                    InnerShadow(
+                                        radius = 8f.dp * progress,
+                                        color = Color.Black.copy(alpha = 0.15f),
+                                        alpha = progress,
+                                    )
+                                } else {
+                                    null
+                                }
+                            },
+                            layerBlock = {
+                                scaleX = dampedDragAnimation.scaleX
+                                scaleY = dampedDragAnimation.scaleY
+                                val velocity = dampedDragAnimation.velocity / 10f
+                                scaleX /= 1f - (velocity * 0.75f).coerceIn(-0.2f, 0.2f)
+                                scaleY *= 1f - (velocity * 0.25f).coerceIn(-0.2f, 0.2f)
+                            },
+                            onDrawSurface = {
+                                val progress = dampedDragAnimation.pressProgress
+                                drawRect(
+                                    if (themeDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f),
+                                    alpha = 1f - progress,
+                                )
+                                drawRect(Color.Black.copy(alpha = 0.03f * progress))
+                            },
+                        )
+                    } else Modifier
                         .graphicsLayer {
                             scaleX = dampedDragAnimation.scaleX
                             scaleY = dampedDragAnimation.scaleY
