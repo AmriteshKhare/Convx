@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -103,8 +104,8 @@ fun LargeScreenTitle(
  * Home/History/Stats.
  */
 @Composable
-fun rememberTitleCollapseProgress(state: LazyListState, titleItemKey: Any? = null): Float {
-    val progress by remember(state, titleItemKey) {
+fun rememberTitleCollapseProgressState(state: LazyListState, titleItemKey: Any? = null): State<Float> =
+    remember(state, titleItemKey) {
         derivedStateOf {
             val visible = state.layoutInfo.visibleItemsInfo
             val titleItem = if (titleItemKey != null) {
@@ -120,8 +121,10 @@ fun rememberTitleCollapseProgress(state: LazyListState, titleItemKey: Any? = nul
             }
         }
     }
-    return progress
-}
+
+@Composable
+fun rememberTitleCollapseProgress(state: LazyListState, titleItemKey: Any? = null): Float =
+    rememberTitleCollapseProgressState(state, titleItemKey).value
 
 @Composable
 fun rememberTitleCollapseProgress(state: LazyGridState, thresholdPx: Float = 220f): Float {

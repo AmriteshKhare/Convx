@@ -181,6 +181,7 @@ import com.convx.music.ui.component.MenuState
 import com.convx.music.ui.component.NavigationTitle
 import com.convx.music.ui.component.rememberAppBackgroundColor
 import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 import com.convx.music.ui.component.shimmer.GridItemPlaceHolder
 import com.convx.music.ui.component.shimmer.ShimmerHost
 import com.convx.music.ui.component.shimmer.TextPlaceholder
@@ -326,8 +327,11 @@ fun HomeScreen(
     // LocalHomeTopBarLogoProgress for why the hand-off is a shared float
     // rather than something threaded through the Scaffold.
     val homeTopBarLogoProgress = LocalHomeTopBarLogoProgress.current
-    val logoCollapseProgress = rememberTitleCollapseProgress(lazylistState)
-    homeTopBarLogoProgress.floatValue = logoCollapseProgress
+    val logoCollapseProgress = rememberTitleCollapseProgressState(lazylistState)
+    LaunchedEffect(logoCollapseProgress, homeTopBarLogoProgress) {
+        snapshotFlow { logoCollapseProgress.value }
+            .collect { homeTopBarLogoProgress.floatValue = it }
+    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val scrollToTop =
         backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
@@ -763,7 +767,7 @@ fun HomeScreen(
                                 top = AppleTokens.ItemGap,
                                 bottom = AppleTokens.TextGap,
                             )
-                            .graphicsLayer { alpha = 1f - logoCollapseProgress }
+                            .graphicsLayer { alpha = 1f - logoCollapseProgress.value }
                             .animateItem(),
                     )
                 }

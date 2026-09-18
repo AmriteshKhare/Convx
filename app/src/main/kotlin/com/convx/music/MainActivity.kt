@@ -1711,7 +1711,7 @@ class MainActivity : ComponentActivity() {
                                                     // Home's own big logo (first item of its list)
                                                     // fades OUT with the same progress this fades
                                                     // IN with — see LocalHomeTopBarLogoProgress.
-                                                    val logoProgress = LocalHomeTopBarLogoProgress.current.floatValue
+                                                    val logoProgress = LocalHomeTopBarLogoProgress.current
                                                     Text(
                                                         text = BrandName,
                                                         style = AppTheme.typography.titleLarge.copy(
@@ -1721,7 +1721,7 @@ class MainActivity : ComponentActivity() {
                                                             letterSpacing = 1.5.sp,
                                                         ),
                                                         color = topBarTitleColor,
-                                                        modifier = Modifier.graphicsLayer { alpha = logoProgress },
+                                                        modifier = Modifier.graphicsLayer { alpha = logoProgress.floatValue },
                                                     )
                                                 } else {
                                                     Text(
