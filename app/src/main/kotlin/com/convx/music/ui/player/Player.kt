@@ -1234,6 +1234,11 @@ fun BottomSheetPlayer(
         modifier = modifier,
         // iOS 27 container morph: the player grows out of the mini player as one card.
         morphEnabled = PlayerMorph.enabled,
+        // Resident content: opening from pause used to cold-compose the whole player
+        // on its first frame (thumbnail recalc pop, controls fading in after the
+        // morph). Once opened it stays composed, measured-but-unplaced while
+        // collapsed: animation-time state is already there when the morph starts.
+        keepContentComposed = true,
         // The DIY editor mounts this same BottomSheetPlayer as a forced-open preview
         // (editorPlayerState) sitting behind its own sticker-editing overlay. Without
         // this, a drag that isn't fully consumed by the overlay (e.g. panning empty

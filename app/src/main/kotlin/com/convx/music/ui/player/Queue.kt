@@ -197,6 +197,12 @@ fun Queue(
      *  there drops the sheet's own drag handling entirely; the queue toggle icon
      *  and back gesture are still how it closes. */
     sheetDraggable: Boolean = true,
+    /** False when the host drives back itself (V17's queue pane switches panes on
+     *  back; the inner sheet collapsing first made the switch lag behind it). */
+    handleBack: Boolean = true,
+    /** False when the host already applies the status-bar inset (V17's frame does);
+     *  true keeps the standalone sheet's own inset. */
+    applyTopSystemInset: Boolean = true,
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -370,6 +376,7 @@ fun Queue(
         state = state,
         modifier = modifier,
         isExpandable = sheetDraggable,
+        handleBack = handleBack,
         background = {
             Box(Modifier.fillMaxSize().background(Color.Unspecified))
         },
@@ -875,7 +882,10 @@ fun Queue(
                     ) { }
                     .windowInsetsPadding(
                         WindowInsets.systemBars
-                            .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                            .only(
+                                if (applyTopSystemInset) WindowInsetsSides.Top + WindowInsetsSides.Horizontal
+                                else WindowInsetsSides.Horizontal
+                            ),
                     ),
             ) {
                 if (showHeaderRow) {

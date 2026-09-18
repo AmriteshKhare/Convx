@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -144,9 +146,21 @@ fun BottomSheet(
      * caller keeps the plain slide-up sheet.
      */
     morphEnabled: Boolean = false,
+    /** False when the host drives back itself (V2's queue pane uses a predictive-back
+     *  transition; this sheet collapsing first made the pane switch lag behind it). */
+    handleBack: Boolean = true,
+    /**
+     * Keep [content] composed while collapsed once it has been opened (Melox's resident
+     * full-player host). Otherwise every open composes the whole player on its first
+     * frame and the morph runs over a page that is still being built. While collapsed the
+     * content is measured but not placed: nothing draws, nothing takes input, no semantics.
+     */
+    keepContentComposed: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val density = LocalDensity.current
+    var hasBeenShown by remember { mutableStateOf(false) }
+    if (!state.isCollapsed) hasBeenShown = true
 
     // Second stage of the corner treatment: once the sheet has settled at full size, its
     // corners open out to square over a short beat of their own, so the player ends up
@@ -258,15 +272,28 @@ fun BottomSheet(
                 clip = true
             }
     ) {
-        if (!state.isCollapsed && !state.isDismissed) {
+        if (handleBack && !state.isCollapsed && !state.isDismissed) {
             BackHandler(onBack = state::collapseSoft)
         }
 
         // main content
-        if (!state.isCollapsed) {
+        if (!state.isCollapsed || (keepContentComposed && hasBeenShown)) {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(
+                        if (state.isCollapsed) {
+                            Modifier
+                                .clearAndSetSemantics {}
+                                .layout { measurable, constraints ->
+                                    val placeable = measurable.measure(constraints)
+                                    // Not placed: skips draw and hit-testing entirely.
+                                    layout(placeable.width, placeable.height) {}
+                                }
+                        } else {
+                            Modifier
+                        },
+                    )
                     .then(
                         if (morphEnabled) {
                             Modifier.recordPlayerLayer(

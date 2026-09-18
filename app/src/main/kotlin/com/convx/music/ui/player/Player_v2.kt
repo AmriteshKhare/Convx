@@ -1146,9 +1146,13 @@ fun PlayerV2(
                                                 .padding(end = 20.dp, bottom = 12.dp),
                                         )
                                     } else {
+                                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                                         val queueSheetState = rememberBottomSheetState(
                                             dismissedBound = 0.dp,
-                                            expandedBound = LocalConfiguration.current.screenHeightDp.dp,
+                                            // Pane-tall, not screen-tall: the old screenHeight
+                                            // bound overshot this pane on mount (a full-height
+                                            // frame, then a clip = expand-then-shrink into top).
+                                            expandedBound = maxHeight,
                                             initialAnchor = expandedAnchor,
                                         )
                                         // Queue's own inner sheet drags independently of playerState,
@@ -1172,12 +1176,9 @@ fun PlayerV2(
                                         // the sheet on mount, and only let a dismissal mean "leave
                                         // the queue" once it has genuinely been open.
                                         var queueOpened by remember { mutableStateOf(false) }
-                                        // Snap, not spring: this sheet has no gesture handling
-                                        // (sheetDraggable=false below) so nothing can settle an
-                                        // interrupted expand -- a spring parked mid-flight by a
-                                        // touch stayed there. The constructor already animates
-                                        // 0 -> expanded on mount; the snap just guarantees the
-                                        // end state.
+                                        // Snap, not spring: it guarantees the end state even if
+                                        // a touch parks the mount animation mid-flight. The
+                                        // constructor already animates 0 -> expanded on mount.
                                         LaunchedEffect(Unit) {
                                             queueSheetState.snapTo(queueSheetState.expandedBound)
                                         }
@@ -1214,11 +1215,20 @@ fun PlayerV2(
                                                 // the thumbnail/title/like — the shared header row
                                                 // would just repeat them.
                                                 showHeaderRow = false,
-                                                // Drag-to-dismiss on this sheet was getting stuck —
-                                                // the queue toggle icon and back gesture still close it.
-                                                sheetDraggable = false,
-                                                modifier = Modifier.fillMaxSize().padding(top = 16.dp)
+                                                // Pane-tall bounds above fixed the stuck mid-gesture
+                                                // settle, so the sheet drags again; dismissal still
+                                                // means "leave the queue" via queueOpened below.
+                                                sheetDraggable = true,
+                                                // V2 owns back here (pane switch above): the inner
+                                                // sheet collapsing first made that switch lag 1-2s
+                                                // behind. One target, one transition.
+                                                handleBack = false,
+                                                // V17's frame already insets the status bar; the
+                                                // sheet's own inset counted it twice (top gap).
+                                                applyTopSystemInset = false,
+                                                modifier = Modifier.fillMaxSize(),
                                             )
+                                        }
                                         }
                                     }
                                 }
