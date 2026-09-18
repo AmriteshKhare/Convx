@@ -33,7 +33,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Bounded session cache of baked blurred backdrops, keyed by
- * "source|decodeSize|radiusPx". One entry per track per background style; a
+ * "source|decodeSize|radiusPx|finishKey". One entry per track per background style; a
  * 128-entry ceiling covers hours of listening.
  */
 private val blurredBackdropCache = android.util.LruCache<String, Bitmap>(128)
@@ -69,6 +69,13 @@ fun BlurredBackdropImage(
      * against nothing.
      */
     onReady: (() -> Unit)? = null,
+    /**
+     * Static finish pass applied once on the CPU inside the existing bake
+     * (flip, colour matrix, vertical alpha ramp) — the CPU equivalent of an
+     * Offscreen layer + DstIn gradient. Null = plain blur as before.
+     */
+    finish: ((Bitmap) -> Bitmap)? = null,
+    finishKey: String = "",
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -83,7 +90,7 @@ fun BlurredBackdropImage(
     // so nothing changes for the callers that pass one.
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenRadiusPx = with(density) { screenBlurRadiusDp.dp.toPx() }
-    val cacheKey = "$model|$decodeSize|$screenBlurRadiusDp"
+    val cacheKey = "$model|$decodeSize|$screenBlurRadiusDp|$finishKey"
     var baked by remember(cacheKey) { mutableStateOf(blurredBackdropCache.get(cacheKey)) }
 
     LaunchedEffect(cacheKey) {
@@ -103,6 +110,7 @@ fun BlurredBackdropImage(
         // belongs on Default; only the state write below has to come back.
         val blurred = withContext(Dispatchers.Default) {
             bmp.copy(Bitmap.Config.ARGB_8888, true).stackBlur(sourceRadius)
+                .let { finish?.invoke(it) ?: it }
         }
         blurredBackdropCache.put(cacheKey, blurred)
         baked = blurred
@@ -125,4 +133,54 @@ fun BlurredBackdropImage(
             modifier = modifier,
         )
     }
+}
+
+/** Centre-crop dimensions of a w×h source to [aspect] (w/h), pure for tests. */
+internal fun cropSize(w: Int, h: Int, aspect: Float): Pair<Int, Int> =
+    if (w.toFloat() / h > aspect) (h * aspect).roundToInt() to h
+    else w to (w / aspect).roundToInt()
+
+/**
+ * Centre-crops [src] to [aspect] (w/h), optionally flips it vertically, applies [matrix],
+ * then multiplies alpha by a vertical ramp ([rampAlphas] at [rampStops], 0..1 of height),
+ * i.e. the CPU equivalent of an Offscreen layer + DstIn gradient.
+ */
+internal fun bakeRamp(
+    src: Bitmap,
+    aspect: Float,
+    flip: Boolean,
+    matrix: android.graphics.ColorMatrix?,
+    rampStops: FloatArray,
+    rampAlphas: FloatArray,
+): Bitmap {
+    val (cw, ch) = cropSize(src.width, src.height, aspect)
+    val out = Bitmap.createBitmap(cw.coerceAtLeast(1), ch.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(out)
+    val sx = (src.width - cw) / 2
+    val sy = (src.height - ch) / 2
+    canvas.save()
+    if (flip) canvas.scale(1f, -1f, cw / 2f, ch / 2f)
+    canvas.drawBitmap(
+        src,
+        android.graphics.Rect(sx, sy, sx + cw, sy + ch),
+        android.graphics.Rect(0, 0, cw, ch),
+        android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG).apply {
+            matrix?.let { colorFilter = android.graphics.ColorMatrixColorFilter(it) }
+        },
+    )
+    canvas.restore()
+    val colors = IntArray(rampAlphas.size) {
+        android.graphics.Color.argb((rampAlphas[it] * 255).roundToInt(), 255, 255, 255)
+    }
+    canvas.drawRect(
+        0f, 0f, cw.toFloat(), ch.toFloat(),
+        android.graphics.Paint().apply {
+            shader = android.graphics.LinearGradient(
+                0f, 0f, 0f, ch.toFloat(), colors, rampStops,
+                android.graphics.Shader.TileMode.CLAMP,
+            )
+            xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_IN)
+        },
+    )
+    return out
 }

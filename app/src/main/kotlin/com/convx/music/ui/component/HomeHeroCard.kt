@@ -27,10 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -150,43 +147,33 @@ fun HomeHeroCard(
             )
 
             // Frosted band over the lower portion: the cover again, blurred, revealed by
-            // an alpha ramp so it fades in rather than starting at a hard edge. Offscreen
-            // compositing is required, not cosmetic — the ramp is applied with DstIn,
-            // which needs its own layer to blend against or it would punch through the
-            // sharp artwork underneath as well.
-            //
-            // Inside this BoxWithConstraints so it can share `request` directly. Hoisting
-            // the request out through a state write would be a write during composition,
-            // which is how you get a recomposition loop.
+            // an alpha ramp so it fades in rather than starting at a hard edge. Ramp,
+            // saturation and darken are static once the art loads, so they bake once on
+            // the CPU inside BlurredBackdropImage: one plain Image, no Offscreen layer.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                        .drawWithContent {
-                            drawContent()
-                            drawRect(
-                                brush = Brush.verticalGradient(
-                                    0.3f to Color.Transparent,
-                                    0.55f to Color.White.copy(alpha = 0.65f),
-                                    0.75f to Color.White,
-                                ),
-                                blendMode = BlendMode.DstIn,
-                            )
-                        },
-                ) {
-                    // Baked once per artwork rather than blurred live: a non-null
-                    // RenderEffect is re-evaluated on every composite, so this band --
-                    // static once the cover loads -- was a full-card blur pass on every
-                    // frame Home drew. The radius is projected for the full screen width
-                    // inside the helper, so scale it for the card's narrower width.
-                    BlurredBackdropImage(
-                        model = thumbnailUrl,
-                        screenBlurRadiusDp = frostBlurDp,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                // Baked once per artwork rather than blurred live: a non-null
+                // RenderEffect is re-evaluated on every composite, so this band --
+                // static once the cover loads -- was a full-card blur pass on every
+                // frame Home drew. The radius is projected for the full screen width
+                // inside the helper, so scale it for the card's narrower width.
+                val frostAspect = maxWidth / maxHeight
+                BlurredBackdropImage(
+                    model = thumbnailUrl,
+                    screenBlurRadiusDp = frostBlurDp,
+                    contentScale = ContentScale.FillBounds,
+                    finish = {
+                        bakeRamp(
+                            it,
+                            frostAspect,
+                            flip = false,
+                            matrix = null,
+                            rampStops = floatArrayOf(0f, 0.3f, 0.55f, 0.75f, 1f),
+                            rampAlphas = floatArrayOf(0f, 0f, 0.65f, 1f, 1f),
+                        )
+                    },
+                    finishKey = "hero-frost-${"%.3f".format(frostAspect)}",
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
 

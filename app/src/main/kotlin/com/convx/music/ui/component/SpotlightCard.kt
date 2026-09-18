@@ -24,14 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -192,65 +185,52 @@ private fun ChartCollageArt(urls: List<String>, modifier: Modifier = Modifier) {
 }
 
 /**
- * The mirrored lower portion. Offscreen compositing is required rather than cosmetic:
- * the alpha ramp is applied with BlendMode.DstIn, which needs a layer of its own to
- * blend against or it would punch through the clear artwork underneath it too.
+ * The mirrored lower portion, baked once per artwork on the CPU
+ * (see BlurredBackdropImage's finish pass): no layer, no per-frame cost.
  */
 @Composable
 private fun BoxScope.SpotlightReflection(
     thumbnailUrl: String?,
     artworkSize: Dp,
 ) {
-    val saturate = remember {
-        ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(ReflectionSaturation) })
-    }
     // BlurredBackdropImage projects its radius assuming the result is stretched to the
     // full screen width; this one is stretched to the card's width instead, so scale the
     // radius up by however much narrower that is or the reflection comes out sharp.
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val projectedBlur = ReflectionBlurRadius.value * (screenWidthDp / artworkSize.value)
-    Box(
+    // The ramp, flip, saturation and darken are static once the art loads, so they
+    // are baked once on the CPU inside BlurredBackdropImage instead of an Offscreen
+    // layer + DstIn gradient per frame. Box height = artworkSize = H; the old
+    // gradient spanned [H/3, 2H/3].
+    // The old black overlay at alpha d over the image is exactly rgb * (1-d).
+    val reflectionMatrix = remember {
+        android.graphics.ColorMatrix().apply {
+            setSaturation(ReflectionSaturation)
+            postConcat(
+                android.graphics.ColorMatrix().apply {
+                    setScale(1f - ReflectionDarken, 1f - ReflectionDarken, 1f - ReflectionDarken, 1f)
+                },
+            )
+        }
+    }
+    BlurredBackdropImage(
+        model = thumbnailUrl,
+        screenBlurRadiusDp = projectedBlur,
+        contentScale = ContentScale.FillBounds,
+        finish = {
+            bakeRamp(
+                it,
+                1f,
+                flip = true,
+                matrix = reflectionMatrix,
+                rampStops = floatArrayOf(0f, 1f / 3f, 1f / 3f + 0.3f / 3f, 1f / 3f + 0.75f / 3f, 2f / 3f, 1f),
+                rampAlphas = floatArrayOf(0f, 0f, 0.3f, 0.8f, 1f, 1f),
+            )
+        },
+        finishKey = "spot-refl",
         modifier = Modifier
             .align(Alignment.BottomStart)
             .fillMaxWidth()
-            .height(artworkSize)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .drawWithContent {
-                drawContent()
-                // Ramp expressed in artwork heights so it tracks the card at any size:
-                // nothing until two thirds down the artwork, fully opaque by its edge.
-                val artworkPx = artworkSize.toPx()
-                val rampEnd = size.height - artworkPx / 3f
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.3f to Color.White.copy(alpha = 0.3f),
-                        0.75f to Color.White.copy(alpha = 0.8f),
-                        1f to Color.White,
-                        startY = (rampEnd - artworkPx / 3f).coerceAtLeast(0f),
-                        endY = rampEnd,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            },
-    ) {
-        // Baked once per artwork, not a live RenderEffect: a non-null RenderEffect is
-        // re-evaluated on every composite, so the reflection -- whose pixels are fixed the
-        // moment the thumbnail loads -- was costing a blur pass per visible card per frame
-        // for the whole life of the Home row. Same helper HeroArtwork's backdrop uses.
-        BlurredBackdropImage(
-            model = thumbnailUrl,
-            screenBlurRadiusDp = projectedBlur,
-            contentScale = ContentScale.Crop,
-            colorFilter = saturate,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { scaleY = -1f },
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = ReflectionDarken)),
-        )
-    }
+            .height(artworkSize),
+    )
 }
