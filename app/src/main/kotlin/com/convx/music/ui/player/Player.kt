@@ -623,7 +623,12 @@ fun BottomSheetPlayer(
             addAction("android.media.AUDIO_BECOMING_NOISY")
         }
         
-        context.registerReceiver(receiver, filter)
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            ContextCompat.RECEIVER_EXPORTED,
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && callback != null) {
             audioManager.registerAudioDeviceCallback(callback, Handler(Looper.getMainLooper()))
         }
@@ -1749,7 +1754,9 @@ fun BottomSheetPlayer(
                                         m.setToSaturation(1.8f) // Reduced to avoid neon look
                                         m
                                     }
-                                    val colorFilter = ColorFilter.colorMatrix(matrix)
+                                    val colorFilter = remember(matrix) {
+                                        ColorFilter.colorMatrix(matrix)
+                                    }
 
                                     // All 3 layers bake the blur into the 48px decode
                                     // (see BLUR branch note) — the RenderEffect versions

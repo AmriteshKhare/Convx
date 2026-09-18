@@ -263,7 +263,12 @@ fun Queue(
             addAction("android.media.AUDIO_BECOMING_NOISY")
         }
         
-        context.registerReceiver(receiver, filter)
+        androidx.core.content.ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            androidx.core.content.ContextCompat.RECEIVER_EXPORTED,
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && callback != null) {
             audioManager.registerAudioDeviceCallback(callback, Handler(Looper.getMainLooper()))
         }

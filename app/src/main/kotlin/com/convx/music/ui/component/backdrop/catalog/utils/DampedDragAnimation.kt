@@ -1,10 +1,10 @@
 /*
- * Vendored from Kyant0/AndroidLiquidGlass (kmp branch)
- * https://github.com/Kyant0/AndroidLiquidGlass — Copyright 2025 Kyant0, Apache License 2.0
- * app/src/commonMain/kotlin/com/kyant/backdrop/catalog/utils/DampedDragAnimation.kt
+ * Copyright 2026, compose-miuix-ui contributors
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Not published as a library — ported straight from the catalog demo app that
- * showcases Kyant0/backdrop, source-only. Package renamed accordingly.
+ * Ported one-to-one from Melox's DampedDragAnimation. The only Convx extension is
+ * snapValue(), used when an external pager already owns the position animation;
+ * it is not used by pointer drag/press/release behavior.
  */
 package com.convx.music.ui.component.backdrop.catalog.utils
 
@@ -12,17 +12,23 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MutatorMutex
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.time.TimeSource
 
+/**
+ * Keeps the logical tab position, pressed morphology, and normalized drag velocity in sync.
+ * Callers translate the dimensionless [value] into pixels for their own layout.
+ */
 class DampedDragAnimation(
     private val animationScope: CoroutineScope,
     val initialValue: Float,
@@ -30,47 +36,35 @@ class DampedDragAnimation(
     val visibilityThreshold: Float,
     val initialScale: Float,
     val pressedScale: Float,
+    val canDrag: (Offset) -> Boolean = { true },
     val onDragStarted: DampedDragAnimation.(position: Offset) -> Unit,
     val onDragStopped: DampedDragAnimation.() -> Unit,
     val onDrag: DampedDragAnimation.(size: IntSize, dragAmount: Offset) -> Unit,
-    /**
-     * Damping of the tracked drag velocity, which callers turn into stretch.
-     *
-     * The library's 0.5f is underdamped, so the velocity rings after every change
-     * of speed and anything driven by it wobbles rather than following the finger.
-     * Pass 1f for a stretch that tracks the drag and stops when it stops.
-     */
-    val velocityDampingRatio: Float = 0.5f,
 ) {
+    private val valueAnimationSpec = spring(1f, 1000f, visibilityThreshold)
+    private val velocityAnimationSpec = spring(0.5f, 300f, visibilityThreshold * 10f)
+    private val pressProgressAnimationSpec = spring(1f, 1000f, 0.001f)
+    private val scaleXAnimationSpec = spring(0.6f, 250f, 0.001f)
+    private val scaleYAnimationSpec = spring(0.7f, 250f, 0.001f)
 
-    private val valueAnimationSpec =
-        spring(1f, 1000f, visibilityThreshold)
-    private val velocityAnimationSpec =
-        spring(velocityDampingRatio, 300f, visibilityThreshold * 10f)
-    private val pressProgressAnimationSpec =
-        spring(1f, 1000f, 0.001f)
-    private val scaleXAnimationSpec =
-        spring(0.6f, 250f, 0.001f)
-    private val scaleYAnimationSpec =
-        spring(0.7f, 250f, 0.001f)
-
-    private val valueAnimation =
-        Animatable(initialValue, visibilityThreshold)
-    private val velocityAnimation =
-        Animatable(0f, 5f)
-    private val pressProgressAnimation =
-        Animatable(0f, 0.001f)
-    private val scaleXAnimation =
-        Animatable(initialScale, 0.001f)
-    private val scaleYAnimation =
-        Animatable(initialScale, 0.001f)
+    private val valueAnimation = Animatable(initialValue, visibilityThreshold)
+    private val velocityAnimation = Animatable(0f, 5f)
+    private val pressProgressAnimation = Animatable(0f, 0.001f)
+    private val scaleXAnimation = Animatable(initialScale, 0.001f)
+    private val scaleYAnimation = Animatable(initialScale, 0.001f)
 
     private val mutatorMutex = MutatorMutex()
-
+    private var pressJob: Job? = null
+    private var releaseJob: Job? = null
     private val velocityTracker = VelocityTracker()
+    private val startMark = TimeSource.Monotonic.markNow()
+
+    private fun nowMillis(): Long = startMark.elapsedNow().inWholeMilliseconds
 
     val value: Float get() = valueAnimation.value
-    val progress: Float get() = (value - valueRange.start) / (valueRange.endInclusive - valueRange.start)
+    val progress: Float
+        get() = (value - valueRange.start) /
+            (valueRange.endInclusive - valueRange.start).coerceAtLeast(1e-6f)
     val targetValue: Float get() = valueAnimation.targetValue
     val pressProgress: Float get() = pressProgressAnimation.value
     val scaleX: Float get() = scaleXAnimation.value
@@ -90,15 +84,21 @@ class DampedDragAnimation(
             onDragCancel = {
                 onDragStopped()
                 release()
-            }
+            },
         ) { change, dragAmount ->
-            onDrag(size, dragAmount)
+            val isInside = canDrag(change.position)
+            val wasInside = canDrag(change.previousPosition)
+            if (isInside && wasInside) {
+                onDrag(size, dragAmount)
+            }
         }
     }
 
     fun press() {
+        releaseJob?.cancel()
+        pressJob?.cancel()
         velocityTracker.resetTracking()
-        animationScope.launch {
+        pressJob = animationScope.launch {
             launch { pressProgressAnimation.animateTo(1f, pressProgressAnimationSpec) }
             launch { scaleXAnimation.animateTo(pressedScale, scaleXAnimationSpec) }
             launch { scaleYAnimation.animateTo(pressedScale, scaleYAnimationSpec) }
@@ -106,13 +106,14 @@ class DampedDragAnimation(
     }
 
     fun release() {
-        animationScope.launch {
-            awaitFrame()
+        releaseJob?.cancel()
+        releaseJob = animationScope.launch {
+            withFrameMillis { }
+            // Keep the stretched glass shape visible until the position spring is nearly settled.
             if (value != targetValue) {
                 val threshold = (valueRange.endInclusive - valueRange.start) * 0.025f
                 snapshotFlow { valueAnimation.value }
-                    .filter { abs(it - valueAnimation.targetValue) < threshold }
-                    .first()
+                    .first { abs(it - valueAnimation.targetValue) < threshold }
             }
             launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
             launch { scaleXAnimation.animateTo(initialScale, scaleXAnimationSpec) }
@@ -120,25 +121,10 @@ class DampedDragAnimation(
         }
     }
 
-    /**
-     * Set the value immediately, with no animation of its own.
-     *
-     * For following an external driver frame by frame — the tab pager's own scroll
-     * position, say. [updateValue] would spring toward each sample and so trail the
-     * driver by a frame or more, and [animateToValue] would additionally press-grow
-     * the puck on every single sample.
-     *
-     * Suspend rather than launching internally so the caller keeps ONE collector
-     * coroutine for the whole gesture instead of starting a fresh one per frame.
-     */
-    suspend fun snapValue(value: Float) {
-        valueAnimation.snapTo(value.coerceIn(valueRange))
-    }
-
     fun updateValue(value: Float) {
         val targetValue = value.coerceIn(valueRange)
         animationScope.launch {
-            launch { valueAnimation.animateTo(targetValue, valueAnimationSpec) { updateVelocity() } }
+            valueAnimation.animateTo(targetValue, valueAnimationSpec) { updateVelocity() }
         }
     }
 
@@ -156,16 +142,18 @@ class DampedDragAnimation(
         }
     }
 
+    /** Convx pager extension; pointer drag behavior remains identical to Melox. */
+    suspend fun snapValue(value: Float) {
+        valueAnimation.snapTo(value.coerceIn(valueRange))
+    }
+
     private fun updateVelocity() {
-        velocityTracker.addPosition(
-            System.nanoTime() / 1_000_000L,
-            Offset(value, 0f)
-        )
-        val targetVelocity = velocityTracker.calculateVelocity().x / (valueRange.endInclusive - valueRange.start)
+        velocityTracker.addPosition(nowMillis(), Offset(value, 0f))
+        // Normalize by the whole logical range so deformation is independent of tab count.
+        val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1e-6f)
+        val targetVelocity = velocityTracker.calculateVelocity().x / span
+        // animateTo (not snapTo): a spring toward the new velocity is what makes the
+        // stretch track the drag smoothly rather than jump frame to frame.
         animationScope.launch { velocityAnimation.animateTo(targetVelocity, velocityAnimationSpec) }
     }
-}
-
-private suspend fun awaitFrame() {
-    androidx.compose.runtime.withFrameNanos { }
 }

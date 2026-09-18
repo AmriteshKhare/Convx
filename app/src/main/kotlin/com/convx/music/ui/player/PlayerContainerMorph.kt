@@ -46,7 +46,13 @@ internal val miniPlayerContainerRect: Rect? get() = miniContainerRect.value
  * pill's bounds and changes nothing about how the pill renders.
  */
 fun Modifier.registerMiniContainerRect(): Modifier = onGloballyPositioned {
-    if (it.isAttached) miniContainerRect.value = it.boundsInRoot()
+    if (!it.isAttached) return@onGloballyPositioned
+    val bounds = it.boundsInRoot()
+    val previous = miniContainerRect.value
+    // A resized pill (layout branch change, rotation) invalidates its last recording --
+    // that frame was captured at the old size, not this one. See PlayerMorph.invalidateMiniFrame.
+    if (previous != null && previous.size != bounds.size) PlayerMorph.invalidateMiniFrame()
+    miniContainerRect.value = bounds
 }
 
 /**
@@ -134,9 +140,15 @@ fun PlayerContainerMorphOverlay(
             .fillMaxSize()
             .drawWithCache {
                 val clipPath = Path()
+                // This whole block re-runs whenever the overlay's own (screen) size
+                // changes -- rotation, window resize -- so it is the natural hook to
+                // invalidate the full player's recordings, the same way a mini pill
+                // resize invalidates its own (see registerMiniContainerRect).
+                PlayerMorph.invalidateFullFrames()
                 onDrawBehind {
                     val fraction = progress().coerceIn(0f, 1f)
                     if (fraction <= 0f || fraction >= 1f) return@onDrawBehind
+                    if (!PlayerMorph.sharedLayersReady) return@onDrawBehind
                     val mini = miniContainerRect.value ?: return@onDrawBehind
                     // onGloballyPositioned can fire once with a degenerate size before layout
                     // settles.

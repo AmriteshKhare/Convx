@@ -35,6 +35,12 @@ import androidx.compose.ui.util.lerp
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.utils.additiveChrome
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeInputScale
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -93,7 +99,7 @@ internal fun rememberElasticStretch(): InteractiveHighlight {
  * flat circle when glass is disabled or unsupported, same as
  * [com.convx.music.ui.component.FloatingNavBar]'s own useGlass fallback.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalHazeMaterialsApi::class, ExperimentalHazeApi::class)
 @Composable
 fun GlassCircleButton(
     onClick: () -> Unit,
@@ -106,6 +112,20 @@ fun GlassCircleButton(
     // Photos (account avatar) must not run through additiveChrome: Plus adds
     // white over every pixel and washes the photo out. Icons keep it.
     applyAdditiveChrome: Boolean = true,
+    // True skips the blur/lens/highlight-rim backdrop sampling entirely and always
+    // uses the flat fallback fill below — for a button that shouldn't be its own
+    // offscreen glass surface (e.g. the top-bar account avatar). The press-driven
+    // elastic squish and glow sheen (elasticStretch below) are unconditional either
+    // way, so this only removes the blur/lens/rim, not the interaction feel.
+    forceFlat: Boolean = false,
+    // When set (and forceFlat is false), the button samples this Haze source
+    // instead of running the full liquidGlass blur+lens+highlight+shadow+dark-rim
+    // chain — a real frosted blur of whatever content the caller marked with
+    // Modifier.hazeSource(hazeState), at a small fraction of the cost, but
+    // without lens refraction. Pass the screen's existing HazeState (most list
+    // screens already have one for their own top fade) rather than creating a
+    // new source just for this button.
+    hazeState: HazeState? = null,
     content: @Composable () -> Unit,
 ) {
     // Non-nav glass: thinner lens per spec Q17 (.35/.40), fixed style.
@@ -113,7 +133,8 @@ fun GlassCircleButton(
     // These float over content the same way the nav bar does and are meant to
     // read as the same material, so they follow the nav bar's own on/off switch
     // and its effect values rather than only the global one.
-    val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
+    val useGlass = !forceFlat && hazeState == null &&
+        glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
 
     val ambientColor = com.convx.music.LocalAmbientBackgroundColor.current.value
     // Single limelight: no local rim computation — pass an explicit caller tint
@@ -135,6 +156,15 @@ fun GlassCircleButton(
             highlightAlpha = highlightAlpha,
             rimTintColor = effectiveRimTintColor,
         )
+    } else if (!forceFlat && hazeState != null) {
+        Modifier
+            .clip(GlassCircleShape)
+            .hazeEffect(state = hazeState, style = HazeMaterials.thin(fallbackFill)) {
+                // Same idea as GlassPoolScale/GLASS_RESOLUTION_SCALE elsewhere: a
+                // small circular button hides the upscale completely, so sample far
+                // below Haze's own default.
+                inputScale = HazeInputScale.Fixed(0.2f)
+            }
     } else {
         Modifier
             .clip(GlassCircleShape)

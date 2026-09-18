@@ -1042,7 +1042,8 @@ fun ArtistScreen(
             onClick = {
                 showLocal = showLocal.not()
                 if (!showLocal && artistPage == null) viewModel.fetchArtistsFromYTM()
-            }
+            },
+            hazeState = hazeState,
         )
         
         SnackbarHost(

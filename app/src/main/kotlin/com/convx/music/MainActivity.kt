@@ -360,6 +360,10 @@ private val TabRootRoutes = setOf(
 )
 
 private const val DIAG_DISABLE_BACKDROP = false
+// Melox's measured-fast path lets the few visible chrome surfaces sample the
+// shared backdrop directly. A full-screen pre-blur/flatten pool added ~4.5 ms
+// issue-draw time on the SM-M346B when only nav/search/mini chrome consumed it.
+private const val USE_SHARED_GLASS_POOL = false
 
 /**
  * Routes whose whole screen is an `AndroidView` WebView. They opt out of the app
@@ -948,7 +952,7 @@ class MainActivity : ComponentActivity() {
                     glassAllowed,
                     glassEffectConfig.anyComponentEnabled,
                 ) {
-                    if (glassAllowed && glassEffectConfig.anyComponentEnabled) {
+                    if (USE_SHARED_GLASS_POOL && glassAllowed && glassEffectConfig.anyComponentEnabled) {
                         PooledGlass(
                             backdrop = glassPoolBackdrop,
                             blurRadiusDp = glassEffectConfig.blurRadius,
@@ -1428,10 +1432,20 @@ class MainActivity : ComponentActivity() {
                 // now also feeds the tab bar's backdrop through LocalAppBackdropFrozen.
                 // Both freezes are stable objects; navTransitionFreeze is itself keyed on
                 // the current route, so it changes exactly when it should.
-                val backdropFrozenProvider = remember(backdropFreeze, navTransitionFreeze) {
+                val backdropFrozenProvider = remember(
+                    backdropFreeze,
+                    navTransitionFreeze,
+                    floatingNavBarScrollConnection,
+                ) {
                     {
                         backdropFreeze.frozen() ||
-                            navTransitionFreeze.frozen()
+                            navTransitionFreeze.frozen() ||
+                            // This is the same clock that visibly drives the bar's
+                            // collapse/expand, so it is guaranteed to observe the
+                            // nested scroll stream. Sharing it prevents the app
+                            // backdrop (and therefore GlassPool.contentVersion) from
+                            // re-recording while list pixels are moving.
+                            floatingNavBarScrollConnection.isScrolling()
                     }
                 }
 
@@ -1730,7 +1744,7 @@ class MainActivity : ComponentActivity() {
                                                 // this gets the same liquid-glass rim + elastic
                                                 // press stretch as every other floating chrome
                                                 // button (back/share on detail screens).
-                                                GlassCircleButton(applyAdditiveChrome = false, onClick = {
+                                                GlassCircleButton(applyAdditiveChrome = false, forceFlat = true, onClick = {
                                                       if (enableSettingsPopup) {
                                                           showSettingDialoge = true
                                                       } else {
@@ -1910,35 +1924,20 @@ class MainActivity : ComponentActivity() {
                                             ) {
                                                 Modifier
                                             } else {
-                                                // graphicsLayer BEFORE layerBackdrop, not
-                                                // after: the layer must enclose the backdrop
-                                                // node, otherwise that node's draw still
-                                                // re-runs every time anything else in the
-                                                // window redraws. The mini player and nav bar
-                                                // are siblings of this Box, yet their
-                                                // per-frame ticks were forcing a full
-                                                // re-record of this subtree â€” 117ms/frame at
-                                                // idle with a song playing. Defaults only, so
-                                                // nothing about the rendered result changes.
-                                                Modifier
-                                                    // OUTER layer: isolates this subtree from
-                                                    // sibling redraws (mini player waveform,
-                                                    // 10Hz position poll), which were forcing
-                                                    // a full re-record. 117ms -> ~48ms idle
-                                                    // while playing.
-                                                    .graphicsLayer()
-                                                    .layerBackdrop(
-                                                        appBackdrop,
-                                                        frozen = backdropFrozenProvider,
-                                                    )
-                                                    // INNER layer: the content becomes ONE
-                                                    // cached RenderNode, so the backdrop's
-                                                    // layer.record { drawContent() } records a
-                                                    // single drawRenderNode instead of
-                                                    // re-issuing every op in the tree. Compose
-                                                    // keeps that node up to date incrementally
-                                                    // on its normal draw path.
-                                                    .graphicsLayer()
+                                                // Attach exactly one backdrop source, matching
+                                                // Melox's scaffold. The previous outer+inner
+                                                // full-screen graphicsLayer pair forced the
+                                                // changing NavHost into one giant RenderNode;
+                                                // every scroll then rebuilt that entire node
+                                                // even while layerBackdrop itself was frozen.
+                                                // The backdrop node already throttles idle
+                                                // recording and freezes during scroll/nav, so
+                                                // extra isolation layers only defeated Compose's
+                                                // incremental child-RenderNode reuse.
+                                                Modifier.layerBackdrop(
+                                                    appBackdrop,
+                                                    frozen = backdropFrozenProvider,
+                                                )
                                             }
                                         )
                                         .nestedScroll(backdropFreezeConnection)

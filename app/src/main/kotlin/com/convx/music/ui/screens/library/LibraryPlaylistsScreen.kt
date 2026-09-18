@@ -528,6 +528,7 @@ fun LibraryPlaylistsScreen(
                     onClick = {
                         showCreatePlaylistDialog = true
                     },
+                    hazeState = hazeState,
                 )
             }
 
@@ -729,6 +730,7 @@ fun LibraryPlaylistsScreen(
                     onClick = {
                         showCreatePlaylistDialog = true
                     },
+                    hazeState = hazeState,
                 )
             }
         }

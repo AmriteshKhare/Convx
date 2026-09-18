@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import com.convx.music.ui.ios.compat.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -31,9 +30,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import com.convx.music.ui.utils.isScrollingUp
+import dev.chrisbanes.haze.HazeState
 
+/**
+ * [hazeState] should be the screen's own existing HazeState (most list screens
+ * already have one for their top fade — see [com.convx.music.ui.component.TopFadeBlur])
+ * whose source is the scrolling content behind this FAB. Passing one gives these
+ * buttons a real frosted blur of that content for a fraction of liquidGlass's cost
+ * (no lens/highlight/shadow, just Haze's blur). Null keeps the flat fallback —
+ * there's nothing to blur here without a real source, and sampling the live app
+ * backdrop instead would risk a RenderNode self-reference cycle on screens with no
+ * hero backdrop of their own.
+ */
 @Composable
 fun BoxScope.HideOnScrollFAB(
     visible: Boolean = true,
@@ -41,6 +50,7 @@ fun BoxScope.HideOnScrollFAB(
     @DrawableRes icon: Int,
     onClick: () -> Unit,
     onRecognitionClick: (() -> Unit)? = null,
+    hazeState: HazeState? = null,
 ) {
     AnimatedVisibility(
         visible = visible && lazyListState.isScrollingUp(),
@@ -54,16 +64,6 @@ fun BoxScope.HideOnScrollFAB(
                     .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
             ),
     ) {
-        // Unattached backdrop, scoped to just these two buttons: never
-        // .layerBackdrop'd, so liquidGlass early-returns to its translucent
-        // frosted fallback instead of sampling the live NavHost-wide
-        // appBackdrop, which — since this composable is used on ordinary
-        // NavHost screens with no hero backdrop of their own to borrow —
-        // would be a RenderNode self-reference cycle. Same style as the nav
-        // bar's glass (liquidGlass + GlassCircleButton), just without real
-        // blur-through here.
-        val fabBackdrop = rememberLayerBackdrop()
-        CompositionLocalProvider(LocalAppBackdrop provides fabBackdrop) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(16.dp)
@@ -71,6 +71,13 @@ fun BoxScope.HideOnScrollFAB(
             if (onRecognitionClick != null) {
                 GlassCircleButton(
                     onClick = onRecognitionClick,
+                    hazeState = hazeState,
+                    // Never fall through to liquidGlass's default ambient-backdrop
+                    // path here: this FAB sits inside the same content the app
+                    // backdrop captures, and sampling it is a RenderNode
+                    // self-reference cycle (HWUI recurses in prepareTree until it
+                    // stack-overflows). Haze if we have a real source, flat otherwise.
+                    forceFlat = hazeState == null,
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.mic),
@@ -83,13 +90,14 @@ fun BoxScope.HideOnScrollFAB(
             GlassCircleButton(
                 onClick = onClick,
                 size = 56.dp,
+                hazeState = hazeState,
+                forceFlat = hazeState == null,
             ) {
                 Icon(
                     painter = painterResource(icon),
                     contentDescription = null,
                 )
             }
-        }
         }
     }
 }
@@ -101,6 +109,7 @@ fun BoxScope.HideOnScrollFAB(
     @DrawableRes icon: Int,
     onClick: () -> Unit,
     onRecognitionClick: (() -> Unit)? = null,
+    hazeState: HazeState? = null,
 ) {
     AnimatedVisibility(
         visible = visible && lazyListState.isScrollingUp(),
@@ -114,16 +123,6 @@ fun BoxScope.HideOnScrollFAB(
                     .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
             ),
     ) {
-        // Unattached backdrop, scoped to just these two buttons: never
-        // .layerBackdrop'd, so liquidGlass early-returns to its translucent
-        // frosted fallback instead of sampling the live NavHost-wide
-        // appBackdrop, which — since this composable is used on ordinary
-        // NavHost screens with no hero backdrop of their own to borrow —
-        // would be a RenderNode self-reference cycle. Same style as the nav
-        // bar's glass (liquidGlass + GlassCircleButton), just without real
-        // blur-through here.
-        val fabBackdrop = rememberLayerBackdrop()
-        CompositionLocalProvider(LocalAppBackdrop provides fabBackdrop) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(16.dp)
@@ -131,6 +130,13 @@ fun BoxScope.HideOnScrollFAB(
             if (onRecognitionClick != null) {
                 GlassCircleButton(
                     onClick = onRecognitionClick,
+                    hazeState = hazeState,
+                    // Never fall through to liquidGlass's default ambient-backdrop
+                    // path here: this FAB sits inside the same content the app
+                    // backdrop captures, and sampling it is a RenderNode
+                    // self-reference cycle (HWUI recurses in prepareTree until it
+                    // stack-overflows). Haze if we have a real source, flat otherwise.
+                    forceFlat = hazeState == null,
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.mic),
@@ -143,13 +149,14 @@ fun BoxScope.HideOnScrollFAB(
             GlassCircleButton(
                 onClick = onClick,
                 size = 56.dp,
+                hazeState = hazeState,
+                forceFlat = hazeState == null,
             ) {
                 Icon(
                     painter = painterResource(icon),
                     contentDescription = null,
                 )
             }
-        }
         }
     }
 }
@@ -161,6 +168,7 @@ fun BoxScope.HideOnScrollFAB(
     @DrawableRes icon: Int,
     onClick: () -> Unit,
     onRecognitionClick: (() -> Unit)? = null,
+    hazeState: HazeState? = null,
 ) {
     AnimatedVisibility(
         visible = visible && scrollState.isScrollingUp(),
@@ -174,16 +182,6 @@ fun BoxScope.HideOnScrollFAB(
                     .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
             ),
     ) {
-        // Unattached backdrop, scoped to just these two buttons: never
-        // .layerBackdrop'd, so liquidGlass early-returns to its translucent
-        // frosted fallback instead of sampling the live NavHost-wide
-        // appBackdrop, which — since this composable is used on ordinary
-        // NavHost screens with no hero backdrop of their own to borrow —
-        // would be a RenderNode self-reference cycle. Same style as the nav
-        // bar's glass (liquidGlass + GlassCircleButton), just without real
-        // blur-through here.
-        val fabBackdrop = rememberLayerBackdrop()
-        CompositionLocalProvider(LocalAppBackdrop provides fabBackdrop) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(16.dp)
@@ -191,6 +189,13 @@ fun BoxScope.HideOnScrollFAB(
             if (onRecognitionClick != null) {
                 GlassCircleButton(
                     onClick = onRecognitionClick,
+                    hazeState = hazeState,
+                    // Never fall through to liquidGlass's default ambient-backdrop
+                    // path here: this FAB sits inside the same content the app
+                    // backdrop captures, and sampling it is a RenderNode
+                    // self-reference cycle (HWUI recurses in prepareTree until it
+                    // stack-overflows). Haze if we have a real source, flat otherwise.
+                    forceFlat = hazeState == null,
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.mic),
@@ -203,13 +208,14 @@ fun BoxScope.HideOnScrollFAB(
             GlassCircleButton(
                 onClick = onClick,
                 size = 56.dp,
+                hazeState = hazeState,
+                forceFlat = hazeState == null,
             ) {
                 Icon(
                     painter = painterResource(icon),
                     contentDescription = null,
                 )
             }
-        }
         }
     }
 }

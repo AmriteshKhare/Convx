@@ -75,6 +75,9 @@ fun SquigglySlider(
     // Animation state
     var phaseOffset by remember { mutableFloatStateOf(0f) }
     var heightFraction by remember { mutableFloatStateOf(if (isPlaying) 1f else 0f) }
+    // The wave redraws every display frame while playing. Reuse its mutable geometry
+    // instead of allocating a new Path up to 120 times per second.
+    val wavePath = remember { Path() }
 
     val scope = rememberCoroutineScope()
 
@@ -198,8 +201,10 @@ fun SquigglySlider(
                 }
             }
 
-            // Build wavy path for played portion
-            val path = Path()
+            // Build wavy path for played portion. Path is mutable and owned by this
+            // composable, so reset/rebuild is safe and allocation-free per frame.
+            val path = wavePath
+            path.reset()
             val waveStart = -phaseOffset - waveLength / 2f
             val waveEnd = if (transitionEnabled) totalWidth else waveProgressPx
 

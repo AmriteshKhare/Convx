@@ -137,8 +137,17 @@ enum class PlayerInternalState { COVER, LYRICS, QUEUE }
 /** Mirrors Player.kt's PARENT_SHEET_SETTLE_TIMEOUT_MS (private to that file). */
 private const val V2_PARENT_SHEET_SETTLE_TIMEOUT_MS = 1_000L
 
-private fun Modifier.customSoftShadow(elevation: androidx.compose.ui.unit.Dp, cornerRadius: androidx.compose.ui.unit.Dp, enabled: Boolean): Modifier =
-    if (enabled) shadow(elevation, RoundedCornerShape(cornerRadius)) else this
+// enabled flips instantly on hero-look/pause-state changes; animating the elevation
+// (rather than adding/removing the shadow modifier on the raw boolean) is what makes
+// it fade in/out instead of popping on in a single frame.
+@Composable
+private fun Modifier.customSoftShadow(elevation: androidx.compose.ui.unit.Dp, cornerRadius: androidx.compose.ui.unit.Dp, enabled: Boolean): Modifier {
+    val animatedElevation by animateDpAsState(
+        targetValue = if (enabled) elevation else 0.dp,
+        label = "playerThumbnailShadowElevation",
+    )
+    return if (animatedElevation > 0.dp) shadow(animatedElevation, RoundedCornerShape(cornerRadius)) else this
+}
 
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
@@ -387,7 +396,12 @@ fun PlayerV2(
             addAction("android.media.AUDIO_BECOMING_NOISY")
         }
         
-        context.registerReceiver(receiver, filter)
+        androidx.core.content.ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            androidx.core.content.ContextCompat.RECEIVER_EXPORTED,
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && callback != null) {
             am.registerAudioDeviceCallback(callback, Handler(Looper.getMainLooper()))
         }

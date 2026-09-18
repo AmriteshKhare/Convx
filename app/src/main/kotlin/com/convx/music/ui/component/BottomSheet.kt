@@ -58,8 +58,6 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import com.convx.music.constants.NavigationBarAnimationSpec
-import com.convx.music.ui.utils.bounceSeedVelocity
-import com.convx.music.ui.utils.bounceStiffnessFor
 import com.convx.music.ui.utils.nearestProjectedSnap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -187,6 +185,7 @@ fun BottomSheet(
                     Modifier.recordPlayerLayer(
                         layer = { PlayerMorph.fullBackgroundLayer },
                         drawInPlace = { !PlayerMorph.active },
+                        markReady = { PlayerMorph.fullBackgroundFrameReady = true },
                     )
                 } else {
                     Modifier
@@ -273,6 +272,7 @@ fun BottomSheet(
                             Modifier.recordPlayerLayer(
                                 layer = { PlayerMorph.fullContentLayer },
                                 drawInPlace = { !PlayerMorph.active },
+                                markReady = { PlayerMorph.fullContentFrameReady = true },
                             )
                         } else {
                             Modifier
@@ -428,34 +428,29 @@ class BottomSheetState(
     /**
      * [velocityPxPerSec] is the fling's actual velocity (same sign convention as
      * [performFling]: positive travels toward expanded, negative toward collapsed).
-     * Seeded into the spring as its initial velocity, on the same
-     * [bounceSeedVelocity]/[bounceStiffnessFor] curve the list/hero overscroll bounce
-     * already uses, so a hard downward flick carries into the collapse as a real
-     * rubber-band snap instead of the spring starting from rest every time.
+     * Same fixed spring as [collapseSoft]/[expandSoft] (Melox settles every path --
+     * drag-release or tap -- on one NoBouncy/360 curve; only the seed velocity
+     * differs). This used to borrow the list/hero overscroll bounce's
+     * velocity-tiered stiffness instead, which made a swipe-release settle on a
+     * visibly different curve than a tap-open right next to it.
      */
     private fun collapse(velocityPxPerSec: Float = 0f) {
-        val seed = bounceSeedVelocity(velocityPxPerSec)
         collapse(
             spring(
-                // Reference release lands on its anchor without a bounce; the fling's
-                // velocity still carries in through the seed.
-                dampingRatio = 1f,
-                stiffness = bounceStiffnessFor(seed),
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = 360f,
             ),
-            initialVelocity = with(density) { seed.toDp() },
+            initialVelocity = with(density) { velocityPxPerSec.toDp() },
         )
     }
 
     private fun expand(velocityPxPerSec: Float = 0f) {
-        val seed = bounceSeedVelocity(velocityPxPerSec)
         expand(
             spring(
-                // Reference release lands on its anchor without a bounce; the fling's
-                // velocity still carries in through the seed.
-                dampingRatio = 1f,
-                stiffness = bounceStiffnessFor(seed),
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = 360f,
             ),
-            initialVelocity = with(density) { seed.toDp() },
+            initialVelocity = with(density) { velocityPxPerSec.toDp() },
         )
     }
 

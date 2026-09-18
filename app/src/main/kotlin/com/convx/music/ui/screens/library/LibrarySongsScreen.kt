@@ -487,6 +487,7 @@ fun LibrarySongsScreen(
                     ),
                 )
             },
+            hazeState = hazeState,
         )
     }
 }

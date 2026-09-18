@@ -44,6 +44,28 @@ object PlayerMorph {
     @JvmField var fullBackgroundLayer: GraphicsLayer? = null
     @JvmField var fullContentLayer: GraphicsLayer? = null
 
+    /**
+     * Confirmed-fresh flags (Melox PlayerSheetTransitionState.miniFrameReady /
+     * fullBackgroundFrameReady / fullContentFrameReady).
+     *
+     * [active] used to trust a recording the instant its [GraphicsLayer] ref was
+     * non-null and the pill had a measured size -- true from the very first frame of
+     * a fast tap-open, before the full player's content had actually been composed,
+     * measured, and drawn even once. For that frame the source was already hidden
+     * (`drawInPlace = !active`) but the overlay's own zero-size guard on
+     * `fullContentLayer` also skipped drawing -- nothing painted, then the next frame
+     * caught up all at once. That read as a static mini pill with the real player
+     * just fading in, not one shape growing, because the overlay's very first visible
+     * frame showed a stale or empty recording instead of the actual content.
+     *
+     * Set true only after [Modifier.recordPlayerLayer] has actually recorded that
+     * layer at a usable size; reset whenever the source's own bounds resize, so a
+     * layout change (tab style, rotation) can't leave a stale recording trusted.
+     */
+    @JvmField var miniFrameReady: Boolean = false
+    @JvmField var fullBackgroundFrameReady: Boolean = false
+    @JvmField var fullContentFrameReady: Boolean = false
+
     /** Set by the player; the sheet's own 0..1 drag/settle progress. */
     @JvmField var progressProvider: () -> Float = { 0f }
 
@@ -87,26 +109,37 @@ object PlayerMorph {
      */
     val active: Boolean
         get() {
-            if (!enabled) return false
             val fraction = progress
             if (fraction <= 0f || fraction >= 1f) return false
-            if (miniLayer == null || fullBackgroundLayer == null || fullContentLayer == null) return false
-            val mini = miniPlayerContainerRect ?: return false
-            return mini.width > 0f && mini.height > 0f
+            return sharedLayersReady
         }
 
     /**
-     * All three recordings present with a usable pill: the overlay may draw.
-     * Melox gates the shared layers on measured-size agreement; the size gate
-     * lives at the record sites (degenerate bounds never publish).
+     * All three recordings present, confirmed freshly recorded, with a usable pill:
+     * the overlay may draw and the sources may hide. Melox gates this on its own
+     * per-layer frame-ready flags (see their doc above); a non-null layer with a
+     * non-zero pill is necessary but not sufficient -- see [miniFrameReady].
      */
     val sharedLayersReady: Boolean
         get() {
             if (!enabled) return false
             if (miniLayer == null || fullBackgroundLayer == null || fullContentLayer == null) return false
+            if (!miniFrameReady || !fullBackgroundFrameReady || !fullContentFrameReady) return false
             val mini = miniPlayerContainerRect ?: return false
             return mini.width > 0f && mini.height > 0f
         }
+
+    /** Call when the mini pill's own bounds resize (layout branch change, rotation):
+     *  its last recording was made at the old size and can't be trusted at the new one. */
+    fun invalidateMiniFrame() {
+        miniFrameReady = false
+    }
+
+    /** Call when the full player's bounds resize (rotation, window resize). */
+    fun invalidateFullFrames() {
+        fullBackgroundFrameReady = false
+        fullContentFrameReady = false
+    }
 }
 
 /**
@@ -140,10 +173,15 @@ fun InstallPlayerMorphLayers() {
  * While the morph is running both ends answer false: the overlay is drawing their
  * recordings inside the shared container instead, and drawing them here as well would
  * leave a second copy sitting at its own resting position.
+ *
+ * [markReady] fires after each successful non-zero-size recording (Melox
+ * markXFrameRecorded) -- see [PlayerMorph.miniFrameReady]'s doc for why the overlay
+ * must not trust a layer before this has fired at least once at the current size.
  */
 fun Modifier.recordPlayerLayer(
     layer: () -> GraphicsLayer?,
     drawInPlace: () -> Boolean,
+    markReady: () -> Unit = {},
 ): Modifier = drawWithContent {
     val target = layer()
     if (target == null) {
@@ -151,6 +189,7 @@ fun Modifier.recordPlayerLayer(
         return@drawWithContent
     }
     target.record { this@drawWithContent.drawContent() }
+    if (target.size.width > 0 && target.size.height > 0) markReady()
     if (drawInPlace()) {
         target.alpha = 1f
         target.renderEffect = null

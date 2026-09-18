@@ -252,6 +252,7 @@ fun LocalSongsScreen(
                     ),
                 )
             },
+            hazeState = hazeState,
         )
     }
 }

@@ -42,7 +42,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
@@ -68,6 +67,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -94,7 +94,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -122,22 +121,17 @@ import com.convx.music.ui.component.elasticStretchLayerBlock
 import com.convx.music.ui.component.glassResolutionScale
 import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.component.backdrop.Backdrop
-import com.convx.music.ui.component.backdrop.backdrops.layerBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.rememberCombinedBackdrop
-import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
-import com.convx.music.ui.component.LocalAppBackdropFrozen
 import com.convx.music.ui.component.backdrop.catalog.utils.DampedDragAnimation
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.backdrop.drawBackdrop
 import com.convx.music.ui.component.backdrop.effects.blur
 import com.convx.music.ui.component.backdrop.effects.lens
 import com.convx.music.ui.component.backdrop.effects.vibrancy
-import com.convx.music.ui.component.backdrop.highlight.Highlight
-import com.convx.music.ui.component.backdrop.shadow.InnerShadow
-import com.convx.music.ui.component.backdrop.shadow.Shadow
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.player.PlayerMorph
 import com.convx.music.ui.theme.isHueless
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sign
@@ -274,9 +268,7 @@ fun FloatingTabBar(
     // fade this bar had before — melt costs a real offscreen blur pass on every
     // transition, so lower-end devices or anyone who just doesn't like the look
     // can drop back to the cheap crossfade.
-    // Off by default: iOS 27 keeps the mini player sharp through the morph and only blurs the
-    // tab labels (animateEnterExitTab), which a whole-bar gooey pass cannot do.
-    val meltTransitionEnabled by rememberPreference(NavBarMeltTransitionKey, defaultValue = false)
+    val meltTransitionEnabled by rememberPreference(NavBarMeltTransitionKey, defaultValue = true)
     val gooeyBlurPx = with(LocalDensity.current) { GooeyPeakBlur.toPx() }
     // Liquid "gooey" merge/split (see GooeyTransition.kt): peaks mid-crossfade
     // and returns to 0 at rest, on every transition regardless of direction —
@@ -343,16 +335,25 @@ fun FloatingTabBar(
             ) {
                 transition.AnimatedContent(
                     transitionSpec = {
-                        // iOS 27 (designRefrence/threadsdownloader.com_0805d3.mp4, mini title y per
-                        // frame): collapsing fits a critically damped spring at stiffness 440
-                        // (~270ms), expanding a stiffer ~700 (~200ms). No bounce either way.
-                        val collapsing = targetState == FloatingTabBarVisual.INLINE
-                        val stiffness = if (collapsing) 440f else 700f
-                        (fadeIn(spring(dampingRatio = 1f, stiffness = stiffness)) togetherWith
-                            fadeOut(spring(dampingRatio = 1f, stiffness = stiffness)))
+                        // Preserve the inline/expanded size morph, but hand icon
+                        // ownership over once: old tree fades out in the first half,
+                        // new tree fades in in the second. This removes the overlap/
+                        // readjust glitch while keeping the requested animation.
+                        (fadeIn(
+                            tween(
+                                durationMillis = GooeyDurationMs / 2,
+                                delayMillis = GooeyDurationMs / 2,
+                                easing = FastOutSlowInEasing,
+                            )
+                        ) togetherWith fadeOut(
+                            tween(
+                                durationMillis = GooeyDurationMs / 2,
+                                easing = FastOutSlowInEasing,
+                            )
+                        ))
                             .using(
                                 SizeTransform(clip = false) { _, _ ->
-                                    spring(dampingRatio = 1f, stiffness = stiffness)
+                                    tween(GooeyDurationMs, easing = FastOutSlowInEasing)
                                 }
                             )
                     },
@@ -769,12 +770,6 @@ private fun SharedTransitionScope.InlineTab(
             // Outside sharedElement: draw-only, so bounds tracking is
             // unaffected, and no overlay clipping can cut the stretch.
             .graphicsLayer(elasticStretchLayerBlock(glow))
-            .sharedElement(
-                sharedContentState = rememberSharedContentState("tabGroup"),
-                animatedVisibilityScope = animatedVisibilityScope,
-                boundsTransform = LocalBarBoundsTransforms.current.bar,
-                zIndexInOverlay = 1f
-            )
             .shadow(
                 shape = shapes.tabBarShape,
                 elevation = elevations.inlineElevation
@@ -1311,83 +1306,68 @@ private fun SharedTransitionScope.ExpandedTabs(
             allTabs.indexOfFirst { it.key == selectedTabKey }.coerceIn(0, tabsCount - 1)
         )
     }
-    // Matches Kyant's LiquidBottomTabs behavior exactly: navigation fires ONLY
-    // in onDragStopped (finger lifted, puck settling onto its target) — never
-    // mid-drag. An earlier "predictive fire" here navigated while the puck was
-    // still being dragged, which opened screens before the drop.
-    // inspectDragGestures (vendored) fires onDragStart/onDrag/onDragEnd for a
-    // plain tap-through too, with zero net movement, and never consumes the
-    // touch — so a tap that lands on the puck while it's mid-sweep between
-    // two tabs would otherwise re-navigate to targetValue (the sweep's
-    // destination) on top of whatever the tapped tab's own tapClickable just
-    // navigated to. Gate the puck's own navigate-on-release to genuine drags.
-    var hasDraggedPuck = false
-    val dampedDragAnimation = remember(animationScope, tabsCount) {
+    // Break the construction-time self-reference: canDrag needs the animation's current value.
+    class DampedDragHolder {
+        var instance: DampedDragAnimation? = null
+    }
+    val holder = remember { DampedDragHolder() }
+    val dampedDragAnimation = remember(animationScope, tabsCount, density, isLtr) {
         DampedDragAnimation(
             animationScope = animationScope,
             initialValue = currentIndex.toFloat(),
             valueRange = 0f..(tabsCount - 1).toFloat(),
             visibilityThreshold = 0.001f,
             initialScale = 1f,
-            // Matches LiquidBottomTabs' literal ratio (78dp/56dp) rather than a
-            // fraction of our own tab width — a proportional scale factor, not
-            // an absolute size, so it should track the source value directly.
             pressedScale = 78f / 56f,
-            onDragStarted = { hasDraggedPuck = false },
+            canDrag = { offset ->
+                val anim = holder.instance ?: return@DampedDragAnimation true
+                if (tabWidthPx == 0f) return@DampedDragAnimation false
+                val indicatorX = anim.value * tabWidthPx
+                val pad = with(density) { 4.dp.toPx() }
+                val globalTouchX = if (isLtr) {
+                    pad + indicatorX + offset.x
+                } else {
+                    totalWidthPx - pad - tabWidthPx - indicatorX + offset.x
+                }
+                globalTouchX in 0f..totalWidthPx
+            },
+            onDragStarted = {},
             onDragStopped = {
                 val targetIndex = targetValue.fastRoundToInt().coerceIn(0, tabsCount - 1)
-                currentIndex = targetIndex
-                // updateValue (not animateToValue): the modifier's own
-                // onDragStart/onDragEnd already own the press-grow + release
-                // shrink. animateToValue pressed a SECOND time and, worse, ran
-                // under mutatorMutex — a later sync could cancel it mid-settle
-                // and strand the puck at the old index (puck stuck on Home while
-                // a different screen is showing). updateValue just springs the
-                // position, no press, no mutex.
-                updateValue(targetIndex.toFloat())
+                if (currentIndex != targetIndex) {
+                    currentIndex = targetIndex
+                } else {
+                    animateToValue(targetIndex.toFloat())
+                }
                 animationScope.launch {
                     offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f))
                 }
-                if (hasDraggedPuck) {
-                    currentTabs.value.getOrNull(targetIndex)?.onClick?.invoke()
-                }
             },
             onDrag = { _, dragAmount ->
-                if (dragAmount != Offset.Zero) hasDraggedPuck = true
-                updateValue(
-                    (targetValue + dragAmount.x / tabWidthPx * if (isLtr) 1f else -1f)
-                        .fastCoerceIn(0f, (tabsCount - 1).toFloat())
-                )
-                animationScope.launch {
-                    offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
+                if (tabWidthPx > 0f) {
+                    updateValue(
+                        (targetValue + dragAmount.x / tabWidthPx * if (isLtr) 1f else -1f)
+                            .fastCoerceIn(0f, (tabsCount - 1).toFloat())
+                    )
+                    animationScope.launch {
+                        offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x)
+                    }
                 }
             },
-            // Critically damped, so the stretch tracks the drag instead of ringing
-            // after it: the library's underdamped default is what made the puck
-            // wobble as it crossed each tab.
-            velocityDampingRatio = 1f,
-        )
+        ).also { holder.instance = it }
     }
-    // False until this bar has run its selection sync once. Expanding back from
-    // inline builds a brand new ExpandedBar (it is its own AnimatedContent
-    // branch), so everything here re-remembers and this effect fires on first
-    // composition — with the puck ALREADY on the right tab, because
-    // dampedDragAnimation starts at currentIndex. animateToValue would then
-    // press-grow and release the puck without moving it anywhere, launched into a
-    // coroutine under mutatorMutex so it lands a frame or two into the crossfade:
-    // the indicator appears to pop in late and twitch. On that first pass the
-    // position is already correct, so there is nothing to animate.
-    var hasSyncedSelection by remember(tabsCount) { mutableStateOf(false) }
+    // Keep click/drag selection and the moving puck synchronized through one index,
+    // exactly as Melox does. The remembered tab list prevents stale callback captures.
+    LaunchedEffect(dampedDragAnimation) {
+        snapshotFlow { currentIndex }
+            .drop(1)
+            .collectLatest { index ->
+                dampedDragAnimation.animateToValue(index.toFloat())
+                currentTabs.value.getOrNull(index)?.onClick?.invoke()
+            }
+    }
 
-    // While the pager is moving, the puck IS the pager: same value, same frame, no
-    // spring of its own. `tabPosition` returns null the moment that driver settles, so
-    // the selectedTabKey effect below resumes ownership and a drag on the puck is never
-    // fought over. One collector for the whole gesture, not a coroutine per frame --
-    // see DampedDragAnimation.snapValue.
-    //
-    // Tab index and page index are deliberately the same number: `scope.tabs` here is
-    // Home/Library/Settings and so is MainTabsScreens, because search was taken out of
-    // the pager and made an overlay. Nothing has to map between them.
+    // While an external pager is moving, follow its fractional position directly.
     if (tabPosition != null) {
         LaunchedEffect(dampedDragAnimation, tabPosition) {
             snapshotFlow { tabPosition() }.collect { position ->
@@ -1396,32 +1376,11 @@ private fun SharedTransitionScope.ExpandedTabs(
         }
     }
 
-    // Keeps the puck synced when selection changes from a tap (or external
-    // navigation) rather than a drag on this bar.
+    // External navigation updates the same local index; the collector above owns
+    // the Melox press-grow-and-settle animation and click callback.
     LaunchedEffect(selectedTabKey, tabsCount) {
         val index = allTabs.indexOfFirst { it.key == selectedTabKey }
-        if (index != -1) {
-            currentIndex = index
-            if (!hasSyncedSelection) {
-                hasSyncedSelection = true
-                // Pin without the press animation; already in the right place.
-                dampedDragAnimation.updateValue(index.toFloat())
-                return@LaunchedEffect
-            }
-            // Re-pin on EVERY selection change, not only when currentIndex differs:
-            // the puck's animated value can drift out from under a matching currentIndex
-            // (a cancelled drag, an interrupted settle) and strand the indicator on the
-            // wrong tab — the "selected icon doesn't update" bug. Forcing this here
-            // always snaps it back to the actually-selected route.
-            //
-            // animateToValue (not updateValue): a tap should feel like a drag-release —
-            // the same press/grow-then-settle the puck does when you actually drag it,
-            // not just a bare position slide. This used to fall back to updateValue
-            // because animateToValue's press-grow visibly doubled the selected icon
-            // against the puck's glass copy — that's fixed now (the hidden backdrop row's
-            // contentScale and padding are kept in sync with the visible row, see above).
-            dampedDragAnimation.animateToValue(index.toFloat())
-        }
+        if (index != -1 && currentIndex != index) currentIndex = index
     }
 
     val interactiveHighlight = remember(animationScope) {
@@ -1436,33 +1395,21 @@ private fun SharedTransitionScope.ExpandedTabs(
             }
         )
     }
-
-    // Invisible tinted copy of the tabs, sampled by the puck below so the
-    // selected icon shows through the glass in the accent color.
-    val tabsBackdrop = rememberLayerBackdrop()
-
-    // This is the app's SECOND layerBackdrop, and it was the only one never told to
-    // sit out app-level motion. The app backdrop takes `frozen = backdropFrozenProvider`
-    // in MainActivity; this one took the `{ false }` default, so it ran the full
-    // `layer.record { drawContent() }` path -- which cannot reuse unchanged child
-    // RenderNodes -- on every frame of every scroll, on every screen the bar appears on.
-    // What it captures is this bar's own icon row sampling the screen behind it, so
-    // while the screen is moving the capture is stale a frame later anyway; the puck's
-    // lens lagging during motion is the same invisible-against-moving-content trade the
-    // app backdrop already makes.
-    val appBackdropFrozen = LocalAppBackdropFrozen.current
-
     Box(modifier.width(with(density) { totalWidthPx.toDp() })) {
         Row(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { translationX = panelOffset }
-                .sharedElement(
-                    sharedContentState = rememberSharedContentState("tabGroup"),
-                    animatedVisibilityScope = animatedVisibilityScope,
-                    boundsTransform = LocalBarBoundsTransforms.current.bar,
-                    zIndexInOverlay = 1f
-                )
+                .graphicsLayer {
+                    translationX = panelOffset
+                    val width = size.width.coerceAtLeast(1f)
+                    val pressScale = lerp(
+                        1f,
+                        1f + 16.dp.toPx() / width,
+                        dampedDragAnimation.pressProgress,
+                    )
+                    scaleX = pressScale
+                    scaleY = pressScale
+                }
                 .shadow(
                     shape = shapes.tabBarShape,
                     elevation = elevations.expandedElevation
@@ -1495,26 +1442,12 @@ private fun SharedTransitionScope.ExpandedTabs(
                                     // animateEnterExitAccessory already makes.
                                     compositingStrategy = CompositingStrategy.ModulateAlpha
                                 }
-                                .then(
-                                    // Q1 fix: selected icon rides the tabGroup like
-                                    // every other icon -- its own shared node nested
-                                    // inside the group's node read as readjusting.
-                                    Modifier.animateEnterExitTab(
-                                        sharedTransitionScope = this@ExpandedTabs,
-                                        animatedVisibilityScope = animatedVisibilityScope
-                                    )
-                                )
                         ) {
                             tab.icon()
                         }
                     },
                     title = {
-                        Box(
-                            Modifier.animateEnterExitTab(
-                                sharedTransitionScope = this@ExpandedTabs,
-                                animatedVisibilityScope = animatedVisibilityScope
-                            )
-                        ) {
+                        Box {
                             tab.title()
                         }
                     },
@@ -1532,113 +1465,10 @@ private fun SharedTransitionScope.ExpandedTabs(
                         .clip(shapes.tabShape)
                         .tapClickable(
                             indication = tab.indication?.invoke(),
-                            onClick = tab.onClick
+                            onClick = { currentIndex = index }
                         )
                         .padding(sizes.tabExpandedContentPadding)
                 )
-            }
-        }
-
-        if (backdrop != null) {
-            // Fixed 1dp blur here (see the blur() call below), so this is a
-            // stable fraction, not something that needs recomputing per frame.
-            // Pinned at 1f: glassResolutionScale(1f) used to resolve to 1.0
-            // before the chrome-glass scale change (FULL_QUALITY_BLUR_DP 2.5f),
-            // and this hidden row feeds the puck's lens() refraction — a sharp
-            // effect that visibly softens at reduced capture resolution. The
-            // strip is short, so full-res capture here is cheap.
-            val tabsBackdropScale = 1f
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clearAndSetSemantics {}
-                    .alpha(0f)
-                    .layerBackdrop(tabsBackdrop, frozen = appBackdropFrozen)
-                    .graphicsLayer { translationX = panelOffset }
-                    // Padding here (not after drawBackdrop, like the tail
-                    // .padding below) so it actually shrinks this row's own
-                    // measured bounds — matching LiquidBottomTabs' explicit
-                    // .height(56dp) vs the main row's 64dp: what tabsBackdrop
-                    // captures needs to be genuinely inset, not full-bleed.
-                    .padding(sizes.tabBarContentPadding)
-                    // Ported from LiquidBottomTabs: this hidden row isn't just a
-                    // tinted icon cutout, it's a real blurred/lensed glass sample
-                    // of the screen behind the bar — that's what makes the puck
-                    // below look like it's made of the *bar's* frosted material
-                    // (not a flat color) when it slides underneath.
-                    .drawBackdrop(
-                        backdrop = backdrop,
-                        shape = { shapes.tabBarShape },
-                        effects = {
-                            val progress = dampedDragAnimation.pressProgress
-                            vibrancy()
-                            // Without any blur here, this hidden row's lens()
-                            // distortion (below) samples the raw, sharp backdrop —
-                            // that's what made the puck look like undistorted,
-                            // "blur gone" background while dragging. Kyant's source
-                            // uses a fixed 8dp; we drive it from the user's own
-                            // glass blur-intensity setting instead of hardcoding.
-                            blur(glassConfig.blurRadius.dp.toPx() * tabsBackdropScale)
-                            lens(
-                                15f.dp.toPx() * progress * tabsBackdropScale,
-                                18f.dp.toPx() * progress * tabsBackdropScale
-                            )
-                        },
-                        highlight = null,
-                        onDrawSurface = { drawRect(colors.backgroundColor) },
-                        // Same GPU-saving trick as Modifier.liquidGlass: record this
-                        // hidden row at a fraction of surface resolution and let the
-                        // blur hide the upscale — was left at the 1f (full-res)
-                        // default here even though liquidGlass already uses this.
-                        backdropScale = tabsBackdropScale,
-                        frozen = LocalTabBarBackdropFrozen.current
-                    )
-                    .then(interactiveHighlight.modifier)
-                    // NOT a second .padding(sizes.tabBarContentPadding) here — the one
-                    // above (before drawBackdrop) already insets this row's measured
-                    // bounds. A second one compounded the inset only on this hidden
-                    // row (the visible row above applies it exactly once), shifting
-                    // its tabs right of their real counterparts — the puck's sampled
-                    // icon then visibly drifted from the real icon under it.
-                    .graphicsLayer(colorFilter = ColorFilter.tint(accentColor)),
-                horizontalArrangement = Arrangement.spacedBy(sizes.tabSpacing)
-            ) {
-                allTabs.forEachIndexed { index, tab ->
-                    Tab(
-                        // Behind copy hides at rest (press=0) so only the crisp
-                        // overlay shows; fades in on drag as that overlay fades.
-                        icon = {
-                            Box(
-                                Modifier.graphicsLayer {
-                                    alpha = dampedDragAnimation.pressProgress
-                                }
-                            ) { tab.icon() }
-                        },
-                        title = tab.title,
-                        isInline = false,
-                        isStandalone = false,
-                        // Must match the visible row's per-tab contentScale (see
-                        // above) — this hidden row is what the puck's glass samples,
-                        // so if it doesn't zoom in sync with the real icon during a
-                        // press/drag, the accent-tinted copy visibly drifts from the
-                        // real icon on top, reading as a ghosted double image.
-                        contentScale = if (index == currentIndex) {
-                            lerp(1f, 1.12f, dampedDragAnimation.pressProgress)
-                        } else {
-                            1f
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            // Must match the visible row's skipToLookaheadSize() too
-                            // (see below) — without it this hidden row can measure a
-                            // hair differently under the shared-transition lookahead
-                            // pass, leaving the puck's sampled icon slightly off from
-                            // the real one even at rest.
-                            .skipToLookaheadSize()
-                            .padding(sizes.tabExpandedContentPadding)
-                    )
-                }
             }
         }
 
@@ -1663,163 +1493,38 @@ private fun SharedTransitionScope.ExpandedTabs(
                 .width(sizes.tabWidth)
                 .fillMaxHeight()
                 .then(
-                    if (backdrop != null) {
-                        Modifier.drawBackdrop(
-                            backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
-                            shape = { shapes.tabShape },
-                            effects = {
-                                val progress = dampedDragAnimation.pressProgress
-                                // Soft frosted puck at rest (constant blur), deepening
-                                //
-                                blur(3f.dp.toPx() * (1f - progress))
-
-                                // Refraction is weakest at REST and deepens while the
-                                // puck is held and dragged: at rest the sharp overlay
-                                // icon sits on top at full alpha, and any real bend
-                                // there splits it from its lensed copy underneath —
-                                // the doubled/ghosted icon. That overlay fades out
-                                // over the first third of the press ramp, so by the
-                                // time the bend is at full strength there is only one
-                                // copy left to warp.
-                                lens(
-                                    lerp(0f.dp.toPx(), 10f.dp.toPx(), progress),
-                                    lerp(0f.dp.toPx(), 12f.dp.toPx(), progress),
-                                    // Dispersion is a drag-only flourish. It costs a
-                                    // second, heavier shader, so a puck sitting still
-                                    // should not be paying for it.
-                                    chromaticAberration = progress > 0.01f
-                                )
-                            },
-                            // Spec Q13: rim light only while dragged/pressed.
-                            highlight = {
-                                val p = dampedDragAnimation.pressProgress
-                                if (p > 0.01f) Highlight(width = 1.dp, alpha = 0.55f * p) else null
-                            },
-                            shadow = {
-                                val progress = dampedDragAnimation.pressProgress
-                                // Same reasoning: a little separation at rest so
-                                // the puck reads as a raised element rather than
-                                // a flat patch of the bar.
-                                Shadow(alpha = lerp(PuckRestShadowAlpha, 1f, progress))
-                            },
-                            innerShadow = {
-                                val progress = dampedDragAnimation.pressProgress
-                                // Press-only. InnerShadowModifier bails out solely on a
-                                // null return: handing it alpha = 0 still costs an
-                                // Offscreen render target, an outline build and a layer
-                                // record every frame, to composite something fully
-                                // transparent. A puck at rest should pay nothing.
-                                if (progress > 0f) {
-                                    InnerShadow(radius = 8f.dp * progress, alpha = progress)
-                                } else {
-                                    null
-                                }
-                            },
-                            layerBlock = {
-                                scaleX = dampedDragAnimation.scaleX
-                                scaleY = dampedDragAnimation.scaleY
-                            },
-                            onDrawSurface = {
-                                // What shows inside the puck is the hidden tinted tab
-                                // row sampled back through this glass, so anything
-                                // painted here lands ON TOP of the selected icon.
-                                // Black at any real strength crushes it — hence an
-                                // accent wash that defines the pill's shape while
-                                // leaving the icon at full strength, deepening only
-                                // while pressed.
-                                val progress = dampedDragAnimation.pressProgress
-
-                                // Was a hardcoded near-black at 0.8 alpha, which on a
-                                // dark bar made the whole puck read as a dark blob and
-                                // on a light theme was simply wrong. Colour and resting
-                                // opacity are configurable now, and the unset default
-                                // follows the theme instead of assuming dark.
-                                drawRect(puckWash.copy(alpha = puckRestAlpha * (1f - 0.75f * progress)))
-                            },
-                            frozen = LocalTabBarBackdropFrozen.current
+                    // Melox/BitChord-style puck: a flat tinted fill, no lens/backdrop
+                    // sampling of its own — the "liquid" read comes entirely from the
+                    // stretch/squash deformation below, riding on the bar's own glass
+                    // surface underneath it. This used to be a full drawBackdrop chain
+                    // (lens + highlight + inner shadow, sampling a dedicated invisible
+                    // tint-recording pass) costing 2 extra offscreen passes every scroll
+                    // frame for a live-refraction effect; that pass and its backing
+                    // tabsBackdrop/combinedBackdrop are gone along with it.
+                    Modifier
+                        .graphicsLayer {
+                            scaleX = dampedDragAnimation.scaleX
+                            scaleY = dampedDragAnimation.scaleY
+                            // Velocity-driven stretch/squash: the same asymmetric
+                            // deformation the old lens layerBlock applied, now on a
+                            // flat shape instead of a sampled one.
+                            val velocity = dampedDragAnimation.velocity / 10f
+                            scaleX /= 1f - (velocity * 0.75f).coerceIn(-0.2f, 0.2f)
+                            scaleY *= 1f - (velocity * 0.25f).coerceIn(-0.2f, 0.2f)
+                        }
+                        .shadow(
+                            shape = shapes.tabShape,
+                            elevation = elevations.expandedElevation * dampedDragAnimation.pressProgress
                         )
-                    } else {
-                        Modifier
-                            .graphicsLayer {
-                                scaleX = dampedDragAnimation.scaleX
-                                scaleY = dampedDragAnimation.scaleY
-                            }
-                            .shadow(
-                                shape = shapes.tabShape,
-                                elevation = elevations.expandedElevation * dampedDragAnimation.pressProgress
-                            )
-                            .background(
-                                colors.backgroundColor.copy(
-                                    alpha = 0.5f + 0.5f * dampedDragAnimation.pressProgress
-                                ),
-                                shapes.tabShape
-                            )
-                            .clip(shapes.tabShape)
-                    }
+                        .background(
+                            colors.backgroundColor.copy(
+                                alpha = 0.5f + 0.5f * dampedDragAnimation.pressProgress
+                            ),
+                            shapes.tabShape
+                        )
+                        .clip(shapes.tabShape)
                 )
         )
-
-        // The selected icon, drawn a second time above the puck.
-        //
-        // What shows *through* the puck is the hidden accent-tinted tab row
-        // refracted by the glass, and the puck's surface tint necessarily paints
-        // over it — so that copy can never be at full opacity. Redrawing the icon
-        // here is the only way to keep it crisp.
-        //
-        // It rides the puck's own translation and squash, so the two cannot drift
-        // apart mid-drag, and it always covers the dimmed copy underneath rather
-        // than ghosting beside it. Which icon to draw is derived state, so this
-        // recomposes when the puck crosses into a new tab, not every frame.
-        val puckIndex by remember(tabsCount) {
-            derivedStateOf {
-                dampedDragAnimation.value
-                    .fastRoundToInt()
-                    .coerceIn(0, (tabsCount - 1).coerceAtLeast(0))
-            }
-        }
-        Box(
-            Modifier
-                .padding(sizes.tabBarContentPadding)
-                .graphicsLayer {
-                    translationX =
-                        if (isLtr) dampedDragAnimation.value * tabWidthPx + panelOffset
-                        else size.width - (dampedDragAnimation.value + 1f) * tabWidthPx + panelOffset
-                    scaleX = dampedDragAnimation.scaleX
-                    scaleY = dampedDragAnimation.scaleY
-                    // Settled state only. Fades roughly three times faster than the
-                    // press ramp, so it is fully gone a third of the way into the
-                    // gesture instead of lingering over the moving puck. Read in the
-                    // draw phase, so it costs no recomposition.
-                    alpha = (1f - dampedDragAnimation.pressProgress * 3f).fastCoerceIn(0f, 1f)
-                }
-                .width(sizes.tabWidth)
-                .fillMaxHeight()
-                // Purely decorative: the tab underneath keeps the click and the
-                // semantics, and this must never swallow either.
-                .clearAndSetSemantics {},
-        ) {
-            currentTabs.value.getOrNull(puckIndex)?.let { tab ->
-                // Must go through Tab, not just tab.icon(): Tab is a Column of
-                // icon THEN title, so drawing the icon alone centres it on the
-                // puck while the row centres it on the icon+title pair — which is
-                // exactly how far off it looked. Same props as the row's selected
-                // tab, so the two line up.
-                Tab(
-                    // No tint override: the icon keeps the selected colour its
-                    // caller gave it, which is the point of drawing it again.
-                    icon = { tab.icon() },
-                    title = { tab.title() },
-                    isInline = false,
-                    isStandalone = false,
-                    // No press zoom: only visible at rest, where the row's own lerp
-                    // lands on 1f. Leaving it out also stops the overlay recomposing
-                    // on every frame of a drag.
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(sizes.tabExpandedContentPadding),
-                )
-            }
-        }
     }
 }
 
@@ -1921,38 +1626,13 @@ private fun Modifier.animateEnterExitTab(
             }
         }
 
-        val blurRadius = with(LocalDensity.current) { 50.dp.toPx() }
-        val animatedBlur by transition.animateFloat(
-            transitionSpec = {
-                keyframes {
-                    durationMillis = durationMs
-                    if (targetState == EnterExitState.Visible) {
-                        blurRadius atFraction enterStartFraction using FastOutSlowInEasing
-                        0f atFraction enterEndFraction
-                    }
-                }
-            }
-        ) { targetState ->
-            when (targetState) {
-                EnterExitState.Visible -> 0f
-                else -> blurRadius
-            }
-        }
-
         graphicsLayer {
+            // The tab group already scales/translates these pixels on the shared
+            // 300 ms bounds clock. A second 50 dp blur clock made each icon resolve
+            // independently mid-morph (the visible readjust/shimmer) and allocated
+            // an extra offscreen layer per icon/title. Fade only: one transform clock,
+            // identical settled pixels, and substantially less transition work.
             alpha = animatedAlpha
-            // BlurEffect(0f, 0f) is still a *non-null* RenderEffect, and a non-null
-            // RenderEffect forces its own offscreen render target and is re-evaluated
-            // on every composite -- not only while recording. Leaving one set at rest
-            // made every unselected tab icon and every tab title its own permanently
-            // blurred layer, for the whole life of the bar, to render a blur of radius
-            // zero. Null it once the 150ms transition lands, the way Modifier.gooey
-            // already does in GooeyTransition.kt.
-            renderEffect = if (animatedBlur > 0f) {
-                BlurEffect(radiusX = animatedBlur, radiusY = animatedBlur)
-            } else {
-                null
-            }
         }
     }
 }
@@ -2164,34 +1844,26 @@ object FloatingTabBarDefaults {
 }
 
 /**
- * iOS 27 tab bar collapse/expand choreography, measured off
- * designRefrence/threadsdownloader.com_0805d3.mp4 (30fps, bar extents and mini title y per frame):
- *
- * - Collapse: the tab pill shrinks into the selected tab and Search detaches first; the mini
- *   player follows ~90ms later, travelling down into the gap between them. Critically damped,
- *   the mini's travel fitting a stiffness-440 spring (~320ms).
- * - Expand: the reverse lead -- the mini rises first (~200ms, stiffness ~700), the pill grows
- *   out of the tab ~70ms behind it.
- *
- * Springs can't be delayed, so each trailing half is a tween on the curve that matches that
- * spring's shape.
+ * Inline/expand choreography, reverted to the pre-yesterday behaviour: one
+ * fixed-duration tween drives the outer SizeTransform, the fades AND every
+ * sharedElement bounds, zero delay, both directions. Tweens share one end
+ * frame, so the overlay hands back to real layout on the same frame -- no
+ * spring settle-threshold drift between the container and the overlay copy,
+ * which is what read as the icon pop. Stagger/bounce sacrificed on purpose:
+ * each was its own clock on the same pixels.
  */
 internal class BarBoundsTransforms(val bar: BoundsTransform, val accessory: BoundsTransform) {
     companion object {
-        private val CritSpring440Easing = CubicBezierEasing(0.25f, 0.75f, 0.35f, 1f)
-        private fun <T> spring440() = spring<T>(dampingRatio = 1f, stiffness = 440f)
-        private fun <T> spring700() = spring<T>(dampingRatio = 1f, stiffness = 700f)
+        private fun <T> morphTween() =
+            tween<T>(GooeyDurationMs, easing = FastOutSlowInEasing)
 
         val Collapse = BarBoundsTransforms(
-            bar = BoundsTransform { _, _ -> spring440() },
-            accessory = BoundsTransform { _, _ -> tween(320, delayMillis = 90, easing = CritSpring440Easing) },
+            bar = BoundsTransform { _, _ -> morphTween() },
+            accessory = BoundsTransform { _, _ -> morphTween() },
         )
         val Expand = BarBoundsTransforms(
-            // Q1 lock: bar/icons ride the container spring with zero delay so the
-            // sharedElement overlay and the SizeTransform never double-drive the
-            // icons mid-flight. Stagger lives on the accessory only (Collapse).
-            bar = BoundsTransform { _, _ -> spring700() },
-            accessory = BoundsTransform { _, _ -> spring700() },
+            bar = BoundsTransform { _, _ -> morphTween() },
+            accessory = BoundsTransform { _, _ -> morphTween() },
         )
     }
 }

@@ -13,7 +13,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -117,17 +116,26 @@ fun MeshGradientBackground(
     // stop, since the drift is only visible through the blur.
     val (reduceMotion) = rememberPreference(ReduceDynamicBlurKey, false)
 
-    val tuned = (palette.colors.ifEmpty { FallbackColors } + FallbackColors)
-        .take(4)
-        .map { it.tuned() }
-
-    // Each slot crossfades independently when the palette changes; with motion reduced
-    // they snap straight to target instead.
-    val colorSpec: AnimationSpec<Color> = if (reduceMotion) snap() else tween(1400)
-    val animatedColors = tuned.mapIndexed { index, color ->
-        animateColorAsState(color, colorSpec, label = "meshColor$index").value
+    val tuned = remember(palette.colors) {
+        (palette.colors.ifEmpty { FallbackColors } + FallbackColors)
+            .take(4)
+            .map { it.tuned() }
     }
-    val baseColor by animateColorAsState(tuned.first().dimmed(), colorSpec, label = "meshBase")
+
+    // Keep the animation States intact and read them from the Canvas below. Reading
+    // `.value` here used to recompose this whole composable every frame of the 1.4 s
+    // palette crossfade; a draw-phase read invalidates only the RenderNode instead.
+    val colorSpec: AnimationSpec<Color> = remember(reduceMotion) {
+        if (reduceMotion) snap() else tween(1400)
+    }
+    val animatedColors = tuned.mapIndexed { index, color ->
+        animateColorAsState(color, colorSpec, label = "meshColor$index")
+    }
+    val baseColor = animateColorAsState(
+        tuned.first().dimmed(),
+        colorSpec,
+        label = "meshBase",
+    )
 
     // Read in the draw lambda, not here: an Animatable read during draw invalidates the
     // draw phase only, leaving composition out of the loop.
@@ -153,12 +161,13 @@ fun MeshGradientBackground(
                 scaleX = 1.3f
                 scaleY = 1.3f
             }
-            .background(baseColor)
             .blur(64.dp),
     ) {
         val drift = phase.value
+        drawRect(baseColor.value)
 
-        animatedColors.forEachIndexed { index, color ->
+        animatedColors.forEachIndexed { index, colorState ->
+            val color = colorState.value
             val anchor = BlobAnchors[index]
             val speed = BlobSpeeds[index]
             val center = Offset(

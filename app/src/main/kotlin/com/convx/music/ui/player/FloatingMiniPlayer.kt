@@ -248,6 +248,7 @@ fun FloatingMiniPlayer(
                 // that's currently off.
                 layer = { if (PlayerMorph.enabled) PlayerMorph.miniLayer else null },
                 drawInPlace = { !PlayerMorph.active },
+                markReady = { PlayerMorph.miniFrameReady = true },
             )
             .onSizeChanged { measuredHeightPx = it.height }
             // Finger-following glow, same as the search pill.

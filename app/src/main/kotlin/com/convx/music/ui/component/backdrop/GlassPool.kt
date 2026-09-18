@@ -66,10 +66,7 @@ private class GlassPoolElement(
     override fun create(): GlassPoolNode = GlassPoolNode(source, pooled, effects, scale)
 
     override fun update(node: GlassPoolNode) {
-        node.source = source
-        node.pooled = pooled
-        node.effects = effects
-        node.scale = scale
+        node.update(source, pooled, effects, scale)
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -79,9 +76,15 @@ private class GlassPoolElement(
 
     override fun equals(other: Any?): Boolean =
         other is GlassPoolElement && source == other.source && pooled == other.pooled &&
-            scale == other.scale
+            effects == other.effects && scale == other.scale
 
-    override fun hashCode(): Int = 31 * source.hashCode() + pooled.hashCode()
+    override fun hashCode(): Int {
+        var result = source.hashCode()
+        result = 31 * result + pooled.hashCode()
+        result = 31 * result + effects.hashCode()
+        result = 31 * result + scale.hashCode()
+        return result
+    }
 }
 
 private class GlassPoolNode(
@@ -100,6 +103,26 @@ private class GlassPoolNode(
 
     private var coordinates: LayoutCoordinates? = null
     private var recordedSize: IntSize = IntSize.Zero
+    private var recordedSourceVersion: Int? = null
+    private var recordedScale = Float.NaN
+    private var captureDirty = true
+
+    fun update(
+        source: Backdrop,
+        pooled: LayerBackdrop,
+        effects: BackdropEffectScope.() -> Unit,
+        scale: Float,
+    ) {
+        if (this.source != source || this.pooled != pooled ||
+            this.effects !== effects || this.scale != scale
+        ) {
+            captureDirty = true
+        }
+        this.source = source
+        this.pooled = pooled
+        this.effects = effects
+        this.scale = scale
+    }
 
     override fun ContentDrawScope.draw() {
         // Nothing of this node is visible; it exists to keep [pooled] current.
@@ -111,9 +134,15 @@ private class GlassPoolNode(
             (size.width * scale).toInt().coerceAtLeast(1),
             (size.height * scale).toInt().coerceAtLeast(1),
         )
-        // Re-recorded every frame, deliberately: the surfaces sampling this show what is
-        // behind them live, and holding a copy while the page scrolls is exactly the
-        // stale-glass look this is meant to avoid. Three passes buys it for all of them.
+        val sourceVersion = (source as? LayerBackdrop)?.contentVersion
+        val sourceChanged = sourceVersion == null || sourceVersion != recordedSourceVersion
+        if (!captureDirty && !sourceChanged && recordSize == recordedSize &&
+            scale == recordedScale && pooled.hasRecording
+        ) {
+            // The source is frozen or unchanged. Re-blurring and flattening it would
+            // produce exactly the same pixels, so keep replaying the pooled RenderNode.
+            return
+        }
 
         effectScope.update(this, scale)
         effectScope.apply(effects)
@@ -141,16 +170,21 @@ private class GlassPoolNode(
         pooled.contentRecorded()
 
         recordedSize = recordSize
+        recordedScale = scale
+        recordedSourceVersion = sourceVersion
+        captureDirty = false
     }
 
     override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
         if (coordinates.isAttached) {
+            if (this.coordinates != coordinates) captureDirty = true
             this.coordinates = coordinates
         }
     }
 
     override fun onAttach() {
         captureLayer = requireGraphicsContext().createGraphicsLayer()
+        captureDirty = true
     }
 
     override fun onDetach() {
@@ -158,6 +192,9 @@ private class GlassPoolNode(
         captureLayer = null
         coordinates = null
         recordedSize = IntSize.Zero
+        recordedScale = Float.NaN
+        recordedSourceVersion = null
+        captureDirty = true
         effectScope.reset()
     }
 }
