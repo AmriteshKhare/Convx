@@ -176,9 +176,19 @@ fun PlayerV2(
     // whichever side the finger is dragging toward, tracking the drag itself rather than
     // only appearing once the gesture commits.
     val queueWindows by playerConnection.queueWindows.collectAsState()
-    val currentQueueIndex by playerConnection.currentMediaItemIndex.collectAsState()
+    // Play-order index, not timeline order: queueWindows is built in play order
+    // (PlayerExt.getQueueWindows), so ±1 here stays faithful on shuffle.
+    val currentQueueIndex by playerConnection.currentWindowIndex.collectAsState()
     val nextMediaMetadata = queueWindows.getOrNull(currentQueueIndex + 1)?.mediaItem?.metadata
     val previousMediaMetadata = queueWindows.getOrNull(currentQueueIndex - 1)?.mediaItem?.metadata
+    // Prerender fuel for the melt: neighbour covers decoded before the skip lands,
+    // keyed by the exact resized URL ThumbnailImage will request.
+    val heroPreloadUrls = remember(nextMediaMetadata?.thumbnailUrl, previousMediaMetadata?.thumbnailUrl) {
+        listOfNotNull(
+            nextMediaMetadata?.thumbnailUrl?.resize(1200, 1200),
+            previousMediaMetadata?.thumbnailUrl?.resize(1200, 1200),
+        )
+    }
     val currentSong by playerConnection.currentSong.collectAsState(initial = null)
     val currentLyrics by playerConnection.currentLyrics.collectAsState(initial = null)
     val menuState = LocalMenuState.current
@@ -756,6 +766,27 @@ fun PlayerV2(
                                             if (!PlayerMorph.active) artworkRestScaleState.floatValue = it
                                         }
                                     }
+                                    // Settle flush (mini-tap stuck-shrunk fix): an animation that
+                                    // finishes mid-flight leaves the holder stale -- the collector
+                                    // above drops in-flight values and conflation can swallow the
+                                    // final one, so nothing re-asserts it after landing until the
+                                    // next play/pause flap. Re-assert the intent-led target on the
+                                    // settled edge only, so rest animations stay smooth: at rest
+                                    // the collector owns the holder, this effect stays quiet.
+                                    // Intent (playWhenReady at the song-play event), not the lagging
+                                    // isPlaying flow, decides -- a mini-tap seek sets it
+                                    // synchronously while the flow still reports ENDED.
+                                    var heroWasUnsettled by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                                    androidx.compose.runtime.LaunchedEffect(state.isExpanded, state.isCollapsed, state.isDragging) {
+                                        val settled = !state.isDragging && (state.isExpanded || state.isCollapsed)
+                                        if (!settled) {
+                                            heroWasUnsettled = true
+                                        } else if (heroWasUnsettled && !PlayerMorph.active) {
+                                            heroWasUnsettled = false
+                                            artworkRestScaleState.floatValue =
+                                                if (isHeroLook || playerConnection.player.playWhenReady) 1f else 0.729f
+                                        }
+                                    }
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
@@ -777,6 +808,10 @@ fun PlayerV2(
                                             artworkUri = mediaMetadata?.thumbnailUrl?.resize(1200, 1200),
                                             cropArtwork = true,
                                             crossfadeMillis = heroCrossfadeMs.takeIf { it > 0 }?.toInt() ?: 200,
+                                            // Same-song URL rung change (fallback ladder) must not
+                                            // melt the image into itself.
+                                            contentKey = mediaMetadata?.id,
+                                            preloadUrls = heroPreloadUrls,
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                         // Same baked progressive foot as artist/classic player
@@ -965,11 +1000,15 @@ fun PlayerV2(
                                                 }
                                             )
                                     ) {
-                                        AsyncImage(
-                                            model = mediaMetadata?.thumbnailUrl?.resize(1200, 1200),
-                                            contentDescription = "Cover Art",
+                                        // Same melt as the hero cover, not a pop: the shrink
+                                        // morph reads as one image travelling while the pixels
+                                        // themselves dissolve.
+                                        ThumbnailImage(
+                                            artworkUri = mediaMetadata?.thumbnailUrl?.resize(1200, 1200),
+                                            cropArtwork = true,
+                                            crossfadeMillis = 450,
+                                            contentKey = mediaMetadata?.id,
                                             modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
                                         )
                                         PlayerV2Canvas(
                                             mediaMetadata = mediaMetadata,
@@ -1133,8 +1172,14 @@ fun PlayerV2(
                                         // the sheet on mount, and only let a dismissal mean "leave
                                         // the queue" once it has genuinely been open.
                                         var queueOpened by remember { mutableStateOf(false) }
+                                        // Snap, not spring: this sheet has no gesture handling
+                                        // (sheetDraggable=false below) so nothing can settle an
+                                        // interrupted expand -- a spring parked mid-flight by a
+                                        // touch stayed there. The constructor already animates
+                                        // 0 -> expanded on mount; the snap just guarantees the
+                                        // end state.
                                         LaunchedEffect(Unit) {
-                                            queueSheetState.expandSoft()
+                                            queueSheetState.snapTo(queueSheetState.expandedBound)
                                         }
                                         LaunchedEffect(queueSheetState.isExpanded) {
                                             if (queueSheetState.isExpanded) queueOpened = true

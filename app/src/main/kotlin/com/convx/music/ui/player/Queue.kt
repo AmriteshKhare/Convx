@@ -1315,7 +1315,14 @@ fun Queue(
                             ).asPaddingValues(),
                     modifier = Modifier
                         .fillMaxSize()
-                        .nestedScroll(state.preUpPostDownNestedScrollConnection)
+                        // The parent sheet owns the drag when this queue is hosted as a
+                        // pane (V2 passes sheetDraggable=false): installing the sheet's
+                        // nested-scroll connection here turned scroll-ups at the top
+                        // into dismisses, i.e. the queue closing under the finger.
+                        .then(
+                            if (sheetDraggable) Modifier.nestedScroll(state.preUpPostDownNestedScrollConnection)
+                            else Modifier
+                        )
                 ) {
                     item(key = "queue_top_spacer") {
                         Spacer(

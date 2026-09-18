@@ -787,6 +787,7 @@ private fun ThumbnailItem(
                     artworkUri = artworkUriToUse?.resize(1200, 1200),
                     cropArtwork = cropAlbumArt,
                     crossfadeMillis = crossfadeDurationMs.takeIf { isCurrentItem && it > 0 }?.toInt() ?: 200,
+                    contentKey = item.mediaId,
                 )
             }
             
@@ -1040,16 +1041,27 @@ internal fun ThumbnailImage(
     cropArtwork: Boolean,
     modifier: Modifier = Modifier,
     // Matches the audio crossfade's own length right after a DJ handoff (see
-    // PlayerConnection.crossfadeDurationMs); a short default the rest of the
-    // time, so a manual skip/seek still feels snappy.
+    // PlayerConnection.crossfadeDurationMs); floored below so a manual
+    // skip/seek still reads and the GPU gets a frame budget.
     crossfadeMillis: Int = 200,
+    // Song identity for the URL. A fallback-ladder rung change (maxres -> sd)
+    // alters the URL without altering the picture -- without the key that
+    // melts the image into itself, visibly, for no reason.
+    contentKey: String? = null,
+    // Exact resized URLs to decode ahead of time, so the melt starts on warm
+    // bitmaps instead of stuck-then-jump (V2 passes the neighbour covers).
+    preloadUrls: List<String> = emptyList(),
 ) {
+    // Floor: below this the melt is a shimmer the eye never registers and the
+    // first-frame shader compile eats the whole window (sometimes -> never-do).
+    val resolvedCrossfadeMillis = maxOf(crossfadeMillis, 450)
     val context = LocalContext.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     val shaderMorphSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
 
     var boxSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
     var currentUrl by remember { mutableStateOf(artworkUri) }
+    var currentKey by remember { mutableStateOf(contentKey) }
     var outgoingUrl by remember { mutableStateOf<String?>(null) }
     val morph = remember { Animatable(1f) }
     // Driven only while a transition is in flight — an always-on tick for the
@@ -1080,38 +1092,49 @@ internal fun ThumbnailImage(
     }
 
     LaunchedEffect(artworkUri) {
-        if (artworkUri != currentUrl) {
-            ensureLoaded(artworkUri)
-            outgoingUrl = currentUrl
+        if (artworkUri == currentUrl) return@LaunchedEffect
+        if (contentKey != null && contentKey == currentKey) {
+            // Same song, new URL rung: adopt silently, no self-melt.
             currentUrl = artworkUri
-            morph.snapTo(0f)
-            coroutineScope {
-                val timeJob = if (shaderMorphSupported) {
-                    launch {
-                        val start = withFrameNanos { it }
-                        while (isActive) {
-                            timeSeconds = (withFrameNanos { it } - start) / 1_000_000_000f
-                        }
-                    }
-                } else {
-                    null
-                }
-                morph.animateTo(1f, animationSpec = tween(crossfadeMillis, easing = LinearEasing))
-                timeJob?.cancel()
-            }
-            outgoingUrl = null
-            // Only the just-landed cover matters from here — this is a
-            // per-composable cache for morph-ready bitmaps, not a general
-            // image cache (Coil already owns that).
-            if (rawBitmaps.size > MAX_CACHED_COVERS) {
-                rawBitmaps.keys.filterNot { it == currentUrl }.forEach { rawBitmaps.remove(it) }
-            }
-            val keep = currentUrl
-            scaledBitmaps.keys.filterNot { keep != null && it.startsWith("$keep@") }
-                .forEach { scaledBitmaps.remove(it) }
+            return@LaunchedEffect
         }
+        ensureLoaded(artworkUri)
+        outgoingUrl = currentUrl
+        currentUrl = artworkUri
+        currentKey = contentKey
+        morph.snapTo(0f)
+        coroutineScope {
+            val timeJob = if (shaderMorphSupported) {
+                launch {
+                    val start = withFrameNanos { it }
+                    while (isActive) {
+                        timeSeconds = (withFrameNanos { it } - start) / 1_000_000_000f
+                    }
+                }
+            } else {
+                null
+            }
+            morph.animateTo(1f, animationSpec = tween(resolvedCrossfadeMillis, easing = LinearEasing))
+            timeJob?.cancel()
+        }
+        outgoingUrl = null
+        // Only the just-landed cover matters from here — this is a
+        // per-composable cache for morph-ready bitmaps, not a general
+        // image cache (Coil already owns that). Preloaded neighbours are
+        // spared so the next skip starts warm.
+        if (rawBitmaps.size > MAX_CACHED_COVERS) {
+            rawBitmaps.keys.filterNot { it == currentUrl || it in preloadUrls }.forEach { rawBitmaps.remove(it) }
+        }
+        val keep = currentUrl
+        scaledBitmaps.keys.filterNot { keep != null && it.startsWith("$keep@") }
+            .forEach { scaledBitmaps.remove(it) }
     }
     LaunchedEffect(Unit) { ensureLoaded(currentUrl) }
+    // Prerender: decode neighbour covers ahead of the skip so both melt
+    // endpoints are resident when the transition fires.
+    LaunchedEffect(preloadUrls) {
+        preloadUrls.forEach { ensureLoaded(it) }
+    }
 
     if (!shaderMorphSupported) {
         fun scaledKeyFor(url: String) = "$url@${boxSize.width}x${boxSize.height}x$cropArtwork"

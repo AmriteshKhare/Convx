@@ -92,9 +92,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
@@ -1512,17 +1514,21 @@ private fun SharedTransitionScope.ExpandedTabs(
                             scaleX /= 1f - (velocity * 0.75f).coerceIn(-0.2f, 0.2f)
                             scaleY *= 1f - (velocity * 0.25f).coerceIn(-0.2f, 0.2f)
                         }
-                        .shadow(
-                            shape = shapes.tabShape,
-                            elevation = elevations.expandedElevation * dampedDragAnimation.pressProgress
-                        )
-                        .background(
-                            colors.backgroundColor.copy(
-                                alpha = 0.5f + 0.5f * dampedDragAnimation.pressProgress
-                            ),
-                            shapes.tabShape
-                        )
-                        .clip(shapes.tabShape)
+                        // Melox's pill surface: a 10% neutral wash at rest that fades out
+                        // as the press grows, leaving only a 3% dark film while dragged.
+                        // The old fill was colors.backgroundColor ramped to full alpha --
+                        // Color.Transparent on glass, i.e. black, so a drag painted an
+                        // opaque black capsule over the icons. The puck sits above the
+                        // tab row, so it has to stay see-through at every press level.
+                        .drawWithCache {
+                            val outline = shapes.tabShape.createOutline(size, layoutDirection, this)
+                            val wash = if (themeDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
+                            onDrawBehind {
+                                val progress = dampedDragAnimation.pressProgress
+                                drawOutline(outline, color = wash, alpha = 1f - progress)
+                                drawOutline(outline, color = Color.Black.copy(alpha = 0.03f * progress))
+                            }
+                        }
                 )
         )
     }

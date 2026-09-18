@@ -45,7 +45,8 @@ fun UpNextSong(
     additiveChrome: Boolean = false,
 ) {
     val queueWindows by playerConnection.queueWindows.collectAsState()
-    val currentIndex by playerConnection.currentMediaItemIndex.collectAsState()
+    // Play-order index (see PlayerExt.getQueueWindows): timeline-order +1 goes wrong on shuffle.
+    val currentIndex by playerConnection.currentWindowIndex.collectAsState()
 
     val nextItem = queueWindows.getOrNull(currentIndex + 1)?.mediaItem?.metadata
 
