@@ -84,6 +84,7 @@ fun ScreenChromeBox(
     onBack: (() -> Unit)?,
     onBackLongClick: (() -> Unit)?,
     actions: @Composable () -> Unit,
+    titleAlphaProvider: (() -> Float)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
@@ -116,6 +117,7 @@ fun ScreenChromeBox(
             onBackLongClick = onBackLongClick,
             title = title,
             titleAlpha = titleAlpha,
+            titleAlphaProvider = titleAlphaProvider,
             actions = actions,
             modifier = Modifier.align(Alignment.TopCenter),
         )
@@ -141,6 +143,7 @@ fun ScreenScaffold(
     onBackLongClick: (() -> Unit)? = null,
     pageColor: Color = AppTheme.colorScheme.background,
     actions: @Composable () -> Unit = {},
+    titleAlphaProvider: (() -> Float)? = null,
     content: @Composable BoxScope.(GlassScreenChrome) -> Unit,
 ) {
     val chrome = rememberGlassScreenChrome(background = pageColor)
@@ -148,6 +151,7 @@ fun ScreenScaffold(
         ScreenChromeBox(
             title = title,
             titleAlpha = titleAlpha,
+            titleAlphaProvider = titleAlphaProvider,
             pageColor = pageColor,
             chrome = chrome,
             onBack = onBack,
@@ -196,17 +200,18 @@ fun ScreenPage(
 ) {
     val chrome = rememberGlassScreenChrome(background = pageColor)
     // Measured, not guessed: the title block's height is the exact distance the
-    // page has to travel before the compact title should be fully in, and it
-    // changes with the status bar inset and the font scale.
+    // page has to travel before the compact title should be fully in.
     var titleBlockHeight by remember { mutableIntStateOf(1) }
-    val titleAlpha by remember(scrollState) {
-        derivedStateOf { (scrollState.value / titleBlockHeight.toFloat()).coerceIn(0f, 1f) }
-    }
 
     CompositionLocalProvider(LocalAppBackdrop provides chrome.backdrop) {
         ScreenChromeBox(
             title = title,
-            titleAlpha = titleAlpha,
+            titleAlpha = 0f,
+            titleAlphaProvider = {
+                // Read ScrollState in draw phase via provider chain:
+                // FrostedTopBar invokes this only inside graphicsLayer/derivedStateOf.
+                (scrollState.value / titleBlockHeight.toFloat()).coerceIn(0f, 1f)
+            },
             pageColor = pageColor,
             chrome = chrome,
             onBack = onBack,
@@ -267,11 +272,13 @@ fun ScreenLazyPage(
     content: LazyListScope.() -> Unit,
 ) {
     val chrome = rememberGlassScreenChrome(background = pageColor)
+    val lazyTitleProgress = rememberTitleCollapseProgressState(listState, titleItemKey = "title")
 
     CompositionLocalProvider(LocalAppBackdrop provides chrome.backdrop) {
         ScreenChromeBox(
             title = title,
-            titleAlpha = rememberTitleCollapseProgress(listState, titleItemKey = "title"),
+            titleAlpha = 0f,
+            titleAlphaProvider = { lazyTitleProgress.value },
             pageColor = pageColor,
             chrome = chrome,
             onBack = onBack,

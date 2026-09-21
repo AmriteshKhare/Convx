@@ -318,7 +318,37 @@ class MusicService :
     private fun karaokePosition(p: Player = player) {
         val id = p.currentMediaItem?.mediaId
         playerKaraokeProcessors[p]?.rebase(id, p.currentPosition)
-        karaoke.onPosition(id, p.duration.coerceAtLeast(0L), p.currentPosition)
+        karaoke.onPosition(
+            id,
+            p.duration.coerceAtLeast(0L),
+            p.currentPosition,
+            // The real stream URI, so karaoke analysis can range-fetch bytes the
+            // player hasn't buffered yet instead of failing on the cache miss.
+            p.currentMediaItem?.localConfiguration?.uri,
+        )
+        karaokePreanalyzeNext(p)
+    }
+
+    /**
+     * Starts karaoke analysis on the upcoming queue item while the current one
+     * is still playing, so its masks are (mostly) ready when the transition
+     * lands instead of arriving half a minute late. The engine itself skips
+     * complete masks and duplicate jobs, so this runs unconditionally.
+     */
+    private fun karaokePreanalyzeNext(p: Player) {
+        if (!karaoke.state.value.enabled) return
+        val nextIndex = p.nextMediaItemIndex
+        if (nextIndex == C.INDEX_UNSET) return
+        val next = runCatching { p.getMediaItemAt(nextIndex) }.getOrNull() ?: return
+        val uri = next.localConfiguration?.uri ?: return
+        // Timeline duration when the item is prepared, else the runtime the
+        // queue row carried (`d=`), available from the moment the queue is set.
+        val durationMs = runCatching { p.currentTimeline.getWindow(nextIndex, Timeline.Window()).durationMs }
+            .getOrNull()?.takeIf { it != C.TIME_UNSET && it > 0 }
+            ?: runCatching { uri.getQueryParameter("d") }.getOrNull()?.toLongOrNull()
+                ?.takeIf { it > 0 }?.times(1000L)
+            ?: return
+        karaoke.preanalyze(next.mediaId, durationMs, uri)
     }
     private var sparePlayer: ExoPlayer? = null
 
@@ -622,6 +652,7 @@ class MusicService :
 
         AudioCache.init(playerCache)
         AudioCache.prefetchHead = ::prefetchAnalysisHead
+        AudioCache.analyzerUpstream = youtubeUpstreamFactory()
 
         trackAnalyzer = TrackAnalyzer(this, AudioCache)
         crossfade = CrossfadeController(
@@ -3162,20 +3193,17 @@ class MusicService :
         }
     }
 
-    private fun createCacheDataSource(): CacheDataSource.Factory {
+    /**
+     * The network leg of the player cache chain, shared with the analyzer so
+     * karaoke/DJ analysis can fill its own cache misses with the same proxy,
+     * DNS and auth behaviour as playback — see AudioCache.analyzerUpstream.
+     */
+    private fun youtubeUpstreamFactory(): DefaultDataSource.Factory {
         val ytProxy = YouTube.proxy
         val ytProxyAuth = YouTube.proxyAuth
-        return CacheDataSource
-            .Factory()
-            .setCache(downloadCache)
-            .setUpstreamDataSourceFactory(
-                CacheDataSource
-                    .Factory()
-                    .setCache(playerCache)
-                    .setUpstreamDataSourceFactory(
-                        DefaultDataSource.Factory(
-                            this,
-                            OkHttpDataSource.Factory(
+        return DefaultDataSource.Factory(
+            this,
+            OkHttpDataSource.Factory(
                                 OkHttpClient
                                     .Builder()
                                     .dns(object : Dns {
@@ -3209,8 +3237,18 @@ class MusicService :
                                     }
                                     .build(),
                             ),
-                        ),
-                    ),
+                        )
+    }
+
+    private fun createCacheDataSource(): CacheDataSource.Factory {
+        return CacheDataSource
+            .Factory()
+            .setCache(downloadCache)
+            .setUpstreamDataSourceFactory(
+                CacheDataSource
+                    .Factory()
+                    .setCache(playerCache)
+                    .setUpstreamDataSourceFactory(youtubeUpstreamFactory()),
             ).setCacheWriteDataSinkFactory(null)
             .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
     }

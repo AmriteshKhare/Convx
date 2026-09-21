@@ -54,7 +54,7 @@ fun LibraryArtistListItem(
             }
         ) {
             Icon(
-                painter = painterResource(R.drawable.more_vert),
+                painter = painterResource(R.drawable.more_horiz),
                 contentDescription = null
             )
         }
@@ -124,7 +124,7 @@ fun LibraryAlbumListItem(
             }
         ) {
             Icon(
-                painter = painterResource(R.drawable.more_vert),
+                painter = painterResource(R.drawable.more_horiz),
                 contentDescription = null
             )
         }
@@ -225,7 +225,7 @@ fun LibraryPlaylistListItem(
             }
         ) {
             Icon(
-                painter = painterResource(R.drawable.more_vert),
+                painter = painterResource(R.drawable.more_horiz),
                 contentDescription = null
             )
         }

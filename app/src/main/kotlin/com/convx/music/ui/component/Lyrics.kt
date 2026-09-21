@@ -1954,7 +1954,7 @@ fun Lyrics(
                     enabled = selectedIndices.isNotEmpty()
                 ) {
                     Icon(
-                        painter = painterResource(id = R.drawable.share),
+                        painter = painterResource(id = R.drawable.ios_share),
                         contentDescription = stringResource(R.string.share_selected),
                         modifier = Modifier.size(20.dp)
                     )
@@ -2031,7 +2031,7 @@ fun Lyrics(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.share), // Use new share icon
+                            painter = painterResource(id = R.drawable.ios_share), // Use new share icon
                             contentDescription = null,
                             tint = AppTheme.colorScheme.primary
                         )
@@ -2056,7 +2056,7 @@ fun Lyrics(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.share), // Use new share icon
+                            painter = painterResource(id = R.drawable.ios_share), // Use new share icon
                             contentDescription = null,
                             tint = AppTheme.colorScheme.primary
                         )

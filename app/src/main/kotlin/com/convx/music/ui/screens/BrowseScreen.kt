@@ -57,7 +57,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import com.convx.music.ui.component.ScreenLargeTitle
 import com.convx.music.ui.component.ScreenScaffold
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
  import com.convx.music.viewmodels.BrowseViewModel
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -80,13 +80,15 @@ import com.convx.music.ui.component.rememberTitleCollapseProgress
      val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
  
      val gridState = rememberLazyGridState()
+     val browseTitleProgress = rememberTitleCollapseProgressState(gridState)
 
-     ScreenScaffold(
-         title = title ?: "",
-         titleAlpha = rememberTitleCollapseProgress(gridState),
-         onBack = navController::navigateUp,
-         onBackLongClick = navController::backToMain,
-     ) { chrome ->
+ScreenScaffold(
+        title = title ?: "",
+        titleAlpha = 0f,
+        titleAlphaProvider = { browseTitleProgress.value },
+        onBack = navController::navigateUp,
+        onBackLongClick = navController::backToMain,
+    ) { chrome ->
      LazyVerticalGrid(
          state = gridState,
          columns = rememberGridColumns(),
@@ -114,9 +116,8 @@ import com.convx.music.ui.component.rememberTitleCollapseProgress
                                       is AlbumItem -> navController.navigate(albumRoute(item.id, item.thumbnail))
                                       is PlaylistItem -> navController.navigate(onlinePlaylistRoute(item.id, item.title, item.thumbnail))
                                       is ArtistItem -> navController.navigate(artistRoute(item.id, item.thumbnail))
-                                     else -> {
-                                         // Do nothing
-                                     }
+else -> {
+                                    }
                                  }
                              },
                              onLongClick = {
@@ -144,9 +145,8 @@ import com.convx.music.ui.component.rememberTitleCollapseProgress
                                              )
                                          }
  
-                                         else -> {
-                                             // Do nothing
-                                         }
+else -> {
+                                        }
                                      }
                                  }
                              }

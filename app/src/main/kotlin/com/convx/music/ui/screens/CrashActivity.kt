@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens
 
+import androidx.compose.ui.res.painterResource
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -46,7 +47,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.convx.music.R
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
 import com.composables.sfsymbols.monochrome.SFSquareOnSquare
 import com.composables.sfsymbols.monochrome.SFXmark
 import com.convx.music.ui.theme.vivimusicTheme
@@ -171,7 +171,7 @@ fun CrashScreen(
                 onClick = onShare,
                 icon = {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
+                        painter = painterResource(R.drawable.ios_share),
                         contentDescription = null
                     )
                 },

@@ -142,25 +142,18 @@ fun AnimatedBottomSheet(
 }
 
 /**
- * Outer corner radius shared by every menu sheet. Continuous (superellipse) corners at
- * this size are the iOS sheet silhouette; Material's default is both smaller and drawn
- * with circular arcs, which is most of why our sheets did not read as the reference.
+ * Outer radius for every menu sheet — continuous (superellipse) corners are the iOS
+ * sheet silhouette; Material's smaller circular-arc default is why sheets didn't match.
  */
 val MenuSheetCornerRadius = 28.dp
 
 /** Horizontal inset the sheet's content sits at, and the basis for [MenuSheetItemRadius]. */
 val MenuSheetContentInset = 16.dp
 
-/**
- * Radius for anything drawn as a card/row inside a menu sheet, so its curve stays
- * concentric with the sheet's own. Use this instead of picking a radius per screen.
- */
+/** Card/row radius inside a sheet, kept concentric with the sheet's own curve. */
 val MenuSheetItemRadius: Dp = concentricRadius(MenuSheetCornerRadius, MenuSheetContentInset)
 
-/** Cupertino's own action-sheet timing, read out of its (unexposed) source rather than
- *  guessed: 400ms in on this cubic-bezier, 150ms of [EaseIn] on the way out. Reproduced
- *  here — not called into the library — because [io.github.alexzhirkevich.cupertino.CupertinoActionSheet]
- *  exposes no modifier/shape/margin hook to float, rim-light or drag-dismiss its sheet. */
+/** Cupertino's action-sheet timing (from its source): 400ms in on this cubic-bezier, 150ms of [EaseIn] out. */
 private val CupertinoSheetEasing = CubicBezierEasing(0.2833f, 0.99f, 0.31833f, 0.99f)
 private const val CupertinoSheetEnterMillis = 400
 private const val CupertinoSheetExitMillis = 150
@@ -172,8 +165,7 @@ private val MenuDragResistRange = 320.dp
 fun BottomSheetMenu(
     modifier: Modifier = Modifier,
     state: MenuState,
-    // The sheet is the *grouped* background: menu content sits on it as cards, which
-    // is only legible if the sheet itself is the darker/greyer of the two.
+    // Sheet is the grouped background — darker/greyer than the cards laid on it.
     background: Color = Color.Unspecified,
 ) {
     val iosColors = IosTheme.colors
@@ -195,11 +187,8 @@ fun BottomSheetMenu(
         ),
     )
 
-    // Routed through hig's own detent state machine (CupertinoSheetState) via
-    // CupertinoModalBottomSheet — the real library mechanism, not a hand-rolled
-    // stand-in: opens to the Medium detent, drags to Large, dismisses past Medium.
-    // hide() plays the real slide-down settle; MenuState.isVisible only flips once
-    // that finishes (see onDismissRequest below), so this stays composed for it.
+    // hide() plays the real slide-down settle; isVisible only flips once it finishes,
+    // so the sheet stays composed until then.
     fun dismiss() {
         focusManager.clearFocus()
         scope.launch { sheetState.hide() }
@@ -237,10 +226,7 @@ fun BottomSheetMenu(
                     }
                 },
             ) {
-                // CupertinoModalBottomSheet provides hig's own LocalContentColor, but
-                // this app's screens are built on the ios.compat Icon/Text, which reads
-                // a separate compat LocalContentColor — provide that one too, or content
-                // here falls back to Compose's global-default black regardless.
+                // hig provides its own LocalContentColor; provide the compat one this app's screens read too.
                 CompositionLocalProvider(LocalContentColor provides iosColors.label) {
                     Column(
                         modifier = Modifier
@@ -257,17 +243,10 @@ fun BottomSheetMenu(
 }
 
 /**
- * The iOS sheet grabber: a 36x5 capsule sitting close under the sheet's own top edge,
- * not floating in a tall Material-sized handle area.
- *
- * [dragOffsetPx] is the caller's own drag-to-dismiss offset — the grabber stretches
- * into a wider, thinner capsule as the sheet is pulled, same tanh-damped "elastic"
- * feel as [GlassCircleButton]'s press/drag distortion, just driven by the sheet's
- * existing drag state instead of its own gesture (the whole sheet already owns
- * vertical drag; a second detector on the grabber alone would fight it). Used as the
- * drag handle for Material's [ModalBottomSheet]-backed sheets ([IosCompatTail]'s
- * default, [BottomSheetPage]) — [BottomSheetMenu] drags through hig's
- * [zone.ien.hig.CupertinoModalBottomSheet], which draws its own grabber.
+ * iOS sheet grabber: a 36x5 capsule under the sheet's top edge. [dragOffsetPx] is the
+ * caller's drag-to-dismiss offset — the grabber stretches wider/thinner as the sheet is
+ * pulled, same tanh-damped feel as [GlassCircleButton]. Not used by [BottomSheetMenu]'s
+ * hig-based sheet, which draws its own grabber.
  */
 @Composable
 fun IosGrabber(modifier: Modifier = Modifier, dragOffsetPx: Float = 0f) {

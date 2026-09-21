@@ -74,7 +74,6 @@ import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.composables.sfsymbols.SfSymbols
 import androidx.compose.ui.res.painterResource
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFMagnifyingglass
 import com.composables.sfsymbols.monochrome.SFXmark
 import com.convx.music.constants.HistorySource
@@ -91,7 +90,7 @@ import com.convx.music.ui.component.FrostedTopBar
 import com.convx.music.ui.component.LargeScreenTitle
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.NavigationTitle
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 import com.convx.music.ui.component.SongListItem
 import com.convx.music.ui.component.YouTubeListItem
 import com.convx.music.ui.component.GlassCircleButton
@@ -205,6 +204,7 @@ fun HistoryScreen(
     }
 
     val lazyListState = rememberLazyListState()
+    val historyTitleProgress = rememberTitleCollapseProgressState(lazyListState)
 
     val heroUrl = remember(filteredRemoteContent, filteredEvents) {
         if (historySource == HistorySource.REMOTE) {
@@ -332,7 +332,7 @@ fun HistoryScreen(
                                         }
                                     ) {
                                         Icon(
-                                            imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                            painter = painterResource(R.drawable.more_horiz),
                                             contentDescription = null
                                         )
                                     }
@@ -419,7 +419,7 @@ fun HistoryScreen(
                                             }
                                         ) {
                                             Icon(
-                                                imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                                painter = painterResource(R.drawable.more_horiz),
                                                 contentDescription = null
                                             )
                                         }
@@ -497,7 +497,8 @@ fun HistoryScreen(
             if (!inSelectMode && !isSearching) {
                 FrostedTopBar(
                     title = stringResource(R.string.history),
-                    titleAlpha = rememberTitleCollapseProgress(lazyListState),
+                    titleAlpha = 0f,
+                    titleAlphaProvider = { historyTitleProgress.value },
                     titleColor = onTint,
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
@@ -565,7 +566,7 @@ fun HistoryScreen(
                             }
                         ) {
                             Icon(
-                                imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                painter = painterResource(R.drawable.more_horiz),
                                 contentDescription = null
                             )
                         }

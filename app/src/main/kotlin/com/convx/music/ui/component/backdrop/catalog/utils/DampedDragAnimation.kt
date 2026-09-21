@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -56,6 +57,7 @@ class DampedDragAnimation(
     private val mutatorMutex = MutatorMutex()
     private var pressJob: Job? = null
     private var releaseJob: Job? = null
+    private var settleJob: Job? = null
     private val velocityTracker = VelocityTracker()
     private val startMark = TimeSource.Monotonic.markNow()
 
@@ -107,53 +109,89 @@ class DampedDragAnimation(
 
     fun release() {
         releaseJob?.cancel()
+        pressJob?.cancel()
         releaseJob = animationScope.launch {
             withFrameMillis { }
             // Keep the stretched glass shape visible until the position spring is nearly settled.
+            // Bounded: drag deltas arriving mid-release used to hold this await open forever
+            // (stuck stretch). Event-driven rule: a release settles the latest state, then
+            // deflates — it never waits unboundedly for quiet.
             if (value != targetValue) {
                 val threshold = (valueRange.endInclusive - valueRange.start) * 0.025f
-                snapshotFlow { valueAnimation.value }
-                    .first { abs(it - valueAnimation.targetValue) < threshold }
+                withTimeoutOrNull(400) {
+                    snapshotFlow { valueAnimation.value }
+                        .first { abs(it - valueAnimation.targetValue) < threshold }
+                }
             }
+            launch { velocityAnimation.animateTo(0f, velocityAnimationSpec) }
             launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
             launch { scaleXAnimation.animateTo(initialScale, scaleXAnimationSpec) }
             launch { scaleYAnimation.animateTo(initialScale, scaleYAnimationSpec) }
         }
     }
 
+    /**
+     * Drag path: the finger owns the position, so the event snaps state
+     * synchronously instead of queueing an `animateTo` per delta behind the
+     * in-flight frame (which lagged the puck under fast drags). Settle springs
+     * run only on release / programmatic taps ([animateToValue]).
+     */
     fun updateValue(value: Float) {
-        val targetValue = value.coerceIn(valueRange)
+        val coerced = if (value.isFinite()) value.coerceIn(valueRange) else valueAnimation.value
+        // Snap, don't animate: one synchronous state write per drag event, no queue.
         animationScope.launch {
-            valueAnimation.animateTo(targetValue, valueAnimationSpec) { updateVelocity() }
+            valueAnimation.snapTo(coerced)
+            snapVelocity()
         }
     }
 
+    /**
+     * Tap path: single-flight. Rapid taps cancel the previous settle instead of
+     * queueing behind it in [mutatorMutex] (which stranded pressProgress at 1 and
+     * left the puck at 1.39x scale). The finally guarantees the pressed
+     * morphology always deflates, even when a newer tap supersedes this one.
+     */
     fun animateToValue(value: Float) {
-        animationScope.launch {
+        settleJob?.cancel()
+        settleJob = animationScope.launch {
             mutatorMutex.mutate {
-                press()
-                val targetValue = value.coerceIn(valueRange)
-                launch { valueAnimation.animateTo(targetValue, valueAnimationSpec) }
-                if (velocity != 0f) {
-                    launch { velocityAnimation.animateTo(0f, velocityAnimationSpec) }
+                var released = false
+                try {
+                    press()
+                    val targetValue = if (value.isFinite()) value.coerceIn(valueRange) else valueAnimation.value
+                    valueAnimation.animateTo(targetValue, valueAnimationSpec)
+                    if (velocityAnimation.value != 0f) {
+                        velocityAnimation.animateTo(0f, velocityAnimationSpec)
+                    }
+                    release()
+                    released = true
+                } finally {
+                    // Cancelled mid-flight by a newer tap: release() never ran, so
+                    // deflate directly without awaiting settle. On the normal path
+                    // release() already owns the deflate — no duplicate.
+                    if (!released &&
+                        (pressProgressAnimation.value != 0f ||
+                            scaleXAnimation.value != initialScale ||
+                            scaleYAnimation.value != initialScale)
+                    ) {
+                        launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
+                        launch { scaleXAnimation.animateTo(initialScale, scaleXAnimationSpec) }
+                        launch { scaleYAnimation.animateTo(initialScale, scaleYAnimationSpec) }
+                    }
                 }
-                release()
             }
         }
     }
 
     /** Convx pager extension; pointer drag behavior remains identical to Melox. */
     suspend fun snapValue(value: Float) {
-        valueAnimation.snapTo(value.coerceIn(valueRange))
+        valueAnimation.snapTo(if (value.isFinite()) value.coerceIn(valueRange) else valueAnimation.value)
     }
 
-    private fun updateVelocity() {
-        velocityTracker.addPosition(nowMillis(), Offset(value, 0f))
-        // Normalize by the whole logical range so deformation is independent of tab count.
+    private suspend fun snapVelocity() {
+        velocityTracker.addPosition(nowMillis(), Offset(valueAnimation.value, 0f))
         val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1e-6f)
-        val targetVelocity = velocityTracker.calculateVelocity().x / span
-        // animateTo (not snapTo): a spring toward the new velocity is what makes the
-        // stretch track the drag smoothly rather than jump frame to frame.
-        animationScope.launch { velocityAnimation.animateTo(targetVelocity, velocityAnimationSpec) }
+        val raw = velocityTracker.calculateVelocity().x / span
+        velocityAnimation.snapTo(if (raw.isFinite()) raw else 0f)
     }
 }

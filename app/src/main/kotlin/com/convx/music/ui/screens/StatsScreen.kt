@@ -84,7 +84,7 @@ import com.convx.music.ui.component.ChoiceChipsRow
 import com.convx.music.ui.component.FrostedTopBar
 import com.convx.music.ui.component.HideOnScrollFAB
 import com.convx.music.ui.component.LargeScreenTitle
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 import com.convx.music.ui.component.LocalAlbumsGrid
 import com.convx.music.ui.component.LocalArtistsGrid
 import com.convx.music.ui.component.LocalMenuState
@@ -125,6 +125,7 @@ fun StatsScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
+    val statsTitleProgress = rememberTitleCollapseProgressState(lazyListState)
     val selectedOption by viewModel.selectedOption.collectAsState()
 
     val weeklyDates =
@@ -471,7 +472,6 @@ fun StatsScreen(
                 }
             }
 
-            // FAB to shuffle most played songs
             if (mostPlayedSongs.isNotEmpty()) {
                 HideOnScrollFAB(
                     visible = true,
@@ -488,10 +488,10 @@ fun StatsScreen(
                 )
             }
 
-            // Top bar logic
             FrostedTopBar(
                 title = stringResource(R.string.stats),
-                titleAlpha = rememberTitleCollapseProgress(lazyListState),
+                titleAlpha = 0f,
+                titleAlphaProvider = { statsTitleProgress.value },
                 titleColor = onTint,
                 modifier = Modifier.align(Alignment.TopCenter),
             )

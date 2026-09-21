@@ -145,25 +145,14 @@ import kotlin.math.sign
 
 
 
-// ponytail: diagnostic slow-motion for the inline<->expanded transition.
-// Was left at 6 after a jitter hunt (gooey crossfade 300ms -> 1800ms, tab
-// fades 220/180ms -> ~1.4s): both bars rendered overlapping for seconds —
-// the reported "ghosting" and puck-behind-nav-bar — and taps during the
-// crawl felt dead. Keep at 1; raise only to re-diagnose.
+// Diagnostic slow-motion for the inline<->expanded transition; keep at 1 or ghosting returns.
 private const val DIAG_SLOWDOWN = 1
 
-// Tuning for the gooey merge/split pulse across the inline<->expanded
-// crossfade — see GooeyTransition.kt. Not derived from fadeIn()/fadeOut()'s
-// own duration; just a reasonable match for it.
+// Gooey merge/split pulse duration; not derived from the fades, just a reasonable match.
 private val GooeyPeakBlur = 12.dp
 private const val GooeyDurationMs = 300 * DIAG_SLOWDOWN
 
-// Shadow the selection puck keeps when it is NOT being pressed. It used to be
-// driven straight off pressProgress, i.e. zero at rest, which left the puck
-// defined only by its own surface wash — invisible against a dark bar.
-// (The matching rim light is gone: the iOS 26 reference bars render the selected
-// capsule as a plain fill with no specular edge. Separation at rest is the
-// shadow's job now, which is what the reference does too.)
+// Rest-state puck shadow: with zero press it would be invisible against a dark bar.
 private const val PuckRestShadowAlpha = 0.35f
 
 /** How long after the last scroll event the bar's backdrop stays frozen. Long enough to
@@ -174,17 +163,10 @@ private const val ScrollFreezeTailNs = 120_000_000L
 // EMA weight for the scroll-velocity estimate. Plain value, no recomposition.
 private const val MomentumVelocityEmaAlpha = 0.35f
 
-// Vendored addition: the three shapes the bar can render. INLINE is the
-// scroll-collapsed row (unchanged by search mode); EXPANDED is the normal
-// all-tabs pill; SEARCH_EXPANDED replaces EXPANDED while search mode is
-// active (see SearchExpandedBar).
+// Vendored addition: the three shapes the bar can render (INLINE, EXPANDED, SEARCH_EXPANDED).
 private enum class FloatingTabBarVisual { INLINE, EXPANDED, SEARCH_EXPANDED }
 
-// Matches the established inline-row height (InlineStandaloneTab's own
-// defaultMinSize floor at the FloatingNavBar call site, and the inline mini
-// player's own ~48dp content height) so the search-expanded row doesn't read
-// shorter than the bar's own shrunk state. Also the shrunk mini player's
-// pinned height (see FloatingMiniPlayer) — one constant, same row height.
+// Matches the mini player's 48dp row height so the shrunk states all read as one height.
 internal val SearchBarRowHeight = 48.dp
 
 /**
@@ -215,30 +197,13 @@ fun FloatingTabBar(
     shapes: FloatingTabBarShapes = FloatingTabBarDefaults.shapes(),
     sizes: FloatingTabBarSizes = FloatingTabBarDefaults.sizes(),
     elevations: FloatingTabBarElevations = FloatingTabBarDefaults.elevations(),
-    // Vendored addition: when non-null, the expanded selection puck samples this
-    // backdrop for lens refraction and an accent-tinted glass preview of the
-    // selected tab's icon. Null falls back to a flat colored puck.
+    // Vendored addition: sampled by the puck for lens refraction and a glass icon preview; null = flat puck.
     backdrop: Backdrop? = null,
     accentColor: Color? = null,
-    // Vendored addition: when true (and searchBarContent non-null), the
-    // expanded state renders SearchExpandedBar instead of ExpandedBar — the
-    // tab group shrinks to the current screen's own icon and the standalone
-    // slot expands to fill the rest of the row with searchBarContent. The
-    // inline (scrolled) state is unaffected — it stays the normal collapsed
-    // icon+accessory+standalone row regardless of searchMode.
-    // Vendored addition: the puck's live position, when something outside the bar is
-    // already animating the selection -- the main tabs pager. Returns the fractional
-    // tab index while that driver is moving, and null the rest of the time so the
-    // ordinary selectedTabKey settle takes back over.
-    //
-    // Without this the puck waited for the pager to FINISH: `selectedTabKey` derives
-    // from `pagerState.currentPage`, which only flips near the end of
-    // `animateScrollToPage`, and only then did the puck start its own spring. Two
-    // springs in series, so the puck arrived roughly a full animation after the page
-    // it marks -- the "selected icon puck comes after a second" report.
+    // Vendored addition: true renders SearchExpandedBar (tab group shrinks to the current screen's icon).
+    // Vendored addition: live puck position while an external pager drives selection, avoiding two springs in series.
     tabPosition: (() -> Float?)? = null,
-    // Whole-bar snap thump, 0 at rest. The docked mini fires it on drag
-    // release (see onSnapRelease); read in the draw phase, no recomposition.
+    // Whole-bar snap thump (0 at rest), fired by the docked mini on drag release; read in draw, no recomposition.
     snapPulse: () -> Float = { 0f },
     searchMode: Boolean = false,
     searchBarContent: (@Composable (Modifier) -> Unit)? = null,

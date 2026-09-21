@@ -32,7 +32,6 @@ object DeepLService {
     ): Result<List<String>> = withContext(Dispatchers.IO) {
         var currentAttempt = 0
         
-        // Validate input
         if (text.isBlank()) {
             return@withContext Result.failure(Exception("Input text is empty"))
         }

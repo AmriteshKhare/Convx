@@ -3,13 +3,9 @@ package com.convx.music.data.settings
 import com.convx.music.playback.smart.TransitionPlan
 
 /**
- * The Automix transition the planner has lined up for the track that is playing, exposed to
- * the UI so the seek bar can show where the mix will happen before it arrives.
- *
- * Carries the overlap's real start and end on the outgoing track. It used to carry a single
- * `positionMs` computed as `transitionStart * 1000 / duration` — a 0..1 fraction assigned to a
- * Long, so it truncated to 0 for every track. Nothing read it, which is why that went
- * unnoticed.
+ * Automix overlap the planner lined up for the playing track, exposed to the UI so the seek
+ * bar can preview the mix window. Bounds are real ms; a prior single 0..1 fraction truncated
+ * to 0 in a Long.
  */
 data class TransitionWindow(
     val plan: TransitionPlan,

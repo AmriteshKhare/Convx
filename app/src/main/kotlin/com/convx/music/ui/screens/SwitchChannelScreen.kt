@@ -78,7 +78,7 @@ fun SwitchChannelScreen(navController: NavController) {
         titleAlpha = 1f,
         onBack = navController::navigateUp,
         onBackLongClick = navController::backToMain,
-    ) {
+        content = {
         AndroidView(
             // Deliberately NOT the chrome's contentModifier: recording a
             // hardware-accelerated WebView into a backdrop layer makes the page

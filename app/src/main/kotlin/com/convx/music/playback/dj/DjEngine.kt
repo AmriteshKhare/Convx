@@ -41,17 +41,14 @@ data class TrackAnalysis(
      *  track when it came from a probe rather than a full play-through. */
     val energyProfile: ByteArray = ByteArray(0),
 ) {
-    // ByteArray makes the generated equals/hashCode identity-based. Nothing
-    // compares these; they are looked up by media id.
+    // ByteArray makes equals/hashCode identity-based; these are looked up by media id, never compared.
     override fun equals(other: Any?): Boolean = this === other
     override fun hashCode(): Int = System.identityHashCode(this)
 }
 
 /**
- * What the player surfaces about DJ mixing. Deliberately reports the tier and
- * style that actually fired rather than what was hoped for, so a fallback is
- * visible instead of leaving the listener wondering why a transition sounded
- * plain.
+ * What the player surfaces about DJ mixing — reports the tier and style that
+ * actually fired rather than what was hoped for, so fallbacks stay visible.
  */
 data class DjState(
     val enabled: Boolean = false,
@@ -64,14 +61,9 @@ data class DjState(
 )
 
 /**
- * Owns everything the DJ mode knows and decides: per-track analysis, its
- * persistence, the pre-analysis probe player, and what a given transition
- * should do.
- *
- * Deliberately does NOT own the players or the crossfade mechanics — MusicService
- * keeps those, because swapping the active player, the MediaSession and the
- * listener set is service lifecycle work, not DJ work. The split is: this class
- * answers *when* to transition and *how*, MusicService carries it out.
+ * Owns DJ-mode state and decisions: per-track analysis, persistence, the
+ * pre-analysis probe, and when/how to transition. Deliberately does not own
+ * players or crossfade mechanics, which MusicService keeps.
  */
 @UnstableApi
 class DjEngine(
@@ -80,10 +72,8 @@ class DjEngine(
     private val createProbePlayer: () -> ExoPlayer,
 ) {
 
-    // Own scope rather than MusicService's: that one is a `var` that gets
-    // replaced when the service restarts (MusicService.kt:1427), so a captured
-    // reference would quietly become a cancelled scope and every persist and
-    // probe would stop firing with no error.
+    // Own scope: MusicService's is a var replaced on restart, so a captured
+    // reference would silently become a cancelled scope.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /** Mirrors AutoDjMixingEnabledKey, kept fresh by MusicService's collector so
@@ -91,14 +81,8 @@ class DjEngine(
     @Volatile
     var enabled: Boolean = false
 
-    /** Mirrors CreativeTransitionsEnabledKey. Off by default: Auto-DJ on its own
-     *  means beatmatching and a transparent mix, which is what most listeners
-     *  actually want.
-     *
-     *  Subordinate to [enabled]: creative transitions are a DJ-mode feature, so with
-     *  Auto-DJ off they must not fire even if the user left this preference on. The
-     *  two prefs are independent in DataStore, and reading them independently let
-     *  filter sweeps and tail effects run on every PLAIN crossfade with DJ mode off. */
+    /** Mirrors CreativeTransitionsEnabledKey. Off by default, and subordinate to
+     *  [enabled]: creative effects must not fire when DJ mode is off. */
     @Volatile
     private var creativePref: Boolean = false
 
@@ -111,10 +95,7 @@ class DjEngine(
     private val filters = java.util.concurrent.ConcurrentHashMap<Player, DjFilterAudioProcessor>()
     private val tails = java.util.concurrent.ConcurrentHashMap<Player, DjTailAudioProcessor>()
     /** Which track each player's analyzer is currently accumulating for.
-     *  Per-player, not a single field on the service: the crossfade swaps which
-     *  ExoPlayer object is "the" player, so one shared "previous media id"
-     *  would end up filing the new player's energy profile under the old
-     *  track. */
+     *  Per-player because the crossfade swaps which ExoPlayer is "the" player. */
     private val analyzingMediaId = java.util.concurrent.ConcurrentHashMap<Player, String>()
     private val delays = java.util.concurrent.ConcurrentHashMap<Player, DelayAudioProcessor>()
 
@@ -161,13 +142,9 @@ class DjEngine(
     fun filterFor(player: Player?): DjFilterAudioProcessor? = player?.let { filters[it] }
 
     /**
-     * Bass swap. The outgoing track loses its low end while the incoming one
-     * gains it, so the two never fight over the same frequencies — this is the
-     * difference between a mix sounding *mixed* and sounding like two songs
-     * playing at once.
-     *
-     * [progress] runs 0..1 across the crossfade. Targets are stepped rather
-     * than jumped; the processor glides between the steps.
+     * Bass swap: the outgoing track loses its low end while the incoming one
+     * gains it, so they never fight over the same frequencies. [progress] runs
+     * 0..1 across the crossfade; targets are stepped, the processor glides.
      */
     fun driveFilterSweep(outgoing: Player?, incoming: Player?, progress: Float) {
         val plan = activePlan ?: return
@@ -187,8 +164,7 @@ class DjEngine(
     }
 
     /** Puts the incoming player's filter where the sweep starts, before it
-     *  makes a sound, so the first thing heard is already bass-cut rather than
-     *  full-range for a buffer. */
+     *  makes a sound, so the first thing heard is already bass-cut. */
     fun armIncomingFilter(incoming: Player?) {
         val filter = filterFor(incoming) ?: return
         if (activePlan?.tier != DjMixTier.FULL_DJ) {
@@ -200,8 +176,7 @@ class DjEngine(
         filter.snapToTargets()
     }
 
-    /** Filters must not outlive the transition — the incoming player is the
-     *  primary player afterwards and has to be full-range. */
+    /** Filters must not outlive the transition; afterward the incoming player has to be full-range. */
     fun openFilters(vararg players: Player?) {
         players.forEach { filterFor(it)?.open() }
     }
@@ -211,8 +186,7 @@ class DjEngine(
             Math.log(from.toDouble()) + (Math.log(to.toDouble()) - Math.log(from.toDouble())) * t
         ).toFloat()
 
-    /** A player moved to a new track: flush whatever the old one accumulated
-     *  first, then restart analysis. */
+    /** A player moved to a new track: flush the old accumulation, then restart analysis. */
     fun onTrackChanged(player: Player, newMediaId: String?) {
         analyzingMediaId[player]?.let { captureEnergyProfile(player, it) }
         analyzers[player]?.resetForTrack()
@@ -240,24 +214,20 @@ class DjEngine(
         )
     }
 
-    /** Fired from the audio renderer thread once a track has had enough audio
-     *  to analyze. Resolved against whichever player owns this analyzer's
-     *  CURRENT media item — looked up at call time, not capture time, since the
-     *  estimate belongs to whatever is playing when it completes. */
+    /** Fired from the audio renderer thread once a track has had enough audio to
+     *  analyze; ownership is looked up at call time, not capture time. */
     fun onAnalysisReady(analyzer: TrackAnalyzerAudioProcessor) {
         scope.launch {
             val owner = analyzers.entries.find { it.value === analyzer }?.key ?: return@launch
             val mediaId = owner.currentMediaItem?.mediaId ?: return@launch
-            // Off the main thread as well as off the audio thread: the tempo
-            // search is heavy enough to drop a frame if it ran on either.
+            // Off main and audio threads: the tempo search is heavy enough to drop a frame.
             val (grid, key) = withContext(Dispatchers.Default) { analyzer.computeAnalysis() }
             if (grid.bpm <= 0f && key.pitchClass < 0) return@launch
             val analysis = TrackAnalysis(grid, key.takeIf { it.pitchClass >= 0 }, analyzer.energyProfile)
             analyses[mediaId] = analysis
             persist(mediaId, analysis)
-            // Seeds the map for a player that never fired a transition event —
-            // the crossfade's secondary player is started before it is listened
-            // to, so this is its first chance to be recorded.
+            // Seeds the map for a player that never fired a transition event:
+            // the crossfade's secondary player starts before it is listened to.
             analyzingMediaId[owner] = mediaId
             if (owner.currentMediaItem?.mediaId == mediaId) publishState(mediaId, null)
             Timber.tag(TAG).d(
@@ -273,12 +243,8 @@ class DjEngine(
         }
     }
 
-    /**
-     * Re-read the energy profile for a track that has been playing and store the
-     * fuller version. The grid is final after the analysis window, but the
-     * profile grows for the whole track, and the outro — the part that decides
-     * how to mix out — only exists once the track has actually got there.
-     */
+    /** Re-read the energy profile for a track that has been playing: the grid is
+     *  final after the analysis window, but the outro only exists once reached. */
     fun captureEnergyProfile(player: Player, mediaId: String) {
         val analyzer = analyzers[player] ?: return
         val profile = analyzer.energyProfile
@@ -291,8 +257,7 @@ class DjEngine(
         persist(mediaId, updated)
     }
 
-    /** Load cached analysis for upcoming queue items so a track that has been
-     *  heard before needs no probe at all. */
+    /** Loads cached analysis for upcoming queue items so a known track needs no probe. */
     fun hydrate(mediaIds: List<String>) {
         val missing = mediaIds.filter { it.isNotEmpty() && !analyses.containsKey(it) }
         if (missing.isEmpty()) return
@@ -341,14 +306,8 @@ class DjEngine(
 
     /**
      * Approximates a chorus/drop cut point for [TransitionStyle.ECHO_FREEZE]:
-     * the loudest moment in the middle portion of the track, skipping the
-     * intro (first quarter) and anything past 70% (usually the outro or a
-     * final restatement, not where you'd want to cut away into an echo).
-     *
-     * A real chorus detector needs lyrics/structure the on-device analyzer
-     * doesn't have; the loudest mid-track second is a cheap, local stand-in
-     * that lands on a real chorus or drop far more often than the track's
-     * own tail does. Null when there isn't enough profile to judge from.
+     * the loudest moment mid-track (25–70%), a cheap stand-in for structure the
+     * on-device analyzer can't detect. Null when there isn't enough profile.
      */
     fun echoPointMs(mediaId: String?): Long? {
         val profile = analysisFor(mediaId)?.energyProfile ?: return null
@@ -368,18 +327,11 @@ class DjEngine(
     }
 
     /**
-     * Silently pre-plays [item] through a throwaway muted player at
-     * [PROBE_SPEED]x so the analyzer can cache a grid for it well before the
-     * real crossfade needs one.
-     *
-     * The probe rides the normal ResolvingDataSource chain, so YouTube
-     * resolution, lossless namespacing, Spine modules and the cache all work
-     * exactly as they do for real playback — which is why this exists instead
-     * of a separate MediaExtractor decode path.
-     *
-     * [guardMediaId] is the track that was playing when this was scheduled; if
-     * it has changed by the time the probe fires, the transition it was for is
-     * no longer happening.
+     * Silently pre-plays [item] through a throwaway muted player at [PROBE_SPEED]x
+     * so the analyzer can cache a grid before the crossfade needs one. Rides the
+     * normal ResolvingDataSource chain so resolution and cache work as in real
+     * playback. [guardMediaId] is the track playing when scheduled; if it changed,
+     * the transition it was for is no longer happening.
      */
     fun schedulePreAnalysis(
         item: MediaItem,
@@ -466,18 +418,14 @@ class DjEngine(
         return plan
     }
 
-    /**
-     * Arms whatever the selector chose on the outgoing player, for the length of
-     * the crossfade. All three effects are things a DJ does to the track that is
-     * *leaving* — the incoming one is supposed to arrive clean.
-     */
+    /** Arms whatever the selector chose on the outgoing player for the length of
+     *  the crossfade — effects act on the track that is *leaving*. */
     fun startTailEffect(outgoing: Player?, crossfadeMs: Long) {
         tailJob?.cancel()
         tailJob = null
         if (!creativeEnabled || outgoing == null) return
 
-        // No measured beat, no effect. Guessing a tempo here means looping or
-        // freezing on a grid that has nothing to do with the music.
+        // No measured beat, no effect; a guessed tempo would loop/freeze on a grid unrelated to the music.
         val beatMs = analysisFor(outgoing.currentMediaItem?.mediaId)?.grid?.beatMs
             ?.takeIf { it > 0f } ?: return
 
@@ -491,17 +439,11 @@ class DjEngine(
 
             TransitionStyle.ECHO_FREEZE -> {
                 val echo = delays[outgoing] ?: return
-                // Eighth-note slap-back on the outgoing track's own tempo, not
-                // a fixed 220ms — a delay unrelated to the beat reads as an
-                // artificial/washy echo instead of a musical one.
+                // Eighth-note slap-back on the outgoing tempo; a beat-unrelated delay reads as washy echo.
                 echo.setDelayMs((beatMs / 2f).toLong().coerceAtLeast(1L))
                 Timber.tag(TAG).d("Echo freeze at ${(crossfadeMs * ECHO_FREEZE_AT).toLong()}ms into the fade")
-                // Two stages, and the timing matters as much as the order.
-                // Freezing an empty delay line produces silence, so the line is
-                // fed first; and freezing kills the dry signal outright, so it
-                // has to happen late in the fade. Freezing a beat in — as this
-                // first did — removed the outgoing track four seconds before
-                // the crossfade had finished handing over, leaving a hole.
+                // Feed first — freezing an empty delay line is silence — then
+                // freeze late, since freezing kills the dry signal outright.
                 echo.frozen = false
                 echo.wetMix = ECHO_WET_MIX
                 tailJob = scope.launch {
@@ -529,8 +471,7 @@ class DjEngine(
     }
 
     fun clearActivePlan() {
-        // Recorded even when transparent, so a run of transparent mixes doesn't
-        // leave a stale creative move sitting at the head of the history.
+        // Recorded even when transparent, so a stale creative move never sits at the head.
         recentStyles.addFirst(activeStyle)
         while (recentStyles.size > STYLE_HISTORY) recentStyles.removeLast()
         activePlan = null
@@ -544,16 +485,10 @@ class DjEngine(
         get() = activePlan?.let { it.tier != DjMixTier.PLAIN_CROSSFADE } == true
 
     /**
-     * Where the crossfade should actually start, in track time.
-     *
-     * Two refinements over a flat `duration - crossfadeMs`:
-     * 1. If the energy profile shows the track dropping into an outro near that
-     *    point, mix out from the drop — that is where a human would.
-     * 2. Snap to a phrase boundary. Starting mid-phrase is the most audible
-     *    tell that a machine chose the moment.
-     *
-     * Falls back to the flat point whenever DJ mixing is off or the track has no
-     * usable grid, so non-DJ crossfades behave exactly as before.
+     * Where the crossfade should start, in track time. Two refinements over a
+     * flat `duration - crossfadeMs`: mix out from a nearby outro drop, and snap
+     * to a phrase boundary. Falls back to the flat point when DJ mixing is off
+     * or the track has no usable grid.
      */
     fun transitionPointMs(mediaId: String?, durationMs: Long, crossfadeMs: Long): Long {
         val flat = durationMs - crossfadeMs
@@ -569,23 +504,16 @@ class DjEngine(
             val dropSecond = EnergyProfile.outroDropSecond(profile)
             if (dropSecond >= 0) {
                 val dropMs = dropSecond * 1000L
-                // Only honour a drop that is genuinely near the end; an early
-                // breakdown is not an invitation to cut the track short.
+                // Only honour a drop genuinely near the end; an early breakdown is not an invitation to cut.
                 if (dropMs in (flat - MAX_OUTRO_PULL_MS)..(flat + crossfadeMs)) target = dropMs
             }
         }
 
-        // Snap DOWN, never to the nearest boundary. Rounding to nearest can
-        // push the mix up to half a phrase (~3.7 s at 128 BPM) *later* than
-        // `duration - crossfadeMs`, which leaves less track than the fade needs
-        // and the outgoing song simply ends partway through the crossfade. The
-        // clamp enforces the same rule: the transition may start earlier than
-        // the flat point, never later.
+        // Snap DOWN, never to the nearest boundary: rounding up can push the mix
+        // later than `duration - crossfadeMs`, and the song would end mid-fade.
         val snapped = grid.phraseAtOrBeforeMs(target).toLong()
-        // flat already leaves crossfadeMs of tail, but a short configured
-        // crossfade (e.g. well under a second) could otherwise let the
-        // transition land with almost nothing left to play after it.
-        // MIN_TAIL_MS is an independent floor for that case.
+        // flat already leaves crossfadeMs of tail, but a short crossfade could
+        // otherwise leave almost nothing after it; MIN_TAIL_MS is an extra floor.
         val maxResult = minOf(flat, durationMs - MIN_TAIL_MS).coerceAtLeast(0L)
         val minResult = (flat - MAX_OUTRO_PULL_MS).coerceAtMost(maxResult)
         val result = snapped.coerceIn(minResult, maxResult)
@@ -598,23 +526,11 @@ class DjEngine(
     }
 
     /**
-     * Where the incoming track should start playing, in its own track time.
-     *
-     * This has to land *on the incoming track's own beat grid*. Releasing the
-     * incoming player exactly on an outgoing beat only aligns the two if the
-     * incoming is also starting on one of its beats — start it at position 0
-     * and the grids stay offset by whatever the incoming's own phase happens to
-     * be, which is the very error the beat tracker exists to measure.
-     *
-     * That costs less than one beat of the track, and stays inside audio the
-     * player has already buffered.
-     *
-     * Deliberately does NOT skip a quiet intro, though mixing into 30 s of pad
-     * is a poor mix: seeking a freshly created player up to 16 s in means
-     * fetching an unbuffered byte range with only the crossfade's few seconds to
-     * do it, and an incoming track that never arrives is far worse than one that
-     * arrives over its own intro. Worth revisiting once transitions are proven
-     * solid, gated on the region already being buffered.
+     * Where the incoming track should start, in its own track time — it must land
+     * *on the incoming grid*, else the grids stay offset by its phase. Costs less
+     * than one beat and stays inside buffered audio. Deliberately skips no quiet
+     * intro: seeking a fresh player into an unbuffered range risks an arrival
+     * that never comes, gated on the region already being buffered.
      */
     fun incomingStartMs(mediaId: String?): Long {
         if (!enabled) return 0L
@@ -624,9 +540,8 @@ class DjEngine(
         return grid.beatAtOrAfter(0L).toLong().coerceAtLeast(0L)
     }
 
-    /** Cancels in-flight work and drops all state. Cancels the scope's
-     *  children rather than the scope itself, so the engine still works if the
-     *  service is recreated. */
+    /** Cancels in-flight work and drops all state. Cancels the scope's children,
+     *  not the scope itself, so the engine still works if the service is recreated. */
     fun release() {
         releaseProbe()
         scope.coroutineContext.cancelChildren()
@@ -643,18 +558,16 @@ class DjEngine(
     companion object {
         private const val TAG = "DjEngine"
 
-        /** [echoPointMs] needs at least this much profile before its answer means
-         *  anything — shorter than this and "loudest second" is just noise. */
+        /** [echoPointMs] needs this much profile before "loudest second" means anything. */
         private const val MIN_ECHO_POINT_PROFILE_SECONDS = 40
         private const val ECHO_POINT_WINDOW_START = 0.25
         private const val ECHO_POINT_WINDOW_END = 0.70
 
-        /** Probe playback rate. 4x provides ample lead time while keeping background
-         *  CPU audio decoding overhead low. */
+        /** Probe playback rate — ample lead time without heavy background decode. */
         const val PROBE_SPEED = 4f
 
-        /** How far ahead of the crossfade to start pre-analysing. 40 s of track
-         *  at 6x is ~7 s of wall clock; the rest is slack for buffering. */
+        /** How far ahead of the crossfade to start pre-analysing — slack for
+         *  buffering beyond the probe's own decode time. */
         const val PROBE_LEAD_MS = 20_000L
 
         /** How far earlier than the flat point an outro drop may pull the mix. */
@@ -666,9 +579,8 @@ class DjEngine(
         private const val TAPE_STOP_BEATS = 1.5f
         private const val ECHO_WET_MIX = 0.55f
 
-        /** Fraction of the crossfade at which the echo stops taking new input.
-         *  Late, so the outgoing track is already most of the way faded out by
-         *  the time its dry signal disappears. */
+        /** Fraction of the crossfade at which the echo stops taking new input — late,
+         *  so the outgoing track is already mostly faded when its dry signal goes. */
         private const val ECHO_FREEZE_AT = 0.6f
 
         /** Long enough to serve the selector's effect cooldown. */

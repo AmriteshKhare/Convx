@@ -118,7 +118,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.ArtistAlbumsViewModel
 import com.convx.music.ui.component.ScreenLargeTitle
 import com.convx.music.ui.component.ScreenScaffold
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -157,12 +157,14 @@ fun ArtistAlbumsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val visibleAlbums = remember(albums) { albums.distinctBy { it.id } }
+    val artistAlbumsTitleProgress = rememberTitleCollapseProgressState(lazyGridState)
 
     ScreenScaffold(
         title = artist?.artist?.name.orEmpty(),
         // A grid has no title item to measure against, so this rides the grid's
         // own scroll offset — see the LazyGridState overload.
-        titleAlpha = rememberTitleCollapseProgress(lazyGridState),
+        titleAlpha = 0f,
+        titleAlphaProvider = { artistAlbumsTitleProgress.value },
         onBack = navController::navigateUp,
         onBackLongClick = navController::backToMain,
     ) { chrome ->

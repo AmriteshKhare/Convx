@@ -39,10 +39,8 @@ import com.convx.music.viewmodels.AccountSettingsViewModel
 import com.convx.music.ui.component.ScreenPage
 
 /**
- * Shown right after a WebView login when the signed-in Google Account has more
- * than one YouTube channel — [PendingChannelLogin] carries the cookie and the
- * channel list over from [LoginScreen]. Picking one finishes the login the same
- * way a single-channel account always has (name/email lookup, then restart).
+ * Shown after a WebView login when the signed-in Google Account has more than one
+ * YouTube channel; picking one finishes the login that [LoginScreen] otherwise completes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,8 +51,7 @@ fun ChannelPickerScreen(navController: NavController) {
 
     ScreenPage(
         title = stringResource(R.string.choose_channel_title),
-        // No back button on purpose: this page exists because a channel has to
-        // be picked before anything else can continue.
+        // No back button: a channel must be picked before anything else can continue.
         horizontalPadding = 16.dp,
     ) {
             Text(

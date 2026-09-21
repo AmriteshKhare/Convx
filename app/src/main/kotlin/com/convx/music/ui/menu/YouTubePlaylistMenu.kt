@@ -579,7 +579,7 @@ fun YouTubePlaylistMenu(
                             description = { Text(text = stringResource(R.string.share_desc)) },
                             icon = {
                                 Icon(
-                                    painter = painterResource(R.drawable.share),
+                                    painter = painterResource(R.drawable.ios_share),
                                     contentDescription = null,
                                 )
                             },

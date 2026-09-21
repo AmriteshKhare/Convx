@@ -170,11 +170,9 @@ fun LibraryAlbumsScreen(
 
     val lazyListState = rememberLazyListState()
     val lazyGridState = rememberLazyGridState()
-    // Pull-to-refresh only: no hero artwork on this screen, so heroZoom.scale
-    // goes unread and the modifier contributes just the rubber-band stretch.
+    // Pull-to-refresh only: heroZoom.scale goes unread, contributes just the rubber-band stretch.
     val heroZoom = rememberHeroZoom()
-    // Progressive top blur so the list dissolves under the status bar instead
-    // of cutting off hard — same technique as the rest of the app's screens.
+    // Top blur so the list dissolves under the status bar.
     val hazeState = remember { HazeState() }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -244,8 +242,7 @@ fun LibraryAlbumsScreen(
         }
     }
 
-    // Hoisted: both view types filtered and de-duped the same list separately, and the
-    // scroll rail needs the resulting count too.
+    // Hoisted: both view types and the scroll rail share this deduped list.
     val visibleAlbums = remember(albums, hideExplicit) {
         (if (hideExplicit) albums.filter { !it.album.explicit } else albums)
             .distinctBy { it.id }

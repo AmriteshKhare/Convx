@@ -544,7 +544,7 @@ fun Queue(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.more_vert),
+                            painter = painterResource(id = R.drawable.more_horiz),
                             contentDescription = null,
                             modifier = Modifier
                                 .size(iconSize)
@@ -1013,7 +1013,7 @@ fun Queue(
                             )
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.more_vert),
+                                painter = painterResource(R.drawable.more_horiz),
                                 contentDescription = moreDescription,
                                 tint = chromePrimary,
                                 modifier = Modifier
@@ -1299,7 +1299,7 @@ fun Queue(
                             },
                         ) {
                             Icon(
-                                painter = painterResource(R.drawable.more_vert),
+                                painter = painterResource(R.drawable.more_horiz),
                                 contentDescription = null,
                                 tint = chromePrimary,
                                 modifier = Modifier
@@ -1449,7 +1449,7 @@ fun Queue(
                                                         }
                                                     ) {
                                                         Icon(
-                                                            painter = painterResource(R.drawable.more_vert),
+                                                            painter = painterResource(R.drawable.more_horiz),
                                                             contentDescription = null,
                                                             tint = chromePrimary,
                                                             modifier = Modifier

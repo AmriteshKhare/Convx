@@ -65,16 +65,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.pow
 
-/** Mirrors BackdropFreeze.kt's identical constant: a safety net for drags that
- *  never deliver onDragEnd/onDragCancel (e.g. gesture stolen elsewhere). */
 /**
- * Progress at which the collapsed and expanded layers hand over (Melox
- * PLAYER_LAYER_HANDOFF_END_PROGRESS).
- *
- * Mini content is fully faded out just after, at [PLAYER_MINI_FADE_END]; the
- * full player's own content starts appearing at [PLAYER_CONTENT_APPEAR_START]
- * and is fully in by [PLAYER_CONTENT_APPEAR_END]. One value per band so the
- * halves cannot drift into overlapping again.
+ * Progress where the collapsed and expanded layers hand over (Melox
+ * PLAYER_LAYER_HANDOFF_END_PROGRESS). Mini content is fully faded out just
+ * after, at [PLAYER_MINI_FADE_END]; the player's content starts appearing at
+ * [PLAYER_CONTENT_APPEAR_START] and is fully in by [PLAYER_CONTENT_APPEAR_END].
  */
 internal const val PLAYER_LAYER_HANDOFF_PROGRESS = 0.2f
 
@@ -87,19 +82,13 @@ internal const val PLAYER_CONTENT_APPEAR_START = 0.1f
 /** Full-player content fully visible here (Melox CONTENT_APPEAR_END 0.6). */
 internal const val PLAYER_CONTENT_APPEAR_END = 0.6f
 
-/**
- * Q3 lock: backdrop sampling stays frozen through the morph flight and goes
- * live here, ahead of the glass/content resolve, so the first live capture
- * is already warm when the glass fades in instead of popping a stale frame.
- */
+/** Q3 lock: backdrop sampling stays frozen through the morph, going live here so
+ *  the first capture after the glass fades in is warm, not a stale frame. */
 internal const val PLAYER_GLASS_UNFREEZE_PROGRESS = 0.75f
 
 private const val BackdropFreezeSafetyNs = 900_000_000L
 
-/** ponytail: diagnostic slow-motion for the player<->mini sheet transition.
- *  Was left at 6f after a jitter hunt (every sheet spring divided → 6x slower
- *  expand/collapse), which read as lag, dead taps during the crawl and
- *  transition ghosting. Revert to 1f only to re-diagnose. */
+/** ponytail: diagnostic slow-motion; leave at 1f except to re-diagnose transitions. */
 private const val DIAG_SLOWDOWN = 1f
 
 /**
@@ -114,47 +103,28 @@ fun BottomSheet(
     onDismiss: (() -> Unit)? = null,
     collapsedContent: @Composable BoxScope.() -> Unit,
     isExpandable: Boolean = true,
-    /** Caps the expanded content to this width, centered horizontally, so the
-     *  controls read as one phone-shaped panel on a wide screen instead of
-     *  stretching edge to edge. [background] (the full-bleed artwork/wash) is
-     *  deliberately NOT capped by this — it stays full-screen regardless, same
-     *  as the mobile layout's own artwork treatment; only the controls above it
-     *  get centered and width-limited. The collapsed/mini content (a full-width
-     *  dock regardless) is unaffected either way.
+    /** Caps the expanded content to this width, centered, so the controls read as one
+     *  phone-shaped panel on a wide screen. [background] stays full-bleed regardless;
      *  [Dp.Unspecified] (default) lets content fill the sheet exactly as before. */
     contentMaxWidth: Dp = Dp.Unspecified,
-    /** Corner radius the sheet rounds to as it reaches full size. The player passes the
-     *  device's physical screen radius so the sheet's corners land on the glass; other
-     *  callers can leave it and keep the plain collapsed-to-square curve. */
+    /** Radius the sheet rounds to at full size — the player passes the device's physical
+     *  screen radius so the corners land on the glass. */
     expandedCornerRadius: Dp = 0.dp,
     /** Corner radius while collapsed. */
     collapsedCornerRadius: Dp = 16.dp,
-    /**
-     * Drawn as a sibling of the sheet's own draggable content, NOT nested inside it --
-     * the sheet applies its own `translationY` to track the drag, and this overlay needs
-     * plain, unshifted root/window coordinates to place things by. Null for every caller
-     * that doesn't need one (this is a generic sheet primitive; only the player's own
-     * `BottomSheet(...)` call passes one, for the mini-to-full artwork morph).
-     */
+    /** Drawn as a sibling, NOT nested — the sheet applies its own `translationY` during
+     *  drag, and this overlay needs plain, unshifted root/window coordinates. Only the
+     *  player passes one, for the mini-to-full artwork morph. */
     overlayContent: (@Composable BoxScope.() -> Unit)? = null,
-    /**
-     * Hands this sheet's drawing to the shared container morph (see [PlayerMorph]).
-     *
-     * While the morph is running the sheet is recorded and NOT drawn where it sits, and
-     * it stops translating -- the container overlay draws the recording scaled into the
-     * rect that grows out of the mini player. Only the player passes this; every other
-     * caller keeps the plain slide-up sheet.
-     */
+    /** Hands this sheet's drawing to the shared container morph ([PlayerMorph]): while it
+     *  runs, the sheet is recorded and not drawn where it sits, and it stops translating.
+     *  Only the player passes this. */
     morphEnabled: Boolean = false,
-    /** False when the host drives back itself (V2's queue pane uses a predictive-back
-     *  transition; this sheet collapsing first made the pane switch lag behind it). */
+    /** False when the host drives back itself (predictive-back queue pane). */
     handleBack: Boolean = true,
-    /**
-     * Keep [content] composed while collapsed once it has been opened (Melox's resident
-     * full-player host). Otherwise every open composes the whole player on its first
-     * frame and the morph runs over a page that is still being built. While collapsed the
-     * content is measured but not placed: nothing draws, nothing takes input, no semantics.
-     */
+    /** Keep [content] composed while collapsed once opened — the morph then runs over a built
+     *  page, not one composing its first frame. Measured but not placed: nothing draws, takes
+     *  input or reports semantics. */
     keepContentComposed: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -162,11 +132,9 @@ fun BottomSheet(
     var hasBeenShown by remember { mutableStateOf(false) }
     if (!state.isCollapsed) hasBeenShown = true
 
-    // Second stage of the corner treatment: once the sheet has settled at full size, its
-    // corners open out to square over a short beat of their own, so the player ends up
-    // filling the display edge to edge with the device's own glass doing the rounding.
-    // Separate from the sheet's motion on purpose -- the corners resolve after the sheet
-    // arrives, not with it.
+    // Once the sheet has settled at full size, its corners open to square on their own
+    // short beat, so the player fills the display edge to edge with the glass rounding.
+    // Deliberately separate from the sheet's motion — the corners resolve after it arrives.
     val cornerExpansion = remember { Animatable(0f) }
     LaunchedEffect(state.isExpanded) {
         cornerExpansion.animateTo(
@@ -175,19 +143,15 @@ fun BottomSheet(
         )
     }
 
-    // The sheet's two halves record SEPARATELY (Melox background/content
-    // layers): the overlay fades bg in over the first fifth and content from
-    // a tenth to six tenths. One combined recording could not stage the two.
+    // The two halves record separately (Melox background/content layers); the overlay
+    // stages bg over the first fifth and content from a tenth to six tenths.
     Box(
         modifier = modifier
             .graphicsLayer {
-                // background fades during about 10%-61% progress
                 alpha = if (morphEnabled && PlayerMorph.active) {
-                    // Opaque for the whole flight. Easing it in with progress left the
-                    // recorded card mostly see-through right where the backing plate under
-                    // it had already faded out (the handoff at 0.25) -- the "black gap" that
-                    // got the morph switched off. iOS 27's card shows the player's own
-                    // background from its first frame (designRefrence/threadsdownloader.com_0805d3.mp4).
+                    // Opaque for the whole flight: easing with progress left the recorded card
+                    // see-through where the backing had already faded — the "black gap" that got
+                    // the morph switched off.
                     1f
                 } else {
                     (1.4f * (state.progress.coerceAtLeast(0.1f) - 0.1f).pow(0.5f)).coerceIn(0f, 1f)

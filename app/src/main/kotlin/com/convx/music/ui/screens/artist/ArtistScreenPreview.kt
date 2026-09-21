@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.artist
 
+import com.convx.music.R
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -199,7 +200,7 @@ private fun ArtistScreenPreview() {
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Filled.MoreVert,
+                                        painter = painterResource(R.drawable.more_horiz),
                                         contentDescription = null,
                                         tint = LocalContentColor.current,
                                         modifier = Modifier

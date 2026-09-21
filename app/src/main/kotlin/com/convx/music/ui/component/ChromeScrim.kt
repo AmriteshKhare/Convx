@@ -20,10 +20,8 @@ import androidx.compose.ui.graphics.Color
 import com.convx.music.constants.AppBarHeight
 
 /**
- * How far a hero-header list has scrolled past its art, 0..1 — feeds
- * [ChromeScrim]'s intensity. Shared by Artist/Album/Playlist screens so the
- * floating back/share button row stays legible over regular content, not
- * just the hero art it starts over.
+ * Hero-header scroll progress 0..1 feeding [ChromeScrim] intensity. Shared by
+ * Artist/Album/Playlist screens so back/share buttons stay legible over content.
  */
 @Composable
 fun rememberChromeScrimProgress(lazyListState: LazyListState, thresholdPx: Float = 300f): Float {
@@ -41,11 +39,9 @@ fun rememberChromeScrimProgress(lazyListState: LazyListState, thresholdPx: Float
 }
 
 /**
- * Progressive dark scrim behind a hero screen's floating back/share chrome —
- * transparent at the very top (over the hero art), fading to a dark shade
- * once scrolled past it. A true fade (transparent at the bottom edge), not a
- * flat rectangle: the bottom stop must stay [Color.Transparent] or the box's
- * own bounds show up as a visible line.
+ * Progressive dark scrim behind hero back/share chrome, fading to dark once scrolled
+ * past the art. Bottom gradient stop must stay [Color.Transparent] or a visible line
+ * appears at the box's own bounds.
  */
 @Composable
 fun ChromeScrim(progress: Float, modifier: Modifier = Modifier) {

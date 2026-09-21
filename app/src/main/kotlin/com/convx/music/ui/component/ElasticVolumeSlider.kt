@@ -87,9 +87,7 @@ fun ElasticVolumeSlider(
     var dragging by remember { mutableStateOf(false) }
     var region by remember { mutableStateOf(ElasticRegion.MIDDLE) }
 
-    // Tracks the finger 1:1 while dragging (mutableFloatStateOf, not
-    // Animatable — this needs a synchronous write from a non-suspend drag
-    // callback). Only the release bounce-back is a real spring animation.
+    // Plain state (not Animatable): drag callbacks aren't suspend, so the write must be synchronous; only release springs.
     var liveOverflowPx by remember { mutableFloatStateOf(0f) }
     var releasing by remember { mutableStateOf(false) }
     val releaseOverflow = remember { Animatable(0f) }
@@ -106,8 +104,7 @@ fun ElasticVolumeSlider(
         label = "elasticVolumeTrackHeight",
     )
 
-    // One-shot pulse when a hand crosses INTO an overflow region — a nudge on
-    // arrival, not a permanent bulge held for as long as it stays there.
+    // One-shot nudge on entry into an overflow region, not a held bulge.
     val leftPulse = remember { Animatable(1f) }
     val rightPulse = remember { Animatable(1f) }
     LaunchedEffect(region) {
@@ -181,9 +178,7 @@ fun ElasticVolumeSlider(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            // Squash+stretch: scaleX widens with overflow, scaleY thins to sell
-            // the rubber-band feel, transform origin anchored at whichever end
-            // is being pulled so the OTHER end stays put.
+            // Squash/stretch anchored at the pulled end so the other end stays put.
             val stretchOrigin = if (region == ElasticRegion.RIGHT) 0f else 1f
             Box(
                 modifier = Modifier

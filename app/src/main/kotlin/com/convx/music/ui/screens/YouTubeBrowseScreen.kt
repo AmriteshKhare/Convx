@@ -5,10 +5,10 @@
 
 package com.convx.music.ui.screens
 
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -258,7 +258,7 @@ fun YouTubeBrowseScreen(
             }
 
             // Top bar logic
-            val titleAlpha = com.convx.music.ui.component.rememberTitleCollapseProgress(lazyGridState)
+            val browseGridProgress = com.convx.music.ui.component.rememberTitleCollapseProgressState(lazyGridState)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -287,7 +287,7 @@ fun YouTubeBrowseScreen(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 12.dp)
-                        .alpha(titleAlpha),
+                        .graphicsLayer { alpha = browseGridProgress.value },
                     textAlign = TextAlign.Center,
                 )
 

@@ -92,9 +92,7 @@ import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
 import com.composables.sfsymbols.SfSymbols
 import com.composables.sfsymbols.monochrome.SFArrowDownCircle
-import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
 import com.composables.sfsymbols.monochrome.SFECircle
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFHeart
 import com.composables.sfsymbols.monochrome.SFHeartFill
 import com.composables.sfsymbols.monochrome.SFMagnifyingglass
@@ -553,7 +551,7 @@ fun OnlinePlaylistScreen(
                                             YouTubeSongMenu(songItem, navController, menuState::dismiss)
                                         }
                                     }) {
-                                        Icon(imageVector = SfSymbols.Monochrome.SFEllipsis, null)
+                                        Icon(painter = painterResource(R.drawable.more_horiz), null)
                                     }
                                 }
                             }
@@ -727,7 +725,7 @@ fun OnlinePlaylistScreen(
                         }
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFEllipsis,
+                            painter = painterResource(R.drawable.more_horiz),
                             contentDescription = null,
                             modifier = Modifier.alpha(if (selection.isNotEmpty()) 1f else 0.4f)
                         )
@@ -855,7 +853,7 @@ fun OnlinePlaylistScreen(
                         modifier = Modifier.size(38.dp)
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
+                            painter = painterResource(R.drawable.ios_share),
                             contentDescription = stringResource(R.string.share),
                             modifier = with(onlineChrome) {
                                 Modifier.iconEnter(1)
@@ -882,7 +880,7 @@ fun OnlinePlaylistScreen(
                         modifier = Modifier.size(38.dp)
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFEllipsis,
+                            painter = painterResource(R.drawable.more_horiz),
                             contentDescription = stringResource(R.string.more_options),
                             modifier = with(onlineChrome) {
                                 Modifier.iconEnter(2)
@@ -1042,7 +1040,7 @@ private fun OnlinePlaylistHeader(
                         size = 48.dp,
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
+                            painter = painterResource(R.drawable.ios_share),
                             contentDescription = stringResource(R.string.share),
                             modifier = Modifier.size(20.dp)
                         )
@@ -1324,7 +1322,7 @@ private fun OnlinePlaylistHeader(
                     size = 48.dp,
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFEllipsis,
+                        painter = painterResource(R.drawable.more_horiz),
                         contentDescription = stringResource(R.string.more_options),
                         modifier = Modifier.size(20.dp)
                     )

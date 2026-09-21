@@ -115,12 +115,7 @@ fun LocalMusicScreen(
                 when (sortMode) {
                     LocalSortMode.NAME -> list.sortedBy { it.title.lowercase() }
                     LocalSortMode.DURATION -> list.sortedByDescending { it.song.duration }
-                    // "Recently added" means MediaStore's DATE_ADDED, which the scanner
-                    // stores in inLibrary — not dateModified, which is the file's mtime.
-                    // Copying a music folder onto the device preserves the source files'
-                    // mtimes, so sorting on it ordered songs by when they were authored
-                    // rather than when they landed on the phone. dateModified stays as a
-                    // fallback for rows written before the scanner recorded DATE_ADDED.
+                    // "Recently added" = MediaStore DATE_ADDED stored at scan; dateModified is the file's mtime.
                     LocalSortMode.RECENT -> list.sortedByDescending {
                         it.song.inLibrary ?: it.song.dateModified ?: LocalDateTime.MIN
                     }
@@ -146,7 +141,6 @@ fun LocalMusicScreen(
         } else {
             Manifest.permission.READ_EXTERNAL_STORAGE
         }
-        // Check if already granted
         hasStoragePermission = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
                 context.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -155,9 +149,7 @@ fun LocalMusicScreen(
         }
     }
 
-    // Entering the screen refreshes the library instead of leaving it to the Rescan
-    // button. force = false so this only fires when the last scan has gone stale —
-    // navigating to the player and back must not restart a full MediaStore sweep.
+    // Refresh on entry; force=false so returning from the player doesn't re-sweep.
     LaunchedEffect(hasStoragePermission) {
         if (hasStoragePermission) viewModel.scanDevice(context, force = false)
     }
@@ -169,7 +161,6 @@ fun LocalMusicScreen(
         state = lazyListState,
         modifier = Modifier.fillMaxSize(),
     ) {
-        // Header
         item(key = "header") {
             Column(
                 modifier = Modifier
@@ -187,7 +178,6 @@ fun LocalMusicScreen(
                         modifier = Modifier.weight(1f),
                     )
                     if (hasStoragePermission) {
-                        // Search
                         IconButton(
                             onClick = {
                                 showSearch = !showSearch
@@ -199,7 +189,6 @@ fun LocalMusicScreen(
                                 contentDescription = "Search",
                             )
                         }
-                        // Sort
                         Box {
                             IconButton(onClick = { showSortMenu = true }) {
                                 Icon(
@@ -228,8 +217,6 @@ fun LocalMusicScreen(
                         // Rescan
                         IconButton(
                             onClick = { if (!isScanning) viewModel.scanDevice(context) },
-                            enabled = !isScanning,
-                        ) {
                             if (isScanning) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),

@@ -151,11 +151,9 @@ private enum class PickerTab(val label: String) {
 }
 
 /**
- * The iOS colour picker: a segmented Grid / Spectrum / Sliders control over a swatch
- * grid, an HSB area, or RGB channel sliders, with the chosen colour and its hex below.
- *
- * The signature is unchanged from the Material version, so all ten call sites are
- * untouched, and [ColorPickerConversions] — which has unit tests — still does the maths.
+ * iOS colour picker: segmented Grid/Spectrum/Sliders over a swatch grid, HSB area,
+ * or RGB sliders, with the chosen colour and hex below. Signature is unchanged from
+ * the Material version, so call sites are untouched.
  */
 @Composable
 fun ColorPickerDialog(

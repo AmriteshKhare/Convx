@@ -57,7 +57,7 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
 import com.convx.music.constants.AppIconKey
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 import com.convx.music.ui.component.topBarContentPadding
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import com.convx.music.ui.utils.backToMain
@@ -106,11 +106,13 @@ fun AppIconScreen(
     }
 
     val gridState = rememberLazyGridState()
+    val appIconTitleProgress = rememberTitleCollapseProgressState(gridState)
 
     SettingsScaffold(
         navController = navController,
         title = stringResource(R.string.app_icon),
-        titleAlpha = rememberTitleCollapseProgress(gridState),
+        titleAlpha = 0f,
+        titleAlphaProvider = { appIconTitleProgress.value },
         pageColor = AppTheme.colorScheme.background,
     ) { chrome ->
         LazyVerticalGrid(

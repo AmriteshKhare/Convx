@@ -298,7 +298,7 @@ fun YouTubeSongMenu(
                     NewAction(
                         icon = {
                             Icon(
-                                painter = painterResource(R.drawable.share),
+                                painter = painterResource(R.drawable.ios_share),
                                 contentDescription = null,
                                 modifier = Modifier.size(28.dp),
                                 tint = AppTheme.colorScheme.onSurfaceVariant

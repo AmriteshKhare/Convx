@@ -73,9 +73,7 @@ fun <T> ChipsRow(
     onValueUpdate: (T) -> Unit,
     modifier: Modifier = Modifier,
     containerColor: Color = AppTheme.colorScheme.surfaceContainer,
-    // Callers sitting over their own blurred hero backdrop (search results, over
-    // a hero blur) pass transparent/tint-based colors here instead of the
-    // Material defaults, so the chips read as part of the glass, not a card.
+    // Callers over blurred hero backdrops pass tint/transparent colors so chips read as glass, not a card.
     selectedContainerColor: Color = AppTheme.colorScheme.secondaryContainer,
     labelColor: Color = Color.Unspecified,
     selectedLabelColor: Color = Color.Unspecified,
@@ -118,7 +116,6 @@ fun <T> ChipsRow(
         chips.forEachIndexed { index, (value, label) ->
             val isSelected = currentValue == value
 
-            // Animate the corner radius based on selection
             val cornerRadius by animateDpAsState(
                 targetValue = if (isSelected) 20.dp else 8.dp,
                 animationSpec = spring(

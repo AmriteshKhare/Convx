@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens.search
 
+import androidx.compose.ui.res.painterResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -56,7 +57,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_ALBUM
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_ARTIST
 import com.music.innertube.YouTube.SearchFilter.Companion.FILTER_COMMUNITY_PLAYLIST
@@ -229,7 +229,7 @@ fun OnlineSearchResult(
                     onClick = longClick,
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFEllipsis,
+                        painter = painterResource(R.drawable.more_horiz),
                         contentDescription = null,
                     )
                 }

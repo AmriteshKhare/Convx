@@ -65,7 +65,6 @@ import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFLine3Horizontal
 import com.composables.sfsymbols.monochrome.SFLock
 import com.composables.sfsymbols.monochrome.SFLockOpen
@@ -892,7 +891,7 @@ fun LocalPlaylistScreen(
                                         },
                                     ) {
                                         Icon(
-                                            imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                            painter = painterResource(R.drawable.more_horiz),
                                             contentDescription = null,
                                         )
                                     }
@@ -1079,7 +1078,7 @@ fun LocalPlaylistScreen(
                         }
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFEllipsis,
+                            painter = painterResource(R.drawable.more_horiz),
                             contentDescription = null,
                             tint = if (useGlass && ambientColor.isSpecified) ambientColor.asSoftIconTint() else chromeContentColor,
                             modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
@@ -1515,7 +1514,7 @@ fun LocalPlaylistHeader(
                     size = 48.dp,
                 ) {
                     Icon(
-                        imageVector = SfSymbols.Monochrome.SFEllipsis,
+                        painter = painterResource(R.drawable.more_horiz),
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
                     )

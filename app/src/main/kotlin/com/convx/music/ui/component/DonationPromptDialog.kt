@@ -44,9 +44,8 @@ private val MIN_DAYS_BEFORE_FIRST_PROMPT = TimeUnit.DAYS.toMillis(3)
 private val MIN_DAYS_BETWEEN_PROMPTS = TimeUnit.DAYS.toMillis(30)
 
 /**
- * Gentle, occasional ask to support the project — never on a fresh install, never more
- * than once a month, and gone for good the moment the user says not to ask again.
- * Mount this once near the app root; it decides on its own whether to actually show.
+ * Self-gating donation ask: never on a fresh install, at most monthly, gone for good
+ * once dismissed. Mount once near the app root.
  */
 @Composable
 fun DonationPromptHost() {

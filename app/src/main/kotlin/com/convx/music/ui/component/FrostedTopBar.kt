@@ -29,7 +29,10 @@ import androidx.compose.material.icons.rounded.Person
 import com.convx.music.ui.ios.compat.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -112,6 +115,10 @@ fun FrostedTopBar(
     onBackLongClick: (() -> Unit)? = null,
     title: String = "",
     titleAlpha: Float = 0f,
+    // Draw-phase progress source. When supplied, the bar reads it only inside
+    // graphicsLayer/derivedStateOf so scroll deltas never recompose callers.
+    // Prefer this over [titleAlpha] for any scroll-driven title.
+    titleAlphaProvider: (() -> Float)? = null,
     // Lets an artwork-tinted screen (History, Stats) keep its whole chrome in
     // that tint instead of snapping to the flat theme color the bar defaults
     // to everywhere else.
@@ -128,12 +135,17 @@ fun FrostedTopBar(
     actions: @Composable () -> Unit = {},
 ) {
     val reduceDynamicBlur by rememberPreference(ReduceDynamicBlurKey, false)
+    // Boolean derived from progress: derivedStateOf only invalidates when the
+    // threshold flips, not on every scroll pixel.
+    val showDivider by remember(titleAlpha, titleAlphaProvider) {
+        derivedStateOf { (titleAlphaProvider?.invoke() ?: titleAlpha) > 0.99f }
+    }
     // Only the solid bar wants a hairline under it. A faded one has no edge for
     // the line to mark, and drawing it there would be inventing the very seam
     // the fade exists to remove.
     val dividerColor by animateColorAsState(
         targetValue = AppTheme.colorScheme.outline.copy(
-            alpha = if (titleAlpha > 0.99f && reduceDynamicBlur) 0.6f else 0f,
+            alpha = if (showDivider && reduceDynamicBlur) 0.6f else 0f,
         ),
         animationSpec = tween(220),
         label = "topBarDivider",
@@ -181,7 +193,9 @@ fun FrostedTopBar(
                     // so a title sitting slightly lower reads clearer against it.
                     .padding(top = 4.dp)
                     .fillMaxWidth()
-                    .graphicsLayer { alpha = titleAlpha },
+                    .graphicsLayer {
+                        alpha = titleAlphaProvider?.invoke() ?: titleAlpha
+                    },
             )
             // On a pushed page the back affordance is always visible, since
             // there is no large in-list header to fall back on.

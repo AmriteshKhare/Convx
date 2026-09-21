@@ -379,6 +379,11 @@ dependencies {
     // Smart analysis ONNX models (Beat This + Open-Unmix vocal separator)
     implementation(libs.onnxruntime)
 
+    // Streaming vocal separation (Sing v2): LiteRT runtime + bundled GPU delegate
+    // (no Play Services dependency, so the foss flavor works too).
+    implementation(libs.litert)
+    implementation(libs.litert.gpu)
+
     testImplementation(libs.junit)
 }
 

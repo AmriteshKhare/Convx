@@ -5,10 +5,10 @@
 
 package com.convx.music.ui.screens
 
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 import com.convx.music.ui.ios.foundation.IosTheme
 import androidx.compose.foundation.layout.size
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -129,8 +129,7 @@ fun NewReleaseScreen(
         tint = tint,
         heroSource = heroSource,
         heroScale = heroZoom.scale,
-        // Progressive top blur: the artwork dissolves under the status bar as
-        // the grid scrolls up — same treatment as the other hero screens.
+        // Progressive top blur: artwork dissolves under the status bar as the grid scrolls up.
         topBlurProgress = rememberHeroTopBlur(lazyGridState),
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -198,8 +197,7 @@ fun NewReleaseScreen(
                 }
             }
 
-            // Top bar logic
-            val titleAlpha = com.convx.music.ui.component.rememberTitleCollapseProgress(lazyGridState)
+            val newReleaseProgress = com.convx.music.ui.component.rememberTitleCollapseProgressState(lazyGridState)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -228,7 +226,7 @@ fun NewReleaseScreen(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 12.dp)
-                        .alpha(titleAlpha),
+                        .graphicsLayer { alpha = newReleaseProgress.value },
                     textAlign = TextAlign.Center,
                 )
 

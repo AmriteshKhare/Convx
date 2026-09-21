@@ -127,8 +127,8 @@ fun rememberTitleCollapseProgress(state: LazyListState, titleItemKey: Any? = nul
     rememberTitleCollapseProgressState(state, titleItemKey).value
 
 @Composable
-fun rememberTitleCollapseProgress(state: LazyGridState, thresholdPx: Float = 220f): Float {
-    val progress by remember(state) {
+fun rememberTitleCollapseProgressState(state: LazyGridState, thresholdPx: Float = 220f): State<Float> =
+    remember(state) {
         derivedStateOf {
             val scrolled = if (state.firstVisibleItemIndex == 0) {
                 state.firstVisibleItemScrollOffset.toFloat()
@@ -138,6 +138,10 @@ fun rememberTitleCollapseProgress(state: LazyGridState, thresholdPx: Float = 220
             (scrolled / thresholdPx).coerceIn(0f, 1f)
         }
     }
+
+@Composable
+fun rememberTitleCollapseProgress(state: LazyGridState, thresholdPx: Float = 220f): Float {
+    val progress by rememberTitleCollapseProgressState(state, thresholdPx)
     return progress
 }
 

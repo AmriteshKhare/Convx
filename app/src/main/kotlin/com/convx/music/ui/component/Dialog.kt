@@ -107,7 +107,6 @@ fun DefaultDialog(
                     CompositionLocalProvider(LocalContentColor provides IosTheme.colors.label) {
                         ProvideTextStyle(IosTheme.typography.headline) {
                             Box(
-                                // Align the title to the center when an icon is present.
                                 Modifier.align(if (icon == null) Alignment.Start else Alignment.CenterHorizontally)
                             ) {
                                 title()
@@ -265,7 +264,6 @@ fun TextFieldDialog(
     keyboardType: KeyboardType = KeyboardType.Text,
     onDone: (String) -> Unit = {},
 
-    // new multi-field support
     textFields: List<Pair<String, TextFieldValue>>? = null,
     onTextFieldsChange: ((Int, TextFieldValue) -> Unit)? = null,
     onDoneMultiple: ((List<String>) -> Unit)? = null,
@@ -373,9 +371,8 @@ fun TextFieldDialog(
 }
 
 /**
- * Dialog entrance: scale 0.96 -> 1 + fade, on [Motion.appear].
- * Transform + opacity only. Entry-only: the platform Dialog window is removed
- * on dismiss, so no exit transition is possible without keeping it composed.
+ * Dialog entrance: scale 0.96 -> 1 + fade on [Motion.appear]. Entry-only — the
+ * platform Dialog window is torn down on dismiss, so no exit can be animated.
  */
 @Composable
 private fun Modifier.dialogEnter(): Modifier {

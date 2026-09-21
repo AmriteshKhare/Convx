@@ -14,6 +14,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import com.convx.music.ui.utils.Motion
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -99,8 +100,8 @@ fun PlayerSliderTrack(
         // fade, so the sheen dies away with the mix instead of vanishing on its last frame.
         AnimatedVisibility(
             visible = mixing,
-            enter = fadeIn(tween(durationMillis = 420)),
-            exit = fadeOut(tween(durationMillis = 520)),
+            enter = fadeIn(Motion.appear()),
+            exit = fadeOut(Motion.appearExit()),
         ) {
             MixSheen(trackHeight = trackHeight)
         }

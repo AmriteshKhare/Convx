@@ -64,7 +64,14 @@ class KaraokeEngine(private val context: Context) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, KaraokeMask>?) = size > 3
     }
 
-    private data class Track(val mediaId: String, val uri: Uri, val durationMs: Long, val startMs: Long)
+    private data class Track(
+        val mediaId: String,
+        val uri: Uri,
+        val durationMs: Long,
+        val startMs: Long,
+        /** Real stream URI for range-fetching uncached bytes; null keeps cache-only reads. */
+        val streamUri: Uri?,
+    )
 
     fun register(processor: KaraokeAudioProcessor) {
         synchronized(processors) { processors += processor }
@@ -94,13 +101,13 @@ class KaraokeEngine(private val context: Context) {
      * From MusicService on every track change and seek of the ACTIVE player (which rebases its own
      * processor): which track to analyse, and where to start.
      */
-    fun onPosition(mediaId: String?, durationMs: Long, positionMs: Long) {
+    fun onPosition(mediaId: String?, durationMs: Long, positionMs: Long, streamUri: Uri? = null) {
         if (mediaId == null) return
         val current = track
         // New track, or the same one now that the player knows its duration.
         if (current?.mediaId != mediaId || (current.durationMs <= 0 && durationMs > 0)) {
             val uri = Uri.parse("https://music.youtube.com/watch?v=$mediaId")
-            val next = Track(mediaId, uri, durationMs, positionMs)
+            val next = Track(mediaId, uri, durationMs, positionMs, streamUri)
             track = next
             _state.update { it.copy(mediaId = mediaId, progress = progressOf(synchronized(masks) { masks[mediaId] })) }
             push()
@@ -122,25 +129,63 @@ class KaraokeEngine(private val context: Context) {
 
     private fun schedule(t: Track) = executor.execute { analyse(t) }
 
-    private fun analyse(t: Track) {
+    @Volatile private var bgId: String? = null
+
+    /**
+     * Analyses a track that is not playing yet (the queue's next item) so its
+     * masks are ready when the transition lands instead of starting from zero
+     * there. Cheap when there is nothing to do: complete masks and an already
+     * queued job both return immediately, so per-transition callers need no
+     * gating of their own.
+     */
+    fun preanalyze(mediaId: String?, durationMs: Long, streamUri: Uri?) {
+        if (mediaId == null || durationMs <= 0 || !_state.value.enabled) return
+        synchronized(masks) {
+            val existing = masks[mediaId]
+            if (existing != null && existing.frames > 0 && existing.ready.all { it }) return
+        }
+        if (bgId == mediaId) return
+        bgId = mediaId
+        val uri = Uri.parse("https://music.youtube.com/watch?v=$mediaId")
+        executor.execute {
+            try {
+                analyse(Track(mediaId, uri, durationMs, 0L, streamUri), background = true)
+            } finally {
+                if (bgId == mediaId) bgId = null
+            }
+        }
+    }
+
+    private fun analyse(t: Track, background: Boolean = false) {
         if (t.durationMs <= 0) return
         val windowSeconds = VocalTracker.FIXED_FRAMES / KaraokeMask.FRAME_RATE
         val totalFrames = ceil(t.durationMs / 1000.0 * KaraokeMask.FRAME_RATE).toInt()
         val mask = synchronized(masks) { masks.getOrPut(t.mediaId) { KaraokeMask(t.mediaId, totalFrames) } }
         push()
         val windows = ceil(totalFrames / VocalTracker.FIXED_FRAMES.toDouble()).toInt()
-        val first = (t.startMs / 1000.0 / windowSeconds).toInt().coerceIn(0, windows - 1)
-        // Outward from the playing window, forward first: that is where the listener is going.
-        val order = buildList {
-            for (i in first until windows) add(i)
-            for (i in first - 1 downTo 0) add(i)
+        val order = if (background) {
+            // Window 0 first: the transition lands on the intro, not mid-song.
+            (0 until windows).toList()
+        } else {
+            val first = (t.startMs / 1000.0 / windowSeconds).toInt().coerceIn(0, windows - 1)
+            // Outward from the playing window, forward first: that is where the listener is going.
+            buildList {
+                for (i in first until windows) add(i)
+                for (i in first - 1 downTo 0) add(i)
+            }
         }
+        // Foreground owns the track while it is current; background yields the
+        // moment it becomes current (the foreground pass takes over) or Sing
+        // goes off. Both write the same mask, and ready flags are the shared
+        // truth, so a handover never re-analyses a finished window.
+        val owned: () -> Boolean =
+            if (background) ({ track?.mediaId != t.mediaId }) else ({ track?.mediaId == t.mediaId })
         val done = BooleanArray(windows) { w -> mask.ready[w * VocalTracker.FIXED_FRAMES] }
         var idlePasses = 0
-        while (track?.mediaId == t.mediaId && _state.value.enabled && !done.all { it }) {
+        while (_state.value.enabled && owned() && !done.all { it }) {
             var progressed = false
             for (w in order) {
-                if (done[w] || track?.mediaId != t.mediaId || !_state.value.enabled) continue
+                if (done[w] || !_state.value.enabled || !owned()) continue
                 if (analyseWindow(t, mask, w, windowSeconds)) {
                     done[w] = true
                     progressed = true
@@ -162,7 +207,8 @@ class KaraokeEngine(private val context: Context) {
         val end = minOf(start + windowSeconds, t.durationMs / 1000.0)
         val rendition = AudioCache.renditionsOf(t.uri).maxByOrNull { it.cachedPrefix } ?: return false
         val decoded = runCatching {
-            AudioCache.renditionDataSource(t.uri, rendition).use { AudioDecoder.decodeRegionStereo(it, start, end) }
+            AudioCache.renditionDataSource(t.uri, rendition, t.streamUri)
+                .use { AudioDecoder.decodeRegionStereo(it, start, end) }
         }.getOrNull() ?: return false
         val (pcm, actualStart) = decoded
         // The extractor may start a little early; drop the lead-in so frame 0 is `start`.

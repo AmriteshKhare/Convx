@@ -1261,13 +1261,23 @@ fun ArtistHeroImage(
                     .heroFootBlur(
                         enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !loading,
                         live = liveOverlay,
-                        contentKey = artworkUrl,
+                        contentKey = Triple(artworkUrl, appleArtworkUrl, liveOverlay),
                     ),
             ) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(side),
+                        .height(side)
+                        // Live scroll blur: sharp square + blurred replay from the SAME
+                        // pixels (still or video frames), so photo and motion share
+                        // one blur, one mask, one ramp. Replaces the baked still-only
+                        // plate that showed photo blur over playing video.
+                        .scrollLiveBlur(
+                            enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !loading,
+                            live = liveOverlay,
+                            contentKey = Triple(artworkUrl, appleArtworkUrl, liveOverlay),
+                            progress = scrollBlur,
+                        ),
                 ) {
                 if (loading) {
                     Box(
@@ -1314,29 +1324,6 @@ fun ArtistHeroImage(
                             .fillMaxSize(0.3f)
                             .align(Alignment.Center)
                             .graphicsLayer { alpha = 0.3f },
-                    )
-                }
-            }
-            if (!loading) {
-                if (!artworkUrl.isNullOrBlank()) {
-                    // Still photo: baked once, kept composed (so the first scroll doesn't wait on a
-                    // bake), fully masked out at rest.
-                    BlurredBackdropImage(
-                        model = artworkUrl,
-                        screenBlurRadiusDp = ArtistScrollBlurDp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(side)
-                            // Progress is read here, in the draw phase: scrolling redraws this
-                            // layer continuously instead of recomposing the header in steps.
-                            .graphicsLayer {
-                                alpha = if (scrollBlur() > 0.001f) 1f else 0f
-                                compositingStrategy = CompositingStrategy.Offscreen
-                            }
-                            .drawWithContent {
-                                drawContent()
-                                drawRect(brush = scrollBlurMask(scrollBlur()), blendMode = BlendMode.DstIn)
-                            },
                     )
                 }
             }
@@ -1434,13 +1421,6 @@ private fun artistWashStops(pageColor: Color): Array<Pair<Float, Color>> {
         position to pageColor.copy(alpha = artistWash(position * ArtistHeroExtent))
     }
 }
-
-/**
- * Where the baked blurred copy takes over from the sharp photo. Wide and eased on purpose: the
- * baked copy comes from a 320px decode, so a short linear hand-off showed its softer edge.
- */
-private const val ArtistFootFadeInStart = 0.60f
-private const val ArtistFootFadeInEnd = 0.88f
 
 /**
  * Where the scroll blur covers the photo (fractions of its height) at scroll progress [p]: a
@@ -1560,6 +1540,34 @@ private suspend fun bakeArtistFoot(context: Context, url: String, extent: Float 
 }
 
 /**
+ * One progressive foot band: smoothstep in ([inStart]→[inEnd]), smoothstep out
+ * ([outStart]→[outEnd]), zero slope at all four joints so no edge reads as a
+ * line.
+ */
+private fun footBand(inStart: Float, inEnd: Float, outStart: Float, outEnd: Float): Brush {
+    val steps = 24
+    return Brush.verticalGradient(
+        colorStops = Array(steps + 1) { i ->
+            val y = i / steps.toFloat()
+            val a = smoothstep(inStart, inEnd, y) * (1f - smoothstep(outStart, outEnd, y))
+            y to Color.Black.copy(alpha = a)
+        },
+    )
+}
+
+/**
+ * Progressive foot windows, tall-box fractions. In hero-side fractions (×1.36):
+ * soft arrives 0.76→0.86 (the bake's zero-slope knee is 0.78), hands to mid at
+ * ~1.0 (the square foot, σ≈12pt), heavy takes over past ~1.15 toward the 48pt
+ * peak at 1.23, then eases out 0.94→1.00 tall so the wash lands home with no
+ * bottom edge. Same curve as [artistFootBlurPt], sampled in three live bands
+ * instead of baked per-row.
+ */
+private val FootSoftBand = footBand(0.56f, 0.63f, 0.70f, 0.78f)
+private val FootMidBand = footBand(0.68f, 0.76f, 0.84f, 0.92f)
+private val FootHeavyBand = footBand(0.82f, 0.90f, 0.94f, 1.00f)
+
+/**
  * Vertical alpha ramp, transparent above [start] and opaque below [end], eased with smoothstep so
  * neither end of the ramp has a slope break the eye can pick out as a line.
  */
@@ -1608,11 +1616,14 @@ private fun Modifier.heroBandMask(start: Float, end: Float): Modifier =
         }
 
 /**
- * Live foot replay for the artist hero square: sharp subtree plus one blurred,
- * ramp-masked replay of the same pixels. The replay re-records only when the
- * content key/size changes (photos: once) or every frame while [live] (video),
- * so static art costs one extra layer draw and motion stays live. Same
- * 0.60→0.88 ramp the bake used; constant 14dp radius ≈ its in-square peak.
+ * Live progressive foot for the artist hero square: sharp subtree plus three
+ * blurred replays of the same pixels at growing radii, crossfaded through
+ * overlapping smoothstep bands. The replay re-records only when the content
+ * key/size changes (photos: once) or every frame while [live] (video), so
+ * static art costs extra layer draws and motion stays live. Same curve the
+ * per-row CPU bake drew ([artistFootBlurPt]: 0 with zero slope at the 0.78
+ * knee, ~12pt at the square foot, 48pt by 1.23) with a smooth top and bottom
+ * curve on every band — no constant-radius pane, no sharp shape.
  */
 private fun Modifier.heroFootBlur(enabled: Boolean, live: Boolean, contentKey: Any?): Modifier =
     this then FootBlurElement(enabled, live, contentKey)
@@ -1636,10 +1647,165 @@ private class FootBlurNode(
     var contentKey: Any?,
 ) : Modifier.Node(), androidx.compose.ui.node.DrawModifierNode {
     private var sharp: androidx.compose.ui.graphics.layer.GraphicsLayer? = null
+    private var soft: androidx.compose.ui.graphics.layer.GraphicsLayer? = null
+    private var mid: androidx.compose.ui.graphics.layer.GraphicsLayer? = null
+    private var heavy: androidx.compose.ui.graphics.layer.GraphicsLayer? = null
+    private var effectsReady = false
+    private var lastSize: androidx.compose.ui.unit.IntSize = androidx.compose.ui.unit.IntSize.Zero
+    private var lastKey: Any? = Unit
+
+    override fun onAttach() {
+        val context = requireGraphicsContext()
+        sharp = context.createGraphicsLayer()
+        soft = context.createGraphicsLayer()
+        mid = context.createGraphicsLayer()
+        heavy = context.createGraphicsLayer()
+    }
+
+    override fun onDetach() {
+        val context = requireGraphicsContext()
+        sharp?.let { context.releaseGraphicsLayer(it) }
+        soft?.let { context.releaseGraphicsLayer(it) }
+        mid?.let { context.releaseGraphicsLayer(it) }
+        heavy?.let { context.releaseGraphicsLayer(it) }
+        sharp = null
+        soft = null
+        mid = null
+        heavy = null
+        effectsReady = false
+        lastSize = androidx.compose.ui.unit.IntSize.Zero
+        lastKey = Unit
+    }
+
+    override fun ContentDrawScope.draw() {
+        drawContent()
+        val sharp = sharp ?: return
+        val soft = soft ?: return
+        val mid = mid ?: return
+        val heavy = heavy ?: return
+        if (!enabled) return
+        val size = size.toIntSize()
+        if (live || size != lastSize || contentKey != lastKey) {
+            if (!effectsReady) {
+                // Bake sigmas sampled: ~6pt at 0.9W, ~22pt at 1.05W, ~48pt at 1.2W.
+                soft.renderEffect = blurOf(8.dp.toPx())
+                mid.renderEffect = blurOf(22.dp.toPx())
+                heavy.renderEffect = blurOf(48.dp.toPx())
+                effectsReady = true
+            }
+            // Sharp pixels first; every band replays them, so photo and video
+            // share one source and the hand-off from sharp stays invisible.
+            recordLayer(this@FootBlurNode, sharp, size) {
+                paintSharp(this@draw)
+            }
+            recordBand(soft, FootSoftBand)
+            recordBand(mid, FootMidBand)
+            recordBand(heavy, FootHeavyBand)
+            lastSize = size
+            lastKey = contentKey
+        }
+        drawLayer(soft)
+        drawLayer(mid)
+        drawLayer(heavy)
+    }
+
+    private fun blurOf(px: Float): androidx.compose.ui.graphics.RenderEffect =
+        androidx.compose.ui.graphics.BlurEffect(
+            px, px, androidx.compose.ui.graphics.TileMode.Clamp,
+        )
+
+    /** One band: the sharp snapshot re-drawn blurred, stretched below the square
+     *  (the live bottom-row repeat), then cut to its smooth top+bottom window. */
+    private fun ContentDrawScope.recordBand(
+        band: androidx.compose.ui.graphics.layer.GraphicsLayer,
+        mask: Brush,
+    ) {
+        val sharp = sharp ?: return
+        val size = size.toIntSize()
+        recordLayer(this@FootBlurNode, band, size) {
+            // Transparent start every record: re-records (video frames) must
+            // never accumulate veil/mask over previous generations.
+            drawRect(color = Color.Transparent, blendMode = BlendMode.Clear)
+            drawLayer(sharp)
+            // Below-square extension: the bottom strip re-drawn stretched to
+            // the tall box bottom — the live bottom-row repeat. Blur turns it
+            // into the same mush the bake made, then the wash dissolves it
+            // into the page. Clip first in raw coords; the translate+scale
+            // below must not move the clip itself.
+            val sqH = size.height / ArtistHeroExtent
+            val stripTop = sqH * 0.75f
+            val sy = (size.height - sqH) / (sqH - stripTop)
+            withTransform({
+                clipRect(
+                    left = 0f, top = sqH,
+                    right = size.width.toFloat(), bottom = size.height.toFloat(),
+                )
+                translate(top = sqH - stripTop * sy)
+                scale(
+                    scaleX = 1f, scaleY = sy,
+                    pivot = androidx.compose.ui.geometry.Offset(0f, stripTop),
+                )
+            }) {
+                drawLayer(sharp)
+            }
+            // No frost veil: the old bake had none, and white here reads as tint.
+            drawRect(
+                brush = mask,
+                topLeft = androidx.compose.ui.geometry.Offset.Zero,
+                blendMode = BlendMode.DstIn,
+            )
+        }
+    }
+
+    private val paintSharp: ContentDrawScope.() -> Unit = {
+        drawContent()
+    }
+}
+
+/**
+ * Live scroll-blur replay for the hero square: draws the square sharp, then one
+ * blurred replay of those SAME pixels masked by [scrollBlurMask].
+ *
+ * Photo and motion video share this path, so the climb reads identically: 0 at
+ * rest, full [ArtistScrollBlurDp] once scrolled. Progress is read in the draw
+ * phase, so scroll redraws the layer without recomposing the header.
+ * Re-records when frames move ([live]), size/key rotate, or progress steps;
+ * inert (draws nothing extra) at rest.
+ */
+private fun Modifier.scrollLiveBlur(
+    enabled: Boolean,
+    live: Boolean,
+    contentKey: Any?,
+    progress: () -> Float,
+): Modifier = this then ScrollBlurElement(enabled, live, contentKey, progress)
+
+private data class ScrollBlurElement(
+    val enabled: Boolean,
+    val live: Boolean,
+    val contentKey: Any?,
+    val progress: () -> Float,
+) : androidx.compose.ui.node.ModifierNodeElement<ScrollBlurNode>() {
+    override fun create(): ScrollBlurNode = ScrollBlurNode(enabled, live, contentKey, progress)
+    override fun update(node: ScrollBlurNode) {
+        node.enabled = enabled
+        node.live = live
+        node.contentKey = contentKey
+        node.progress = progress
+    }
+}
+
+private class ScrollBlurNode(
+    var enabled: Boolean,
+    var live: Boolean,
+    var contentKey: Any?,
+    var progress: () -> Float,
+) : Modifier.Node(), androidx.compose.ui.node.DrawModifierNode {
+    private var sharp: androidx.compose.ui.graphics.layer.GraphicsLayer? = null
     private var blurred: androidx.compose.ui.graphics.layer.GraphicsLayer? = null
     private var effect: androidx.compose.ui.graphics.RenderEffect? = null
     private var lastSize: androidx.compose.ui.unit.IntSize = androidx.compose.ui.unit.IntSize.Zero
     private var lastKey: Any? = Unit
+    private var lastP = -1f
 
     override fun onAttach() {
         val context = requireGraphicsContext()
@@ -1656,6 +1822,7 @@ private class FootBlurNode(
         effect = null
         lastSize = androidx.compose.ui.unit.IntSize.Zero
         lastKey = Unit
+        lastP = -1f
     }
 
     override fun ContentDrawScope.draw() {
@@ -1663,56 +1830,30 @@ private class FootBlurNode(
         val sharp = sharp ?: return
         val blurred = blurred ?: return
         if (!enabled) return
+        val p = progress().coerceIn(0f, 1f)
+        if (p <= 0.001f) {
+            lastP = p
+            return
+        }
         val size = size.toIntSize()
-        if (live || size != lastSize || contentKey != lastKey) {
-            if (effect == null) {
-                val px = 14.dp.toPx()
-                effect = androidx.compose.ui.graphics.BlurEffect(
-                    px, px, androidx.compose.ui.graphics.TileMode.Clamp,
-                ).also { blurred.renderEffect = it }
-            }
-            // Sharp pixels first; the blur replays them masked, so the ramp edge
-            // is crisp exactly where the bake put it — no upward bleed.
-            recordLayer(this@FootBlurNode, sharp, size) {
+        if (effect == null) {
+            val px = ArtistScrollBlurDp.dp.toPx()
+            effect = androidx.compose.ui.graphics.BlurEffect(
+                px, px, androidx.compose.ui.graphics.TileMode.Clamp,
+            ).also { blurred.renderEffect = it }
+        }
+        if (live || size != lastSize || contentKey != lastKey || p != lastP) {
+            recordLayer(this@ScrollBlurNode, sharp, size) {
                 paintSharp(this@draw)
             }
-            recordLayer(this@FootBlurNode, blurred, size) {
-                // Transparent start every record: re-records (video frames) must
-                // never accumulate veil/mask over previous generations.
+            recordLayer(this@ScrollBlurNode, blurred, size) {
                 drawRect(color = Color.Transparent, blendMode = BlendMode.Clear)
                 drawLayer(sharp)
-                // Below-square extension: the bottom strip re-drawn stretched to
-                // the tall box bottom — the live bottom-row repeat. Heavy blur
-                // turns either into the same mush the bake made, then the wash
-                // dissolves it into the page. Clip first in raw coords; the
-                // translate+scale below must not move the clip itself.
-                val sqH = size.height / ArtistHeroExtent
-                val stripTop = sqH * 0.75f
-                val sy = (size.height - sqH) / (sqH - stripTop)
-                withTransform({
-                    clipRect(
-                        left = 0f, top = sqH,
-                        right = size.width.toFloat(), bottom = size.height.toFloat(),
-                    )
-                    translate(top = sqH - stripTop * sy)
-                    scale(
-                        scaleX = 1f, scaleY = sy,
-                        pivot = androidx.compose.ui.geometry.Offset(0f, stripTop),
-                    )
-                }) {
-                    drawLayer(sharp)
-                }
-                // Frost veil, ramped with the blur so it never reads as a flat sheet.
-                drawRect(color = Color.White.copy(alpha = 0.06f))
-                // Hero fractions, like the old mask: dissolve into the bg below.
-                drawRect(
-                    brush = smoothRamp(ArtistFootFadeInStart / ArtistHeroExtent, 1.00f),
-                    topLeft = androidx.compose.ui.geometry.Offset.Zero,
-                    blendMode = BlendMode.DstIn,
-                )
+                drawRect(brush = scrollBlurMask(p), blendMode = BlendMode.DstIn)
             }
             lastSize = size
             lastKey = contentKey
+            lastP = p
         }
         drawLayer(blurred)
     }

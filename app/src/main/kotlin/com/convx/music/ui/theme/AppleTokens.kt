@@ -15,43 +15,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Apple Music design tokens — the single source of truth for colors, shapes, and
- * adaptive contrast helpers. Every screen references these instead of hardcoding values.
+ * Apple Music design tokens — single source of truth for colors, shapes, motion, and contrast helpers.
  */
 object AppleTokens {
-    // Accent
     val AccentRed = Color(0xFFFA2D48)
 
-    // Surfaces — Apple-style soft dark greys, not pure black (pure black stays an
-    // opt-in via the PureBlack setting for OLED). Monotonic elevation ladder.
+    // Surfaces — Apple-style soft dark greys, not pure black (pure black is an OLED opt-in via PureBlack).
     val Bg = Color(0xFF121212)
     val BgElevated = Color(0xFF1A1A1A)
     val Card = Color(0xFF1C1C1E)
     val CardSecondary = Color(0xFF2C2C2E)
 
-    /**
-     * Hairline rule on whatever surface the caller sits on. Derived from the
-     * content colour rather than fixed to white: a constant white rule is
-     * invisible on the light theme, and on an artwork-tinted screen it reads as
-     * a foreign line instead of one belonging to the surface.
-     */
+    /** Hairline rule on whatever surface the caller sits on. Derived from content colour, not white: a fixed white rule is invisible on light theme and reads foreign on artwork-tinted screens. */
     val divider: Color
         @Composable get() = LocalContentColor.current.copy(alpha = 0.12f)
 
-    /**
-     * Metadata text — artist names, subtitles, durations. One step down from
-     * on-surface, never full white: the hierarchy on Home is carried by this
-     * contrast step rather than by size, since title and subtitle share a size.
-     *
-     * Reads [LocalMetadataColor] rather than being the constant itself, so a screen
-     * painted in its own colour (the artist page's artwork mesh) can hand this tier
-     * a colour derived from that background instead of leaving a foreign grey on it.
-     * Everywhere else the local carries the same fixed grey it always was.
-     */
+    /** Metadata text — one contrast step below on-surface. Reads [LocalMetadataColor] so artwork-painted screens can hand this tier their own colour. */
     val Metadata: Color
         @Composable get() = LocalMetadataColor.current
-
-    // Spacing — the whole scale. Screens reference these, never a dp literal.
 
     /** Horizontal screen gutter. The only gutter. */
     val Gutter = 20.dp
@@ -62,13 +43,9 @@ object AppleTokens {
     /** Gap between stacked text lines inside one item. */
     val TextGap = 2.dp
 
-    // Type scale — Home's headers and tile text. Sizes are fixed rather than
-    // taken from the Material scale: the design pins them to specific values and
-    // the tile grid's alignment depends on title and subtitle matching exactly.
+    // Type scale — design-pinned sizes, not Material scale: tile-grid alignment depends on title/subtitle matching exactly.
 
-    // Each size carries its own line height. Compose otherwise derives leading from
-    // the font's own metrics, which lands taller than the design at every step and
-    // shows up as sections that drift out of alignment the further down you scroll.
+    // Each size carries its own line height — Compose's derived leading lands taller than the design at every step.
 
     /** Screen title ("Listen Now"). */
     val TitleLarge = 34.sp
@@ -86,25 +63,14 @@ object AppleTokens {
     val Caption = 12.sp
     val CaptionLineHeight = 16.sp
 
-    // Shapes — four corners, no more. Artwork is the only rounded thing on a
-    // content tile; a card corner means the object is genuinely a card.
-    // Every one of them is drawn with continuous (squircle) curvature — see
-    // [AppShapes] — so nothing in the app mixes circular and continuous corners.
+    // Shapes — four corners, no more. All continuous (squircle) curvature — see [AppShapes].
     val Artwork = 8.dp
     val Control = 8.dp
     val CardCorner = 14.dp
     val CardCornerLarge = 18.dp
 
-    // Motion — one spring, three tempers, modelled on SwiftUI's `.smooth`: a spring
-    // with a 0.5s natural period and zero bounce. That is the default here, and
-    // bounce is reserved for selection feedback and hero entrances.
-    //
-    // Compose takes stiffness where SwiftUI takes a period: stiffness =
-    // (2*pi / period)^2. SwiftUI `bounce` maps to `1 - dampingRatio`.
-    //
-    // Not yet adopted app-wide — motion is currently scattered across
-    // Spring.StiffnessMedium, tween(200) and hand-picked specs. Convert call
-    // sites deliberately, checking each one, rather than sweeping them.
+    // Motion — modelled on SwiftUI `.smooth` (0.5s natural period, zero bounce).
+    // Compose takes stiffness where SwiftUI takes a period: stiffness = (2*pi / period)^2.
     object Motion {
         /** (2*pi / 0.5s)^2. The period behind every spec below. */
         const val Stiffness = 158f

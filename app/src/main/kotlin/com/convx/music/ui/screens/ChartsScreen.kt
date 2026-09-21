@@ -68,7 +68,6 @@ import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.composables.sfsymbols.SfSymbols
 import androidx.compose.ui.res.painterResource
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.constants.ListItemHeight
 import com.convx.music.models.toMediaMetadata
 import com.convx.music.playback.queues.YouTubeQueue
@@ -153,8 +152,7 @@ fun ChartsScreen(
         tint = tint,
         heroSource = heroSource,
         heroScale = heroZoom.scale,
-        // Progressive top blur: the artwork dissolves under the status bar as
-        // the list scrolls up — same treatment as the other hero screens.
+        // Progressive top blur: artwork dissolves under the status bar as the list scrolls up.
         topBlurProgress = rememberHeroTopBlur(lazyListState),
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -317,7 +315,7 @@ fun ChartsScreen(
                                                     },
                                                 ) {
                                                     Icon(
-                                                        imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                                        painter = painterResource(R.drawable.more_horiz),
                                                         contentDescription = null,
                                                     )
                                                 }
@@ -415,7 +413,6 @@ fun ChartsScreen(
                 }
             }
 
-            // Top bar logic
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

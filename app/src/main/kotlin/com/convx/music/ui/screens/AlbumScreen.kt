@@ -120,10 +120,8 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
 import androidx.compose.ui.res.painterResource
 import com.composables.sfsymbols.monochrome.SFECircle
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFXmark
 import com.composables.sfsymbols.monochrome.SFShuffle
 import com.composables.sfsymbols.monochrome.SFSquareStack
@@ -941,7 +939,7 @@ fun AlbumScreen(
                                     },
                                 ) {
                                     Icon(
-                                        imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                        painter = painterResource(R.drawable.more_horiz),
                                         contentDescription = null,
                                     )
                                 }
@@ -1263,7 +1261,7 @@ fun AlbumScreen(
                         }
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFEllipsis,
+                            painter = painterResource(R.drawable.more_horiz),
                             contentDescription = null,
                             tint = pillIconTint,
                             modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
@@ -1311,7 +1309,7 @@ fun AlbumScreen(
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
-                                imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
+                                painter = painterResource(R.drawable.ios_share),
                                 contentDescription = stringResource(R.string.share),
                                 tint = pillIconTint,
                                 modifier = with(chrome) {
@@ -1338,7 +1336,7 @@ fun AlbumScreen(
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
-                                imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                painter = painterResource(R.drawable.more_horiz),
                                 contentDescription = stringResource(R.string.more_options),
                                 tint = pillIconTint,
                                 modifier = with(chrome) {

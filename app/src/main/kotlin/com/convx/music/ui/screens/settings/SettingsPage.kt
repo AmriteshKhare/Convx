@@ -113,11 +113,13 @@ fun SettingsScaffold(
     onBack: (() -> Unit)? = null,
     pageColor: Color = IosTheme.colors.systemGroupedBackground,
     actions: @Composable () -> Unit = {},
+    titleAlphaProvider: (() -> Float)? = null,
     content: @Composable BoxScope.(GlassScreenChrome) -> Unit,
 ) {
     ScreenScaffold(
         title = title,
         titleAlpha = titleAlpha,
+        titleAlphaProvider = titleAlphaProvider,
         onBack = onBack ?: { navController.navigateUp(); Unit },
         onBackLongClick = navController::backToMain,
         pageColor = pageColor,

@@ -150,6 +150,7 @@ private fun Modifier.customSoftShadow(elevation: androidx.compose.ui.unit.Dp, co
 }
 
 @OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun PlayerV2(
     state: BottomSheetState,
@@ -1107,7 +1108,7 @@ fun PlayerV2(
                                             }
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.MoreVert,
+                                                painter = painterResource(R.drawable.more_horiz),
                                                 contentDescription = "Options",
                                                 tint = adaptivePrimary,
                                                 modifier = Modifier.size(24.dp)
@@ -1450,23 +1451,30 @@ fun PlayerV2(
                             .then(if (hideVolumeBar) Modifier.clearAndSetSemantics {} else Modifier),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // While Sing is on, this bar drives the vocal level instead of
+                        // the device volume; the mic capsule stays the fine
+                        // control and both stay in sync through the same state.
+                        val singEngine = playerConnection.service.karaoke
+                        val singState by singEngine.state.collectAsState()
                         ElasticVolumeSlider(
-                            value = animatedVolume,
+                            value = if (singState.enabled) singState.level else animatedVolume,
                             onValueChange = { newValue ->
-                                systemVolume = newValue
-                                val targetVolume = (newValue * maxSystemVolume).toInt()
-                                audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVolume, 0)
+                                if (singState.enabled) {
+                                    singEngine.setLevel(newValue)
+                                } else {
+                                    systemVolume = newValue
+                                    val targetVolume = (newValue * maxSystemVolume).toInt()
+                                    audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, targetVolume, 0)
+                                }
                             },
                             enabled = !hideVolumeBar,
                             activeColor = adaptivePrimary.copy(alpha = 0.8f),
                             inactiveColor = adaptivePrimary.copy(alpha = 0.3f),
                             modifier = Modifier.fillMaxWidth(),
-                            leftIcon = {
-                                Icon(Icons.Default.VolumeMute, contentDescription = "Volume Down", tint = adaptiveSecondary, modifier = Modifier.size(20.dp))
-                            },
-                            rightIcon = {
-                                Icon(Icons.Default.VolumeUp, contentDescription = "Volume Up", tint = adaptiveSecondary, modifier = Modifier.size(20.dp))
-                            },
+                            // No end glyphs: the lyrics corner mic is the only
+                            // volume/vocal icon.
+                            leftIcon = {},
+                            rightIcon = {},
                         )
                         }
                     }

@@ -41,13 +41,22 @@ const val ARTWORK_VERTICAL_LINEAR_WEIGHT = 0.4f
  */
 const val SCREEN_CORNER_EXPANSION_MILLIS = 140
 
+/**
+ * Single source of truth for progress sanitization: NaN/Inf from a torn drag
+ * read or a divide-by-zero must clamp to rest, never propagate NaN into a Rect
+ * (which draws nothing and poisons every lerp downstream). All geometry below
+ * routes through here so edge handling lives in one place.
+ */
+internal fun sanitizedProgress(progress: Float): Float =
+    if (progress.isNaN()) 0f else progress.coerceIn(0f, 1f)
+
 fun easeInCubic(value: Float): Float {
-    val clamped = value.coerceIn(0f, 1f)
+    val clamped = sanitizedProgress(value)
     return clamped * clamped * clamped
 }
 
 fun easeOutCubic(value: Float): Float {
-    val clamped = value.coerceIn(0f, 1f)
+    val clamped = sanitizedProgress(value)
     val inverse = 1f - clamped
     return 1f - inverse * inverse * inverse
 }
@@ -60,7 +69,7 @@ fun easeOutCubic(value: Float): Float {
  * progress already shapes the motion, so the rect itself adds no second curve.
  */
 fun sharedContainerRect(source: Rect, target: Rect, progress: Float): Rect {
-    val fraction = progress.coerceIn(0f, 1f)
+    val fraction = sanitizedProgress(progress)
     return Rect(
         left = lerp(source.left, target.left, fraction),
         top = lerp(source.top, target.top, fraction),
@@ -87,12 +96,15 @@ internal fun playerSheetInputOwner(
     dragStartedFromMiniPlayer: Boolean,
     progress: Float,
     sharedLayersReady: Boolean,
-): PlayerInputOwner = when {
-    isDragging -> if (dragStartedFromMiniPlayer) PlayerInputOwner.MINI else PlayerInputOwner.FULL
-    !targetOpen && progress.coerceIn(0f, 1f) <= PLAYER_INPUT_MINI_END_PROGRESS ->
-        PlayerInputOwner.MINI
-    sharedLayersReady || targetOpen && progress >= 1f -> PlayerInputOwner.FULL
-    else -> PlayerInputOwner.NONE
+): PlayerInputOwner {
+    val safeProgress = sanitizedProgress(progress)
+    return when {
+        isDragging -> if (dragStartedFromMiniPlayer) PlayerInputOwner.MINI else PlayerInputOwner.FULL
+        !targetOpen && safeProgress <= PLAYER_INPUT_MINI_END_PROGRESS ->
+            PlayerInputOwner.MINI
+        sharedLayersReady || targetOpen && safeProgress >= 1f -> PlayerInputOwner.FULL
+        else -> PlayerInputOwner.NONE
+    }
 }
 
 /**
@@ -126,7 +138,7 @@ fun sharedMiniPlayerControlsShift(
  * into the target's shape.
  */
 fun sharedArtworkRect(source: Rect, target: Rect, progress: Float): Rect {
-    val fraction = progress.coerceIn(0f, 1f)
+    val fraction = sanitizedProgress(progress)
     val centerX = lerp(source.center.x, target.center.x, easeOutCubic(fraction))
     val verticalFraction = lerp(
         easeInCubic(fraction),
@@ -192,7 +204,7 @@ internal fun sharedContainerCornerRadii(
     target: SharedContainerCornerRadii,
     progress: Float,
 ): SharedContainerCornerRadii {
-    val fraction = progress.coerceIn(0f, 1f)
+    val fraction = sanitizedProgress(progress)
     fun interpolate(sourceRadius: Float, targetRadius: Float): Float = if (fraction < 1f) {
         lerp(sourceRadius, targetRadius, fraction)
     } else {
@@ -226,11 +238,13 @@ fun sharedContainerCornerRadius(
     progress: Float,
     screenCornerExpansionProgress: Float,
 ): Float {
-    val fraction = progress.coerceIn(0f, 1f)
-    val transitionRadius = lerp(collapsedCornerRadius, expandedCornerRadius, fraction)
+    val fraction = sanitizedProgress(progress)
+    val collapsed = if (collapsedCornerRadius.isFinite()) collapsedCornerRadius else 0f
+    val expanded = if (expandedCornerRadius.isFinite()) expandedCornerRadius else 0f
+    val transitionRadius = lerp(collapsed, expanded, fraction)
     val settled = ((fraction - (1f - CORNER_EXPANSION_PROGRESS_BAND)) / CORNER_EXPANSION_PROGRESS_BAND)
         .coerceIn(0f, 1f)
-    val expansion = screenCornerExpansionProgress.coerceIn(0f, 1f) * settled
+    val expansion = sanitizedProgress(screenCornerExpansionProgress) * settled
     return lerp(transitionRadius, 0f, expansion)
 }
 

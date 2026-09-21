@@ -100,7 +100,7 @@ import com.convx.music.viewmodels.AccountViewModel
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import com.convx.music.ui.component.ScreenLargeTitle
 import com.convx.music.ui.component.ScreenScaffold
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -121,10 +121,12 @@ fun AccountScreen(
     val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
 
     val gridState = rememberLazyGridState()
+    val accountTitleProgress = rememberTitleCollapseProgressState(gridState)
 
     ScreenScaffold(
         title = stringResource(R.string.account),
-        titleAlpha = rememberTitleCollapseProgress(gridState),
+        titleAlpha = 0f,
+        titleAlphaProvider = { accountTitleProgress.value },
         onBack = navController::navigateUp,
         onBackLongClick = navController::backToMain,
     ) { chrome ->
@@ -259,6 +261,5 @@ fun AccountScreen(
             }
         }
     }
-
-    }
+}
 }

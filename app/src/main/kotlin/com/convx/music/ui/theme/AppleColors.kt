@@ -12,12 +12,9 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * Apple Music (iOS 26/27) artwork colour rules, ported from the colorExtractionTest project
- * where they were fitted on 27 reference screenshots. Colours are packed 0xRRGGBB ints.
- *
- * The 99% path is Apple's own server-side `bgColor` fed through [pageBackground]; the
- * on-device [estimateArtworkBackground] is only the fallback for artwork Apple has no
- * entry for (YouTube-only items).
+ * Apple Music artwork colour rules; colours are packed 0xRRGGBB ints. Apple's server-side
+ * `bgColor` fed through [pageBackground] is the 99% path; [estimateArtworkBackground] is
+ * the fallback for non-Apple artwork.
  */
 object AppleColors {
     const val WHITE = 0xFFFFFF
@@ -42,7 +39,7 @@ object AppleColors {
     /** WCAG relative luminance. */
     fun luminance(c: Int) = 0.2126 * linear(red(c)) + 0.7152 * linear(green(c)) + 0.0722 * linear(blue(c))
 
-    /** Flat page background below the hero: artwork bgColor minus 165.9·Y per channel when Y > 0.1. */
+    /** Flat page background below the hero: Apple's bgColor darkened by luminance. */
     fun pageBackground(artworkBg: Int): Int {
         val y = luminance(artworkBg)
         if (y <= DARKEN_THRESHOLD) return artworkBg and 0xFFFFFF
@@ -61,26 +58,19 @@ object AppleColors {
         (blue(from) + (blue(to) - blue(from)) * t).roundToInt(),
     )
 
-    /** Play button fill: the artist's keyColor, white when the artist has none. */
+    /** Play button fill — the artist's keyColor, white when the artist has none. */
     fun playFill(keyColor: Int?) = keyColor ?: WHITE
 
-    /** Play glyph: page background pulled 30% toward black, as measured on the play button. */
+    /** Play glyph — page background 30% toward black, as measured on the play button. */
     fun playGlyph(pageBg: Int) = mix(pageBg, 0x000000, 0.3)
 
-    /**
-     * White overlay alpha of the translucent controls sitting on the page, measured per
-     * screenshot against the colour right behind them: the round info/favourite buttons
-     * are a flat ~8%; the featured card rises with the page's luminance (9% on black,
-     * 12.5% on the brightest pages Apple produces).
-     */
+    /** White overlay alpha of translucent page controls; the featured card rises with luminance. */
     const val CONTROL_FILL_ALPHA = 0.08f
     fun cardFillAlpha(pageBg: Int): Float = (0.090 + 0.25 * luminance(pageBg)).toFloat().coerceIn(0.08f, 0.14f)
 
-    /** 1 − worst channel difference / 255. */
     fun accuracy(x: Int, y: Int): Double =
         1.0 - maxOf(kotlin.math.abs(red(x) - red(y)), kotlin.math.abs(green(x) - green(y)), kotlin.math.abs(blue(x) - blue(y))) / 255.0
 
-    /** Box-average downscale of packed RGB pixels to size×size. */
     fun downscale(pixels: IntArray, width: Int, height: Int, size: Int): IntArray {
         val cells = size * size
         val n = IntArray(cells)
@@ -103,10 +93,8 @@ object AppleColors {
     }
 
     /**
-     * On-device estimate of Apple's server-side artwork bgColor from a downscaled grid (64×64):
-     * edge-weighted 32-level-per-channel bucket vote over the top quarter, winner's weighted mean.
-     * Black bucket skipped, fallback weighted mean. Prefer Apple's precomputed bgColor whenever
-     * the artwork comes from Apple Music — used only when there is no Apple Music match.
+     * On-device estimate of Apple's server-side bgColor: edge-weighted 32-level bucket
+     * vote over the top quarter, black bucket skipped. Only a fallback for non-Apple artwork.
      */
     fun estimateArtworkBackground(pixels: IntArray, width: Int, height: Int): Int {
         val levels = 32
@@ -149,12 +137,7 @@ object AppleColors {
         return rgb((sr[best] / m).roundToInt(), (sg[best] / m).roundToInt(), (sb[best] / m).roundToInt())
     }
 
-    /**
-     * Single-pass fast path: box-mean of the top-quarter grid rows straight from full-res
-     * pixels, then the same edge-weighted 32-level vote. Bit-identical to
-     * estimateArtworkBackground(downscale(pixels, w, h, 64), 64, 64); skips the 64×64
-     * intermediate (~4x fewer pixel visits, no second allocation).
-     */
+    /** Single-pass fast path: bit-identical to [estimateArtworkBackground] with a 64×64 grid, no intermediate. */
     fun estimateDirect(pixels: IntArray, width: Int, height: Int, grid: Int = 64): Int {
         val qRows = max(1, grid / 4)
         val cells = qRows * grid
@@ -208,7 +191,6 @@ object AppleColors {
         return rgb((sr[best] / m).roundToInt(), (sg[best] / m).roundToInt(), (sb[best] / m).roundToInt())
     }
 
-    /** [estimateDirect] for a software bitmap. */
     fun estimateArtworkBackground(bitmap: Bitmap): Int {
         val w = bitmap.width
         val h = bitmap.height

@@ -34,28 +34,20 @@ import com.convx.music.playback.dj.TransitionStyle
 import kotlin.math.roundToInt
 
 /**
- * One line of DJ telemetry, shown only while Auto-DJ is on and something is
- * actually known.
- *
- * Reports what happened, not what was intended: if a pair fell back to a plain
- * crossfade the row says so, rather than leaving the listener to wonder why a
- * transition sounded ordinary.
+ * One line of DJ telemetry while Auto-DJ is on, reporting what actually happened
+ * (e.g. a fallback to plain crossfade) rather than what was intended.
  */
 @Composable
 fun DjReadout(
     modifier: Modifier = Modifier,
-    // Unspecified keeps the classic player's own theme-driven colour; Player V17
-    // passes its adaptive secondary tint so this reads correctly against its
-    // artwork-derived/static/gradient backgrounds too, not just the app theme.
+    // Unspecified = player's own theme colour; Player V17 passes an adaptive tint for artwork backgrounds.
     color: Color = Color.Unspecified,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val state by playerConnection.djState.collectAsStateWithLifecycle()
 
     if (!state.enabled) return
-    // Analysis needs the track to play a while before it reports anything, so
-    // say so rather than showing an empty row — otherwise "no BPM" is
-    // indistinguishable from "broken".
+    // Analysis needs a few seconds first; placeholder so an empty row isn't read as broken.
     val text = state.describe() ?: stringResource(R.string.dj_readout_analyzing)
 
     Row(

@@ -319,11 +319,8 @@ private const val VideoLoopBucketMs = 100L
 /** Upper bound on waiting for the player sheet before opening the queue inside it. */
 private const val PARENT_SHEET_SETTLE_TIMEOUT_MS = 1_000L
 
-/**
- * Strength of white content added onto the background under `additiveChrome`. Below full so
- * the blend doesn't clip to plain white -- the background's own colour and saturation stay
- * visible through the tint instead of getting washed out.
- */
+/** Strength of white content added onto the background under `additiveChrome`. Below full so
+ *  the blend doesn't clip to plain white and wash out the background's colour. */
 private const val AdditiveChromeContentAlpha = 0.45f
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -333,21 +330,14 @@ fun BottomSheetPlayer(
     navController: NavController,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
-    // The DIY editor mounts this same composable as its live editing canvas (real
-    // background/controls, not a hand-built approximation) and draws its own
-    // editable sticker overlay on top — this trio lets it do that without changing
-    // anything for the one real, singleton instance in MainActivity, which never
-    // passes these.
-    /** Off in the editor: it draws its own (live, editable) sticker layer instead —
-     *  leaving this on would double-render the saved layout underneath it. */
+    /** Editor-only: the DIY editor mounts this composable as its live canvas and draws its own
+     *  sticker layer — off there so the saved layout isn't double-rendered underneath. */
     showDiyStickers: Boolean = true,
-    /** Editor-only: previews the orientation the user is toggling instead of the
-     *  device's actual orientation, which the editor may not itself be in. */
+    /** Editor-only: previews the orientation the user is toggling, not the device's real one. */
     forcedOrientation: DiyOrientation? = null,
-    /** Editor-only: this composable is mounted a second time there alongside the
-     *  real singleton instance in MainActivity — suppresses the window-level side
-     *  effects (status bar icon color, keep-screen-on) so the two copies can't
-     *  fight over that global, real-device state. */
+    /** Editor-only: mounted there a second time alongside the real instance, so window-level
+     *  effects (status bar icon color, keep-screen-on) are suppressed to keep the two copies
+     *  from fighting over that global state. */
     isPreviewOnly: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -358,16 +348,12 @@ fun BottomSheetPlayer(
     val playerConnection = LocalPlayerConnection.current ?: return
 
     // Alternate player style, ported from vivizzz007/vivi-music. Off by default.
-    // Swapped in below as the BottomSheet's collapsed/expanded content slots (see
-    // collapsedContent/content near the BottomSheet(...) call) so it still goes
-    // through the sheet's real drag/expand/collapse mechanics -- an early return
-    // here used to skip that machinery entirely, which is why V17 used to render
-    // as an always-on-top full-bleed box instead of a proper mini/expanded player.
+    // Swapped in below as the sheet's collapsed/expanded content slots so it still goes
+    // through the real drag/expand/collapse mechanics.
     val (useAppleMusicPlayer) = rememberPreference(UseAppleMusicPlayerKey, defaultValue = false)
 
-    // Shared between the background slot (BackgroundVideoView polls into it)
-    // and the control pills below (read it via LocalBackdropLoopBucket) — see
-    // VideoLoopClock's doc for why this is a plain clock, not snapshot state.
+    // Shared between the background slot (BackgroundVideoView polls into it) and the
+    // control pills below — see VideoLoopClock's doc for why this is a plain clock.
     val videoLoopClock = rememberVideoLoopClock()
 
     val (useNewPlayerDesign, onUseNewPlayerDesignChange) = rememberPreference(
@@ -405,10 +391,8 @@ fun BottomSheetPlayer(
 
     val dataSaverEnabled by rememberPreference(DataSaverEnabledKey, false)
     val enableCanvasPref by rememberPreference(CanvasThumbnailAnimationKey, true)
-    // Canvas videos are the app's single largest data consumer (a looping video
-    // per track). DataSaver is the user's explicit "don't stream video" consent;
-    // battery saver gets the same treatment automatically — decoding + streaming
-    // a video per track is exactly what power saving exists to stop.
+    // Canvas videos are the app's single largest data consumer; DataSaver and
+    // battery saver both get them disabled.
     val powerSaverActive = remember {
         context.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode ?: false
     }
@@ -429,9 +413,8 @@ fun BottomSheetPlayer(
     val keepScreenOn = isPlaying && isKeepScreenOn
 
     DisposableEffect(playerBackground, state.isExpanded, useDarkTheme, keepScreenOn, isPreviewOnly) {
-        // The editor mounts a second copy of this composable alongside the real
-        // singleton instance in MainActivity — without this guard both would fight
-        // over the same real window's status bar icon color / keep-screen-on flag.
+        // The editor mounts a second copy; without this guard both would fight over
+        // the same real window's status bar icon color / keep-screen-on flag.
         if (isPreviewOnly) return@DisposableEffect onDispose {}
         val window = (context as? android.app.Activity)?.window
         if (window != null && state.isExpanded) {
@@ -2422,7 +2405,7 @@ fun BottomSheetPlayer(
                             ) {
                                 PlayerGlyph(
                                     slot = PlayerIconSlot.MORE,
-                                    fallback = R.drawable.more_vert,
+                                    fallback = R.drawable.more_horiz,
                                     tint = LocalContentColor.current,
                                     modifier = Modifier.size(24.dp)
                                         .additiveChrome(additiveChrome)
@@ -3710,7 +3693,7 @@ fun MoreActionsButton(
         // nothing here even though the sibling PlayerMoreMenuButton honoured it.
         PlayerGlyph(
             slot = PlayerIconSlot.MORE,
-            fallback = R.drawable.more_vert,
+            fallback = R.drawable.more_horiz,
             tint = iconButtonColor,
         )
     }

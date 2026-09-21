@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens.search
 
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import com.convx.music.ui.utils.bounceClick
@@ -61,7 +62,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.composables.sfsymbols.monochrome.SFArrowUp
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.composables.sfsymbols.monochrome.SFClock
 import com.composables.sfsymbols.monochrome.SFMagnifyingglass
 import com.composables.sfsymbols.monochrome.SFXmark
@@ -293,7 +293,7 @@ fun OnlineSearchScreen(
                         }
                     ) {
                         Icon(
-                            imageVector = SfSymbols.Monochrome.SFEllipsis,
+                            painter = painterResource(R.drawable.more_horiz),
                             contentDescription = null
                         )
                     }

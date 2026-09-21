@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.sfsymbols.SfSymbols
 import com.composables.sfsymbols.monochrome.SFGaugeWithNeedle
 import com.composables.sfsymbols.monochrome.SFSliderHorizontal3
-import com.composables.sfsymbols.monochrome.SFArrowshapeTurnUpLeft
 import com.composables.sfsymbols.monochrome.SFBellFill
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -333,7 +332,7 @@ fun PlayerMenu(
                     NewAction(
                         icon = {
                             Icon(
-                                imageVector = SfSymbols.Monochrome.SFArrowshapeTurnUpLeft,
+                                painter = painterResource(R.drawable.ios_share),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp),
                             )

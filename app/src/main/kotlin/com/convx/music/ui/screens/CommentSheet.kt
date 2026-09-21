@@ -101,7 +101,6 @@ fun CommentSheet(
         containerColor = AppTheme.colorScheme.surfaceContainer
     ) {
         Column(modifier = Modifier.fillMaxHeight()) {
-            // Header row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

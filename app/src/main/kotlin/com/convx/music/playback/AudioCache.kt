@@ -82,16 +82,37 @@ object AudioCache {
     }
 
     /**
+     * Network upstream the analyzer may use to fill cache misses, installed by
+     * MusicService with the player's own (proxy-aware) factory. Null means
+     * cache-only: a miss fails the read exactly like before, which is what
+     * tests and previews want.
+     */
+    var analyzerUpstream: DataSource.Factory? = null
+
+    /**
      * Returns a [MediaDataSource] over a specific rendition for the analyzer
      * to read. Falls back to the live-player cache entry when the requested
      * key is not present.
+     *
+     * Without [fetchUri] the source is cache-only: any byte the player hasn't
+     * cached yet fails the read (the extractor's seeks make this near-certain
+     * for windows past the buffered prefix, which is why Sing stayed silent
+     * on fresh plays). With [fetchUri] misses are range-fetched over the
+     * network through [analyzerUpstream] and land in the cache under the
+     * rendition's own key.
+     *
+     * The fetch URI must be the real stream URI, never the synthetic
+     * `watch?v=` URI analysis keys are built from — fetching that would cache
+     * the watch page HTML as audio bytes.
      */
-    fun renditionDataSource(uri: Uri, rendition: Rendition): MediaDataSource {
-        val cacheSource = CacheDataSource.Factory()
+    fun renditionDataSource(uri: Uri, rendition: Rendition, fetchUri: Uri? = null): MediaDataSource {
+        val factory = CacheDataSource.Factory()
             .setCache(cache)
             .setCacheKeyFactory(keyFactory)
-            .createDataSource()
-        return CacheMediaDataSource(cacheSource, uri)
+        if (fetchUri != null) {
+            factory.setUpstreamDataSourceFactory(analyzerUpstream)
+        }
+        return CacheMediaDataSource(factory.createDataSource(), fetchUri ?: uri, rendition.key)
     }
 
     /**
@@ -148,6 +169,7 @@ object AudioCache {
     private class CacheMediaDataSource(
         private val delegate: DataSource,
         private val uri: Uri,
+        private val cacheKey: String,
     ) : MediaDataSource() {
 
         override fun readAt(position: Long, buffer: ByteArray?, offset: Int, size: Int): Int {
@@ -155,6 +177,10 @@ object AudioCache {
             if (position < 0) return -1
             val dataSpec = DataSpec.Builder()
                 .setUri(uri)
+                // Pin the key: the fetch URI (a googlevideo stream URL) carries
+                // no `v` parameter, so without this upstream fills would land
+                // under the full URL instead of the rendition's key.
+                .setKey(cacheKey)
                 .setPosition(position)
                 .setLength(size.toLong())
                 .build()

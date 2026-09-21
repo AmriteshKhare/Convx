@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens.search
 
+import androidx.compose.ui.res.painterResource
 import android.content.res.Configuration
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -52,7 +53,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
@@ -255,7 +255,7 @@ fun LocalSearchScreen(
                                 }
                             ) {
                                 Icon(
-                                    imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                    painter = painterResource(R.drawable.more_horiz),
                                     contentDescription = null,
                                 )
                             }

@@ -210,10 +210,7 @@ fun AiDjSetScreen(
                                 style = AppTheme.typography.bodyMedium,
                                 color = AppTheme.colorScheme.error,
                             )
-                            // The last line is usually a generic outcome ("No songs
-                            // found") — the actual reason (missing key, network
-                            // error, parse failure) is often an earlier line that
-                            // would otherwise be silently lost.
+                            // Last line is a generic outcome; the real reason is usually an earlier line.
                             if (state.logs.size > 1) {
                                 Text(
                                     text = state.logs.dropLast(1).joinToString("\n"),

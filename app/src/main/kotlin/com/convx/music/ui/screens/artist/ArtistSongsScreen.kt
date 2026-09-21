@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens.artist
 
+import androidx.compose.ui.res.painterResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -70,7 +71,6 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.composables.sfsymbols.SfSymbols
-import com.composables.sfsymbols.monochrome.SFEllipsis
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerConnection
@@ -120,7 +120,7 @@ import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.ArtistSongsViewModel
 import com.convx.music.ui.component.ScreenLargeTitle
 import com.convx.music.ui.component.ScreenScaffold
-import com.convx.music.ui.component.rememberTitleCollapseProgress
+import com.convx.music.ui.component.rememberTitleCollapseProgressState
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -148,10 +148,12 @@ fun ArtistSongsScreen(
     val artist by viewModel.artist.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val lazyListState = rememberLazyListState()
+    val artistSongsTitleProgress = rememberTitleCollapseProgressState(lazyListState, titleItemKey = "title")
 
     ScreenScaffold(
         title = artist?.artist?.name.orEmpty(),
-        titleAlpha = rememberTitleCollapseProgress(lazyListState, titleItemKey = "title"),
+        titleAlpha = 0f,
+        titleAlphaProvider = { artistSongsTitleProgress.value },
         onBack = navController::navigateUp,
         onBackLongClick = navController::backToMain,
     ) { chrome ->
@@ -219,7 +221,7 @@ fun ArtistSongsScreen(
                             },
                         ) {
                             Icon(
-                                imageVector = SfSymbols.Monochrome.SFEllipsis,
+                                painter = painterResource(R.drawable.more_horiz),
                                 contentDescription = null,
                             )
                         }

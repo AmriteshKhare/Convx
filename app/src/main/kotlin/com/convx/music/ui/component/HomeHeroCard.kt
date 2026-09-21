@@ -40,14 +40,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import android.os.Build
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.convx.music.R
 import com.convx.music.constants.HomeHeroCardHeightOverrideKey
+import com.convx.music.constants.ReduceDynamicBlurKey
 import com.convx.music.ui.theme.AppleTokens
+import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.coroutineScope
@@ -86,15 +87,23 @@ fun HomeHeroCard(
     val cardShape = rememberHomeCardShape()
 
     // Zoom-in entrance: the artwork starts 12 % larger and invisible, settling to
-    // normal scale over 500 ms.  One-shot on first composition per [thumbnailUrl] key.
+    // normal scale on Motion.morphEnter (340ms iOS curve, single clock for scale
+    // and alpha). One-shot per composition: keying on thumbnailUrl re-snapped the
+    // entrance when the Apple artwork resolved over YouTube's (double zoom).
+    val (reduceMotion) = rememberPreference(ReduceDynamicBlurKey, false)
     val scale = remember { Animatable(1.12f) }
     val alpha = remember { Animatable(0f) }
-    LaunchedEffect(thumbnailUrl) {
-        scale.snapTo(1.12f)
-        alpha.snapTo(0f)
-        coroutineScope {
-            launch { scale.animateTo(1f, animationSpec = tween(500)) }
-            launch { alpha.animateTo(1f, animationSpec = tween(400)) }
+    LaunchedEffect(Unit) {
+        if (reduceMotion) {
+            scale.snapTo(1f)
+            alpha.snapTo(1f)
+        } else {
+            scale.snapTo(1.12f)
+            alpha.snapTo(0f)
+            coroutineScope {
+                launch { scale.animateTo(1f, animationSpec = Motion.morphEnter()) }
+                launch { alpha.animateTo(1f, animationSpec = Motion.morphEnter()) }
+            }
         }
     }
 
@@ -135,7 +144,7 @@ fun HomeHeroCard(
                 (LocalConfiguration.current.screenWidthDp / maxWidth.value)
             AsyncImage(
                 model = request,
-                contentDescription = null,
+                contentDescription = "$title — $subtitle",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()

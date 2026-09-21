@@ -175,7 +175,7 @@ fun LocalPlaylistMenu(
                 description = { Text(stringResource(R.string.share_playlist_desc)) },
                 icon = {
                     Icon(
-                        painter = painterResource(R.drawable.share),
+                        painter = painterResource(R.drawable.ios_share),
                         contentDescription = null
                     )
                 },

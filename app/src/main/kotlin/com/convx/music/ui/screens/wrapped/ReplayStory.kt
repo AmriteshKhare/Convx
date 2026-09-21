@@ -303,7 +303,7 @@ private fun ReplayChrome(
                 }
                 Spacer(Modifier.weight(1f))
                 ChromeCircle(onShare) {
-                    Icon(painterResource(R.drawable.share), "Share", tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(painterResource(R.drawable.ios_share), "Share", tint = Color.White, modifier = Modifier.size(16.dp))
                 }
             }
         }

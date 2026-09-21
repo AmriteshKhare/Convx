@@ -61,20 +61,13 @@ fun CreatePlaylistDialog(
         title = { Text(text = stringResource(R.string.create_playlist)) },
         initialTextFieldValue = TextFieldValue(initialTextFieldValue ?: ""),
         onDismiss = onDismiss,
-        // TextFieldDialog's default autoDismiss calls onDismiss() BEFORE onDone() runs.
-        // That tears this composable down mid-flight — its coroutineScope gets cancelled
-        // right as the coroutine below hits withContext(Dispatchers.Main), so the toast
-        // and onPlaylistCreated callback silently never ran (the insert just before it
-        // is a plain non-suspending call, so cancellation couldn't interrupt that part,
-        // which is why the playlist itself still got created). Dismiss explicitly once
-        // the work is actually done instead.
+        // Default autoDismiss tears the composable down before onDone() runs, cancelling
+        // this coroutine mid-flight and silently dropping the toast/callback.
         autoDismiss = false,
         onDone = { playlistName ->
             coroutineScope.launch(Dispatchers.IO) {
-                // YouTube.createPlaylist is the one innertube call that is NOT wrapped in
-                // runCatching, so a failed sync (no cookie, network, changed response shape)
-                // threw straight out of this coroutine and the local insert below never ran:
-                // the playlist did not appear at all, with nothing said about why.
+                // The one innertube call not wrapped in runCatching — a failure throws out
+                // of this coroutine and skips the local insert below.
                 val wantsSync = syncedPlaylist
                 val browseId = if (wantsSync && isSignedIn) {
                     runCatching { YouTube.createPlaylist(playlistName) }
@@ -92,11 +85,8 @@ fun CreatePlaylistDialog(
                     isEditable = true,
                 )
 
-                // database.query{} schedules on queryExecutor and returns immediately —
-                // a caller relying on onPlaylistCreated to find this row (e.g. to add
-                // pending songs to it) could run before the scheduled insert lands.
-                // Call the DAO insert directly so it blocks this IO-dispatcher coroutine
-                // until the row actually exists.
+                // database.query{} is async; call insert() directly so the row exists
+                // before onPlaylistCreated runs.
                 database.insert(playlistEntity)
 
                 withContext(Dispatchers.Main) {

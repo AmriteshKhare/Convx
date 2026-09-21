@@ -40,9 +40,6 @@ data class DraggableLyricsProviderItem(
     val id: String,
     val name: String,
     val icon: Painter,
-    // Task 011: the priority list is the single source of truth for which lyrics
-    // providers are active -- this replaced 7 separate enable toggles, so each row
-    // now carries its own on/off state instead of a standalone switch elsewhere.
     val enabled: Boolean = true,
 )
 

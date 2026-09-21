@@ -9,6 +9,7 @@ import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 
@@ -72,7 +73,7 @@ object Motion {
     )
 
     /**
-     * Card growing OUT of its tile (push): 320ms on the iOS nav curve so the
+     * Card growing OUT of its tile (push): 340ms on the iOS nav curve so the
      * morph and the push behind it stay on one clock. Body staggers 70ms after.
      * Value-duplicates PushEasing below: forward ref illegal in object init order.
      */
@@ -133,6 +134,31 @@ object Motion {
     const val AppearExitMillis = 240
 
     fun <T> appearExit(): FiniteAnimationSpec<T> = tween(AppearExitMillis, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
+
+    /**
+     * Icon swap in place: play <-> pause. Single source of truth for every
+     * small symbolic swap so all of them share one clock. Kept deliberately
+     * snappy (200 in / 160 out) with a 0.3 scale pop: at 0.85 the scale delta
+     * is indistinguishable from a cut and the swap reads as a different button
+     * appearing rather than this one changing its mind.
+     */
+    const val SwapEnterMillis = 200
+    const val SwapExitMillis = 160
+    val SwapEasing: Easing = FastOutSlowInEasing
+    const val SwapInitialScale = 0.3f
+
+    fun <T> swapEnter(): FiniteAnimationSpec<T> = tween(SwapEnterMillis, easing = SwapEasing)
+
+    fun <T> swapExit(): FiniteAnimationSpec<T> = tween(SwapExitMillis, easing = SwapEasing)
+
+    /**
+     * Event-driven reduce-motion gate: the single place that decides whether an
+     * animation runs or snaps. Callers read the reduce-motion preference once as
+     * an event ([reduceMotion]) and pass their [Motion] spec through here, so no
+     * call site hand-rolls its own `if (reduce) snap() else tween(...)`.
+     */
+    fun <T> gate(reduceMotion: Boolean, spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =
+        if (reduceMotion) snap() else spec
 
     // The overscroll bounce-back deliberately lives in `IosOverscroll.kt` instead of
     // here: it is velocity-adaptive (a hard flick gets a longer arc), which no single
