@@ -21,16 +21,6 @@ data class AlbumPage(
     val descriptionRuns: List<com.music.innertube.models.Run>? = null,
 ) {
     companion object {
-        fun getPlaylistId(response: BrowseResponse): String? {
-            var playlistId = response.microformat?.microformatDataRenderer?.urlCanonical?.substringAfterLast('=')
-            if (playlistId == null)
-            {
-                playlistId = response.header?.musicDetailHeaderRenderer?.menu?.menuRenderer?.topLevelButtons?.firstOrNull()
-                    ?.buttonRenderer?.navigationEndpoint?.watchPlaylistEndpoint?.playlistId
-            }
-            return playlistId
-        }
-
         fun getTitle(response: BrowseResponse): String? {
             val title = getHeader(response)?.title ?: response.header?.musicDetailHeaderRenderer?.title
             return title?.runs?.firstOrNull()?.text
