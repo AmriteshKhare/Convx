@@ -6,6 +6,8 @@ package com.convx.music.ui.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
@@ -33,16 +35,59 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
  */
 object PlayerMorph {
     /**
-     * Master switch, off for now: the shared container/artwork morph read as an ugly,
-     * jarring state-change (a black gap at the fraction 0/1 handoff) rather than a smooth
-     * transition. [active] short-circuits on this so every caller's own
-     * `morphEnabled && PlayerMorph.active` check goes false too, without each of them
-     * needing their own flag. Flip back to true to re-enable once the handoff is redone.
+     * Master switch. [active] short-circuits on this so every caller's own
+     * `morphEnabled && PlayerMorph.active` check goes false too; off, the sheet just slides.
      */
     @JvmField var enabled: Boolean = true
     @JvmField var miniLayer: GraphicsLayer? = null
+    /** The pill's own surface (glass, shadow, fill), recorded apart from its content: the card
+     *  starts as this surface stretched to the card rect (Melox draws its mini surface on the
+     *  growing card), so mini and player read as ONE object, not a pill swapped for a card. */
+    @JvmField var miniSurfaceLayer: GraphicsLayer? = null
     @JvmField var fullBackgroundLayer: GraphicsLayer? = null
     @JvmField var fullContentLayer: GraphicsLayer? = null
+    /** The pill's own drop-shadow elevation (px). The card casts it while it is still the
+     *  pill, so the shadow is there all the way down instead of popping in on landing. */
+    @JvmField var miniShadowElevationPx: Float = 0f
+
+    /**
+     * 0..1 multiplier on the docked pill's drop shadow. Snaps to 0 when the morph takes the
+     * pill, eases back to 1 after it lands ([PILL_SHADOW_RETURN_MS]): the returning shadow
+     * fades in instead of popping on the landing frame. Read in the draw phase only.
+     */
+    val pillShadow = androidx.compose.animation.core.Animatable(1f)
+
+    /**
+     * The close's landing, in sheet-progress units (<= 0 while it runs, 0 at rest).
+     *
+     * The sheet's lower bound IS the collapsed anchor, so the close spring hits it at full
+     * speed and stops dead. The docked pill used to take over there and start its own dip
+     * spring: two motions with the speed cut between them -- the "lands, snaps, THEN
+     * overshoots". Now the card itself carries on past the slot on this spring, seeded with
+     * the exact arrival speed, and springs back; the pill only reappears once it settles.
+     */
+    val landing = androidx.compose.animation.core.Animatable(0f)
+
+    /** True while [landing] runs: the morph card, not the docked pill, owns the drawing. */
+    var landingActive: Boolean by androidx.compose.runtime.mutableStateOf(false)
+
+    /** Card centre travel per unit of progress at the pill end (px); set when a landing starts. */
+    @JvmField var landingTravelPx: Float = 0f
+
+    /** Ceiling of the landing dip (px); the dip eases into it rather than clipping. */
+    @JvmField var landingMaxDipPx: Float = 0f
+
+    /**
+     * How far below its slot the landing card's centre is right now, px (0 at rest). Linear in
+     * [landing] near the slot -- so the card keeps exactly the speed it arrived with -- and
+     * soft-saturating toward [landingMaxDipPx] for hard flings. Snapshot read: callers in the
+     * draw phase redraw every landing frame.
+     */
+    fun landingDipPx(): Float {
+        val overshoot = landing.value
+        if (overshoot >= 0f || landingMaxDipPx <= 0f) return 0f
+        return landingMaxDipPx * kotlin.math.tanh(-overshoot * landingTravelPx / landingMaxDipPx)
+    }
 
     /**
      * Confirmed-fresh flags (Melox PlayerSheetTransitionState.miniFrameReady /
@@ -59,15 +104,18 @@ object PlayerMorph {
      * frame showed a stale or empty recording instead of the actual content.
      *
      * Set true only after [Modifier.recordPlayerLayer] has actually recorded that
-     * layer at a usable size; reset whenever the source's own bounds resize, so a
-     * layout change (tab style, rotation) can't leave a stale recording trusted.
+     * layer at a usable size. Never reset: a resize always redraws, and so re-records, the
+     * source, whereas a reset with no redraw after it left the morph off for good.
      */
     @JvmField var miniFrameReady: Boolean = false
     @JvmField var fullBackgroundFrameReady: Boolean = false
     @JvmField var fullContentFrameReady: Boolean = false
 
-    /** Set by the player; the sheet's own 0..1 drag/settle progress. */
-    @JvmField var progressProvider: () -> Float = { 0f }
+    /** Set by the player; the sheet's own 0..1 drag/settle progress. Snapshot-backed so
+     *  [activeState] re-subscribes when the player installs its provider -- as a plain field
+     *  the derived state first ran against the `{ 0f }` placeholder, recorded no
+     *  dependencies, and stayed false for good (the morph silently never ran). */
+    var progressProvider: () -> Float by androidx.compose.runtime.mutableStateOf({ 0f })
 
     /**
      * The sheet's drag entry points, published for the mini player.
@@ -107,12 +155,32 @@ object PlayerMorph {
      * Both ends have to be recorded AND the pill has to have real bounds; without either
      * the overlay cannot draw anything, so the two ends must keep drawing themselves.
      */
-    val active: Boolean
-        get() {
-            val fraction = progress
-            if (fraction <= 0f || fraction >= 1f) return false
-            return sharedLayersReady
-        }
+    val active: Boolean get() = activeState.value
+
+    /**
+     * [active] as a derived snapshot: a draw-phase reader (the recordPlayerLayer `drawInPlace`
+     * lambdas, hideWhileMorphing) is invalidated only when the boolean flips, not on every
+     * progress tick. Reading raw progress there re-recorded the whole player every frame, and
+     * since the overlay animates that recording's alpha HWUI keeps it as a full-screen
+     * offscreen layer -- so every frame re-rendered the entire player offscreen (measured
+     * 25-110ms RenderThread frames during open/close on the SM-M346B).
+     */
+    private val activeState = androidx.compose.runtime.derivedStateOf {
+        val fraction = progress
+        fraction > 0f && fraction < 1f && sharedLayersReady
+    }
+
+    /**
+     * Glass under the card may skip re-sampling: the card covers it until 0.75, then the
+     * capture goes live so the glass is warm when it resolves. Derived, so draw-phase
+     * readers (backdrop `frozen` providers) invalidate on the flip only -- reading raw
+     * progress there re-invalidated every glass surface on every morph frame.
+     */
+    val glassFrozen: Boolean get() = glassFrozenState.value
+
+    private val glassFrozenState = androidx.compose.runtime.derivedStateOf {
+        activeState.value && progress < com.convx.music.ui.component.PLAYER_GLASS_UNFREEZE_PROGRESS
+    }
 
     /**
      * All three recordings present, confirmed freshly recorded, with a usable pill:
@@ -129,17 +197,6 @@ object PlayerMorph {
             return mini.width > 0f && mini.height > 0f
         }
 
-    /** Call when the mini pill's own bounds resize (layout branch change, rotation):
-     *  its last recording was made at the old size and can't be trusted at the new one. */
-    fun invalidateMiniFrame() {
-        miniFrameReady = false
-    }
-
-    /** Call when the full player's bounds resize (rotation, window resize). */
-    fun invalidateFullFrames() {
-        fullBackgroundFrameReady = false
-        fullContentFrameReady = false
-    }
 }
 
 /**
@@ -152,14 +209,17 @@ object PlayerMorph {
 @Composable
 fun InstallPlayerMorphLayers() {
     val mini = rememberGraphicsLayer()
+    val miniSurface = rememberGraphicsLayer()
     val fullBackground = rememberGraphicsLayer()
     val fullContent = rememberGraphicsLayer()
-    DisposableEffect(mini, fullBackground, fullContent) {
+    DisposableEffect(mini, miniSurface, fullBackground, fullContent) {
         PlayerMorph.miniLayer = mini
+        PlayerMorph.miniSurfaceLayer = miniSurface
         PlayerMorph.fullBackgroundLayer = fullBackground
         PlayerMorph.fullContentLayer = fullContent
         onDispose {
             PlayerMorph.miniLayer = null
+            PlayerMorph.miniSurfaceLayer = null
             PlayerMorph.fullBackgroundLayer = null
             PlayerMorph.fullContentLayer = null
         }

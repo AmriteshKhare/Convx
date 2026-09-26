@@ -19,6 +19,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -145,16 +147,21 @@ fun pillGlassBackground(shape: androidx.compose.foundation.shape.CornerBasedShap
     // NAV_BAR bar toggle is off. Only old/unsupported devices fall back.
     val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     if (isGlassAllowed()) {
-        return Modifier.liquidGlass(config = glassConfig, shape = shape)
+        // Figma chrome shadow under the top-bar pills.
+        return Modifier
+            .shadow(12.dp, shape, spotColor = Color.Black.copy(alpha = 0.35f))
+            .liquidGlass(config = glassConfig, shape = shape)
     }
     val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
-    return Modifier.background(
-        GlassTintTokens.baseSurfaceColor(isDark).copy(
-            alpha = if (isDark) GlassTintTokens.NavPillFillOpacityDark
-            else GlassTintTokens.NavPillFillOpacityLight,
-        ),
-        shape,
-    )
+    return Modifier
+        .shadow(12.dp, shape, spotColor = Color.Black.copy(alpha = 0.35f))
+        .background(
+            GlassTintTokens.baseSurfaceColor(isDark).copy(
+                alpha = if (isDark) GlassTintTokens.NavPillFillOpacityDark
+                else GlassTintTokens.NavPillFillOpacityLight,
+            ),
+            shape,
+        )
 }
 
 /**

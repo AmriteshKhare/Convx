@@ -11,14 +11,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -27,12 +25,11 @@ import com.convx.music.R
 import com.convx.music.constants.AskBeforeReplacingQueueKey
 import com.convx.music.constants.AudioNormalizationKey
 import com.convx.music.constants.AudioQuality
+import com.convx.music.constants.KaraokeModeKey
 import com.convx.music.constants.AudioQualityKey
 import com.convx.music.constants.AutoDjMixingEnabledKey
 import com.convx.music.constants.AutoDownloadOnLikeKey
 import com.convx.music.constants.AutoSkipNextOnErrorKey
-import com.convx.music.constants.CreativeTransitionsEnabledKey
-import com.convx.music.constants.CrossfadeDurationKey
 import com.convx.music.constants.CrossfadeEnabledKey
 import com.convx.music.constants.EnableGoogleCastKey
 import com.convx.music.constants.KeepScreenOn
@@ -43,14 +40,11 @@ import com.convx.music.constants.RememberShuffleAndRepeatKey
 import com.convx.music.constants.ResumeOnBluetoothConnectKey
 import com.convx.music.constants.SimilarContent
 import com.convx.music.constants.SkipSilenceKey
-import com.convx.music.ui.component.DefaultDialog
 import com.convx.music.ui.component.EnumDialog
 import com.convx.music.ui.component.IosSettingsGroup
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.ios.compat.Slider
 import com.convx.music.ui.ios.compat.Switch
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
 
@@ -64,19 +58,11 @@ fun PlayerSettings(
         AudioQualityKey,
         defaultValue = AudioQuality.AUTO
     )
-    val (crossfadeEnabled, onCrossfadeEnabledChange) = rememberPreference(
+    val (crossfadeEnabled) = rememberPreference(
         CrossfadeEnabledKey,
         defaultValue = false
     )
-    val (crossfadeDuration, onCrossfadeDurationChange) = rememberPreference(
-        CrossfadeDurationKey,
-        defaultValue = 5f
-    )
-    val (creativeTransitionsEnabled, onCreativeTransitionsEnabledChange) = rememberPreference(
-        CreativeTransitionsEnabledKey,
-        defaultValue = false
-    )
-    val (autoDjMixingEnabled, onAutoDjMixingEnabledChange) = rememberPreference(
+    val (autoDjMixingEnabled) = rememberPreference(
         AutoDjMixingEnabledKey,
         defaultValue = false
     )
@@ -90,6 +76,10 @@ fun PlayerSettings(
     )
     val (skipSilence, onSkipSilenceChange) = rememberPreference(
         SkipSilenceKey,
+        defaultValue = false
+    )
+    val (karaokeMode, onKaraokeModeChange) = rememberPreference(
+        KaraokeModeKey,
         defaultValue = false
     )
     val (audioNormalization, onAudioNormalizationChange) = rememberPreference(
@@ -137,7 +127,6 @@ fun PlayerSettings(
     var showAudioQualityDialog by remember {
         mutableStateOf(false)
     }
-    var showCrossfadeBetaDialog by remember { mutableStateOf(false) }
 
     if (showAudioQualityDialog) {
         EnumDialog(
@@ -157,44 +146,6 @@ fun PlayerSettings(
                 }
             }
         )
-    }
-
-    // Auto-DJ Mixing needs crossfade on (it beatmatches into the crossfade
-    // window); Creative Transitions needs Auto-DJ Mixing on (its effects run
-    // inside a DJ-mixed transition). Turning the dependency off cascades down
-    // rather than leaving a switch on that can no longer do anything.
-    //
-    // Hoisted here rather than inside the buildList{} below (where they used
-    // to live): buildList's lambda isn't @Composable-shaped, and a
-    // LaunchedEffect call the Compose compiler can't group properly there
-    // was corrupting the composition on this screen specifically -- the
-    // symptom was a native RenderNode crash on the very next forced
-    // re-layout (this screen's own back-navigation pop transition).
-    LaunchedEffect(crossfadeEnabled) {
-        if (!crossfadeEnabled && autoDjMixingEnabled) onAutoDjMixingEnabledChange(false)
-    }
-    LaunchedEffect(autoDjMixingEnabled) {
-        if (!autoDjMixingEnabled && creativeTransitionsEnabled) onCreativeTransitionsEnabledChange(false)
-    }
-
-    if (showCrossfadeBetaDialog) {
-        DefaultDialog(
-            onDismiss = { showCrossfadeBetaDialog = false },
-            title = { Text(stringResource(R.string.crossfade_beta_title)) },
-            buttons = {
-                TextButton(onClick = { showCrossfadeBetaDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-                TextButton(onClick = {
-                    showCrossfadeBetaDialog = false
-                    onCrossfadeEnabledChange(true)
-                }) {
-                    Text(stringResource(R.string.enable))
-                }
-            }
-        ) {
-            Text(stringResource(R.string.crossfade_beta_message))
-        }
     }
 
     SettingsLazyPage(
@@ -222,92 +173,20 @@ fun PlayerSettings(
                             onClick = { showAudioQualityDialog = true }
                         ))
                         add(IosSettingsItem(
-                            icon = painterResource(R.drawable.linear_scale),
-                            title = { Text(stringResource(R.string.crossfade)) },
-                            description = { Text(stringResource(R.string.crossfade_desc)) },
-                            showBadge = true,
-                            trailingContent = {
-                                Switch(
-                                    checked = crossfadeEnabled,
-                                    onCheckedChange = {
-                                        if (!crossfadeEnabled) {
-                                            showCrossfadeBetaDialog = true
-                                        } else {
-                                            onCrossfadeEnabledChange(false)
+                            icon = painterResource(R.drawable.ic_queue_crossfade),
+                            title = { Text(stringResource(R.string.song_transitions)) },
+                            description = {
+                                Text(
+                                    stringResource(
+                                        when {
+                                            !crossfadeEnabled -> R.string.transition_off
+                                            autoDjMixingEnabled -> R.string.transition_automix
+                                            else -> R.string.crossfade
                                         }
-                                    }
-                                )
-                            },
-                            onClick = {
-                                if (!crossfadeEnabled) {
-                                    showCrossfadeBetaDialog = true
-                                } else {
-                                    onCrossfadeEnabledChange(false)
-                                }
-                            }
-                        ))
-                        if (crossfadeEnabled) {
-                            add(IosSettingsItem(
-                                icon = painterResource(R.drawable.timer),
-                                title = { Text(stringResource(R.string.crossfade_duration)) },
-                                description = {
-                                    Column {
-                                        Text(pluralStringResource(R.plurals.seconds, crossfadeDuration.toInt(), crossfadeDuration.toInt()))
-                                        Slider(
-                                            value = crossfadeDuration,
-                                            onValueChange = onCrossfadeDurationChange,
-                                            valueRange = 1f..15f,
-                                            steps = 14
-                                        )
-                                    }
-                                }
-                            ))
-                        }
-                        add(IosSettingsItem(
-                            icon = painterResource(R.drawable.equalizer),
-                            title = { Text(stringResource(R.string.auto_dj_mixing)) },
-                            description = {
-                                Text(
-                                    stringResource(
-                                        if (crossfadeEnabled) R.string.auto_dj_mixing_desc
-                                        else R.string.auto_dj_mixing_needs_crossfade
                                     )
                                 )
                             },
-                            enabled = crossfadeEnabled,
-                            trailingContent = {
-                                Switch(
-                                    checked = autoDjMixingEnabled,
-                                    enabled = crossfadeEnabled,
-                                    onCheckedChange = onAutoDjMixingEnabledChange
-                                )
-                            },
-                            onClick = if (crossfadeEnabled) {
-                                { onAutoDjMixingEnabledChange(!autoDjMixingEnabled) }
-                            } else null
-                        ))
-                        add(IosSettingsItem(
-                            icon = painterResource(R.drawable.equalizer),
-                            title = { Text(stringResource(R.string.creative_transitions)) },
-                            description = {
-                                Text(
-                                    stringResource(
-                                        if (autoDjMixingEnabled) R.string.creative_transitions_desc
-                                        else R.string.creative_transitions_needs_dj
-                                    )
-                                )
-                            },
-                            enabled = autoDjMixingEnabled,
-                            trailingContent = {
-                                Switch(
-                                    checked = creativeTransitionsEnabled,
-                                    enabled = autoDjMixingEnabled,
-                                    onCheckedChange = onCreativeTransitionsEnabledChange
-                                )
-                            },
-                            onClick = if (autoDjMixingEnabled) {
-                                { onCreativeTransitionsEnabledChange(!creativeTransitionsEnabled) }
-                            } else null
+                            onClick = { navController.navigate("settings/song_transitions") }
                         ))
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.music_note),
@@ -338,6 +217,18 @@ fun PlayerSettings(
                                 )
                             },
                             onClick = { onSkipSilenceChange(!skipSilence) }
+                        ))
+                        add(IosSettingsItem(
+                            icon = painterResource(R.drawable.mic),
+                            title = { Text(stringResource(R.string.karaoke_mode)) },
+                            description = { Text(stringResource(R.string.karaoke_mode_desc)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = karaokeMode,
+                                    onCheckedChange = onKaraokeModeChange
+                                )
+                            },
+                            onClick = { onKaraokeModeChange(!karaokeMode) }
                         ))
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.volume_up),

@@ -101,6 +101,8 @@ output-metadata.json
 *.so
 *.bin
 .env
+# Local opencode MCP config — contains Figma API key
+opencode.json
 app/src/main/java/com/vivimusic/music/listentogether/proto/*
 
 # FFTW third-party library build artifacts

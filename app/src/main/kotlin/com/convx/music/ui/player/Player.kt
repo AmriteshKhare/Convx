@@ -224,7 +224,6 @@ import com.convx.music.ui.component.DjReadout
 import com.convx.music.ui.component.BakedFootBlur
 import com.convx.music.ui.component.BlurredBackdropImage
 import com.convx.music.ui.component.BottomSheet
-import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
 import com.convx.music.ui.component.BottomSheetState
 import com.convx.music.ui.component.LocalBottomSheetPageState
 import com.convx.music.ui.component.LocalMenuState
@@ -668,56 +667,90 @@ fun BottomSheetPlayer(
     val defaultGradientColors = listOf(AppTheme.colorScheme.surface, AppTheme.colorScheme.surfaceVariant)
     val fallbackColor = AppTheme.colorScheme.surface.toArgb()
 
-    LaunchedEffect(mediaMetadata?.id, playerBackground) {
-        if (playerBackground == PlayerBackgroundStyle.GRADIENT || playerBackground == PlayerBackgroundStyle.GLOW_ANIMATED) {
-            val currentMetadata = mediaMetadata
-            if (currentMetadata != null && currentMetadata.thumbnailUrl != null) {
-                val cachedColors = gradientColorsCache[currentMetadata.id]
-                if (cachedColors != null) {
-                    gradientColors = cachedColors
-                    return@LaunchedEffect
-                }
-                withContext(Dispatchers.IO) {
+    // Ambient track-change timing: the DJ crossfade's length while one runs (so the backdrop
+    // turns over with the audio and the cover melt), a slow default otherwise. Eased at both
+    // ends -- see SeamlessEasing.
+    val crossfadeMs by playerConnection.crossfadeDurationMs.collectAsStateWithLifecycle()
+    val bgFadeMs = ambientTransitionMillis(crossfadeMs)
+    // A canvas video's own colours, sampled once per video (never per frame) -- see
+    // CanvasVideoLooks. Null until the loop has played a few seconds, then the backdrop
+    // eases over to it exactly like a track change.
+    // Ambient stage of the track-change ladder (TrackChoreography): the backdrop turns over
+    // last, after the cover and the words, so a skip never lands everything in one frame.
+    // V2 builds the same ladder off the same flow, so the stages line up across skins.
+    val trackChoreography = rememberTrackChoreography(mediaMetadata)
+    val ambientMetadata = trackChoreography.ambient.value
+    val videoLook = CanvasVideoLooks.forMedia(ambientMetadata?.id)
+
+    suspend fun extractGradientColors(source: Any, style: PlayerBackgroundStyle): List<Color>? =
+        withContext(Dispatchers.IO) {
+            val bitmap = when (source) {
+                is android.graphics.Bitmap -> source
+                else -> {
                     val request = ImageRequest.Builder(context)
-                        .data(currentMetadata.thumbnailUrl)
+                        .data(source)
                         .size(200, 200)
                         .allowHardware(false)
-                        .memoryCacheKey("gradient_${currentMetadata.id}")
                         .build()
-
-                    val result = runCatching { context.imageLoader.execute(request) }.getOrNull()
-                    if (result != null) {
-                        val bitmap = result.image?.toBitmap()
-                        if (bitmap != null) {
-                            val palette = withContext(Dispatchers.Default) {
-                                Palette.from(bitmap)
-                                    .maximumColorCount(8)
-                                    .resizeBitmapArea(100 * 100)
-                                    .generate()
-                            }
-                            val extractedColors = if (playerBackground == PlayerBackgroundStyle.GLOW_ANIMATED) {
-                                listOfNotNull(
-                                    palette.getVibrantColor(fallbackColor).let { Color(it) },
-                                    palette.getLightVibrantColor(fallbackColor).let { Color(it) },
-                                    palette.getDarkVibrantColor(fallbackColor).let { Color(it) },
-                                    palette.getMutedColor(fallbackColor).let { Color(it) },
-                                    palette.getLightMutedColor(fallbackColor).let { Color(it) },
-                                    palette.getDarkMutedColor(fallbackColor).let { Color(it) }
-                                ).distinct()
-                            } else {
-                                PlayerColorExtractor.extractGradientColors(
-                                    palette = palette,
-                                    fallbackColor = fallbackColor
-                                )
-                            }
-                            gradientColorsCache[currentMetadata.id] = extractedColors
-                            withContext(Dispatchers.Main) { gradientColors = extractedColors }
-                        }
-                    }
+                    runCatching { context.imageLoader.execute(request) }.getOrNull()?.image?.toBitmap()
                 }
+            } ?: return@withContext null
+            val palette = withContext(Dispatchers.Default) {
+                Palette.from(bitmap)
+                    .maximumColorCount(8)
+                    .resizeBitmapArea(100 * 100)
+                    .generate()
+            }
+            if (style == PlayerBackgroundStyle.GLOW_ANIMATED) {
+                listOf(
+                    Color(palette.getVibrantColor(fallbackColor)),
+                    Color(palette.getLightVibrantColor(fallbackColor)),
+                    Color(palette.getDarkVibrantColor(fallbackColor)),
+                    Color(palette.getMutedColor(fallbackColor)),
+                    Color(palette.getLightMutedColor(fallbackColor)),
+                    Color(palette.getDarkMutedColor(fallbackColor)),
+                ).distinct()
+            } else {
+                PlayerColorExtractor.extractGradientColors(palette = palette, fallbackColor = fallbackColor)
+            }
+        }
+
+    LaunchedEffect(ambientMetadata?.id, playerBackground, videoLook) {
+        if (playerBackground == PlayerBackgroundStyle.GRADIENT || playerBackground == PlayerBackgroundStyle.GLOW_ANIMATED) {
+            val currentMetadata = ambientMetadata ?: return@LaunchedEffect
+            val look = videoLook
+            val key = if (look != null) "${currentMetadata.id}#video:$playerBackground" else "${currentMetadata.id}:$playerBackground"
+            gradientColorsCache[key]?.let {
+                gradientColors = it
+                return@LaunchedEffect
+            }
+            val source: Any = look?.stitched ?: currentMetadata.thumbnailUrl ?: return@LaunchedEffect
+            extractGradientColors(source, playerBackground)?.let {
+                gradientColorsCache[key] = it
+                gradientColors = it
             }
         } else {
             gradientColors = emptyList()
+        }
+    }
+
+    // Next track's colours computed while this one plays, so a skip or crossfade starts the
+    // backdrop transition on its first frame instead of after a decode + palette pass.
+    LaunchedEffect(mediaMetadata?.id, playerBackground) {
+        val player = playerConnection.player
+        val nextIndex = player.nextMediaItemIndex
+        if (nextIndex == C.INDEX_UNSET || nextIndex >= player.mediaItemCount) return@LaunchedEffect
+        val next = player.getMediaItemAt(nextIndex)
+        val nextUrl = next.mediaMetadata.artworkUri?.toString() ?: return@LaunchedEffect
+        when (playerBackground) {
+            PlayerBackgroundStyle.BITCHORD_MESH -> prewarmMeshPalette(context, nextUrl)
+            PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.GLOW_ANIMATED -> {
+                val key = "${next.mediaId}:$playerBackground"
+                if (gradientColorsCache[key] == null) {
+                    extractGradientColors(nextUrl, playerBackground)?.let { gradientColorsCache[key] = it }
+                }
+            }
+            else -> Unit
         }
     }
 
@@ -1059,11 +1092,13 @@ fun BottomSheetPlayer(
     val (hideVolumeBar) = rememberPreference(HideVolumeBarKey, defaultValue = false)
     // Position update - only for local playback when player is visible
     // When casting, we use castPosition directly to avoid sync issues
-    // Pauses polling when the full sheet is collapsed to prevent background recompositions
+    // Keep polling while playing (mini needs a coarse tick when collapsed);
+    // drop the isCollapsed gate so the effect doesn't restart on expand/collapse —
+    // reading state.isCollapsed in the body is safe because the key includes it.
     LaunchedEffect(isPlaying, isCasting, state.isCollapsed) {
-        if (!isCasting && isPlaying && !state.isCollapsed) {
+        if (!isCasting && isPlaying) {
             while (isActive) {
-                delay(100) // Update for smooth progress bar while player is open
+                delay(if (state.isCollapsed) 250L else 100L)
                 if (sliderPosition == null) { // Only update if user isn't dragging
                     position = playerConnection.player.currentPosition
                     duration = playerConnection.player.duration
@@ -1158,7 +1193,9 @@ fun BottomSheetPlayer(
     // — recomposed the entire player once per frame. Every consumer below is a
     // graphicsLayer lambda, so hand them a getter and let the read happen in the
     // draw phase. BottomSheet.kt already does it this way.
-    val backgroundAlpha = { state.progress.coerceIn(0f, 1f) }
+    // Opaque while the shared morph draws this background: the overlay owns that fade, and an
+    // alpha animating INSIDE the recording re-rendered the whole full-screen layer every frame.
+    val backgroundAlpha = { if (PlayerMorph.active) 1f else state.progress.coerceIn(0f, 1f) }
     // The canvas-video branch gates composition, so it does need a composition
     // read — but a derived boolean only invalidates when it crosses the
     // threshold, not on every frame.
@@ -1197,18 +1234,43 @@ fun BottomSheetPlayer(
 
     // Publishes this sheet's progress to the shared container morph. Read only in the
     // draw phase (see PlayerMorph), so nothing recomposes per frame because of it.
+    val landingScope = rememberCoroutineScope()
+    val landingDensity = LocalDensity.current
     DisposableEffect(state) {
         PlayerMorph.progressProvider = { state.progress }
         PlayerMorph.onDragStart = { fromMini -> state.onDragStart(fromMini) }
         PlayerMorph.onDragDelta = { state.dispatchRawDelta(it) }
         PlayerMorph.onDragEnd = { state.performFling(it, null) }
-        PlayerMorph.onDragCancel = { state.snapTo(state.collapsedBound) }
+        // Settle to the nearest anchor, never snap: a system gesture stealing the pointer
+        // mid-drag used to slam the player shut in one frame.
+        PlayerMorph.onDragCancel = { state.performFling(0f, null) }
+        // Close lands with speed: carry it into the pill as a dip below its slot + settle.
+        // Armed from the start of every close, so the card is still drawn on the frame the
+        // sheet reaches its bound; disarmed if the close never lands.
+        state.onCollapseArmed = { armed ->
+            if (armed && PlayerMorph.sharedLayersReady) {
+                landingGeneration++
+                PlayerMorph.landingActive = true
+            } else if (!armed) {
+                PlayerMorph.landingActive = false
+            }
+        }
+        state.onCollapseLanded = { velocityDp ->
+            // Undispatched: the dip starts on the frame the card stops, not a hop later --
+            // that dead frame was the "snap, then overshoot".
+            landingScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                playPillLanding(velocityDp, state, landingDensity)
+            }
+        }
         onDispose {
             PlayerMorph.progressProvider = { 0f }
             PlayerMorph.onDragStart = {}
             PlayerMorph.onDragDelta = {}
             PlayerMorph.onDragEnd = {}
             PlayerMorph.onDragCancel = {}
+            state.onCollapseLanded = null
+            state.onCollapseArmed = null
+            PlayerMorph.landingActive = false
         }
     }
 
@@ -1242,6 +1304,7 @@ fun BottomSheetPlayer(
             PlayerMorphHost(
                 progress = { state.progress },
                 thumbnailUrl = mediaMetadata?.thumbnailUrl,
+                mediaId = mediaMetadata?.id,
                 containerColor = AppTheme.colorScheme.surfaceContainer,
                 expandedCornerRadius = rememberScreenCornerRadius(),
             )
@@ -1276,7 +1339,6 @@ fun BottomSheetPlayer(
                 enter = fadeIn(Motion.appear()),
                 exit = fadeOut(Motion.appear()),
             ) {
-                val revealAlpha = ((state.progress - PLAYER_LAYER_HANDOFF_PROGRESS) / 0.2f).coerceIn(0f, 1f)
                 DiyDesignCanvas(
                     orientation = diyOrientation,
                     modifier = Modifier
@@ -1284,11 +1346,20 @@ fun BottomSheetPlayer(
                         // Fades out with the queue's own drag instead of vanishing the
                         // instant the sheet reports itself expanded, same reason as the
                         // original call site's comment (see git history).
+                        // Draw-phase only: progress read in composition recomposed this
+                        // band on every frame of every open/close.
                         .graphicsLayer {
-                            alpha = revealAlpha * (1f - queueSheetState.progress.coerceIn(0f, 1f))
+                            val p = state.progress
+                            val queueFade = 1f - queueSheetState.progress.coerceIn(0f, 1f)
+                            stickerMorphLayer(p, queueFade, (state.expandedBound - state.value).toPx())
                         },
                 ) {
-                    DiyStickerLayer(layout = diyLayout, orientation = diyOrientation, zFilter = { it >= 0 })
+                    DiyStickerLayer(
+                        layout = diyLayout,
+                        orientation = diyOrientation,
+                        zFilter = { it >= 0 },
+                        entranceProgress = { state.progress },
+                    )
                 }
             }
         },
@@ -1333,9 +1404,11 @@ fun BottomSheetPlayer(
                     PlayerBackgroundStyle.GLASS -> {}
                     PlayerBackgroundStyle.BLUR -> {
                         AnimatedContent(
-                            targetState = mediaMetadata?.thumbnailUrl,
+                            // The video's representative frame once sampled, else the still.
+                            targetState = videoLook?.representative ?: ambientMetadata?.thumbnailUrl,
                             transitionSpec = {
-                                fadeIn(tween(800)).togetherWith(fadeOut(tween(800)))
+                                fadeIn(tween(bgFadeMs, easing = SeamlessEasing))
+                                    .togetherWith(fadeOut(tween(bgFadeMs, easing = SeamlessEasing)))
                             },
                             label = "blurBackground"
                         ) { thumbnailUrl ->
@@ -1380,7 +1453,8 @@ fun BottomSheetPlayer(
                         AnimatedContent(
                             targetState = gradientColors,
                             transitionSpec = {
-                                fadeIn(tween(800)).togetherWith(fadeOut(tween(800)))
+                                fadeIn(tween(bgFadeMs, easing = SeamlessEasing))
+                                    .togetherWith(fadeOut(tween(bgFadeMs, easing = SeamlessEasing)))
                             },
                             label = "gradientBackground"
                         ) { colors ->
@@ -1413,7 +1487,8 @@ fun BottomSheetPlayer(
                         AnimatedContent(
                             targetState = gradientColors,
                             transitionSpec = {
-                                fadeIn(tween(1200)) togetherWith fadeOut(tween(1200))
+                                fadeIn(tween(bgFadeMs, easing = SeamlessEasing)) togetherWith
+                                    fadeOut(tween(bgFadeMs, easing = SeamlessEasing))
                             },
                             label = "GlowAnimatedContent"
                         ) { colors ->
@@ -1570,9 +1645,10 @@ fun BottomSheetPlayer(
                     }
                     PlayerBackgroundStyle.APPLE_MUSIC -> {
                         AnimatedContent(
-                            targetState = mediaMetadata?.thumbnailUrl,
+                            targetState = ambientMetadata?.thumbnailUrl,
                             transitionSpec = {
-                                fadeIn(tween(1200)).togetherWith(fadeOut(tween(1200)))
+                                fadeIn(tween(bgFadeMs, easing = SeamlessEasing))
+                                    .togetherWith(fadeOut(tween(bgFadeMs, easing = SeamlessEasing)))
                             },
                             label = "appleMusicBackground"
                         ) { thumbnailUrl ->
@@ -1586,12 +1662,20 @@ fun BottomSheetPlayer(
                                     // Layer 1: Full-Screen Blurred Background — baked still only. The
                                     // title below the clear box reads off this frost + the foot wash;
                                     // no extra scrim (artist-page treatment).
-                                    BlurredBackdropImage(
-                                        model = thumbnailUrl,
-                                        screenBlurRadiusDp = 150f,
-                                        decodeSize = 48,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
+                                    // Frost follows the canvas video's own frame once sampled,
+                                    // crossfading in place (the clear art + video above stay put).
+                                    androidx.compose.animation.Crossfade(
+                                        targetState = videoLook?.representative ?: thumbnailUrl,
+                                        animationSpec = tween(bgFadeMs, easing = SeamlessEasing),
+                                        label = "appleMusicFrost",
+                                    ) { frostModel ->
+                                        BlurredBackdropImage(
+                                            model = frostModel,
+                                            screenBlurRadiusDp = 150f,
+                                            decodeSize = 48,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    }
 
                                     // Layer 2: Clear Artwork (top 65%) with the shared foot knee 0.78:
                                     // opaque to 0.78, eased out by 1.0 — same seam as artist/V2 heroes.
@@ -1603,6 +1687,10 @@ fun BottomSheetPlayer(
 
                                     // Identical hero frame to V2 HERO: full width, 65% of the
                                     // screen height, blend starts at 0.78 of the box in both.
+                                    // Built once: heroFadeOutBrush() allocates a 26-stop gradient,
+                                    // and drawWithContent re-runs every draw pass -- unremembered,
+                                    // this rebuilt it every frame the hero redraws (drag, fades).
+                                    val heroFadeBrush = remember { com.convx.music.ui.component.heroFadeOutBrush() }
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1614,7 +1702,7 @@ fun BottomSheetPlayer(
                                             .drawWithContent {
                                                 drawContent()
                                                 drawRect(
-                                                    brush = com.convx.music.ui.component.heroFadeOutBrush(),
+                                                    brush = heroFadeBrush,
                                                     blendMode = BlendMode.DstIn
                                                 )
                                             }
@@ -1640,7 +1728,7 @@ fun BottomSheetPlayer(
 
                                         if (enableCanvas && canvasArtwork != null && backgroundVisible) {
                                             BackgroundVideoView(
-                                                mediaId = mediaMetadata?.id ?: "",
+                                                mediaId = ambientMetadata?.id ?: "",
                                                 videoUrl = canvasArtwork?.animated ?: canvasArtwork?.videoUrl ?: "",
                                                 isPlaying = isPlaying,
                                                 onError = {
@@ -1655,7 +1743,7 @@ fun BottomSheetPlayer(
                                                 onReady = {
                                                     canvasArtwork?.let {
                                                         CanvasArtworkPlaybackCache.put(
-                                                            "${mediaMetadata?.id}:${canvasSource.name}",
+                                                            "${ambientMetadata?.id}:${canvasSource.name}",
                                                             it
                                                         )
                                                     }
@@ -1715,9 +1803,11 @@ fun BottomSheetPlayer(
                         }
 
                         AnimatedContent(
-                            targetState = mediaMetadata?.thumbnailUrl,
+                            targetState = videoLook?.representative ?: ambientMetadata?.thumbnailUrl,
                             transitionSpec = {
-                                fadeIn(tween(1500)).togetherWith(fadeOut(tween(1500)))
+                                val ms = maxOf(bgFadeMs, 1500)
+                                fadeIn(tween(ms, easing = SeamlessEasing))
+                                    .togetherWith(fadeOut(tween(ms, easing = SeamlessEasing)))
                             },
                             label = "liveMeshBackground"
                         ) { thumbnailUrl ->
@@ -1819,10 +1909,14 @@ fun BottomSheetPlayer(
                         // No AnimatedContent wrapper: the palette crossfades its own
                         // colours over 1.4s, so fading two whole meshes past each other
                         // would be the same transition drawn twice at double the cost.
-                        val meshPalette = rememberArtworkMeshPalette(mediaMetadata?.thumbnailUrl)
+                        val meshPalette = rememberArtworkMeshPalette(
+                            ambientMetadata?.thumbnailUrl,
+                            canvasFrame = videoLook?.stitched,
+                        )
                         MeshGradientBackground(
                             palette = meshPalette,
-                            trackKey = mediaMetadata?.id,
+                            trackKey = ambientMetadata?.id,
+                            transitionMillis = maxOf(bgFadeMs, 1400),
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer { alpha = backgroundAlpha() },
@@ -1856,7 +1950,7 @@ fun BottomSheetPlayer(
                 // case, leaving the player fully blank. Center the app's own mark
                 // instead of a void. STATIC/CUSTOM_GRADIENT/DEFAULT/GLASS never depend
                 // on artwork in the first place, so they're excluded here.
-                if (mediaMetadata?.thumbnailUrl == null &&
+                if (ambientMetadata?.thumbnailUrl == null &&
                     playerBackground !in setOf(
                         PlayerBackgroundStyle.STATIC,
                         PlayerBackgroundStyle.CUSTOM_GRADIENT,
@@ -2449,6 +2543,7 @@ fun BottomSheetPlayer(
                         } else {
                             GlassCircleButton(
                                 onClick = playerConnection::toggleLike,
+                                forceFlat = true,
                             ) {
                                 PlayerGlyph(
                                     slot = if (currentSong?.song?.liked == true)
@@ -3769,6 +3864,10 @@ private fun BackgroundVideoView(
     // ones captured at that first install.
     val currentOnError by rememberUpdatedState(onError)
     val currentOnReady by rememberUpdatedState(onReady)
+    val currentMediaId by rememberUpdatedState(mediaId)
+    // The clip's colours, sampled once (CanvasVideoLooks) so the frost/mesh can follow it.
+    val sampleScope = rememberCoroutineScope()
+    val textureHolder = remember { arrayOfNulls<TextureView>(1) }
 
     val trackSelector = remember {
         DefaultTrackSelector(context).apply {
@@ -3833,6 +3932,8 @@ private fun BackgroundVideoView(
             override fun onRenderedFirstFrame() {
                 isVideoReady = true
                 currentOnReady()
+                val id = currentMediaId
+                if (id.isNotBlank()) sampleScope.launch { sampleCanvasVideoLook(id) { textureHolder[0] } }
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 println("BackgroundVideoView: E: failed to play '$videoUrl': ${error.errorCodeName} ${error.message}")
@@ -3868,7 +3969,7 @@ private fun BackgroundVideoView(
 
     val alpha by animateFloatAsState(
         targetValue = if (isVideoReady) 1f else 0f,
-        animationSpec = tween(800),
+        animationSpec = tween(800, easing = SeamlessEasing),
         label = "videoAlpha"
     )
 
@@ -3886,6 +3987,7 @@ private fun BackgroundVideoView(
                         layoutParams = ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
                     }
                     addView(textureView)
+                    textureHolder[0] = textureView
                     exoPlayer.setVideoTextureView(textureView)
                 }
             }
@@ -3894,6 +3996,103 @@ private fun BackgroundVideoView(
     )
 }
 
+/**
+ * Carries the close spring's arrival speed through the landing. The sheet stops on its bound
+ * at [sheetVelocityDp] (sheet dp/s, negative = closing); [PlayerMorph.landing] picks the
+ * motion up in the same progress units at the same speed, so the card sails past the pill's
+ * slot and springs back as ONE motion -- a fast flick dips further, a tap a little.
+ */
+private suspend fun playPillLanding(
+    sheetVelocityDp: Float,
+    state: BottomSheetState,
+    density: androidx.compose.ui.unit.Density,
+) {
+    // The close armed this landing (see onCollapseArmed); a newer close re-arms and takes
+    // over, and only the newest may clear the flag.
+    val generation = landingGeneration
+    val pill = miniPlayerContainerRect
+    val rangeDp = (state.expandedBound - state.collapsedBound).value
+    val progressVelocity = if (rangeDp > 0f) sheetVelocityDp / rangeDp else 0f
+    if (pill == null || !PlayerMorph.landingActive || progressVelocity >= 0f) {
+        // Nothing to carry: hand straight back to the docked pill (never leave it hidden).
+        if (landingGeneration == generation) PlayerMorph.landingActive = false
+        return
+    }
+    val fullHeightPx = with(density) { state.expandedBound.toPx() }
+    // Card centre per unit of progress near the pill end: screen centre -> pill centre.
+    PlayerMorph.landingTravelPx = pill.center.y - fullHeightPx / 2f
+    PlayerMorph.landingMaxDipPx = with(density) { LANDING_MAX_DIP.toPx() }
+    try {
+        PlayerMorph.landing.snapTo(0f)
+        PlayerMorph.landing.animateTo(
+            targetValue = 0f,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = LANDING_DAMPING,
+                stiffness = LANDING_STIFFNESS,
+            ),
+            initialVelocity = progressVelocity,
+        )
+    } finally {
+        if (landingGeneration == generation) PlayerMorph.landingActive = false
+    }
+}
 
+private var landingGeneration = 0
 
+/**
+ * The z >= 0 sticker band as part of the player, not floating over it: while the morph owns
+ * the frame it rides the card (same origin, same uniform scale as the full-player recording,
+ * clipped to the card's rounded rect), shrinking into the pill and growing back out with it;
+ * otherwise it follows the sheet's own slide. The bounce is per sticker, see
+ * DiyStickerLayer's entrance.
+ */
+private fun androidx.compose.ui.graphics.GraphicsLayerScope.stickerMorphLayer(
+    progress: Float,
+    queueFade: Float,
+    sheetOffsetPx: Float,
+) {
+    val mini = miniPlayerContainerRect
+    if (!PlayerMorph.active || mini == null || size.width <= 0f || size.height <= 0f) {
+        // Each sticker fades itself in with its staggered pop (DiyStickerLayer entrance).
+        alpha = queueFade
+        translationY = sheetOffsetPx
+        scaleX = 1f
+        scaleY = 1f
+        translationX = 0f
+        clip = false
+        return
+    }
+    // Each sticker fades and pops itself in (DiyStickerLayer entrance); the band only rides.
+    alpha = queueFade
+    val q = progress.coerceIn(0f, 1f)
+    val cardWidth = androidx.compose.ui.util.lerp(mini.width, size.width, q)
+    val cardHeight = androidx.compose.ui.util.lerp(mini.height, size.height, q)
+    val scale = cardWidth / size.width
+    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+    scaleX = scale
+    scaleY = scale
+    translationX = androidx.compose.ui.util.lerp(mini.left, 0f, q)
+    translationY = androidx.compose.ui.util.lerp(mini.top, 0f, q)
+    // Card rect in this layer's own (pre-scale) space: full width, the card's height.
+    val clipHeight = cardHeight / scale
+    val radius = androidx.compose.ui.util.lerp(mini.height / 2f, 0f, q) / scale
+    shape = object : androidx.compose.ui.graphics.Shape {
+        override fun createOutline(
+            size: androidx.compose.ui.geometry.Size,
+            layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+            density: androidx.compose.ui.unit.Density,
+        ) = androidx.compose.ui.graphics.Outline.Rounded(
+            androidx.compose.ui.geometry.RoundRect(
+                0f, 0f, size.width, clipHeight,
+                androidx.compose.ui.geometry.CornerRadius(radius, radius),
+            ),
+        )
+    }
+    clip = true
+}
 
+/** Landing spring: the bar's own feel -- a slow, clearly visible rebound (~0.6s period),
+ *  one soft second bounce. The old 360 stiffness snapped back in ~0.3s. */
+private const val LANDING_DAMPING = 0.5f
+private const val LANDING_STIFFNESS = 140f
+private val LANDING_MAX_DIP = 22.dp

@@ -98,7 +98,7 @@ fun vivimusicTheme(
 
     val appFont = remember(selectedFont, customFont) {
         when (AppFont.fromValue(selectedFont)) {
-            AppFont.SYSTEM -> customFont ?: FontFamily.Default
+            AppFont.SYSTEM -> customFont ?: SfProFontFamily
             AppFont.GOOGLE_SANS -> GoogleSansFontFamily
             AppFont.SANS_FLEX -> SansFlexFontFamily
             AppFont.OUTFIT -> OutfitFontFamily
@@ -116,7 +116,11 @@ fun vivimusicTheme(
             if (appTextColorInt != 0) Color(appTextColorInt) else accentTextColor(themeColor, darkTheme)
         ),
     ) {
-        IosTheme(darkTheme = darkTheme, accent = themeColor) {
+        IosTheme(
+            darkTheme = darkTheme,
+            accent = themeColor,
+            typography = remember(appFont) { com.convx.music.ui.ios.foundation.iosTypography(appFont) },
+        ) {
             // ponytail: MaterialTheme stays only to colour the screens that have not
             // been ported yet. Drop it once no file imports androidx.compose.material3.
             MaterialTheme(

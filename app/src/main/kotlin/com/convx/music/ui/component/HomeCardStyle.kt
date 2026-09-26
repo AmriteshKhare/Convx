@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.component
 
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -40,4 +42,10 @@ fun rememberHomeCardShape(): Shape {
  * Not for a card that already samples the backdrop through `Modifier.liquidGlass`; that one
  * gets its highlight from the glass system and stacking both doubles the edge.
  */
-fun Modifier.homeCardRim(shape: Shape): Modifier = rimLight(shape = shape, strength = 0.28f)
+// The card (everything after this in the chain, children included) plus its rim render
+// into one cached layer. A card's pixels don't change while Home scrolls, so each frame
+// composites one texture instead of re-issuing the artwork, frost, scrim and gradient-
+// stroked rim -- the bulk of Home's per-frame draw ops against a flat-carded list.
+fun Modifier.homeCardRim(shape: Shape): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .rimLight(shape = shape, strength = 0.28f)

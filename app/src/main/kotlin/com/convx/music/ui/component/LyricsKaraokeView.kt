@@ -70,12 +70,15 @@ fun KaraokeLyrics(
         fontSize = fontSize.sp,
         lineHeight = (fontSize * lineSpacing).sp,
         fontWeight = FontWeight.Bold,
+        // Figma main tracking: +0.4px @ 34px ≈ +1.2% of size (642:23917).
+        letterSpacing = (fontSize * 0.012f).sp,
     )
-    // Background vocals are a step down in size and weight, the way Apple sets them.
+    // Background vocals: Figma Bg Lyric is Bold at 28/34 ≈ 0.82x (642:23917).
     val accompanimentStyle = TextStyle(
-        fontSize = (fontSize * 0.72f).sp,
-        lineHeight = (fontSize * 0.72f * lineSpacing).sp,
-        fontWeight = FontWeight.SemiBold,
+        fontSize = (fontSize * 0.82f).sp,
+        lineHeight = (fontSize * 0.82f * lineSpacing).sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (fontSize * 0.82f * 0.012f).sp,
     )
     val phoneticStyle = TextStyle(
         fontSize = (fontSize * 0.5f).sp,

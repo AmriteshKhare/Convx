@@ -519,7 +519,7 @@ fun AlbumScreen(
                             heroScale = heroZoom.scale,
                             loading = appleAlbumLoading && fallbackHeroUrl.isNullOrBlank(),
                             liveOverlay = albumCanvasEnabled && canvasArtwork != null,
-                            scrollBlur = { heroTopBlurProgress },
+                            scrollBlur = { heroTopBlurProgress.value },
                             modifier = Modifier.offset { IntOffset(x = 0, y = headerOffset) },
                             overlay = {
                                 if (albumCanvasEnabled && canvasArtwork != null) {

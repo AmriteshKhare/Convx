@@ -1455,6 +1455,11 @@ interface DatabaseDao {
     @Query("SELECT * FROM event ORDER BY rowId DESC")
     fun events(): Flow<List<EventWithSong>>
 
+    /** Newest [limit] plays, for Home's Recently Played — bounded so it never loads the whole event table. */
+    @Transaction
+    @Query("SELECT * FROM event ORDER BY rowId DESC LIMIT :limit")
+    fun recentEvents(limit: Int): Flow<List<EventWithSong>>
+
     /** Latest play only — hot paths (quick picks seed, explore seed) must not load the full event table. */
     @Transaction
     @Query("SELECT * FROM event ORDER BY rowId DESC LIMIT 1")

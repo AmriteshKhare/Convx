@@ -84,6 +84,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastForEachIndexed
@@ -111,10 +113,11 @@ import com.convx.music.R
 import com.convx.music.constants.GridItemSize
 import com.convx.music.constants.GridThumbnailHeight
 import com.convx.music.constants.ListItemHeight
+import com.convx.music.constants.GridCardArtShape
+import com.convx.music.constants.ListRowArtShape
 import com.convx.music.constants.ListThumbnailSize
 import com.convx.music.constants.SmallGridThumbnailHeight
 import com.convx.music.constants.ThumbnailCornerRadius
-import com.convx.music.constants.ThumbnailRoundedShape
 import com.convx.music.db.entities.Album
 import com.convx.music.db.entities.Artist
 import com.convx.music.db.entities.Playlist
@@ -207,6 +210,19 @@ inline fun ListItem(
      * instead of the default nested step.
      */
     thumbnailStartInset: Dp = 12.dp,
+    /**
+     * Title weight/letter-spacing. Figma Queue rows run Semibold 15 with -0.23
+     * tracking; numbered album rows stay Medium (Track Predeterminada
+     * 165:1719). Defaults keep every other row family untouched.
+     */
+    titleFontWeight: FontWeight = FontWeight.Medium,
+    titleLetterSpacing: TextUnit = TextUnit.Unspecified,
+    /**
+     * System-row type (Figma Row Default 495:15280: Regular 17/22).
+     * Defaults keep the 15/20 song-row read.
+     */
+    titleFontSize: TextUnit = AppleTokens.ItemTitle,
+    titleLineHeight: TextUnit = AppleTokens.ItemTitleLineHeight,
 ) {
     val onSurface = LocalContentColor.current
     // Draw modifier only: no layout node, so row measurement is unchanged.
@@ -258,7 +274,9 @@ inline fun ListItem(
                 modifier = Modifier.padding(
                     start = effectiveThumbStart,
                     top = 5.dp,
-                    end = 6.dp,
+                    // Thumb box end 4 + text column start 6 = 10: Figma Queue
+                    // row art-to-text gap (279:887).
+                    end = 4.dp,
                     bottom = 5.dp
                 ),
                 contentAlignment = Alignment.Center
@@ -271,7 +289,7 @@ inline fun ListItem(
                             .align(Alignment.Center)
                             .background(
                                 Color.Black.copy(alpha = 0.25f),
-                                ThumbnailRoundedShape
+                                ListRowArtShape
                             )
                     ) {
                         Icon(
@@ -289,14 +307,17 @@ inline fun ListItem(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 6.dp)
+                    .padding(horizontal = 6.dp),
+                // Figma Queue Info column: 3px title-to-details gap (279:887).
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Text(
                     text = title,
-                    fontSize = AppleTokens.ItemTitle,
-                    lineHeight = AppleTokens.ItemTitleLineHeight,
+                    fontSize = titleFontSize,
+                    lineHeight = titleLineHeight,
                     color = onSurface,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = titleFontWeight,
+                    letterSpacing = titleLetterSpacing,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = titleChrome,
@@ -363,6 +384,21 @@ fun ListItem(
     trailingDividerInset: Dp? = null,
     /** See the base overload: gap between the row gutter and the thumbnail. */
     thumbnailStartInset: Dp = 12.dp,
+    /** See the base overload. */
+    titleFontWeight: FontWeight = FontWeight.Medium,
+    /** See the base overload. */
+    titleLetterSpacing: TextUnit = TextUnit.Unspecified,
+    /** See the base overload. */
+    titleFontSize: TextUnit = AppleTokens.ItemTitle,
+    /** See the base overload. */
+    titleLineHeight: TextUnit = AppleTokens.ItemTitleLineHeight,
+    /**
+     * System-row subtitle (Figma Row Default 495:15280: 15/20).
+     * Defaults keep the 13/18 song-row read.
+     */
+    subtitleFontSize: TextUnit = AppleTokens.ItemSubtitle,
+    /** See [subtitleFontSize]. */
+    subtitleLineHeight: TextUnit = AppleTokens.ItemSubtitleLineHeight,
 ) = ListItem(
     title = title,
     subtitle = {
@@ -372,8 +408,8 @@ fun ListItem(
             // ListItem already provides around its subtitle slot.
             Text(
                 text = subtitle,
-                fontSize = AppleTokens.ItemSubtitle,
-                lineHeight = AppleTokens.ItemSubtitleLineHeight,
+                fontSize = subtitleFontSize,
+                lineHeight = subtitleLineHeight,
                 // Player v2 artist-line logic when chromed; identical otherwise.
                 color = LocalContentColor.current.copy(
                     alpha = if (secondaryAdditiveChrome) ChromedSubtitleDim else 1f
@@ -395,6 +431,10 @@ fun ListItem(
     leadingDivider = leadingDivider,
     trailingDividerInset = trailingDividerInset,
     thumbnailStartInset = thumbnailStartInset,
+    titleFontWeight = titleFontWeight,
+    titleLetterSpacing = titleLetterSpacing,
+    titleFontSize = titleFontSize,
+    titleLineHeight = titleLineHeight,
 )
 
 // merge badges and subtitle text and pass to basic list item
@@ -419,6 +459,18 @@ fun ListItem(
     trailingDividerInset: Dp? = null,
     /** See the base overload: gap between the row gutter and the thumbnail. */
     thumbnailStartInset: Dp = 12.dp,
+    /** See the base overload. */
+    titleFontWeight: FontWeight = FontWeight.Medium,
+    /** See the base overload. */
+    titleLetterSpacing: TextUnit = TextUnit.Unspecified,
+    /** See the base overload. */
+    titleFontSize: TextUnit = AppleTokens.ItemTitle,
+    /** See the base overload. */
+    titleLineHeight: TextUnit = AppleTokens.ItemTitleLineHeight,
+    /** System-row subtitle — see the AnnotatedString overload. */
+    subtitleFontSize: TextUnit = AppleTokens.ItemSubtitle,
+    /** See [subtitleFontSize]. */
+    subtitleLineHeight: TextUnit = AppleTokens.ItemSubtitleLineHeight,
 ) = ListItem(
     title = title,
     subtitle = {
@@ -428,8 +480,8 @@ fun ListItem(
             // Colour inherited — see the AnnotatedString overload above.
             Text(
                 text = subtitle,
-                fontSize = AppleTokens.ItemSubtitle,
-                lineHeight = AppleTokens.ItemSubtitleLineHeight,
+                fontSize = subtitleFontSize,
+                lineHeight = subtitleLineHeight,
                 // Player v2 artist-line logic when chromed; identical otherwise.
                 color = LocalContentColor.current.copy(
                     alpha = if (secondaryAdditiveChrome) ChromedSubtitleDim else 1f
@@ -451,6 +503,10 @@ fun ListItem(
     leadingDivider = leadingDivider,
     trailingDividerInset = trailingDividerInset,
     thumbnailStartInset = thumbnailStartInset,
+    titleFontWeight = titleFontWeight,
+    titleLetterSpacing = titleLetterSpacing,
+    titleFontSize = titleFontSize,
+    titleLineHeight = titleLineHeight,
 )
 
 @Composable
@@ -487,17 +543,37 @@ fun GridItem(
                 Modifier.height(gridHeight)
             }
                 .aspectRatio(thumbnailRatio)
-                .clip(ThumbnailRoundedShape)
+                // Figma Music cards: tile art radius 10 (244:1279).
+                .clip(GridCardArtShape)
         ) {
             thumbnailContent()
         }
 
-        Spacer(modifier = Modifier.height(gridSpacing / 2))
+        // Figma card art-to-title gap: 4 (244:1279).
+        Spacer(modifier = Modifier.height(4.dp))
 
-        title()
+        // Figma card Title row: title + explicit badge, gap 4 (244:1279).
+        // Centred (artist) cards keep the old stacked layout — a title-row
+        // badge would break their centring, and the replica shows none there.
+        if (horizontalAlignment == Alignment.CenterHorizontally) {
+            title()
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            badges()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                badges()
+
+                subtitle()
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    title()
+                }
+                badges()
+            }
 
             subtitle()
         }
@@ -521,7 +597,9 @@ fun GridItem(
             text = title,
             fontSize = AppleTokens.ItemTitle,
             lineHeight = AppleTokens.ItemTitleLineHeight,
-            fontWeight = FontWeight.Medium,
+            // Figma Music card title: Regular 15, -0.23 tracking (244:1279).
+            fontWeight = FontWeight.Normal,
+            letterSpacing = (-0.23).sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = if (horizontalAlignment == Alignment.CenterHorizontally) {
@@ -535,8 +613,10 @@ fun GridItem(
     subtitle = {
         Text(
             text = subtitle,
-            fontSize = AppleTokens.ItemSubtitle,
-            lineHeight = AppleTokens.ItemSubtitleLineHeight,
+            // Figma card sub (Year): 15/20 (244:1279). Colour stays the
+            // adaptive Metadata tier, not the replica's fixed #3C3C43.
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
             color = AppleTokens.Metadata,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -547,6 +627,23 @@ fun GridItem(
     fillMaxWidth = fillMaxWidth,
     horizontalAlignment = horizontalAlignment,
 )
+
+/**
+ * Figma Queue details line (279:887): name at the 13px subtitle size, thin
+ * "•" at 15px, duration at 15px — all on one baseline. Colour stays the
+ * adaptive Metadata tier instead of the replica's fixed #EBEBF5/#3C3C43
+ * pair, and the duration uses the system font (Inter isn't bundled).
+ */
+internal fun queueDetailsLine(name: String, duration: String): AnnotatedString =
+    buildAnnotatedString {
+        append(name)
+        withStyle(SpanStyle(fontSize = 15.sp, fontWeight = FontWeight.Thin)) {
+            append(" • ")
+        }
+        withStyle(SpanStyle(fontSize = 15.sp)) {
+            append(duration)
+        }
+    }
 
 @Composable
 fun SongListItem(
@@ -600,7 +697,11 @@ fun SongListItem(
     val content: @Composable () -> Unit = {
         ListItem(
             title = song.song.title,
-            subtitle = if (!showSubtitle) null else joinByBullet(
+            // Queue rows Semibold, numbered album rows Medium (Figma 279:887
+            // vs Track Predeterminada 165:1719).
+            titleFontWeight = if (albumIndex != null) FontWeight.Medium else FontWeight.SemiBold,
+            titleLetterSpacing = (-0.23).sp,
+            subtitle = if (!showSubtitle) null else queueDetailsLine(
                 song.artists.joinToString { it.name },
                 makeTimeString(song.song.duration * 1000L)
             ),
@@ -628,7 +729,8 @@ fun SongListItem(
                         isSelected = isSelected,
                         isActive = isActive,
                         isPlaying = isPlaying,
-                        shape = ThumbnailRoundedShape,
+                        // Figma Queue art: 48 radius 5 (was the 8dp tile shape).
+                        shape = ListRowArtShape,
                         targetSizePx = thumbnailPx(ListThumbnailSize),
                         modifier = Modifier.size(ListThumbnailSize)
                     )
@@ -689,10 +791,13 @@ fun SongGridItem(
         Text(
             text = song.song.title,
             style = AppTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            // Figma Music card title: Regular 15, -0.23 tracking (244:1279).
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = (-0.23).sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.marqueeWhenVisible().fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
         )
     },
     subtitle = {
@@ -702,6 +807,9 @@ fun SongGridItem(
                 makeTimeString(song.song.duration * 1000L)
             ),
             style = AppTheme.typography.bodySmall,
+            // Figma card sub: 15/20 (244:1279).
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
             color = AppleTokens.Metadata,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -729,7 +837,7 @@ fun SongGridItem(
                 thumbnailUrl = song.song.thumbnailUrl,
                 isActive = isActive,
                 isPlaying = isPlaying,
-                shape = ThumbnailRoundedShape,
+                shape = GridCardArtShape,
                 // A fixed size here ignored the surrounding GridItem's own
                 // fillMaxWidth switch — in a wide tab-view cell the outer square
                 // stretched correctly, but this stayed pinned small and centered
@@ -765,6 +873,13 @@ fun ArtistListItem(
 ) = ListItem(
     title = artist.artist.name,
     subtitle = pluralStringResource(R.plurals.n_song, artist.songCount, artist.songCount),
+    // Figma Row Default system row: Regular 17/22, sub 15/20 (495:15280).
+    titleFontWeight = FontWeight.Normal,
+    titleLetterSpacing = (-0.43).sp,
+    titleFontSize = 17.sp,
+    titleLineHeight = 22.sp,
+    subtitleFontSize = 15.sp,
+    subtitleLineHeight = 20.sp,
     badges = badges,
     thumbnailContent = {
         if (showIconOnly) {
@@ -827,7 +942,8 @@ fun ArtistGridItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(ThumbnailRoundedShape)
+                    // Figma Artist card: full-circle image (351:3038).
+                    .clip(CircleShape)
                     .background(LocalContentColor.current.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -917,13 +1033,20 @@ fun AlbumListItem(
         pluralStringResource(R.plurals.n_song, album.album.songCount, album.album.songCount),
         album.album.year?.toString()
     ),
+    // Figma Row Default system row: Regular 17/22, sub 15/20 (495:15280).
+    titleFontWeight = FontWeight.Normal,
+    titleLetterSpacing = (-0.43).sp,
+    titleFontSize = 17.sp,
+    titleLineHeight = 22.sp,
+    subtitleFontSize = 15.sp,
+    subtitleLineHeight = 20.sp,
     badges = badges,
     thumbnailContent = {
         if (showIconOnly) {
             Box(
                 modifier = Modifier
                     .size(ListThumbnailSize)
-                    .clip(ThumbnailRoundedShape)
+                    .clip(ListRowArtShape)
                     .background(LocalContentColor.current.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -939,7 +1062,7 @@ fun AlbumListItem(
                 thumbnailUrl = album.album.thumbnailUrl,
                 isActive = isActive,
                 isPlaying = isPlaying,
-                shape = ThumbnailRoundedShape,
+                shape = ListRowArtShape,
                 targetSizePx = thumbnailPx(ListThumbnailSize),
                 sharedArtworkId = album.id,
                 modifier = Modifier.size(ListThumbnailSize)
@@ -1003,16 +1126,22 @@ fun AlbumGridItem(
         Text(
             text = album.album.title,
             style = AppTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            // Figma Music card title: Regular 15, -0.23 tracking (244:1279).
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = (-0.23).sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.marqueeWhenVisible().fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
         )
     },
     subtitle = {
         Text(
             text = album.artists.joinToString { it.name },
             style = AppTheme.typography.bodySmall,
+            // Figma card sub: 15/20 (244:1279).
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
             color = AppleTokens.Metadata,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1024,7 +1153,7 @@ fun AlbumGridItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(ThumbnailRoundedShape)
+                    .clip(GridCardArtShape)
                     .background(LocalContentColor.current.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1040,7 +1169,7 @@ fun AlbumGridItem(
                 thumbnailUrl = album.album.thumbnailUrl,
                 isActive = isActive,
                 isPlaying = isPlaying,
-                shape = ThumbnailRoundedShape,
+                shape = GridCardArtShape,
                 sharedArtworkId = album.id,
             )
         }
@@ -1131,13 +1260,13 @@ fun PlaylistListItem(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(ListThumbnailSize)
-                    .clip(ThumbnailRoundedShape),
+                    .clip(ListRowArtShape),
             )
         } else if (showIconOnly) {
             Box(
                 modifier = Modifier
                     .size(ListThumbnailSize)
-                    .clip(ThumbnailRoundedShape)
+                    .clip(ListRowArtShape)
                     .background(LocalContentColor.current.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1167,14 +1296,21 @@ fun PlaylistListItem(
                         )
                     }
                 },
-                shape = ThumbnailRoundedShape
+                shape = ListRowArtShape
             )
         }
     },
     trailingContent = trailingContent,
     modifier = modifier,
     shape = shape,
-    flat = flat
+    flat = flat,
+    // Figma Row Default system row: Regular 17/22, sub 15/20 (495:15280).
+    titleFontWeight = FontWeight.Normal,
+    titleLetterSpacing = (-0.43).sp,
+    titleFontSize = 17.sp,
+    titleLineHeight = 22.sp,
+    subtitleFontSize = 15.sp,
+    subtitleLineHeight = 20.sp,
 )
 
 @Composable
@@ -1223,10 +1359,13 @@ fun PlaylistGridItem(
         Text(
             text = playlist.playlist.name,
             style = AppTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            // Figma Music card title: Regular 15, -0.23 tracking (244:1279).
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = (-0.23).sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.marqueeWhenVisible().fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
         )
     },
     subtitle = {
@@ -1250,6 +1389,9 @@ fun PlaylistGridItem(
         Text(
             text = subtitle,
             style = AppTheme.typography.bodySmall,
+            // Figma card sub: 15/20 (244:1279).
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
             color = AppleTokens.Metadata,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1298,7 +1440,7 @@ fun PlaylistGridItem(
                     )
                 }
             },
-            shape = ThumbnailRoundedShape
+            shape = GridCardArtShape
         )
         }
     },
@@ -1321,23 +1463,21 @@ fun MediaMetadataListItem(
 ) {
     ListItem(
         title = mediaMetadata.title,
-        subtitle = if (mediaMetadata.suggestedBy != null) {
-            buildAnnotatedString {
-                append(mediaMetadata.artists.joinToString { it.name })
-                append(" • ")
-                append(makeTimeString(mediaMetadata.duration * 1000L))
-                append(" • ")
-                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                    append(mediaMetadata.suggestedBy)
-                }
-            }
-        } else {
-            AnnotatedString(
-                joinByBullet(
+        titleFontWeight = FontWeight.SemiBold,
+        titleLetterSpacing = (-0.23).sp,
+        subtitle = buildAnnotatedString {
+            append(
+                queueDetailsLine(
                     mediaMetadata.artists.joinToString { it.name },
                     makeTimeString(mediaMetadata.duration * 1000L)
                 )
             )
+            if (mediaMetadata.suggestedBy != null) {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                    append(" • ")
+                    append(mediaMetadata.suggestedBy)
+                }
+            }
         },
         badges = { if (mediaMetadata.explicit) Icon.Explicit()},
         thumbnailContent = {
@@ -1347,7 +1487,8 @@ fun MediaMetadataListItem(
                 isSelected = isSelected,
                 isActive = isActive,
                 isPlaying = isPlaying,
-                shape = ThumbnailRoundedShape,
+                // Figma Queue art: 48 radius 5 (was the 8dp tile shape).
+                shape = ListRowArtShape,
                 targetSizePx = thumbnailPx(ListThumbnailSize),
                 modifier = Modifier.size(ListThumbnailSize)
             )
@@ -1467,7 +1608,7 @@ fun YouTubeListItem(
                     isPlaying = isPlaying,
                     // List rows keep one artwork shape for every item type; the circle
                     // stays on artist tiles and heroes, where it reads as a portrait.
-                    shape = ThumbnailRoundedShape,
+                    shape = ListRowArtShape,
                     targetSizePx = thumbnailPx(ListThumbnailSize),
                     // Songs open the player, not a detail screen with a hero, so they
                     // stay out of the artwork morph -- the sheet has its own transition.
@@ -1539,11 +1680,14 @@ fun YouTubeGridItem(
         Text(
             text = item.title,
             style = AppTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            // Figma Music card title: Regular 15, -0.23 tracking (244:1279).
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = (-0.23).sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = if (item is ArtistItem) TextAlign.Center else TextAlign.Start,
-            modifier = Modifier.marqueeWhenVisible().fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
         )
     },
     subtitle = {
@@ -1557,6 +1701,9 @@ fun YouTubeGridItem(
             Text(
                 text = subtitle,
                 style = AppTheme.typography.bodySmall,
+                // Figma card sub: 15/20 (244:1279).
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
                 color = AppleTokens.Metadata,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1565,11 +1712,11 @@ fun YouTubeGridItem(
     },
     badges = badges,
     thumbnailContent = {
-        ItemThumbnail(
-            thumbnailUrl = item.thumbnail,
-            isActive = isActive,
-            isPlaying = isPlaying,
-            shape = ThumbnailRoundedShape,
+            ItemThumbnail(
+                thumbnailUrl = item.thumbnail,
+                isActive = isActive,
+                isPlaying = isPlaying,
+                shape = GridCardArtShape,
             sharedArtworkId = if (item is SongItem) null else item.id,
         )
     },
@@ -1597,7 +1744,7 @@ fun LocalSongsGrid(
             thumbnailUrl = thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
-            shape = ThumbnailRoundedShape,
+            shape = GridCardArtShape,
             modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
             showCenterPlay = true,
             playButtonVisible = false
@@ -1626,7 +1773,7 @@ fun LocalArtistsGrid(
             thumbnailUrl = thumbnailUrl,
             isActive = false,
             isPlaying = false,
-            shape = ThumbnailRoundedShape,
+            shape = GridCardArtShape,
             modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
             showCenterPlay = false,
             playButtonVisible = false
@@ -1655,7 +1802,7 @@ fun LocalAlbumsGrid(
             thumbnailUrl = thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
-            shape = ThumbnailRoundedShape,
+            shape = GridCardArtShape,
             modifier = if (fillMaxWidth) Modifier.fillMaxWidth() else Modifier,
             showCenterPlay = false,
             playButtonVisible = true

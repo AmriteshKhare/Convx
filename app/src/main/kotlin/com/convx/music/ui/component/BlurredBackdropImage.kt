@@ -15,6 +15,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -123,6 +124,15 @@ fun BlurredBackdropImage(
         if (baked != null) readyCallback?.invoke()
     }
 
+    // A cache hit shows at once; a bake that lands after first composition eases in instead
+    // of popping -- it usually lands mid-way through a track-change crossfade.
+    val reveal = remember(cacheKey) { androidx.compose.animation.core.Animatable(if (baked != null) 1f else 0f) }
+    LaunchedEffect(baked) {
+        if (baked != null && reveal.value < 1f) {
+            reveal.animateTo(1f, androidx.compose.animation.core.tween(600, easing = com.convx.music.ui.player.SeamlessEasing))
+        }
+    }
+
     baked?.let { bitmap ->
         Image(
             bitmap = bitmap.asImageBitmap(),
@@ -130,7 +140,7 @@ fun BlurredBackdropImage(
             contentScale = contentScale,
             alignment = alignment,
             colorFilter = colorFilter,
-            modifier = modifier,
+            modifier = modifier.graphicsLayer { alpha = reveal.value },
         )
     }
 }

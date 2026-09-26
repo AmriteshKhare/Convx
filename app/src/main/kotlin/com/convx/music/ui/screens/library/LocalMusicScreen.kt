@@ -1,9 +1,5 @@
 package com.convx.music.ui.screens.library
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -26,6 +22,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import com.convx.music.constants.ThumbnailRoundedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.convx.music.ui.component.LocalMusicEmptyState
+import com.convx.music.ui.component.LocalMusicPermissionPrompt
+import com.convx.music.ui.component.hasLocalAudioPermission
+import com.convx.music.ui.component.rememberLocalAudioPermission
 import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
 import com.convx.music.ui.ios.compat.CircularProgressIndicator
@@ -129,25 +129,10 @@ fun LocalMusicScreen(
         artists.filter { it.title.contains(searchQuery, ignoreCase = true) }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasStoragePermission = granted
-    }
+    val audioPermission = rememberLocalAudioPermission { granted -> hasStoragePermission = granted }
 
-    LaunchedEffect(Unit) {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_AUDIO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-        hasStoragePermission = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
-                context.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            else ->
-                context.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-    }
+    // Re-read on entry as well as after the dialog: the user may have flipped it in Settings.
+    LaunchedEffect(Unit) { hasStoragePermission = hasLocalAudioPermission(context) }
 
     // Refresh on entry; force=false so returning from the player doesn't re-sweep.
     LaunchedEffect(hasStoragePermission) {
@@ -217,6 +202,8 @@ fun LocalMusicScreen(
                         // Rescan
                         IconButton(
                             onClick = { if (!isScanning) viewModel.scanDevice(context) },
+                            enabled = !isScanning,
+                        ) {
                             if (isScanning) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(20.dp),
@@ -260,52 +247,11 @@ fun LocalMusicScreen(
         // Scan / Permission section
         if (!hasStoragePermission) {
             item(key = "permission") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = "Grant permission to access your music library",
-                        style = AppTheme.typography.bodyLarge,
-                        color = AppTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                Manifest.permission.READ_MEDIA_AUDIO
-                            } else {
-                                Manifest.permission.READ_EXTERNAL_STORAGE
-                            }
-                            permissionLauncher.launch(permission)
-                        },
-                    ) {
-                        Text("Grant Permission")
-                    }
-                }
+                LocalMusicPermissionPrompt(permission = audioPermission)
             }
         } else if (songs.isEmpty() && !isScanning) {
             item(key = "empty") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = "No local music found",
-                        style = AppTheme.typography.bodyLarge,
-                        color = AppTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = { viewModel.scanDevice(context) },
-                    ) {
-                        Text("Scan Device")
-                    }
-                }
+                LocalMusicEmptyState(onScan = { viewModel.scanDevice(context) })
             }
         }
 

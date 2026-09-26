@@ -16,9 +16,7 @@ import com.convx.music.utils.rememberPreference
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Animatable
@@ -59,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
@@ -68,6 +67,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +77,8 @@ import com.convx.music.R
 import com.convx.music.constants.SearchSource
 import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.elasticStretchLayerBlock
+import com.convx.music.ui.ios.component.IosContextMenuOverlay
+import com.convx.music.ui.ios.component.IosMenuSection
 import com.convx.music.ui.player.FloatingMiniPlayer
 import com.convx.music.ui.screens.Screens
 import com.convx.music.ui.screens.search.DynamicSearchPlaceholder
@@ -93,7 +95,8 @@ import kotlinx.coroutines.launch
 // Kyant0/Capsule's continuous (superellipse) capsule instead of a circular-arc
 // RoundedCornerShape — smoother corners, and lerp-able for the puck's
 // drag-to-search morph (see FloatingTabBar's ExpandedTabs).
-private val NavBarShape = ContinuousRoundedRectangle(percent = 50)
+// Continuous (G2) capsule for the bar's glass; circles stay true circles. See NavContinuousCapsule.
+private val NavBarShape = com.convx.music.ui.component.shapes.NavContinuousCapsule
 
 // Matches FloatingTabBar's own SearchBarRowHeight (the search-expanded row's
 // height, itself matched to the inline mini player's shrunk height) so the
@@ -105,13 +108,14 @@ private val NavBarSearchBarHeight = 48.dp
 // more as the label grows) plus the gap before it and the pill's own horizontal
 // content padding. Whatever is left is split between the tabs.
 //
-// 57 (circle) + 8 (componentSpacing) + 4 (pill horizontal padding) = 69, so the
+// Now 62 (circle) + 8 (componentSpacing) + 8 (pill padding, 4 each side, equal all round
+// so the puck is concentric) = 78, held at 80 so the circle still measures square. Before: 57 + 8 + 4 = 69, so the
 // old 80dp handed the circle 11dp it never used and took that width off the tab
 // pill. The reference bars (designRefrence/navbar.png, navbar.webp) run the tab
 // pill right up to the circle; the pill is the wide element, the circle only as
 // wide as it needs to be. Held one dp under the arithmetic minimum's rounding so
 // the circle still measures square at fontScale 1.
-private val NavBarStandaloneReserve = 70.dp
+private val NavBarStandaloneReserve = 80.dp
 
 // Floor for a tab slot. Below this the icon and its label stop reading as one
 // target; a phone narrow enough to hit this floor gets a bar that overflows
@@ -152,6 +156,11 @@ fun AppFloatingNavBar(
     onAccessoryClick: () -> Unit = {},
     onAccessoryLyricsClick: (() -> Unit)? = null,
     onAccessoryQueueClick: (() -> Unit)? = null,
+    onAccessoryLongClick: (() -> Unit)? = null,
+    // Press-and-hold a tab for its context menu (iOS's own tab bar behaviour). Supplied
+    // from the call site, which is where the nav controller lives; returning an empty
+    // list for a destination means that tab simply has no menu.
+    tabContextMenu: (@Composable (Screens) -> List<IosMenuSection>)? = null,
     // Live fractional tab index while the main tabs pager is moving, null otherwise --
     // see FloatingTabBar's own `tabPosition`. This is what makes the puck travel WITH
     // the page instead of springing to it once the page has already arrived.
@@ -203,6 +212,8 @@ fun AppFloatingNavBar(
                 onAccessoryClick = onAccessoryClick,
                 onAccessoryLyricsClick = onAccessoryLyricsClick,
                 onAccessoryQueueClick = onAccessoryQueueClick,
+                onAccessoryLongClick = onAccessoryLongClick,
+                tabContextMenu = tabContextMenu,
                 searchModeActive = navSearch.visualActive,
                 navSearch = navSearch,
                 tabPosition = tabPosition,
@@ -223,6 +234,8 @@ private fun AppFloatingNavBarChrome(
     onAccessoryClick: () -> Unit,
     onAccessoryLyricsClick: (() -> Unit)?,
     onAccessoryQueueClick: (() -> Unit)?,
+    onAccessoryLongClick: (() -> Unit)?,
+    tabContextMenu: (@Composable (Screens) -> List<IosMenuSection>)?,
     searchModeActive: Boolean,
     navSearch: NavSearchState,
     tabPosition: (() -> Float?)?,
@@ -311,11 +324,20 @@ private fun AppFloatingNavBarChrome(
     val navHighlightAlpha = com.convx.music.ui.theme.GlassTintTokens.pluckOpacity(isDark, ambientColor.isSpecified && !ambientColor.isHueless())
 
     val tabBarContentModifier = if (useGlass) {
+        // Tab-bar freeze covers the bar's own inline/expanded/search transition;
+        // OR the app-wide freeze so nav-transitions and list scroll also hold
+        // the last capture (the default alone would be overridden by passing
+        // frozen explicitly).
+        val appBackdropFrozen = LocalAppBackdropFrozen.current
+        val tabBackdropFrozen = LocalTabBarBackdropFrozen.current
+        val combinedBackdropFrozen = remember(appBackdropFrozen, tabBackdropFrozen) {
+            { appBackdropFrozen() || tabBackdropFrozen() }
+        }
         Modifier.liquidGlass(
             config = glassConfig,
             shape = NavBarShape,
             highlightAlpha = navHighlightAlpha,
-            frozen = LocalTabBarBackdropFrozen.current,
+            frozen = combinedBackdropFrozen,
             rimTintColor = rimTintColor,
         )
     } else {
@@ -356,38 +378,20 @@ private fun AppFloatingNavBarChrome(
             )
         }
     }
-    val inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? =
+    // One mini player for both bar states: the tab bar composes it once and flies it
+    // between its inline and expanded slots (see AccessoryHost), [isInline] only restyles it.
+    val playerAccessory: (@Composable (Modifier, Boolean) -> Unit)? =
         if (showPlayerAccessory) {
-            { accessoryModifier, _ ->
+            { accessoryModifier, isInline ->
                 FloatingMiniPlayer(
-                    isInline = true,
+                    isInline = isInline,
                     contentColor = accessoryContentColor,
                     onClick = onAccessoryClick,
-                    // Same lyrics/queue icons render in inline mode as expanded
-                    // (FloatingMiniPlayer doesn't gate them on isInline), but this
-                    // call site never passed the click handlers — tapping queue
-                    // while the bar was in its scrolled/collapsed state silently
-                    // fell back to a plain expand instead of opening the queue.
                     onLyricsClick = onAccessoryLyricsClick,
                     onQueueClick = onAccessoryQueueClick,
+                    onLongClick = onAccessoryLongClick,
                     onSnapRelease = onMiniSnapRelease,
                     modifier = accessoryModifier.then(tabBarContentModifier),
-                )
-            }
-        } else {
-            null
-        }
-    val expandedAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? =
-        if (showPlayerAccessory) {
-            { accessoryModifier, _ ->
-                FloatingMiniPlayer(
-                    isInline = false,
-                    contentColor = accessoryContentColor,
-                    onClick = onAccessoryClick,
-                    onLyricsClick = onAccessoryLyricsClick,
-                    onQueueClick = onAccessoryQueueClick,
-                    onSnapRelease = onMiniSnapRelease,
-                    modifier = accessoryModifier.fillMaxWidth().then(tabBarContentModifier),
                 )
             }
         } else {
@@ -401,12 +405,26 @@ private fun AppFloatingNavBarChrome(
     // phone the bar read as oversized with a shrunken search icon beside it.
     // Fitting the tabs to the width actually available fixes both at once, and
     // the ceiling keeps wider phones pixel-identical to what they render today.
+    // Which tab is being held, and exactly where it sits -- the menu grows out of that
+    // cell, not out of the middle of the bar.
+    var heldTab by remember { mutableStateOf<Pair<Screens, Rect>?>(null) }
+    val heldSections = heldTab?.let { (screen, _) -> tabContextMenu?.invoke(screen) }.orEmpty()
+
+    IosContextMenuOverlay(
+        sections = heldSections,
+        anchor = heldTab?.second?.takeIf { heldSections.isNotEmpty() },
+        onDismissRequest = { heldTab = null },
+    )
+
     BoxWithConstraints(modifier) {
         val tabWidth = if (tabScreens.isEmpty()) {
             FloatingTabBarDefaults.TabWidth
         } else {
+            // No 88dp ceiling: with 3 tabs the capped row came out ~34dp narrower than the
+            // screen and was centred, so the bar read small next to the reference, which
+            // runs pill + circle edge to edge inside the gutter (m2: 21pt margins).
             ((maxWidth - NavBarStandaloneReserve) / tabScreens.size)
-                .coerceIn(NavBarMinTabWidth, FloatingTabBarDefaults.TabWidth)
+                .coerceAtLeast(NavBarMinTabWidth)
         }
 
         FloatingTabBar(
@@ -416,15 +434,23 @@ private fun AppFloatingNavBarChrome(
             snapPulse = { snapPulse.value },
             modifier = Modifier.fillMaxWidth(),
             tabBarContentModifier = tabBarContentModifier,
-            inlineAccessory = inlineAccessory,
-            expandedAccessory = expandedAccessory,
+            accessory = playerAccessory,
             colors = FloatingTabBarDefaults.colors(
                 backgroundColor = backgroundColor,
                 accessoryBackgroundColor = backgroundColor,
             ),
+            // Pill and mini pill share the bar's continuous capsule so shadow, glass and
+            // clip are one outline; the search circle keeps the circle.
+            shapes = FloatingTabBarDefaults.shapes(
+                tabBarShape = com.convx.music.ui.component.shapes.NavContinuousCapsule,
+                accessoryShape = com.convx.music.ui.component.shapes.NavContinuousCapsule,
+            ),
             sizes = FloatingTabBarDefaults.sizes(
-                tabBarContentPadding = PaddingValues(vertical = 4.dp, horizontal = 4.dp),
-                tabExpandedContentPadding = PaddingValues(vertical = 4.dp, horizontal = 6.dp),
+                // Narrow 4dp inset, equal on all four sides so the puck's radius is the bar's
+                // minus the inset everywhere -- concentric, like iOS. The bar's height now
+                // comes from the content: 32dp glyph + label + 5dp cell padding = 54, +8 = 62.
+                tabBarContentPadding = PaddingValues(4.dp),
+                tabExpandedContentPadding = PaddingValues(vertical = 5.dp, horizontal = 6.dp),
                 tabInlineContentPadding = PaddingValues(8.dp),
                 tabWidth = tabWidth,
             ),
@@ -464,7 +490,10 @@ private fun AppFloatingNavBarChrome(
                             color = if (isSelected) selectedLabelColor else unselectedLabelColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            fontSize = 12.sp,
+                            // Figma Tab Bar tabs: Bold 10 selected, Medium 10
+                            // unselected (348:2524).
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             modifier = Modifier.additiveChrome(useGlass && !isSelected && isDark && ambientColor.isSpecified),
                         )
                     },
@@ -475,7 +504,8 @@ private fun AppFloatingNavBarChrome(
                             ),
                             contentDescription = stringResource(screen.titleId),
                             tint = if (isSelected) selectedIconColor else unselectedIconColor,
-                            modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected && isDark),
+                            // 32 (Figma cell 28): bigger per user, same as search.
+                            modifier = Modifier.size(32.dp).additiveChrome(useGlass && !isSelected && isDark),
                         )
                     },
                     onClick = {
@@ -488,6 +518,7 @@ private fun AppFloatingNavBarChrome(
                             onItemClick(screen, isRouteSelected(currentRoute, screen.route, navigationItems))
                         }
                     },
+                    onLongClick = tabContextMenu?.let { { bounds: Rect -> heldTab = screen to bounds } },
                 )
             }
 
@@ -502,7 +533,10 @@ private fun AppFloatingNavBarChrome(
                             color = if (isSelected) selectedLabelColor else unselectedLabelColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            fontSize = 12.sp,
+                            // Figma Tab Bar tabs: Bold 10 selected, Medium 10
+                            // unselected (348:2524).
+                            fontSize = 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             modifier = Modifier.additiveChrome(useGlass && !isSelected && ambientColor.isSpecified),
                         )
                     },
@@ -513,7 +547,8 @@ private fun AppFloatingNavBarChrome(
                             ),
                             contentDescription = stringResource(screen.titleId),
                             tint = if (isSelected) selectedIconColor else unselectedIconColor,
-                            modifier = Modifier.size(34.dp).additiveChrome(useGlass && !isSelected),
+                            // Same 32 as the tab glyphs, so every bar icon reads one height.
+                            modifier = Modifier.size(32.dp).additiveChrome(useGlass && !isSelected),
                         )
                     },
                     onClick = {
@@ -523,6 +558,7 @@ private fun AppFloatingNavBarChrome(
                             navSearch.onTapSearchIcon()
                         }
                     },
+                    onLongClick = tabContextMenu?.let { { bounds: Rect -> heldTab = screen to bounds } },
                 )
             }
         }
@@ -574,7 +610,7 @@ private fun SearchBarPlaceholder(
         Box(Modifier.weight(1f)) {
             DynamicSearchPlaceholder(
                 searchSource = state.searchSource,
-                style = TextStyle(color = contentColor.copy(alpha = 0.6f), fontSize = 15.sp),
+                style = TextStyle(color = contentColor.copy(alpha = 0.6f), fontSize = 17.sp),
             )
         }
         if (state.canToggleSource) {
@@ -678,7 +714,8 @@ fun NavBarSearchInputBar(
             )
             .then(pillGlow.gestureModifier)
             .then(pillGlow.modifier)
-            .padding(horizontal = 4.dp)
+            // Figma Search Bar content pads L11/R10 (607:457).
+            .padding(start = 11.dp, end = 10.dp)
     ) {
         Box(
             modifier = Modifier
@@ -697,14 +734,14 @@ fun NavBarSearchInputBar(
             if (state.query.text.isEmpty()) {
                 DynamicSearchPlaceholder(
                     searchSource = state.searchSource,
-                    style = TextStyle(color = onTint.copy(alpha = 0.6f), fontSize = 16.sp),
+                    style = TextStyle(color = onTint.copy(alpha = 0.6f), fontSize = 17.sp),
                 )
             }
             BasicTextField(
                 value = state.query,
                 onValueChange = state.onQueryChange,
                 singleLine = true,
-                textStyle = TextStyle(color = onTint, fontSize = 16.sp),
+                textStyle = TextStyle(color = onTint, fontSize = 17.sp),
                 cursorBrush = SolidColor(onTint),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 // Some IMEs render the requested Search action as Done/Go instead

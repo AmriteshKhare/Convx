@@ -373,7 +373,7 @@ fun HomeBackgroundControls() {
         // pulled from the library's own content.
         val (libraryBackgroundMode, onLibraryBackgroundModeChange) = rememberEnumPreference(
             LibraryBackgroundModeKey,
-            LibraryBackgroundMode.THUMBNAIL_BLUR,
+            LibraryBackgroundMode.PLAIN,
         )
         IosSettingsGroup(
             title = stringResource(R.string.library_background),

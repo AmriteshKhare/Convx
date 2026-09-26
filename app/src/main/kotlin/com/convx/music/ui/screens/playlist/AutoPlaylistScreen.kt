@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.screens.playlist
 
+import com.convx.music.ui.component.LocalMusicEmptyState
+import com.convx.music.ui.component.LocalMusicPermissionPrompt
+import com.convx.music.ui.component.rememberLocalAudioPermission
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -37,8 +40,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import android.Manifest
 import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import com.convx.music.ui.ios.compat.Button
 import androidx.compose.material3.ButtonDefaults
 import com.convx.music.ui.ios.compat.CircularProgressIndicator
@@ -200,11 +201,7 @@ fun AutoPlaylistScreen(
         Manifest.permission.READ_EXTERNAL_STORAGE
     }
     var hasAudioPermission by remember { mutableStateOf(false) }
-    val scanPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasAudioPermission = granted
-    }
+    val audioPermissionState = rememberLocalAudioPermission { granted -> hasAudioPermission = granted }
     LaunchedEffect(isLocal) {
         if (isLocal) {
             hasAudioPermission = context.checkSelfPermission(audioPermission) ==
@@ -361,39 +358,30 @@ fun AutoPlaylistScreen(
                     }
 
                     if (filteredSongs.isEmpty() && !isSearching) {
-                        item(key = "empty_placeholder") {
-                            EmptyPlaceholder(
-                                icon = iconRes,
-                                text = stringResource(R.string.playlist_is_empty),
-                                modifier = Modifier.padding(top = 100.dp),
-                            )
-                        }
                         if (isLocal) {
-                            item(key = "local_scan_action") {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
-                                    if (isScanning) {
-                                        CircularProgressIndicator()
-                                    } else {
-                                        Button(
-                                            onClick = {
-                                                if (hasAudioPermission) viewModel.scanLocal(context)
-                                                else scanPermissionLauncher.launch(audioPermission)
-                                            },
-                                        ) {
-                                            Text(
-                                                stringResource(
-                                                    if (hasAudioPermission) R.string.scan_device
-                                                    else R.string.grant_permission
-                                                )
-                                            )
-                                        }
+                            // Local music needs storage access first, then a scan: say what is
+                            // being asked for instead of an empty-playlist message and a bare button.
+                            item(key = "local_prompt") {
+                                Box(Modifier.padding(top = 60.dp)) {
+                                    when {
+                                        !hasAudioPermission -> LocalMusicPermissionPrompt(permission = audioPermissionState)
+                                        isScanning -> Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(48.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                        ) { CircularProgressIndicator() }
+                                        else -> LocalMusicEmptyState(onScan = { viewModel.scanLocal(context) })
                                     }
                                 }
+                            }
+                        } else {
+                            item(key = "empty_placeholder") {
+                                EmptyPlaceholder(
+                                    icon = iconRes,
+                                    text = stringResource(R.string.playlist_is_empty),
+                                    modifier = Modifier.padding(top = 100.dp),
+                                )
                             }
                         }
                     }

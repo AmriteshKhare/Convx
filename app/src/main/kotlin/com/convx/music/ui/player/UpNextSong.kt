@@ -99,7 +99,8 @@ fun UpNextSong(
                         )
                         Text(
                             text = item.title ?: "",
-                            style = AppTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            // Figma Queue row title: Semibold (279:887).
+                            style = AppTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                             color = titleColor,
                             maxLines = 1,
                         )

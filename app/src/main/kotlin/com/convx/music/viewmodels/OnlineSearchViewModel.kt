@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.music.innertube.SearchFilter
 import com.music.innertube.YouTube
 import com.music.innertube.models.filterExplicit
 import com.music.innertube.models.filterVideoSongs
@@ -45,7 +46,7 @@ constructor(
     } catch (e: IllegalArgumentException) {
         requireNotNull(savedStateHandle.get<String>("query")) { "Missing query" }
     }
-    val filter = MutableStateFlow<YouTube.SearchFilter?>(null)
+    val filter = MutableStateFlow<SearchFilter?>(null)
     var summaryPage by mutableStateOf<SearchSummaryPage?>(null)
     val viewStateMap = mutableStateMapOf<String, ItemsPage?>()
 
@@ -57,7 +58,7 @@ constructor(
         }
     }
 
-    private suspend fun load(filter: YouTube.SearchFilter?) {
+    private suspend fun load(filter: SearchFilter?) {
         if (filter == null) {
             if (summaryPage != null) return
             YouTube

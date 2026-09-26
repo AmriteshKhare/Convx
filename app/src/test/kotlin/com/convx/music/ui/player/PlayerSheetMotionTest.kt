@@ -33,6 +33,28 @@ class PlayerSheetMotionTest {
     }
 
     @Test
+    fun `artwork window lands exactly on a non-square hero target`() {
+        val squareArt = Rect(24f, 900f, 88f, 964f)
+        val hero = Rect(0f, 0f, 1080f, 1560f)
+        assertEquals(squareArt, sharedArtworkWindow(squareArt, hero, 0f))
+        val end = sharedArtworkWindow(squareArt, hero, 1f)
+        assertEquals(hero.left, end.left, 0.01f)
+        assertEquals(hero.top, end.top, 0.01f)
+        assertEquals(hero.right, end.right, 0.01f)
+        assertEquals(hero.bottom, end.bottom, 0.01f)
+        val nan = sharedArtworkWindow(squareArt, hero, Float.NaN)
+        assertEquals(squareArt, nan)
+    }
+
+    @Test
+    fun `ambient transition follows the dj crossfade, clamped`() {
+        assertEquals(AMBIENT_TRANSITION_DEFAULT_MS, ambientTransitionMillis(0L))
+        assertEquals(4_000, ambientTransitionMillis(4_000L))
+        assertEquals(8_000, ambientTransitionMillis(30_000L))
+        assertEquals(900, ambientTransitionMillis(100L))
+    }
+
+    @Test
     fun `container interpolates linearly edge to edge`() {
         val mid = sharedContainerRect(mini, full, 0.5f)
         val heightFraction = (mid.height - mini.height) / (full.height - mini.height)

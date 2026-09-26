@@ -39,7 +39,7 @@ import com.convx.music.ui.component.backdrop.internal.recordLayer
  * capture padding already covers.
  */
 /** Fraction of screen size the shared blur is computed at; the blur hides the upscale. */
-const val GlassPoolScale = 0.5f
+const val GlassPoolScale = 0.33f
 
 @Composable
 fun rememberGlassPool(): LayerBackdrop = rememberLayerBackdrop()

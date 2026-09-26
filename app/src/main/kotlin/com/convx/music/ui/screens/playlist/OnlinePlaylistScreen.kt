@@ -60,6 +60,7 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -140,6 +141,7 @@ import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.liquidGlass
 import com.convx.music.ui.component.rememberChromeScrimProgress
 import com.convx.music.ui.component.rememberHeroSource
+import com.convx.music.ui.component.ZeroScrollProgress
 import com.convx.music.ui.component.rememberHeroTopBlur
 import com.convx.music.ui.component.resolvedTextColor
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -919,7 +921,7 @@ private fun OnlinePlaylistHeader(
     heroScale: Float = 1f,
     hazeState: HazeState? = null,
     pageColor: Color = Color.Black,
-    scrollBlurProgress: Float = 0f,
+    scrollBlurProgress: State<Float> = ZeroScrollProgress,
 ) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -1216,7 +1218,8 @@ private fun OnlinePlaylistHeader(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp)
+                        // Figma Button height: 50 (225:2439).
+                        .height(50.dp)
                         .clip(chromeShape)
                         .then(chromeBackgroundModifier)
                         .bounceClick(

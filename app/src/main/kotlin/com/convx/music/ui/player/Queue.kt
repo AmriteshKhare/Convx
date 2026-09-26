@@ -26,6 +26,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -72,6 +74,7 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -106,6 +109,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -117,6 +122,8 @@ import androidx.navigation.NavController
 import com.convx.music.LocalListenTogetherManager
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
+import com.convx.music.constants.AutoLoadMoreKey
+import com.convx.music.constants.CrossfadeEnabledKey
 import com.convx.music.constants.ListItemHeight
 import com.convx.music.constants.PlayerBackgroundStyle
 import com.convx.music.constants.QueueEditLockKey
@@ -203,6 +210,8 @@ fun Queue(
     /** False when the host already applies the status-bar inset (V17's frame does);
      *  true keeps the standalone sheet's own inset. */
     applyTopSystemInset: Boolean = true,
+    /** Opt-in (V2): each change replays the rows' rubber-band landing. 0 = never. */
+    landKey: Int = 0,
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
@@ -211,6 +220,16 @@ fun Queue(
     val bottomSheetPageState = LocalBottomSheetPageState.current
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
+    // Landing clock for the rubber-band entrance: 1 = at rest (no offset).
+    val landClock = remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(landKey) {
+        if (landKey == 0) return@LaunchedEffect
+        landClock.snapTo(0f)
+        landClock.animateTo(
+            1f,
+            androidx.compose.animation.core.tween(QueueLandTotalMs, easing = androidx.compose.animation.core.LinearEasing),
+        )
+    }
     var showAudioDeviceBottomSheet by remember { mutableStateOf(false) }
 
 
@@ -507,6 +526,40 @@ fun Queue(
                             playerConnection.player.toggleRepeatMode()
                         },
                         isActive = repeatMode != Player.REPEAT_MODE_OFF,
+                        enabled = !isListenTogetherGuest,
+                        shape = middleShape,
+                        modifier = Modifier.size(buttonSize),
+                        textButtonColor = textButtonColor,
+                        iconButtonColor = iconButtonColor,
+                        iconSize = iconSize,
+                        textBackgroundColor = TextBackgroundColor,
+                        playerBackground = playerBackground
+                    )
+
+                    // Keep playing: when the queue runs out, append recommendations. Same
+                    // AutoLoadMoreKey the player settings toggle, so both stay in step.
+                    var keepPlaying by rememberPreference(AutoLoadMoreKey, defaultValue = true)
+                    PlayerQueueButton(
+                        icon = R.drawable.ic_queue_infinity,
+                        onClick = { keepPlaying = !keepPlaying },
+                        isActive = keepPlaying,
+                        enabled = !isListenTogetherGuest,
+                        shape = middleShape,
+                        modifier = Modifier.size(buttonSize),
+                        textButtonColor = textButtonColor,
+                        iconButtonColor = iconButtonColor,
+                        iconSize = iconSize,
+                        textBackgroundColor = TextBackgroundColor,
+                        playerBackground = playerBackground
+                    )
+
+                    // Crossfade: the same switch as Settings > Player, which MusicService now
+                    // turns into the controller's actual behaviour.
+                    var crossfadeOn by rememberPreference(CrossfadeEnabledKey, defaultValue = false)
+                    PlayerQueueButton(
+                        icon = R.drawable.ic_queue_crossfade,
+                        onClick = { crossfadeOn = !crossfadeOn },
+                        isActive = crossfadeOn,
                         enabled = !isListenTogetherGuest,
                         shape = repeatShape,
                         modifier = Modifier.size(buttonSize),
@@ -1025,13 +1078,17 @@ fun Queue(
                 }
                 }
 
+                // Equal icon-only pills, the iOS queue's shuffle | repeat | keep playing | crossfade
+                // row (radio, which has no counterpart there, stays as the last pill).
+                var keepPlaying by rememberPreference(AutoLoadMoreKey, defaultValue = true)
+                var crossfadeOn by rememberPreference(CrossfadeEnabledKey, defaultValue = false)
                 FlowRow(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                         .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ToggleButton(
+                    QueuePill(
                         checked = shuffleModeEnabled,
                         onCheckedChange = { checked ->
                             coroutineScope.launch {
@@ -1044,84 +1101,62 @@ fun Queue(
                         },
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                        colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = chromePillContainer,
-                            contentColor = chromeSecondary,
-                            checkedContainerColor = chromePillActive,
-                            checkedContentColor = chromePrimary
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clip(ContinuousRoundedRectangle(percent = 50))
-                            .animateContentSize(),
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.shuffle),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .additiveChrome(chromeAdditive)
-                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha }
-                        )
-                        Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
-                        Text(
-                            text = stringResource(R.string.shuffle),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .additiveChrome(chromeAdditive)
-                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
-                            )
-                    }
+                        icon = R.drawable.shuffle,
+                        description = stringResource(R.string.shuffle),
+                        container = chromePillContainer,
+                        inactiveContent = chromeSecondary,
+                        activeContainer = chromePillActive,
+                        activeContent = chromePrimary,
+                        additive = chromeAdditive,
+                    )
 
-                    ToggleButton(
+                    QueuePill(
                         checked = repeatMode != Player.REPEAT_MODE_OFF,
-                        onCheckedChange = {
-                            playerConnection.player.toggleRepeatMode()
-                        },
+                        onCheckedChange = { playerConnection.player.toggleRepeatMode() },
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-                        colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = chromePillContainer,
-                            contentColor = chromeSecondary,
-                            checkedContainerColor = chromePillActive,
-                            checkedContentColor = chromePrimary
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clip(ContinuousRoundedRectangle(percent = 50))
-                            .animateContentSize(),
-                    ) {
-                        Icon(
-                            painter = painterResource(
-                                when (repeatMode) {
-                                    Player.REPEAT_MODE_ALL -> R.drawable.repeat
-                                    Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
-                                    else -> R.drawable.repeat
-                                }
-                            ),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .additiveChrome(chromeAdditive)
-                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha }
-                        )
-                        Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
-                        Text(
-                            text = stringResource(R.string.repeat),
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .additiveChrome(chromeAdditive)
-                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
-                        )
-                    }
+                        icon = if (repeatMode == Player.REPEAT_MODE_ONE) R.drawable.repeat_one else R.drawable.repeat,
+                        description = stringResource(R.string.repeat),
+                        container = chromePillContainer,
+                        inactiveContent = chromeSecondary,
+                        activeContainer = chromePillActive,
+                        activeContent = chromePrimary,
+                        additive = chromeAdditive,
+                    )
 
-                    ToggleButton(
+                    // Keep playing: when the queue runs out, append recommendations. The same
+                    // AutoLoadMoreKey Settings > Player toggles, so the two stay in step.
+                    QueuePill(
+                        checked = keepPlaying,
+                        onCheckedChange = { keepPlaying = it },
+                        enabled = !isListenTogetherGuest,
+                        shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
+                        icon = R.drawable.ic_queue_infinity,
+                        description = stringResource(R.string.queue_keep_playing),
+                        container = chromePillContainer,
+                        inactiveContent = chromeSecondary,
+                        activeContainer = chromePillActive,
+                        activeContent = chromePrimary,
+                        additive = chromeAdditive,
+                    )
+
+                    // Crossfade: the Settings > Player switch, which MusicService turns into
+                    // the controller's actual behaviour.
+                    QueuePill(
+                        checked = crossfadeOn,
+                        onCheckedChange = { crossfadeOn = it },
+                        enabled = !isListenTogetherGuest,
+                        shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
+                        icon = R.drawable.ic_queue_crossfade,
+                        description = stringResource(R.string.queue_crossfade),
+                        container = chromePillContainer,
+                        inactiveContent = chromeSecondary,
+                        activeContainer = chromePillActive,
+                        activeContent = chromePrimary,
+                        additive = chromeAdditive,
+                    )
+
+                    QueuePill(
                         checked = false,
                         onCheckedChange = {
                             Toast.makeText(context, context.getString(R.string.starting_radio), Toast.LENGTH_SHORT).show()
@@ -1129,38 +1164,14 @@ fun Queue(
                         },
                         enabled = !isListenTogetherGuest,
                         shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                        colors = ToggleButtonDefaults.toggleButtonColors(
-                            containerColor = chromePillContainer,
-                            contentColor = chromeSecondary,
-                            checkedContainerColor = chromePillActive,
-                            checkedContentColor = chromePrimary
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .clip(ContinuousRoundedRectangle(percent = 50))
-                            .animateContentSize(),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .additiveChrome(chromeAdditive)
-                                .graphicsLayer { if (chromeAdditive) alpha = AdditiveChromeContentAlpha },
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.radio),
-                                contentDescription = null,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
-                            Text(
-                                text = stringResource(R.string.start_an_radio),
-                                style = MaterialTheme.typography.labelMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                        icon = R.drawable.radio,
+                        description = stringResource(R.string.start_an_radio),
+                        container = chromePillContainer,
+                        inactiveContent = chromeSecondary,
+                        activeContainer = chromePillActive,
+                        activeContent = chromePrimary,
+                        additive = false,
+                    )
                 }
 
 
@@ -1325,6 +1336,8 @@ fun Queue(
                             ).asPaddingValues(),
                     modifier = Modifier
                         .fillMaxSize()
+                        // Rubber-band landing: the whole list, as one body.
+                        .graphicsLayer { translationY = queueLandOffset(landClock.value, size.height) }
                         // The parent sheet owns the drag when this queue is hosted as a
                         // pane (V2 passes sheetDraggable=false): installing the sheet's
                         // nested-scroll connection here turned scroll-ups at the top
@@ -1739,3 +1752,65 @@ private fun PlayerQueueButton(
     }
 }
 
+private const val QueuePillContentAlpha = 0.45f
+
+/** One icon-only pill of the queue's toggle group; equal width, so the row reads as one control. */
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun FlowRowScope.QueuePill(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean,
+    shapes: ToggleButtonShapes,
+    icon: Int,
+    description: String,
+    container: Color,
+    inactiveContent: Color,
+    activeContainer: Color,
+    activeContent: Color,
+    additive: Boolean,
+) {
+    ToggleButton(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        enabled = enabled,
+        shapes = shapes,
+        colors = ToggleButtonDefaults.toggleButtonColors(
+            containerColor = container,
+            contentColor = inactiveContent,
+            checkedContainerColor = activeContainer,
+            checkedContentColor = activeContent,
+        ),
+        modifier = Modifier
+            .weight(1f)
+            .height(52.dp)
+            .clip(ContinuousRoundedRectangle(percent = 50))
+            .semantics { contentDescription = description },
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = null,
+            modifier = Modifier
+                .size(22.dp)
+                .additiveChrome(additive)
+                .graphicsLayer { if (additive) alpha = QueuePillContentAlpha },
+        )
+    }
+}
+
+/** Rubber-band landing: how long it runs. */
+private const val QueueLandTotalMs = 900
+/** Start stretch: the list hangs this fraction of its own height below its resting place. */
+private const val QueueLandStretch = 0.12f
+/** Springy settle: pulls a little past rest (the elastic recoiling) and relaxes. */
+private val QueueLandSpring = com.convx.music.ui.component.floatingtabbar.SpringEasing(zeta = 0.5f)
+
+/**
+ * Vertical offset of the queue list while [clock] runs 0..1: the list hangs from the top of
+ * the player on an elastic, stretched down by a slice of its [height], and springs up into
+ * place with a small recoil. 0 at rest (clock 1).
+ */
+private fun queueLandOffset(clock: Float, height: Float): Float {
+    if (clock >= 1f) return 0f
+    return height * QueueLandStretch * (1f - QueueLandSpring.transform(clock.coerceIn(0f, 1f)))
+}

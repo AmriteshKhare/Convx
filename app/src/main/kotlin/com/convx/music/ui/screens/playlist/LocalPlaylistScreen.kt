@@ -82,6 +82,7 @@ import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -194,6 +195,7 @@ import com.convx.music.ui.player.MeshGradientBackground
 import com.convx.music.ui.player.dimmed
 import com.convx.music.ui.player.rememberArtworkMeshPalette
 import com.convx.music.ui.component.HeroTopBlur
+import com.convx.music.ui.component.ZeroScrollProgress
 import com.convx.music.ui.component.rememberHeroTopBlur
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
@@ -1203,7 +1205,7 @@ fun LocalPlaylistHeader(
     modifier: Modifier,
     heroScale: Float = 1f,
     hazeState: HazeState? = null,
-    scrollBlurProgress: Float = 0f,
+    scrollBlurProgress: State<Float> = ZeroScrollProgress,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()

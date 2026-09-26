@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -99,7 +100,8 @@ private fun ActionSegment(action: NewAction, modifier: Modifier) {
             .padding(vertical = 10.dp, horizontal = 4.dp)
             .semantics { role = Role.Button },
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        // Figma Quick Action: symbol-to-label gap 5 (393:7946).
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         CompositionLocalProvider(
             LocalIosContentColor provides contentColor,
@@ -109,7 +111,8 @@ private fun ActionSegment(action: NewAction, modifier: Modifier) {
         }
         IosText(
             text = action.text,
-            style = IosTheme.typography.caption,
+            // Figma Quick Action label: Medium 12 (393:7946).
+            style = IosTheme.typography.caption.copy(fontWeight = FontWeight.Medium),
             color = contentColor,
             textAlign = TextAlign.Center,
             maxLines = 1,

@@ -39,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.Animatable
 import android.os.Build
 import coil3.compose.AsyncImage
@@ -248,22 +249,27 @@ private fun HeroPill(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        // Figma Button: gap 4, pads H20/V14 (225:2439).
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .clip(CircleShape)
             .background(Color.White.copy(alpha = 0.22f))
             .bounceClick(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 14.dp),
     ) {
         Icon(
             painter = painterResource(iconRes),
             contentDescription = null,
             tint = Color.White,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(17.dp),
         )
         Text(
             text = label,
             style = AppTheme.typography.labelLarge,
+            // Figma Button label: SemiBold 17, -0.43 tracking (225:2439).
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.43).sp,
             color = Color.White,
             maxLines = 1,
         )

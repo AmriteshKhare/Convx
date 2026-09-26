@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.ZeroCornerSize
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.toRect
 import androidx.compose.ui.graphics.Outline
@@ -60,13 +62,14 @@ open class ContinuousRoundedRectangle(
         val bottomRight = (if (layoutDirection == Ltr) bottomEnd else bottomStart).fastCoerceIn(0f, maxRadius)
         val bottomLeft = (if (layoutDirection == Ltr) bottomStart else bottomEnd).fastCoerceIn(0f, maxRadius)
 
-        return continuity.createRoundedRectangleOutline(
-            size = size,
-            topLeft = topLeft,
-            topRight = topRight,
-            bottomRight = bottomRight,
-            bottomLeft = bottomLeft
-        )
+        // Plain circular-arc rrect (what RoundedCornerShape emits), not the G2 path.
+        // A path outline is Outline.Generic, which Skia can't clip analytically: every
+        // clipped/glass surface re-rasterized its squircle mask on the CPU and uploaded
+        // it each frame it moved (15 uploads + ~20 extra render passes per Home scroll
+        // frame, measured). Melox uses RoundedCornerShape everywhere and pays none of it.
+        // ponytail: G2 corner smoothing dropped app-wide; to restore it for one static
+        // surface, draw that surface's path into a cached layer instead of clipping.
+        return roundedOutline(size, topLeft, topRight, bottomRight, bottomLeft)
     }
 
     override fun copy(
@@ -180,7 +183,10 @@ private data class ContinuousCapsuleImpl(
         bottomEnd: Float,
         bottomStart: Float,
         layoutDirection: LayoutDirection
-    ): Outline = continuity.createCapsuleOutline(size)
+    ): Outline {
+        val radius = size.minDimension * 0.5f
+        return roundedOutline(size, radius, radius, radius, radius)
+    }
 
     override fun toString(): String {
         return "ContinuousCapsule(continuity=$continuity)"
@@ -277,3 +283,19 @@ fun ContinuousRoundedRectangle(
         bottomStart = CornerSize(bottomStartPercent),
         continuity = continuity
     )
+
+private fun roundedOutline(
+    size: Size,
+    topLeft: Float,
+    topRight: Float,
+    bottomRight: Float,
+    bottomLeft: Float
+): Outline = Outline.Rounded(
+    RoundRect(
+        rect = size.toRect(),
+        topLeft = CornerRadius(topLeft),
+        topRight = CornerRadius(topRight),
+        bottomRight = CornerRadius(bottomRight),
+        bottomLeft = CornerRadius(bottomLeft)
+    )
+)

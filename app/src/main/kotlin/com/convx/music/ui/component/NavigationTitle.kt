@@ -31,6 +31,7 @@ import com.convx.music.R
 import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.ui.ios.compat.LocalContentColor
 import com.convx.music.ui.theme.AppleTokens
+import com.convx.music.ui.theme.LocalPageMetrics
 import com.convx.music.ui.theme.LocalAccentTextColor
 import com.convx.music.ui.theme.isHueless
 import androidx.compose.ui.graphics.Color
@@ -66,7 +67,12 @@ fun NavigationTitle(
             .clickable(enabled = onClick != null) {
                 onClick?.invoke()
             }
-            .padding(horizontal = AppleTokens.Gutter, vertical = 12.dp)
+            .padding(
+                start = LocalPageMetrics.current.gutter,
+                end = LocalPageMetrics.current.gutter,
+                top = LocalPageMetrics.current.headerTop,
+                bottom = LocalPageMetrics.current.headerBottom,
+            )
     ) {
         thumbnail?.invoke()
 

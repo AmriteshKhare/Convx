@@ -110,6 +110,8 @@ fun MeshGradientBackground(
     modifier: Modifier = Modifier,
     trackKey: Any? = null,
     driftMillis: Int = 8_000,
+    /** Palette crossfade length; the player passes the ambient (DJ-synced) duration. */
+    transitionMillis: Int = 1_400,
 ) {
     // The app's existing low-power switch stands in for BitChord's `reduceAnimation`:
     // someone who has asked for no dynamic blur is asking for exactly this drift to
@@ -125,8 +127,8 @@ fun MeshGradientBackground(
     // Keep the animation States intact and read them from the Canvas below. Reading
     // `.value` here used to recompose this whole composable every frame of the 1.4 s
     // palette crossfade; a draw-phase read invalidates only the RenderNode instead.
-    val colorSpec: AnimationSpec<Color> = remember(reduceMotion) {
-        if (reduceMotion) snap() else tween(1400)
+    val colorSpec: AnimationSpec<Color> = remember(reduceMotion, transitionMillis) {
+        if (reduceMotion) snap() else tween(transitionMillis, easing = SeamlessEasing)
     }
     val animatedColors = tuned.mapIndexed { index, color ->
         animateColorAsState(color, colorSpec, label = "meshColor$index")
@@ -210,6 +212,7 @@ fun MeshGradientBackground(
 @Composable
 fun rememberArtworkMeshPalette(imageUrl: String?, canvasFrame: Bitmap? = null): MeshPalette {
     val context = LocalContext.current
+    val currentCanvasFrame by androidx.compose.runtime.rememberUpdatedState(canvasFrame)
     val cached = remember(imageUrl) { imageUrl?.let(meshPaletteCache::get) }
     var palette by remember(imageUrl) { 
         mutableStateOf(MeshPalette(cached ?: FallbackColors)) 
@@ -230,7 +233,9 @@ fun rememberArtworkMeshPalette(imageUrl: String?, canvasFrame: Bitmap? = null): 
         val bitmap = (result as? SuccessResult)?.image?.toBitmap() ?: return@LaunchedEffect
         val extracted = withContext(Dispatchers.Default) { paletteOf(bitmap) }
         meshPaletteCache.put(imageUrl, extracted)
-        palette = MeshPalette(extracted)
+        // A video palette that landed first wins: the still's slower decode must not
+        // overwrite the colours of the clip actually on screen.
+        if (currentCanvasFrame == null) palette = MeshPalette(extracted)
     }
 
     LaunchedEffect(canvasFrame) {

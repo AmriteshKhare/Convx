@@ -837,6 +837,9 @@ val AccountEmailKey = stringPreferencesKey("accountEmail")
 val AccountChannelHandleKey = stringPreferencesKey("accountChannelHandle")
 val UseLoginForBrowse = booleanPreferencesKey("useLoginForBrowse")
 
+/** Shows the player's karaoke (Sing) control. Off by default: the vocal separation it runs is heavy. */
+val KaraokeModeKey = booleanPreferencesKey("karaokeMode")
+
 /** JSON array of SavedAccount (see SavedAccount.kt) — every channel seen at login, for instant tap-to-switch. */
 val SavedAccountsKey = stringPreferencesKey("savedAccounts")
 

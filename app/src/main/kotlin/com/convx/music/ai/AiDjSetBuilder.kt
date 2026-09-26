@@ -7,6 +7,7 @@ package com.convx.music.ai
 
 import android.content.Context
 import androidx.media3.common.MediaItem
+import com.music.innertube.SearchFilter
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
 import com.music.innertube.models.WatchEndpoint
@@ -149,7 +150,7 @@ object AiDjSetBuilder {
                 val artist = seedSong?.artists?.firstOrNull()?.name
                 if (!artist.isNullOrBlank()) {
                     onLog("No related songs for the seed — searching more by $artist instead.")
-                    YouTube.search(artist, YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    YouTube.search(artist, SearchFilter.FILTER_SONG).getOrNull()
                         ?.items?.filterIsInstance<SongItem>()
                         ?.forEach { if (it.id != seedSongId) related[it.id] = it }
                 }
@@ -173,7 +174,7 @@ object AiDjSetBuilder {
             // search for the concert's own theme gives the AI real
             // same-artist/same-vibe material as a hint, though the AI is told
             // below to lean on its own knowledge of the artist over this list.
-            YouTube.search(conceptLabel, YouTube.SearchFilter.FILTER_SONG).getOrNull()
+            YouTube.search(conceptLabel, SearchFilter.FILTER_SONG).getOrNull()
                 ?.items?.filterIsInstance<SongItem>()
                 ?.forEach { if (it.id != seedSongId) related.putIfAbsent(it.id, it) }
         }
@@ -295,7 +296,7 @@ object AiDjSetBuilder {
                         val fromRelated = related.values.firstOrNull { it.title.equals(chosen.title, ignoreCase = true) }
                         val item = fromRelated ?: run {
                             val query = if (chosen.artist.isBlank()) chosen.title else "${chosen.title} ${chosen.artist}"
-                            YouTube.search(query, YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                            YouTube.search(query, SearchFilter.FILTER_SONG).getOrNull()
                                 ?.items?.filterIsInstance<SongItem>()?.firstOrNull()
                         }
                         val count = done.incrementAndGet()

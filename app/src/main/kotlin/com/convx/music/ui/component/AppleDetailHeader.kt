@@ -245,13 +245,16 @@ fun DetailActionRow(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                // Figma Button: icon-label gap 4 (225:2439).
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                AnimatedPlayPauseIcon(isPlaying = isPlaying, tint = tint, size = 22.dp)
+                AnimatedPlayPauseIcon(isPlaying = isPlaying, tint = tint, size = 17.dp)
                 Text(
                     text = stringResource(if (isPlaying) R.string.pause else R.string.play),
                     fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
+                    // Figma Button label: SemiBold 17, -0.43 tracking (225:2439).
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.43).sp,
                     color = tint,
                     maxLines = 1,
                 )

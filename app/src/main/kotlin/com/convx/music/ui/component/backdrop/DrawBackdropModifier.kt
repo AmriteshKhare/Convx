@@ -35,6 +35,8 @@ import androidx.compose.ui.node.GlobalPositionAwareModifierNode
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.ObserverModifierNode
+import androidx.compose.ui.node.invalidateDraw
+import kotlinx.coroutines.launch
 import androidx.compose.ui.node.observeReads
 import androidx.compose.ui.node.requireGraphicsContext
 import androidx.compose.ui.platform.InspectorInfo
@@ -369,10 +371,18 @@ private class DrawBackdropNode(
         pool.clear()
     }
 
+    // Vendored change: Auto, not Offscreen. The glass capture inside re-renders every
+    // frame the content behind it moves, so a forced offscreen layer re-rasterized the
+    // surface's own text/icons into a separate render pass each frame, then composited
+    // it again (measured ~1.7ms/frame for the tab + mini-player pills on Home scroll).
+    // Shapes are plain rrects now (see ContinuousRoundedRectangle), so the outline clip
+    // is analytic without a layer, and the capture fills the surface opaquely, so the
+    // Plus-blended chrome content lands on the same pixels either way. Auto still goes
+    // offscreen when alpha < 1.
     private val layoutLayerBlock: GraphicsLayerScope.() -> Unit = {
         clip = true
         shape = shapeProvider.shape
-        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Auto
     }
 
     private var layoutCoordinates: LayoutCoordinates? by mutableStateOf(null, neverEqualPolicy())
@@ -389,6 +399,21 @@ private class DrawBackdropNode(
     private var recordedBackdropVersion: Int? = null
     private var recordedBackdropOffset: Offset? = null
     private var recordedBackdropSize: IntSize = IntSize.Zero
+
+    // `frozen` is a plain lambda read in draw, so its flip back to false invalidates
+    // nothing: after a scroll or bar transition ends on a still screen, the glass kept
+    // showing what was behind it mid-motion (the mini pill's "wrong" glass).
+    private var thawJob: kotlinx.coroutines.Job? = null
+
+    private fun scheduleThawRedraw() {
+        if (thawJob?.isActive == true) return
+        thawJob = coroutineScope.launch {
+            // Polled, not per-frame: withFrameNanos would keep requesting frames (forced
+            // 120Hz redraws) for as long as a long freeze holds.
+            while (frozen()) kotlinx.coroutines.delay(ThawPollMs)
+            invalidateDraw()
+        }
+    }
 
     private fun currentBackdropVersion(): Int? = (backdrop as? LayerBackdrop)?.contentVersion
 
@@ -529,6 +554,9 @@ private class DrawBackdropNode(
             val versionChangeIsElsewhere = versionChanged && !geometryChanged &&
                 offset != null && isFullyStatic(Rect(offset, recordSize.toSize()))
             val needsRecord = if (frozen() && hasRecording) {
+                // Skipped a real change: redraw once the freeze lifts, or the stale capture
+                // stays up until something unrelated invalidates this node.
+                if (geometryChanged || versionChanged) scheduleThawRedraw()
                 false
             } else {
                 (geometryChanged || versionChanged) && !versionChangeIsElsewhere
@@ -660,3 +688,6 @@ private class DrawBackdropNode(
         recordedBackdropSize = IntSize.Zero
     }
 }
+
+/** How often a frozen glass surface checks whether its freeze has lifted. */
+private const val ThawPollMs = 48L

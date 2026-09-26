@@ -226,7 +226,7 @@ fun AppearanceSettings(
     val (useNewPlayerDesign, _) = rememberPreference(UseNewPlayerDesignKey, defaultValue = false)
     val (miniPlayerWaveform, onMiniPlayerWaveformChange) = rememberPreference(
         MiniPlayerWaveformKey,
-        defaultValue = true
+        defaultValue = false
     )
     val (selectedFontValue) = rememberPreference(
         SelectedFontKey,

@@ -6,6 +6,7 @@
 package com.convx.music.ai
 
 import android.content.Context
+import com.music.innertube.SearchFilter
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
 import com.convx.music.db.InternalDatabase
@@ -104,7 +105,7 @@ object AiPlaylistModifier {
                 if (title.isNotEmpty()) {
                     onLog("Searching [${i + 1}/$totalToAdd]: $title - $artist")
                     val searchQuery = "$title $artist"
-                    val result = YouTube.search(searchQuery, YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    val result = YouTube.search(searchQuery, SearchFilter.FILTER_SONG).getOrNull()
                     val topResult = result?.items?.firstOrNull() as? SongItem
                     if (topResult != null) {
                         resolvedSongs.add(topResult)

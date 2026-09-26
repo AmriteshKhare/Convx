@@ -14,19 +14,16 @@ import androidx.compose.ui.unit.Dp
  *
  * One composition driven by one [progress] source, composing (in z order):
  * the interpolated container ([PlayerContainerMorphOverlay]) with the mini
- * recording fading out early and the full recording resolving late as a
- * blurred ghost to crisp, then the artwork ([PlayerArtworkMorphOverlay]) --
- * travelling rect for squared cards, shrink+fade in place for hero / bleed /
- * vinyl / clover.
- *
- * Mini and full UI becoming states of one tree (rather than two recorded
- * roots) lands here next, behind [PlayerMorph.enabled]; the overlay contract
- * -- progress in, draw-phase reads only -- stays identical.
+ * recording fading out early and the full recording fading in late, then the
+ * artwork ([PlayerArtworkMorphOverlay]) -- a travelling window for every V2 look
+ * and the classic card, shrink+fade in place for classic vinyl / clover. The
+ * overlay contract is progress in, draw-phase reads only.
  */
 @Composable
 fun BoxScope.PlayerMorphHost(
     progress: () -> Float,
     thumbnailUrl: String?,
+    mediaId: String?,
     containerColor: Color,
     expandedCornerRadius: Dp,
 ) {
@@ -39,6 +36,7 @@ fun BoxScope.PlayerMorphHost(
     )
     PlayerArtworkMorphOverlay(
         thumbnailUrl = thumbnailUrl,
+        mediaId = mediaId,
         progress = progress,
     )
 }

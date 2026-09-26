@@ -547,6 +547,19 @@ class VocalTracker(private val context: Context) {
             tw
         }
 
+        // Allocated once and reused: ratios() runs once per ~6s analysis window on the
+        // single karaoke thread (as the shared work arrays below already assume). Fresh
+        // per call, the two direct buffers were 25MB of native memory each window that
+        // the GC never felt pressure to free -- lmkd killed the app in the foreground.
+        private val backingIn: ByteBuffer by lazy {
+            ByteBuffer.allocateDirect(4 * DIM_F * DIM_T * Float.SIZE_BYTES).order(ByteOrder.nativeOrder())
+        }
+        private val backingOut: ByteBuffer by lazy {
+            ByteBuffer.allocateDirect(4 * DIM_F * DIM_T * Float.SIZE_BYTES).order(ByteOrder.nativeOrder())
+        }
+        private val mixRe by lazy { Array(2) { Array(DIM_T) { FloatArray(DIM_F) } } }
+        private val mixIm by lazy { Array(2) { Array(DIM_T) { FloatArray(DIM_F) } } }
+
         private val workRe = FloatArray(N_FFT)
         private val workIm = FloatArray(N_FFT)
         private val decRe = FloatArray(M)
@@ -575,25 +588,22 @@ class VocalTracker(private val context: Context) {
             left.copyInto(padL, TRIM, 0, samples)
             right.copyInto(padR, TRIM, 0, samples)
 
-            val shape = 4 * DIM_F * DIM_T
-            val backingIn = ByteBuffer
-                .allocateDirect(shape * Float.SIZE_BYTES)
-                .order(ByteOrder.nativeOrder())
-            val backingOut = ByteBuffer
-                .allocateDirect(shape * Float.SIZE_BYTES)
-                .order(ByteOrder.nativeOrder())
-            val mixRe = Array(2) { Array(DIM_T) { FloatArray(DIM_F) } }
-            val mixIm = Array(2) { Array(DIM_T) { FloatArray(DIM_F) } }
-
             var k = 0
             while (k * GEN < TRIM + samples) {
                 val start = k * GEN
                 stftChunk(padL, padR, start, len, mixRe, mixIm)
                 pack(backingIn.asFloatBuffer(), mixRe, mixIm)
                 try {
-                    // Fresh views per run (see the API-28 note on the ORT path):
-                    // absolute gets below don't touch positions anyway.
+                    // LiteRT copies the result into backingOut with a relative put,
+                    // leaving its position at the end; a view taken from there has
+                    // zero elements and every get() threw (IndexOutOfBounds, limit=0),
+                    // so no Sing mask was ever produced. Rewind through
+                    // java.nio.Buffer -- the base-class method exists on every API
+                    // level, unlike the Java 9 covariant overrides (see the ORT path).
+                    (backingIn as java.nio.Buffer).rewind()
+                    (backingOut as java.nio.Buffer).clear()
                     run(backingIn, backingOut)
+                    (backingOut as java.nio.Buffer).rewind()
                     reduce(backingOut.asFloatBuffer(), mixRe, mixIm, k, frames, out)
                 } catch (e: Exception) {
                     Log.w(TAG, "MDX LiteRT inference failed", e)

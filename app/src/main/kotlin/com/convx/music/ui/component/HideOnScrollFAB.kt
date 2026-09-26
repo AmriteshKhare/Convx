@@ -72,12 +72,13 @@ fun BoxScope.HideOnScrollFAB(
                 GlassCircleButton(
                     onClick = onRecognitionClick,
                     hazeState = hazeState,
-                    // Never fall through to liquidGlass's default ambient-backdrop
-                    // path here: this FAB sits inside the same content the app
-                    // backdrop captures, and sampling it is a RenderNode
-                    // self-reference cycle (HWUI recurses in prepareTree until it
-                    // stack-overflows). Haze if we have a real source, flat otherwise.
-                    forceFlat = hazeState == null,
+                    // Sacrifice: always flat. These float over scrolling content and
+                    // were among Home's eight pooled glass surfaces; AnimatedVisibility
+                    // already removes them when hidden, and flat kills the residual
+                    // haze/liquidGlass cost while visible. Never fall through to
+                    // liquidGlass's ambient path either — sampling the app backdrop
+                    // from inside its own capture is a RenderNode self-reference cycle.
+                    forceFlat = true,
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.mic),
@@ -91,7 +92,7 @@ fun BoxScope.HideOnScrollFAB(
                 onClick = onClick,
                 size = 56.dp,
                 hazeState = hazeState,
-                forceFlat = hazeState == null,
+                forceFlat = true,
             ) {
                 Icon(
                     painter = painterResource(icon),
@@ -131,12 +132,8 @@ fun BoxScope.HideOnScrollFAB(
                 GlassCircleButton(
                     onClick = onRecognitionClick,
                     hazeState = hazeState,
-                    // Never fall through to liquidGlass's default ambient-backdrop
-                    // path here: this FAB sits inside the same content the app
-                    // backdrop captures, and sampling it is a RenderNode
-                    // self-reference cycle (HWUI recurses in prepareTree until it
-                    // stack-overflows). Haze if we have a real source, flat otherwise.
-                    forceFlat = hazeState == null,
+                    // Sacrifice: always flat — see LazyList overload comment.
+                    forceFlat = true,
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.mic),
@@ -150,7 +147,7 @@ fun BoxScope.HideOnScrollFAB(
                 onClick = onClick,
                 size = 56.dp,
                 hazeState = hazeState,
-                forceFlat = hazeState == null,
+                forceFlat = true,
             ) {
                 Icon(
                     painter = painterResource(icon),
@@ -190,12 +187,8 @@ fun BoxScope.HideOnScrollFAB(
                 GlassCircleButton(
                     onClick = onRecognitionClick,
                     hazeState = hazeState,
-                    // Never fall through to liquidGlass's default ambient-backdrop
-                    // path here: this FAB sits inside the same content the app
-                    // backdrop captures, and sampling it is a RenderNode
-                    // self-reference cycle (HWUI recurses in prepareTree until it
-                    // stack-overflows). Haze if we have a real source, flat otherwise.
-                    forceFlat = hazeState == null,
+                    // Sacrifice: always flat — see LazyList overload comment.
+                    forceFlat = true,
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.mic),
@@ -209,7 +202,7 @@ fun BoxScope.HideOnScrollFAB(
                 onClick = onClick,
                 size = 56.dp,
                 hazeState = hazeState,
-                forceFlat = hazeState == null,
+                forceFlat = true,
             ) {
                 Icon(
                     painter = painterResource(icon),

@@ -25,9 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.IconButton
-import androidx.compose.material3.MaterialShapes
 import com.convx.music.ui.ios.compat.AppTheme
-import androidx.compose.material3.toShape
 import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -227,9 +225,12 @@ fun AppleMiniPlayer(
         Box(
             modifier = Modifier
                 .then(if (isTabletLandscape) Modifier.width(500.dp).align(Alignment.Center) else Modifier.fillMaxWidth())
-                .height(64.dp)
+                // Figma Now Playing mini row: 48 tall, full pill (348:2524).
+                // The outer 64 slot stays (layout reserves MiniPlayerHeight).
+                .height(48.dp)
+                .align(Alignment.Center)
                 .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
-                .clip(RoundedCornerShape(8.dp)) // Apple rectangular shape with slightly rounded corners
+                .clip(RoundedCornerShape(24.dp))
                 .background(color = backgroundColor)
         ) {
             // Background Layers
@@ -255,14 +256,15 @@ fun AppleMiniPlayer(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 8.dp),
+                // Figma mini row contents pads: V8/H16 (348:2524).
+                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                // Cookie 4-Sided Thumbnail
+                // Figma mini row art: 32, radius 8 (348:2524).
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(42.dp)
-                        .clip(MaterialShapes.Cookie4Sided.toShape())
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
                         .background(color = outlineColor.copy(alpha = 0.2f))
                 ) {
                     mediaMetadata?.let { metadata ->
@@ -275,7 +277,8 @@ fun AppleMiniPlayer(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                // Figma mini-player art-to-text gap: 8 (348:2524).
+                Spacer(modifier = Modifier.width(8.dp))
 
                 // Song info - title and artist
                 Column(
@@ -288,8 +291,11 @@ fun AppleMiniPlayer(
                         Text(
                             text = metadata.title,
                             color = onSurfaceColor,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
+                            // Figma mini-player title: Semibold 15, -0.23, lh 20 (348:2524).
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = (-0.23).sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.basicMarquee(iterations = 1, initialDelayMillis = 3000, velocity = 30.dp),
@@ -303,7 +309,10 @@ fun AppleMiniPlayer(
                                 Text(
                                     text = metadata.artists.joinToString { it.name },
                                     color = onSurfaceColor.copy(alpha = 0.7f),
-                                    fontSize = 12.sp,
+                                    // Figma mini-player artist: Regular 11, +0.06, lh 13 (348:2524).
+                                    fontSize = 11.sp,
+                                    lineHeight = 13.sp,
+                                    letterSpacing = 0.06.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.basicMarquee(iterations = 1, initialDelayMillis = 3000, velocity = 30.dp),
@@ -340,7 +349,7 @@ fun AppleMiniPlayer(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .clickable {
                             if (isListenTogetherGuest) {
@@ -372,17 +381,19 @@ fun AppleMiniPlayer(
                         },
                         contentDescription = null,
                         tint = onSurfaceColor,
-                        modifier = Modifier.size(28.dp)
+                        // Figma mini-player glyphs: 17pt (348:2524).
+                        modifier = Modifier.size(17.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                // Figma mini-player controls gap: 4 (348:2524).
+                Spacer(modifier = Modifier.width(4.dp))
 
                 // Next Button
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .clickable(enabled = canSkipNext && !isListenTogetherGuest) {
                             playerConnection.seekToNext()
@@ -392,7 +403,7 @@ fun AppleMiniPlayer(
                         imageVector = SfSymbols.Monochrome.SFForwardFill,
                         contentDescription = "Next",
                         tint = if (canSkipNext && !isListenTogetherGuest) onSurfaceColor else onSurfaceColor.copy(alpha = 0.3f),
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 }
             }

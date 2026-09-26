@@ -100,6 +100,8 @@ import com.convx.music.constants.AutoLoadMoreKey
 import com.convx.music.constants.AutoSkipNextOnErrorKey
 import com.convx.music.constants.AutoDjMixingEnabledKey
 import com.convx.music.constants.CreativeTransitionsEnabledKey
+import com.convx.music.constants.CrossfadeDurationKey
+import com.convx.music.constants.CrossfadeEnabledKey
 import com.convx.music.constants.DisableLoadMoreWhenRepeatAllKey
 import android.os.Handler
 import android.os.Looper
@@ -208,6 +210,7 @@ import com.convx.music.utils.dataStore
 import com.convx.music.utils.get
 import com.convx.music.utils.reportException
 import com.convx.music.widget.vivimusicWidgetManager
+import com.convx.music.widget.LyricsWidgetReceiver
 import com.convx.music.widget.MusicWidgetReceiver
 import com.convx.music.widget.NowPlayingWidgetReceiver
 import dagger.hilt.android.AndroidEntryPoint
@@ -249,6 +252,7 @@ import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.seconds
 
 private const val INSTANT_SILENCE_SKIP_STEP_MS = 15_000L
+private const val DEFAULT_CROSSFADE_SECONDS = 5f
 private const val INSTANT_SILENCE_SKIP_SETTLE_MS = 350L
 
 // Minimum gap between two DB writes for the same media item from the ~3s
@@ -683,6 +687,13 @@ class MusicService :
                 cachedPersistentQueue = prefs[PersistentQueueKey] ?: true
             }
         }
+        // Karaoke mode off (the default) means Sing can never be running: the
+        // vocal separation it does is ~70% of a core for as long as it analyses.
+        scope.launch {
+            dataStore.data.map { it[com.convx.music.constants.KaraokeModeKey] == true }
+                .distinctUntilChanged()
+                .collect { on -> if (!on && karaoke.state.value.enabled) karaoke.setEnabled(false) }
+        }
         sleepTimer = SleepTimer(scope, player)
         player.addListener(sleepTimer)
 
@@ -1090,8 +1101,11 @@ class MusicService :
                 }
             }
 
+        // DJ mixing rides on crossfade being on (see SongTransitionsScreen). Deriving that here,
+        // instead of switching the stored preference off, keeps the user's AutoMix choice for
+        // when they turn transitions back on.
         dataStore.data
-            .map { it[AutoDjMixingEnabledKey] ?: false }
+            .map { (it[AutoDjMixingEnabledKey] ?: false) && (it[CrossfadeEnabledKey] ?: false) }
             .distinctUntilChanged()
             .collect(scope) {
                 djEngine.enabled = it
@@ -1101,9 +1115,34 @@ class MusicService :
             }
 
         dataStore.data
-            .map { it[CreativeTransitionsEnabledKey] ?: false }
+            .map {
+                (it[CreativeTransitionsEnabledKey] ?: false) &&
+                    (it[AutoDjMixingEnabledKey] ?: false) &&
+                    (it[CrossfadeEnabledKey] ?: false)
+            }
             .distinctUntilChanged()
             .collect(scope) { djEngine.creativeEnabled = it }
+
+        // The Crossfade switch, its length and Auto-DJ Mixing live in DataStore, but
+        // CrossfadeController reads AppSettings. Nothing copied the first into the second, so
+        // the controller only ever saw its defaults: Automix on (smartFadeEnabled starts true)
+        // and a manual fade of 0s. The switch could not turn crossfade off, and the length
+        // slider did nothing. Off means no transition of either kind; on with Auto-DJ off is the
+        // plain fade of the chosen length; Auto-DJ needs crossfade on (see PlayerSettings).
+        dataStore.data
+            .map { prefs ->
+                val crossfadeOn = prefs[CrossfadeEnabledKey] ?: false
+                Triple(
+                    crossfadeOn,
+                    prefs[CrossfadeDurationKey] ?: DEFAULT_CROSSFADE_SECONDS,
+                    crossfadeOn && (prefs[AutoDjMixingEnabledKey] ?: false),
+                )
+            }
+            .distinctUntilChanged()
+            .collect(scope) { (crossfadeOn, seconds, smart) ->
+                AppSettings.crossfadeSeconds.floatValue = if (crossfadeOn) seconds else 0f
+                AppSettings.smartFadeEnabled.value = smart
+            }
 
         if (dataStore.get(PersistentQueueKey, true)) {
             val queueFile = filesDir.resolve(PERSISTENT_QUEUE_FILE)
@@ -2060,9 +2099,24 @@ class MusicService :
         player.prepare()
     }
 
+    /**
+     * The DB row of the track actually playing, inserted if it is not there yet.
+     *
+     * [currentSong] is a Lazily started stateIn seeded with null: with no other collector its
+     * first() returned that seed and a like/library tap silently did nothing (V2's dead like
+     * button), and just after a skip it could still hold the previous track.
+     */
+    private suspend fun liveCurrentSong(): Song? {
+        val metadata = player.currentMetadata ?: return null
+        database.song(metadata.id).first()?.let { return it }
+        // Awaited (query() is fire-and-forget), so the re-read below sees the row.
+        database.withTransaction { insert(metadata) }
+        return database.song(metadata.id).first()
+    }
+
     fun toggleLibrary() {
         scope.launch {
-            val songToToggle = currentSong.first()
+            val songToToggle = liveCurrentSong()
             songToToggle?.let {
                 val isInLibrary = it.song.inLibrary != null
                 val token = if (isInLibrary) it.song.libraryRemoveToken else it.song.libraryAddToken
@@ -2083,7 +2137,7 @@ class MusicService :
 
     fun toggleLike() {
         scope.launch {
-            val songToToggle = currentSong.first()
+            val songToToggle = liveCurrentSong()
             songToToggle?.let {
                 val song = it.song.toggleLike()
                 database.query {
@@ -2433,11 +2487,10 @@ class MusicService :
         // Widget and Discord RPC updates
         if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED)) {
             updateWidgetUI(player.isPlaying)
+            restartWidgetProgressTicker()
             if (player.isPlaying) {
-                startWidgetUpdates()
                 acquireWifiLock()
             } else {
-                stopWidgetUpdates()
                 releaseWifiLock()
             }
             if (!player.isPlaying && !events.containsAny(Player.EVENT_POSITION_DISCONTINUITY, Player.EVENT_MEDIA_ITEM_TRANSITION)) {
@@ -4017,6 +4070,8 @@ class MusicService :
             }
             MusicWidgetReceiver.ACTION_UPDATE_WIDGET -> {
                 updateWidgetUI(player.isPlaying)
+                // A widget was just placed or resized; pick up the new widget set.
+                restartWidgetProgressTicker()
             }
         }
 
@@ -4027,28 +4082,35 @@ class MusicService :
      * Updates all app widgets with current playback state
      */
     /**
-     * Repaints widget progress once a second, and only when that is actually worth
+     * Repaints widget progress while playing, and only when that is actually worth
      * doing. Gated three ways deliberately: stop when paused (position isn't
      * moving), stop when the screen is off (nobody can see it), and stop when no
-     * Now Playing widget is placed (nothing to repaint). Without those gates this
-     * is a permanent once-a-second wakeup for no visible benefit.
+     * progress-showing widget is placed (nothing to repaint). It replaced an
+     * ungated 200ms loop that ran with the screen off and with no widget placed
+     * at all -- four getAppWidgetIds binder calls every tick, for nothing.
+     * Only a lyrics widget keeps the fast rate: its line highlight needs it.
      */
     private var widgetProgressJob: Job? = null
 
     private fun restartWidgetProgressTicker() {
         widgetProgressJob?.cancel()
+        widgetProgressJob = null
         if (!player.isPlaying) return
 
         val appWidgetManager = AppWidgetManager.getInstance(this)
-        val hasProgressWidget = appWidgetManager
-            .getAppWidgetIds(ComponentName(this, NowPlayingWidgetReceiver::class.java))
-            .isNotEmpty()
+        fun placed(receiver: Class<*>) =
+            appWidgetManager.getAppWidgetIds(ComponentName(this, receiver)).isNotEmpty()
+        val hasLyricsWidget = placed(LyricsWidgetReceiver::class.java)
+        val hasProgressWidget = hasLyricsWidget ||
+            placed(NowPlayingWidgetReceiver::class.java) ||
+            placed(MusicWidgetReceiver::class.java)
         if (!hasProgressWidget) return
+        val interval = if (hasLyricsWidget) WIDGET_LYRICS_INTERVAL_MS else WIDGET_PROGRESS_INTERVAL_MS
 
         widgetProgressJob = scope.launch {
             val powerManager = getSystemService(PowerManager::class.java)
             while (isActive) {
-                delay(WIDGET_PROGRESS_INTERVAL_MS)
+                delay(interval)
                 if (powerManager?.isInteractive != false) {
                     updateWidgetUI(player.isPlaying)
                 }
@@ -4079,25 +4141,6 @@ class MusicService :
                 // Widget not added to home screen or other error
             }
         }
-    }
-
-    private var widgetUpdateJob: Job? = null
-
-    private fun startWidgetUpdates() {
-        widgetUpdateJob?.cancel()
-        widgetUpdateJob = scope.launch {
-            while (isActive) {
-                if (player.isPlaying) {
-                    updateWidgetUI(true)
-                }
-                delay(200)
-            }
-        }
-    }
-
-    private fun stopWidgetUpdates() {
-        widgetUpdateJob?.cancel()
-        widgetUpdateJob = null
     }
 
     private fun shareSong() {
@@ -4274,6 +4317,7 @@ class MusicService :
     companion object {
         /** Widget progress repaint cadence while playing with the screen on. */
         private const val WIDGET_PROGRESS_INTERVAL_MS = 1000L
+        private const val WIDGET_LYRICS_INTERVAL_MS = 200L
         const val ROOT = "root"
         const val SONG = "song"
         const val ARTIST = "artist"

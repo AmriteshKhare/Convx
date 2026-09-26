@@ -64,7 +64,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.convx.music.R
 import com.convx.music.ui.screens.OptionStats
-import com.convx.music.ui.theme.AppleTokens
+import com.convx.music.ui.theme.LocalPageMetrics
 
 @Composable
 fun <T> ChipsRow(
@@ -111,13 +111,14 @@ fun <T> ChipsRow(
             .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
             .padding(vertical = 8.dp),
     ) {
-        Spacer(Modifier.width(AppleTokens.Gutter))
+        Spacer(Modifier.width(LocalPageMetrics.current.gutter))
 
         chips.forEachIndexed { index, (value, label) ->
             val isSelected = currentValue == value
 
             val cornerRadius by animateDpAsState(
-                targetValue = if (isSelected) 20.dp else 8.dp,
+                // Figma Queue Chip On state is a full pill (458:10096).
+                targetValue = if (isSelected) 100.dp else 8.dp,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
                     stiffness = Spring.StiffnessMedium

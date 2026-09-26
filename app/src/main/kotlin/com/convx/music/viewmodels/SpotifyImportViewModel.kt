@@ -18,6 +18,7 @@ import com.convx.music.db.entities.Song
 import com.convx.music.db.entities.SongEntity
 import com.convx.music.models.MediaMetadata
 import com.convx.music.models.toMediaMetadata
+import com.music.innertube.SearchFilter
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
 import com.convx.music.utils.dataStore
@@ -423,7 +424,7 @@ class SpotifyImportViewModel @Inject constructor(
 
                                     val searchResult = YouTube.search(
                                         query = query,
-                                        filter = YouTube.SearchFilter.FILTER_SONG,
+                                        filter = SearchFilter.FILTER_SONG,
                                     ).getOrNull()
 
                                     val candidates = searchResult?.items

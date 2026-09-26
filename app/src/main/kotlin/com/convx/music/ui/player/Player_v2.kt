@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.addPointerInputChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -171,15 +173,37 @@ fun PlayerV2(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val playerConnection = LocalPlayerConnection.current ?: return
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    // The play/pause glyph's own state. A crossfade player swap (PlayerConnection
+    // .updateAttachedPlayer) or an audio-focus blip republishes playWhenReady false then
+    // true a frame or two apart, and the glyph animated pause->play twice. Pauses settle for
+    // a beat first -- a revert inside it cancels the swap; plays stay instant.
+    var glyphPlaying by remember { mutableStateOf(isPlaying) }
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) delay(GLYPH_PAUSE_SETTLE_MS)
+        glyphPlaying = isPlaying
+    }
+    // One canvas decoder for the whole V2 player, shared by the cover and the lyrics/queue
+    // header (see PlayerV2Canvas.kt). Paused whenever the sheet is collapsed.
+    val v2CrossfadeMs by playerConnection.crossfadeDurationMs.collectAsStateWithLifecycle()
+    // Track-change ladder (TrackChoreography): cover -> words -> details -> ambience.
+    val trackChoreography = rememberTrackChoreography(mediaMetadata)
+    val artworkMetadata = trackChoreography.artwork.value
+    val textMetadata = trackChoreography.text.value
+    val detailMetadata = trackChoreography.detail.value
+    val canvasVideo = rememberCanvasVideoController(
+        mediaMetadata = trackChoreography.ambient.value,
+        isPlaying = isPlaying && !state.isCollapsed,
+        trackFadeMillis = ambientTransitionMillis(v2CrossfadeMs),
+    )
     // For the hero artwork's live swipe peek below: the neighbour thumbnail slides in from
     // whichever side the finger is dragging toward, tracking the drag itself rather than
     // only appearing once the gesture commits.
-    val queueWindows by playerConnection.queueWindows.collectAsState()
+    val queueWindows by playerConnection.queueWindows.collectAsStateWithLifecycle()
     // Play-order index, not timeline order: queueWindows is built in play order
     // (PlayerExt.getQueueWindows), so ±1 here stays faithful on shuffle.
-    val currentQueueIndex by playerConnection.currentWindowIndex.collectAsState()
+    val currentQueueIndex by playerConnection.currentWindowIndex.collectAsStateWithLifecycle()
     val nextMediaMetadata = queueWindows.getOrNull(currentQueueIndex + 1)?.mediaItem?.metadata
     val previousMediaMetadata = queueWindows.getOrNull(currentQueueIndex - 1)?.mediaItem?.metadata
     // Prerender fuel for the melt: neighbour covers decoded before the skip lands,
@@ -190,8 +214,15 @@ fun PlayerV2(
             previousMediaMetadata?.thumbnailUrl?.resize(1200, 1200),
         )
     }
-    val currentSong by playerConnection.currentSong.collectAsState(initial = null)
-    val currentLyrics by playerConnection.currentLyrics.collectAsState(initial = null)
+    val currentSong by playerConnection.currentSong.collectAsStateWithLifecycle(initialValue = null)
+    // Like glyph state. The DB row lands a beat after the track, so reading it raw showed the
+    // OLD song's state (or "not liked") and then flipped after the transition. Hold the last
+    // resolved (songId, liked) until the row for the track on screen arrives.
+    val resolvedLike = currentSong?.song?.takeIf { it.id == detailMetadata?.id }?.let { it.id to it.liked }
+    var lastResolvedLike by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    val shownLike = resolvedLike ?: lastResolvedLike
+    SideEffect { if (resolvedLike != null) lastResolvedLike = resolvedLike }
+    val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
     val menuState = LocalMenuState.current
     val bottomSheetPageState = LocalBottomSheetPageState.current
     var playerState by remember { mutableStateOf(PlayerInternalState.COVER) }
@@ -203,6 +234,41 @@ fun PlayerV2(
     // Hoisted out of rememberSwipeCardModifier so the live value is readable here too, for
     // the neighbour-thumbnail peek.
     val heroDragOffset = remember { Animatable(0f) }
+    // Swipe-to-skip commit: the neighbour card that was flown to centre, frozen so the peek
+    // does not re-point at the NEXT-next track once the skip lands. While set, the cover
+    // adopts the new art without a melt, then the offset snaps home under an identical frame.
+    var committedPeek by remember { mutableStateOf<com.convx.music.models.MediaMetadata?>(null) }
+    // The track on screen when the swipe committed ("" if none), null = no commit in flight.
+    // Homing keys off THIS changing, not off the peek: the peek comes from queueWindows and
+    // can be missing (repeat-all wrapping past the end: the player allows the skip, the play-
+    // order list has no neighbour) or name a different track than the one that lands
+    // (shuffle, queue edits). Keyed on the peek, the first left the cover parked off-screen
+    // for good and the second held it at the side for the whole timeout.
+    var committedFromId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(committedFromId, artworkMetadata?.id) {
+        val fromId = committedFromId ?: return@LaunchedEffect
+        if ((artworkMetadata?.id ?: "") == fromId) {
+            // Skip never landed (end of queue, error): fly the card home instead of hanging.
+            // Counted from the commit, and the skip itself only fires once the land spring
+            // settles (~0.8s) + metadata + the artwork stage -- 1.5s lost that race on slower
+            // frames, flew the card home with the OLD cover and then melted it into the next
+            // song on screen (the "current thumbnail changes to the next song" swipe bug).
+            kotlinx.coroutines.delay(3_000)
+            if (committedFromId == fromId) {
+                committedPeek = null
+                committedFromId = null
+                heroDragOffset.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 300f))
+            }
+            return@LaunchedEffect
+        }
+        // The cover has adopted the new art (no melt): give it two frames to draw it, then
+        // move the whole card stack home -- identical pixels under the swap.
+        androidx.compose.runtime.withFrameNanos { }
+        androidx.compose.runtime.withFrameNanos { }
+        heroDragOffset.snapTo(0f)
+        committedPeek = null
+        committedFromId = null
+    }
 
     // The floating mini bar's lyrics/queue icons live outside this composable
     // (FloatingSideBar/FloatingNavBar), so they signal here through
@@ -210,6 +276,13 @@ fun PlayerV2(
     // requestShowLyrics/requestShowQueue contract the classic player observes.
     // V17 never collected these at all, so tapping those icons while V17 was
     // active expanded the player sheet but never switched panes -- a dead tap.
+    // Each open from the mini (the sheet leaving collapsed, while the page is still faded
+    // out) resets the lyrics to the top, so the pane glides down to the current line as the
+    // player arrives instead of already sitting there; the queue replays its rubber landing.
+    var lyricsIntroKey by remember { mutableIntStateOf(0) }
+    LaunchedEffect(state.isCollapsed) {
+        if (!state.isCollapsed) lyricsIntroKey++
+    }
     LaunchedEffect(Unit) {
         playerConnection.requestShowLyrics.collect { requested ->
             if (requested) {
@@ -238,11 +311,11 @@ fun PlayerV2(
     }
 
     val listenTogetherManager = com.convx.music.LocalListenTogetherManager.current
-    val listenTogetherRoleState = listenTogetherManager?.role?.collectAsState(initial = com.convx.music.listentogether.RoomRole.NONE)
+    val listenTogetherRoleState = listenTogetherManager?.role?.collectAsStateWithLifecycle(initialValue = com.convx.music.listentogether.RoomRole.NONE)
     val isListenTogetherGuest = listenTogetherRoleState?.value == com.convx.music.listentogether.RoomRole.GUEST
-    val isMuted by playerConnection.isMuted.collectAsState()
-    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
-    val canSkipNext by playerConnection.canSkipNext.collectAsState()
+    val isMuted by playerConnection.isMuted.collectAsStateWithLifecycle()
+    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
+    val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
     
     androidx.activity.compose.BackHandler(enabled = playerState != PlayerInternalState.COVER) {
         playerState = PlayerInternalState.COVER
@@ -297,7 +370,9 @@ fun PlayerV2(
     
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
-    var sliderPosition by remember { mutableStateOf<Long?>(null) }
+    // Keyed on the track: a drag in flight when the song changes (DJ crossfade handoff,
+    // automix advance) must not seek the NEW song to the old song's position on release.
+    var sliderPosition by remember(mediaMetadata?.id) { mutableStateOf<Long?>(null) }
 
     val audioManager = remember { context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager }
     val maxSystemVolume = remember { audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() }
@@ -356,11 +431,13 @@ fun PlayerV2(
     
     val playerLook by rememberEnumPreference(key = PlayerLookKey, defaultValue = PlayerLook.SQUARED)
     val isHeroLook = playerLook == PlayerLook.HERO
-    val showPlayerThumbnailShadow by rememberPreference(ShowPlayerThumbnailShadowKey, defaultValue = false)
+    // Figma Now Playing artwork always carries its drop shadow (479:13952).
+    val showPlayerThumbnailShadow by rememberPreference(ShowPlayerThumbnailShadowKey, defaultValue = true)
     val playerThumbnailShadowElevation by rememberPreference(PlayerThumbnailShadowElevationKey, defaultValue = 8f)
     val enableGoogleCast by rememberPreference(EnableGoogleCastKey, defaultValue = true)
     val (showUpNext) = rememberPreference(ShowUpNextKey, defaultValue = false)
     val (hideVolumeBar) = rememberPreference(HideVolumeBarKey, defaultValue = false)
+    val (karaokeMode) = rememberPreference(com.convx.music.constants.KaraokeModeKey, defaultValue = false)
     val diyLayout = rememberDiyLayout()
     // Was hardcoded to PORTRAIT below, so rotating into landscape kept using the
     // portrait sticker placement -- same real-orientation read the classic player
@@ -577,10 +654,13 @@ fun PlayerV2(
                     AnimatedContent(
                         targetState = playerState,
                         transitionSpec = {
-                            val enter = fadeIn(animationSpec = spring(dampingRatio = 0.82f, stiffness = 550f)) +
-                                scaleIn(initialScale = 0.96f, animationSpec = spring(dampingRatio = 0.78f, stiffness = 550f))
-                            val exit = fadeOut(animationSpec = spring(dampingRatio = 1.0f, stiffness = 650f)) +
-                                scaleOut(targetScale = 0.96f, animationSpec = spring(dampingRatio = 1.0f, stiffness = 650f))
+                            // Critically damped and slower than before: springs end asymptotically,
+                            // so the pane swap has no visible start or stop (user ask), and the
+                            // fade and scale share one curve so they never read as two motions.
+                            val enter = fadeIn(animationSpec = spring(dampingRatio = 1f, stiffness = 240f)) +
+                                scaleIn(initialScale = 0.95f, animationSpec = spring(dampingRatio = 1f, stiffness = 240f))
+                            val exit = fadeOut(animationSpec = spring(dampingRatio = 1f, stiffness = 320f)) +
+                                scaleOut(targetScale = 0.97f, animationSpec = spring(dampingRatio = 1f, stiffness = 320f))
                             enter.togetherWith(exit).using(
                                 // Ensure the Lyrics pane is drawn OVER the Cover pane during transition
                                 androidx.compose.animation.SizeTransform(clip = false)
@@ -628,6 +708,10 @@ fun PlayerV2(
                                 // ~20dp higher than classic with an earlier blend start), knee
                                 // 0.78, so both heroes read as the same image.
                                 val heroScreenHeight = LocalConfiguration.current.screenHeightDp.dp
+                                // Built once: heroFadeOutBrush() allocates a 26-stop gradient, and
+                                // drawWithContent re-runs every draw pass -- unremembered, this
+                                // rebuilt it every frame the hero redraws (swipe-peek drag, fades).
+                                val heroFadeBrush = remember { com.convx.music.ui.component.heroFadeOutBrush() }
                                 Box(
                                     modifier = if (isHeroLook) {
                                         Modifier
@@ -637,7 +721,7 @@ fun PlayerV2(
                                             .drawWithContent {
                                                 drawContent()
                                                 drawRect(
-                                                    brush = com.convx.music.ui.component.heroFadeOutBrush(),
+                                                    brush = heroFadeBrush,
                                                     blendMode = BlendMode.DstIn
                                                 )
                                             }
@@ -661,19 +745,25 @@ fun PlayerV2(
                                     // Live swipe peek: the neighbour song's own card, revealed from
                                     // whichever side the finger is dragging toward, tracking the drag
                                     // itself rather than only appearing once the gesture commits.
-                                    val peekMetadata = if (heroDragOffset.value > 0f) previousMediaMetadata else nextMediaMetadata
-                                    if (peekMetadata != null && heroDragOffset.value != 0f) {
-                                        val peekDirection = if (heroDragOffset.value > 0f) 1f else -1f
+                                    // Only the drag's SIGN is read in composition (flips at most
+                                    // twice a gesture); the offset itself is read in .offset{} below.
+                                    // Reading .value here recomposed this whole branch per swipe frame.
+                                    val peekSign by remember {
+                                        androidx.compose.runtime.derivedStateOf { kotlin.math.sign(heroDragOffset.value) }
+                                    }
+                                    // Mid-commit only the frozen peek (maybe none): the live
+                                    // neighbour re-points at the next-next track once the skip lands.
+                                    val peekMetadata = if (committedFromId != null) committedPeek
+                                        else if (peekSign > 0f) previousMediaMetadata else nextMediaMetadata
+                                    if (peekMetadata != null && peekSign != 0f) {
+                                        val peekDirection = peekSign
                                         val screenWidthPx = LocalConfiguration.current.screenWidthDp *
                                             androidx.compose.ui.platform.LocalDensity.current.density
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .offset {
-                                                    IntOffset(
-                                                        (heroDragOffset.value - screenWidthPx * peekDirection).roundToInt(),
-                                                        0,
-                                                    )
+                                                .graphicsLayer {
+                                                    carouselCard(heroDragOffset.value - screenWidthPx * peekDirection, screenWidthPx)
                                                 }
                                                 .customSoftShadow(
                                                     elevation = playerThumbnailShadowElevation.dp,
@@ -707,13 +797,19 @@ fun PlayerV2(
                                             // grow into and the morph silently does nothing
                                             // on this player -- the classic player registers
                                             // its own artwork the same way.
-                                            .registerFullArtworkRect(
-                                                with(androidx.compose.ui.platform.LocalDensity.current) { 12.dp.toPx() }
-                                            )
-                                            // Q5: squared travels (overlay owns the cover all
-                                            // flight); fancy looks resolve late in place.
-                                            .hideFullArtworkWhileMorphing(
-                                                travelEnabled = playerLook == PlayerLook.SQUARED,
+                                            // Every look travels (user: all V2 designs animate the
+                                            // same): Squared lands on its 12dp card with its shadow
+                                            // and pause-shrink, Hero on its full-bleed frame with
+                                            // its foot fade growing in as it arrives.
+                                            .fullArtworkMorphTarget(
+                                                cornerRadiusPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+                                                    (if (isHeroLook) 0.dp else 12.dp).toPx()
+                                                },
+                                                heroMask = isHeroLook,
+                                                shadowPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+                                                    if (!isHeroLook && showPlayerThumbnailShadow) playerThumbnailShadowElevation.dp.toPx() else 0f
+                                                },
+                                                pauseShrinks = !isHeroLook,
                                             )
                                             // Deliberately no background/clip/shadow here any more, and no
                                             // scale either -- this Box is only the morph's stable measurement
@@ -724,9 +820,13 @@ fun PlayerV2(
                                             // off/on during a skip, with nothing here clipping it partway.
                                             .then(
                                                 rememberSwipeCardModifier(
-                                                    enabled = (playerState == PlayerInternalState.COVER && !isListenTogetherGuest),
+                                                    enabled = (playerState == PlayerInternalState.COVER && !isListenTogetherGuest && committedFromId == null),
                                                     playerConnection = playerConnection,
                                                     offsetXAnimatable = heroDragOffset,
+                                                    onCommit = { forward ->
+                                                        committedFromId = artworkMetadata?.id ?: ""
+                                                        committedPeek = if (forward) nextMediaMetadata else previousMediaMetadata
+                                                    },
                                                 )
                                             )
                                             .then(
@@ -758,7 +858,7 @@ fun PlayerV2(
                                     // during a real DJ crossfade (PlayerConnection.crossfadeDurationMs)
                                     // and a quick default dissolve otherwise, in one persistent
                                     // composable instead of tearing down/rebuilding per track id.
-                                    val heroCrossfadeMs by playerConnection.crossfadeDurationMs.collectAsState()
+                                    val heroCrossfadeMs by playerConnection.crossfadeDurationMs.collectAsStateWithLifecycle()
                                     // Q6 writer: pause-shrink tracked with zero composition
                                     // cost -- snapshotFlow subscribes outside composition,
                                     // overlay subscribes in composition. Frozen in flight.
@@ -788,14 +888,34 @@ fun PlayerV2(
                                                 if (isHeroLook || playerConnection.player.playWhenReady) 1f else 0.729f
                                         }
                                     }
+                                    // Pause-shrink vs the cover<->mini-header morph: the shared
+                                    // element interpolates LAYOUT bounds only, so a paused cover
+                                    // (0.729) handed to the 64dp header end (1.0) snapped to full
+                                    // scale on the first frame and then shrank -- the artwork
+                                    // "adjusting twice" when opening queue/lyrics while paused.
+                                    // Ride the pause scale from rest to 1 on the same curve the
+                                    // shared bounds use, so painted size = bounds x scale is one
+                                    // continuous move in both directions. Same spring as the
+                                    // default boundsTransform (MediumLow / NoBouncy).
+                                    val coverMorphFrac = this@AnimatedContent.transition.animateFloat(
+                                        transitionSpec = {
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMediumLow,
+                                            )
+                                        },
+                                        label = "coverMorphFrac",
+                                    ) { if (it == EnterExitState.Visible) 0f else 1f }
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .graphicsLayer {
                                                 // Q6: artwork rides the snapshot holder, live at
                                                 // rest (draw-phase read), frozen mid-flight.
-                                                scaleX = artworkRestScaleState.floatValue
-                                                scaleY = artworkRestScaleState.floatValue
+                                                val rest = artworkRestScaleState.floatValue
+                                                val s = rest + (1f - rest) * coverMorphFrac.value
+                                                scaleX = s
+                                                scaleY = s
                                             }
                                             .customSoftShadow(
                                                 elevation = playerThumbnailShadowElevation.dp,
@@ -806,13 +926,14 @@ fun PlayerV2(
                                             .clip(RoundedCornerShape(if (isHeroLook) 0.dp else 12.dp))
                                     ) {
                                         ThumbnailImage(
-                                            artworkUri = mediaMetadata?.thumbnailUrl?.resize(1200, 1200),
+                                            artworkUri = artworkMetadata?.thumbnailUrl?.resize(1200, 1200),
                                             cropArtwork = true,
                                             crossfadeMillis = heroCrossfadeMs.takeIf { it > 0 }?.toInt() ?: 200,
                                             // Same-song URL rung change (fallback ladder) must not
                                             // melt the image into itself.
-                                            contentKey = mediaMetadata?.id,
+                                            contentKey = artworkMetadata?.id,
                                             preloadUrls = heroPreloadUrls,
+                                            morphOnChange = committedFromId == null,
                                             modifier = Modifier.fillMaxSize(),
                                         )
                                         // Same baked progressive foot as artist/classic player
@@ -826,11 +947,9 @@ fun PlayerV2(
                                                 modifier = Modifier.fillMaxSize(),
                                             )
                                         }
-                                        PlayerV2Canvas(
-                                            mediaMetadata = mediaMetadata,
-                                            // Collapsed sheet stays composed: pause the canvas decoder.
-                                            isPlaying = isPlaying && !state.isCollapsed,
-                                            modifier = Modifier.fillMaxSize()
+                                        CanvasVideoSurface(
+                                            controller = canvasVideo,
+                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     }
                                     }
@@ -846,7 +965,7 @@ fun PlayerV2(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         FadeSwapText(
-                                            mediaMetadata?.title ?: "Unknown",
+                                            textMetadata?.title ?: "Unknown",
                                             style = AppTheme.typography.headlineSmall, 
                                             color = adaptivePrimary,
                                             fontWeight = FontWeight.Bold,
@@ -860,7 +979,7 @@ fun PlayerV2(
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
                                         FadeSwapText(
-                                            mediaMetadata?.artists?.firstOrNull()?.name ?: "Unknown",
+                                            textMetadata?.artists?.firstOrNull()?.name ?: "Unknown",
                                             style = AppTheme.typography.titleMedium,
                                             // Same extra dimming UpNextSong applies to its own
                                             // artist line (subtitleColor.copy(alpha = 0.7f)),
@@ -894,8 +1013,6 @@ fun PlayerV2(
                                             .additiveChrome(additiveChrome)
                                             .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                     ) {
-                                        val isLiked = currentSong?.song?.liked == true
-        
                                         // Flamingo's favourite/more glyphs draw their own
                                         // 0.1-alpha disc; the Box that used to sit here drew a
                                         // second one behind it.
@@ -903,16 +1020,18 @@ fun PlayerV2(
                                             onClick = playerConnection::toggleLike,
                                             modifier = Modifier.size(40.dp),
                                         ) {
-                                            PlayerGlyph(
-                                                slot = if (isLiked) PlayerIconSlot.V2_LIKED else PlayerIconSlot.V2_LIKE,
-                                                fallback = if (isLiked) R.drawable.flamingo_favorited else R.drawable.flamingo_favorite,
-                                                // Like sits in the primary row already at full-strength
-                                                // adaptivePrimary either way -- filled vs outline glyph is
-                                                // what signals liked, not a colour swap.
-                                                tint = adaptivePrimary,
-                                                modifier = Modifier.size(28.dp).likePop(isLiked, currentSong?.song?.id),
-                                                contentDescription = "Like",
-                                            )
+                                            LikeGlyphSwap(shownLike) { isLiked, songId ->
+                                                PlayerGlyph(
+                                                    slot = if (isLiked) PlayerIconSlot.V2_LIKED else PlayerIconSlot.V2_LIKE,
+                                                    fallback = if (isLiked) R.drawable.flamingo_favorited else R.drawable.flamingo_favorite,
+                                                    // Like sits in the primary row already at full-strength
+                                                    // adaptivePrimary either way -- filled vs outline glyph is
+                                                    // what signals liked, not a colour swap.
+                                                    tint = adaptivePrimary,
+                                                    modifier = Modifier.size(28.dp).likePop(isLiked, songId),
+                                                    contentDescription = "Like",
+                                                )
+                                            }
                                         }
                                         
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -976,6 +1095,19 @@ fun PlayerV2(
                                         ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    // Mirror of the cover end's pause-scale ride (see the COVER
+                                    // branch): whichever side the shared-element overlay draws,
+                                    // painted size = bounds x scale stays continuous when the
+                                    // pane is entered/left while paused.
+                                    val headerMorphFrac = this@AnimatedContent.transition.animateFloat(
+                                        transitionSpec = {
+                                            spring(
+                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                stiffness = Spring.StiffnessMediumLow,
+                                            )
+                                        },
+                                        label = "headerMorphFrac",
+                                    ) { if (it == EnterExitState.Visible) 1f else 0f }
                                     Box(
                                         modifier = Modifier
                                             .sharedElement(
@@ -983,6 +1115,21 @@ fun PlayerV2(
                                                 animatedVisibilityScope = this@AnimatedContent
                                             )
                                             .size(64.dp)
+                                            // Reopening into Lyrics/Queue flies the cover HERE. Only
+                                            // the big cover registered before, so the flight went to
+                                            // where the cover used to be and vanished on landing.
+                                            .fullArtworkMorphTarget(
+                                                cornerRadiusPx = with(androidx.compose.ui.platform.LocalDensity.current) { 8.dp.toPx() },
+                                                shadowPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+                                                    if (showPlayerThumbnailShadow) (playerThumbnailShadowElevation / 2f).dp.toPx() else 0f
+                                                },
+                                            )
+                                            .graphicsLayer {
+                                                val rest = artworkRestScaleState.floatValue
+                                                val s = rest + (1f - rest) * headerMorphFrac.value
+                                                scaleX = s
+                                                scaleY = s
+                                            }
                                             .customSoftShadow(
                                                 elevation = playerThumbnailShadowElevation.dp / 2f,
                                                 cornerRadius = 8.dp,
@@ -1005,23 +1152,21 @@ fun PlayerV2(
                                         // morph reads as one image travelling while the pixels
                                         // themselves dissolve.
                                         ThumbnailImage(
-                                            artworkUri = mediaMetadata?.thumbnailUrl?.resize(1200, 1200),
+                                            artworkUri = artworkMetadata?.thumbnailUrl?.resize(1200, 1200),
                                             cropArtwork = true,
                                             crossfadeMillis = 450,
-                                            contentKey = mediaMetadata?.id,
+                                            contentKey = artworkMetadata?.id,
                                             modifier = Modifier.fillMaxSize(),
                                         )
-                                        PlayerV2Canvas(
-                                            mediaMetadata = mediaMetadata,
-                                            // Collapsed sheet stays composed: pause the canvas decoder.
-                                            isPlaying = isPlaying && !state.isCollapsed,
-                                            modifier = Modifier.fillMaxSize()
+                                        CanvasVideoSurface(
+                                            controller = canvasVideo,
+                                            modifier = Modifier.fillMaxSize(),
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(16.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            mediaMetadata?.title ?: "Unknown",
+                                            textMetadata?.title ?: "Unknown",
                                             style = AppTheme.typography.titleMedium, 
                                             color = adaptivePrimary,
                                             fontWeight = FontWeight.Bold,
@@ -1033,7 +1178,7 @@ fun PlayerV2(
                                             )
                                         )
                                         Text(
-                                            mediaMetadata?.artists?.firstOrNull()?.name ?: "Unknown",
+                                            textMetadata?.artists?.firstOrNull()?.name ?: "Unknown",
                                             style = AppTheme.typography.titleSmall,
                                             // Same extra dimming as the portrait artist line above.
                                             color = adaptiveSecondary.copy(alpha = 0.7f),
@@ -1057,17 +1202,17 @@ fun PlayerV2(
                                             .additiveChrome(additiveChrome)
                                             .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
                                     ) {
-                                        val isLiked = currentSong?.song?.liked == true
-
                                         IconButton(
                                             onClick = playerConnection::toggleLike
                                         ) {
-                                            Icon(
-                                                painter = painterResource(if (isLiked) R.drawable.flamingo_favorited else R.drawable.flamingo_favorite),
-                                                contentDescription = "Like",
-                                                tint = adaptivePrimary,
-                                                modifier = Modifier.size(24.dp).likePop(isLiked, currentSong?.song?.id)
-                                            )
+                                            LikeGlyphSwap(shownLike) { isLiked, songId ->
+                                                Icon(
+                                                    painter = painterResource(if (isLiked) R.drawable.flamingo_favorited else R.drawable.flamingo_favorite),
+                                                    contentDescription = "Like",
+                                                    tint = adaptivePrimary,
+                                                    modifier = Modifier.size(24.dp).likePop(isLiked, songId)
+                                                )
+                                            }
                                         }
                                         
                                         IconButton(
@@ -1137,15 +1282,18 @@ fun PlayerV2(
                                         Lyrics(
                                             sliderPositionProvider = { sliderPosition ?: position },
                                             showLyrics = true,
+                                            introKey = lyricsIntroKey,
                                             modifier = Modifier.fillMaxSize()
                                         )
-                                        SingControl(
-                                            engine = playerConnection.service.karaoke,
-                                            tint = adaptivePrimary,
-                                            modifier = Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(end = 20.dp, bottom = 12.dp),
-                                        )
+                                        if (karaokeMode) {
+                                            SingControl(
+                                                engine = playerConnection.service.karaoke,
+                                                tint = adaptivePrimary,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomEnd)
+                                                    .padding(end = 20.dp, bottom = 12.dp),
+                                            )
+                                        }
                                     } else {
                                         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                                         val queueSheetState = rememberBottomSheetState(
@@ -1155,6 +1303,11 @@ fun PlayerV2(
                                             // frame, then a clip = expand-then-shrink into top).
                                             expandedBound = maxHeight,
                                             initialAnchor = expandedAnchor,
+                                            // No reveal spring: this pane has no room to bounce
+                                            // into, so animating its mount was the actual source
+                                            // of the reported "expand then shrink" glitch. It
+                                            // opens already at its resting size instead.
+                                            animateOnMount = false,
                                         )
                                         // Queue's own inner sheet drags independently of playerState,
                                         // the outer enum that actually decides whether this whole
@@ -1177,12 +1330,6 @@ fun PlayerV2(
                                         // the sheet on mount, and only let a dismissal mean "leave
                                         // the queue" once it has genuinely been open.
                                         var queueOpened by remember { mutableStateOf(false) }
-                                        // Snap, not spring: it guarantees the end state even if
-                                        // a touch parks the mount animation mid-flight. The
-                                        // constructor already animates 0 -> expanded on mount.
-                                        LaunchedEffect(Unit) {
-                                            queueSheetState.snapTo(queueSheetState.expandedBound)
-                                        }
                                         LaunchedEffect(queueSheetState.isExpanded) {
                                             if (queueSheetState.isExpanded) queueOpened = true
                                         }
@@ -1216,10 +1363,11 @@ fun PlayerV2(
                                                 // the thumbnail/title/like — the shared header row
                                                 // would just repeat them.
                                                 showHeaderRow = false,
-                                                // Pane-tall bounds above fixed the stuck mid-gesture
-                                                // settle, so the sheet drags again; dismissal still
-                                                // means "leave the queue" via queueOpened below.
-                                                sheetDraggable = true,
+                                                // Not draggable: v2's queue is reached and left through
+                                                // the header thumbnail / queue toggle only, never a
+                                                // drag gesture nested inside the already-gestural
+                                                // player sheet.
+                                                sheetDraggable = false,
                                                 // V2 owns back here (pane switch above): the inner
                                                 // sheet collapsing first made that switch lag 1-2s
                                                 // behind. One target, one transition.
@@ -1227,6 +1375,8 @@ fun PlayerV2(
                                                 // V17's frame already insets the status bar; the
                                                 // sheet's own inset counted it twice (top gap).
                                                 applyTopSystemInset = false,
+                                                // Rows land on an elastic each time the player opens.
+                                                landKey = lyricsIntroKey,
                                                 modifier = Modifier.fillMaxSize(),
                                             )
                                         }
@@ -1321,11 +1471,12 @@ fun PlayerV2(
                             .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(makeTimeString(currentPos), color = adaptiveTime, style = AppTheme.typography.labelSmall, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
+                        // Figma Notification Player time: SemiBold 10, +0.35 (458:9635).
+                        Text(makeTimeString(currentPos), color = adaptiveTime, style = AppTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.35.sp)
                         // Collapsed-gated too: this sheet stays composed behind the mini player,
                         // and the badge's infinite spin kept the whole app drawing every vsync.
                         AudioQualityBadge(playerConnection, adaptivePrimary, isPlaying && !state.isCollapsed)
-                        Text("-" + makeTimeString(maxOf(0L, duration - currentPos)), color = adaptiveTime, style = AppTheme.typography.labelSmall, fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
+                        Text("-" + makeTimeString(maxOf(0L, duration - currentPos)), color = adaptiveTime, style = AppTheme.typography.labelSmall, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.35.sp)
                     }
 
                     if (showUpNext) {
@@ -1351,7 +1502,7 @@ fun PlayerV2(
                     ) {
                         val previousInteraction = remember { MutableInteractionSource() }
                         IconButton(
-                            onClick = { if (!isListenTogetherGuest && canSkipPrevious) playerConnection.player.seekToPrevious() },
+                            onClick = { if (!isListenTogetherGuest && canSkipPrevious) playerConnection.requestSkip(forward = false) },
                             enabled = !isListenTogetherGuest && canSkipPrevious,
                             interactionSource = previousInteraction,
                             modifier = Modifier
@@ -1394,7 +1545,7 @@ fun PlayerV2(
                             } else {
                                 AnimatedPlayerGlyph(
                                     modifier = Modifier.playGlyphPress(playInteraction),
-                                    isPlaying = isPlaying,
+                                    isPlaying = glyphPlaying,
                                     playSlot = PlayerIconSlot.V2_PLAY,
                                     pauseSlot = PlayerIconSlot.V2_PAUSE,
                                     playFallback = R.drawable.flamingo_play,
@@ -1412,7 +1563,7 @@ fun PlayerV2(
 
                         val nextInteraction = remember { MutableInteractionSource() }
                         IconButton(
-                            onClick = { if (!isListenTogetherGuest && canSkipNext) playerConnection.player.seekToNext() },
+                            onClick = { if (!isListenTogetherGuest && canSkipNext) playerConnection.requestSkip(forward = true) },
                             enabled = !isListenTogetherGuest && canSkipNext,
                             interactionSource = nextInteraction,
                             modifier = Modifier
@@ -1455,11 +1606,12 @@ fun PlayerV2(
                         // the device volume; the mic capsule stays the fine
                         // control and both stay in sync through the same state.
                         val singEngine = playerConnection.service.karaoke
-                        val singState by singEngine.state.collectAsState()
+                        val singState by singEngine.state.collectAsStateWithLifecycle()
+                        val singActive = karaokeMode && singState.enabled
                         ElasticVolumeSlider(
-                            value = if (singState.enabled) singState.level else animatedVolume,
+                            value = if (singActive) singState.level else animatedVolume,
                             onValueChange = { newValue ->
-                                if (singState.enabled) {
+                                if (singActive) {
                                     singEngine.setLevel(newValue)
                                 } else {
                                     systemVolume = newValue
@@ -1673,19 +1825,25 @@ private fun PlayerV2Frame(
 }
 
 /**
- * The classic mini player's swipe-to-skip card drag, ported onto V17's own cover
- * artwork: the whole artwork follows the finger and springs back (or commits a skip
- * past the sensitivity-scaled threshold, or on a fast flick) instead of the plain
- * gesture-only swipe detector this replaces having no visual feedback at all.
+ * Cover swipe-to-skip, carousel style.
+ *
+ * Both cards ride one shallow circular arc ([carouselCard]): dip, tilt and a hair of
+ * shrink by distance from centre, so the neighbour swings in on a wheel rather than a
+ * rail. The drag follows the finger through a stiff spring (a little life, no lag) and
+ * rubber-bands where there is no track to go to. Release uses the real fling velocity:
+ * a commit flies the incoming card all the way to centre and lands it with a small
+ * overshoot, THEN skips ([onCommit] freezes that card as the peek); a cancel springs home
+ * elastically. The old path sprang the offset back to 0 on commit, which dragged the
+ * half-arrived neighbour back out while the cover melted -- the stall at ~80%.
  */
 @Composable
 private fun rememberSwipeCardModifier(
     enabled: Boolean,
     playerConnection: PlayerConnection,
     // Hoisted so the caller can read the live drag position too, to slide the next/previous
-    // song's own thumbnail in as a preview while the finger is still moving -- not just after
-    // the gesture commits.
+    // song's own thumbnail in as a preview while the finger is still moving.
     offsetXAnimatable: Animatable<Float, AnimationVector1D>,
+    onCommit: (forward: Boolean) -> Unit,
 ): Modifier {
     val (swipeThumbnail) = rememberPreference(SwipeThumbnailKey, true)
     val (swipeSensitivity) = rememberPreference(SwipeSensitivityKey, 0.73f)
@@ -1693,71 +1851,66 @@ private fun rememberSwipeCardModifier(
     val density = androidx.compose.ui.platform.LocalDensity.current.density
     val configuration = LocalConfiguration.current
     val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
-
-    var dragStartTime by remember { mutableLongStateOf(0L) }
-    var totalDragDistance by remember { mutableFloatStateOf(0f) }
-    val animationSpec = remember {
-        spring<Float>(dampingRatio = 0.74f, stiffness = 650f)
-    }
+    val travelPx = configuration.screenWidthDp * density
     val autoSwipeThreshold = remember(swipeSensitivity, configuration.screenWidthDp, density) {
-        val screenWidthPx = configuration.screenWidthDp * density
-        (screenWidthPx * (0.45f - 0.33f * swipeSensitivity.coerceIn(0f, 1f))).roundToInt()
+        travelPx * (0.45f - 0.33f * swipeSensitivity.coerceIn(0f, 1f))
     }
+    val currentOnCommit by rememberUpdatedState(onCommit)
 
     return Modifier
-        .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
+        .graphicsLayer { carouselCard(offsetXAnimatable.value, travelPx) }
         .then(
             if (enabled && swipeThumbnail) {
                 Modifier.pointerInput(Unit) {
+                    val velocityTracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                    var rawX = 0f
                     detectHorizontalDragGestures(
                         onDragStart = {
-                            dragStartTime = System.currentTimeMillis()
-                            totalDragDistance = 0f
+                            velocityTracker.resetTracking()
+                            rawX = offsetXAnimatable.value
                         },
                         onDragCancel = {
-                            coroutineScope.launch { offsetXAnimatable.animateTo(0f, animationSpec) }
+                            coroutineScope.launch { offsetXAnimatable.animateTo(0f, SwipeHomeSpring) }
                         },
-                        onHorizontalDrag = { _, dragAmount ->
-                            val adjustedDragAmount =
-                                if (layoutDirection == LayoutDirection.Rtl) -dragAmount else dragAmount
+                        onHorizontalDrag = { change, dragAmount ->
+                            velocityTracker.addPointerInputChange(change)
+                            val delta = if (layoutDirection == LayoutDirection.Rtl) -dragAmount else dragAmount
+                            rawX += delta
                             val canSkipPrevious = playerConnection.player.previousMediaItemIndex != -1
                             val canSkipNext = playerConnection.player.nextMediaItemIndex != -1
-                            val tryingToSwipeRight = adjustedDragAmount > 0
-                            val tryingToSwipeLeft = adjustedDragAmount < 0
-                            val allowLeft = tryingToSwipeLeft && canSkipNext
-                            val allowRight = tryingToSwipeRight && canSkipPrevious
-                            val canReturnToCenter =
-                                (tryingToSwipeRight && !canSkipPrevious && offsetXAnimatable.value < 0) ||
-                                    (tryingToSwipeLeft && !canSkipNext && offsetXAnimatable.value > 0)
-                            if (allowLeft || allowRight || canReturnToCenter) {
-                                totalDragDistance += kotlin.math.abs(adjustedDragAmount)
-                                coroutineScope.launch {
-                                    offsetXAnimatable.snapTo(offsetXAnimatable.value + adjustedDragAmount)
-                                }
+                            // Nothing that way: follow at a third, like pulling on elastic.
+                            val blocked = (rawX > 0f && !canSkipPrevious) || (rawX < 0f && !canSkipNext)
+                            val shown = if (blocked) rawX * 0.3f else rubberBand(rawX, travelPx)
+                            coroutineScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                                offsetXAnimatable.animateTo(shown, SwipeFollowSpring)
                             }
                         },
                         onDragEnd = {
-                            val dragDuration = System.currentTimeMillis() - dragStartTime
-                            val velocity = if (dragDuration > 0) totalDragDistance / dragDuration else 0f
-                            val currentOffset = offsetXAnimatable.value
-                            val dragged = kotlin.math.abs(currentOffset)
+                            val velocityX = velocityTracker.calculateVelocity().x.let {
+                                if (layoutDirection == LayoutDirection.Rtl) -it else it
+                            }
+                            val current = offsetXAnimatable.value
                             val canSkipPrevious = playerConnection.player.previousMediaItemIndex != -1
                             val canSkipNext = playerConnection.player.nextMediaItemIndex != -1
-                            val shouldChangeSong = dragged > autoSwipeThreshold ||
-                                (velocity > 0.55f && dragged > autoSwipeThreshold * 0.25f)
-                            if (shouldChangeSong) {
-                                if (currentOffset > 0 && canSkipPrevious) {
-                                    playerConnection.seekToPrevious()
-                                } else if (currentOffset <= 0 && canSkipNext) {
-                                    playerConnection.seekToNext()
+                            val flung = kotlin.math.abs(velocityX) > SwipeFlingPxPerSec * density &&
+                                kotlin.math.sign(velocityX) == kotlin.math.sign(current)
+                            val far = kotlin.math.abs(current) > autoSwipeThreshold
+                            val forward = current < 0f
+                            val allowed = if (forward) canSkipNext else canSkipPrevious
+                            coroutineScope.launch {
+                                if ((far || flung) && allowed && current != 0f) {
+                                    currentOnCommit(forward)
+                                    // Incoming card to centre = this card one travel away.
+                                    offsetXAnimatable.animateTo(
+                                        targetValue = if (forward) -travelPx else travelPx,
+                                        animationSpec = SwipeLandSpring,
+                                        initialVelocity = velocityX,
+                                    )
+                                    playerConnection.jumpBy(if (forward) 1 else -1)
+                                } else {
+                                    offsetXAnimatable.animateTo(0f, SwipeHomeSpring, initialVelocity = velocityX)
                                 }
                             }
-                            // Either way, spring the same offset back to 0 -- committed or
-                            // cancelled, this is what carries the live peek the rest of the way
-                            // in (or back out). AnimatedContent below only fades the content
-                            // identity in underneath once mediaMetadata changes; it doesn't also
-                            // slide, so there's only ever one thing moving the card horizontally.
-                            coroutineScope.launch { offsetXAnimatable.animateTo(0f, animationSpec) }
                         },
                     )
                 }
@@ -1766,6 +1919,37 @@ private fun rememberSwipeCardModifier(
             }
         )
 }
+
+/** Past half a travel the card resists a little -- it feels held, not dragged on a rail. */
+private fun rubberBand(x: Float, travelPx: Float): Float {
+    val knee = travelPx * 0.5f
+    val ax = kotlin.math.abs(x)
+    return if (ax <= knee) x else kotlin.math.sign(x) * (knee + (ax - knee) * 0.55f)
+}
+
+/**
+ * One card on the carousel wheel at horizontal offset [xPx]: a shallow arc -- dips, tilts
+ * and shrinks a little with distance from centre. Visible, not theatrical.
+ */
+private fun androidx.compose.ui.graphics.GraphicsLayerScope.carouselCard(xPx: Float, travelPx: Float) {
+    val t = if (travelPx > 0f) (xPx / travelPx).coerceIn(-1.4f, 1.4f) else 0f
+    translationX = xPx
+    translationY = CarouselDip.toPx() * t * t
+    rotationZ = CarouselTiltDegrees * t
+    val scale = 1f - 0.06f * kotlin.math.abs(t)
+    scaleX = scale
+    scaleY = scale
+}
+
+private const val GLYPH_PAUSE_SETTLE_MS = 120L
+private val CarouselDip = 28.dp
+private const val CarouselTiltDegrees = 7f
+private const val SwipeFlingPxPerSec = 450f // dp/s, scaled by density at use
+private val SwipeFollowSpring = spring<Float>(dampingRatio = 0.85f, stiffness = 1800f)
+// Sub-pixel threshold instead of the 0.01px default: same curve, but the skip fires as soon
+// as the card is visibly home rather than ~0.4s later while it creeps the last pixel.
+private val SwipeLandSpring = spring<Float>(dampingRatio = 0.66f, stiffness = 240f, visibilityThreshold = 0.5f)
+private val SwipeHomeSpring = spring<Float>(dampingRatio = 0.6f, stiffness = 380f)
 
 /**
  * BitChord touch, ported: dragging the cover artwork upward opens the queue --
@@ -1842,7 +2026,8 @@ private fun Modifier.transportPressDisc(
     val pressed by interactionSource.collectIsPressedAsState()
     val disc by animateFloatAsState(
         targetValue = if (pressed) 1f else 0f,
-        animationSpec = if (pressed) tween(60) else tween(150, delayMillis = 60),
+        // Lands instantly under the finger (touch feedback can't lag), melts away on release.
+        animationSpec = if (pressed) tween(60) else spring(dampingRatio = 1f, stiffness = 260f),
         label = "transportDisc",
     )
     return drawBehind {
@@ -1868,7 +2053,8 @@ private fun Modifier.playGlyphPress(interactionSource: MutableInteractionSource)
         animationSpec = if (pressed) {
             tween(220, easing = FastOutSlowInEasing)
         } else {
-            spring(dampingRatio = 0.75f, stiffness = 500f)
+            // A touch more give on the rebound: playful, still settles inside ~350ms.
+            spring(dampingRatio = 0.6f, stiffness = 420f)
         },
         label = "playGlyphPress",
     )
@@ -1895,10 +2081,10 @@ private fun Modifier.skipGlyphPress(interactionSource: MutableInteractionSource,
     LaunchedEffect(pressed) {
         if (wasPressed && !pressed) {
             nudge.animateTo(0f, keyframes {
-                durationMillis = 260
+                durationMillis = 340
                 0f at 0
-                1f at 110 using FastOutSlowInEasing
-                0f at 260 using FastOutSlowInEasing
+                1f at 130 using SeamlessEasing
+                0f at 340 using SeamlessEasing
             })
         }
         wasPressed = pressed
@@ -1957,10 +2143,33 @@ private fun Modifier.likePop(isLiked: Boolean, songId: String?): Modifier {
     }
 }
 
+/**
+ * The like glyph across a track change: crossfades (eased, no visible edges) only when the
+ * SONG changes. Keyed on the song id, so tapping like on the same song recomposes in place
+ * and [likePop] plays exactly as before.
+ */
+@Composable
+private fun LikeGlyphSwap(
+    like: Pair<String, Boolean>?,
+    content: @Composable (isLiked: Boolean, songId: String?) -> Unit,
+) {
+    androidx.compose.animation.AnimatedContent(
+        targetState = like,
+        contentKey = { it?.first },
+        transitionSpec = {
+            fadeIn(tween(320, easing = SeamlessEasing)) togetherWith fadeOut(tween(200, easing = SeamlessEasing))
+        },
+        label = "likeGlyphSwap",
+    ) { state ->
+        content(state?.second == true, state?.first)
+    }
+}
+
 // Transport controls leaving / returning (queue scroll, lyrics idle), timed off
 // 60fps.design apple-music-player-controls-collapse (60fps): hide runs ~217ms, show ~383ms.
-private fun <T> ControlsHideSpec(): FiniteAnimationSpec<T> = tween(220, easing = FastOutSlowInEasing)
-private fun <T> ControlsShowSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 250f)
+// Slowed a little and eased at both ends so the tuck never reads as a snap.
+private fun <T> ControlsHideSpec(): FiniteAnimationSpec<T> = tween(300, easing = SeamlessEasing)
+private fun <T> ControlsShowSpec(): FiniteAnimationSpec<T> = spring(dampingRatio = 1f, stiffness = 200f)
 
 /**
  * Now Playing title/artist as Apple Music draws them (designRefrence/GVRecorder_1788117512105~3.mp4):
@@ -1979,7 +2188,9 @@ private fun FadeSwapText(
     androidx.compose.animation.AnimatedContent(
         targetState = text,
         transitionSpec = {
-            fadeIn(tween(220, delayMillis = 90)) togetherWith fadeOut(tween(90))
+            // Old line out, a short blank beat, new line in -- eased so neither edge shows.
+            fadeIn(tween(380, delayMillis = 120, easing = SeamlessEasing)) togetherWith
+                fadeOut(tween(180, easing = SeamlessEasing))
         },
         contentAlignment = Alignment.CenterStart,
         label = "fadeSwapText",
@@ -2015,7 +2226,7 @@ private fun SingControl(
     tint: androidx.compose.ui.graphics.Color,
     modifier: Modifier = Modifier,
 ) {
-    val state by engine.state.collectAsState()
+    val state by engine.state.collectAsStateWithLifecycle()
     var expanded by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     val expansion = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -2059,14 +2270,17 @@ private fun SingControl(
             }
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
+                    // Drag only tunes the level of an already-on Sing. It used to switch
+                    // Sing on too, so any lyrics scroll starting over this button enabled
+                    // vocal separation behind the user's back.
                     onDragStart = {
-                        if (!engine.state.value.enabled) engine.setEnabled(true)
-                        dragging = true; expanded = true
+                        dragging = true; expanded = engine.state.value.enabled
                     },
                     onDragEnd = { dragging = false },
                     onDragCancel = { dragging = false },
                 ) { change, dragAmount ->
                     change.consume()
+                    if (!engine.state.value.enabled) return@detectVerticalDragGestures
                     val travel = with(density) { expandedH.toPx() }
                     engine.setLevel(engine.state.value.level - dragAmount / travel)
                 }

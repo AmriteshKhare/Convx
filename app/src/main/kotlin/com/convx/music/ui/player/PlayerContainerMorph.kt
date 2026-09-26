@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
+import kotlin.math.roundToInt
 import com.convx.music.ui.component.PLAYER_CONTENT_APPEAR_END
 import com.convx.music.ui.component.PLAYER_CONTENT_APPEAR_START
 import com.convx.music.ui.component.PLAYER_LAYER_HANDOFF_PROGRESS
@@ -37,22 +38,25 @@ import com.convx.music.ui.component.PLAYER_MINI_FADE_END
  * floating nav bar, the sheet lives in the player, they are far apart in the tree, and
  * only the overlay -- drawn once, in between -- reads it.
  */
-private val miniContainerRect = mutableStateOf<Rect?>(null)
+private val miniContainerSlot = MorphSlot<Rect>()
 
-internal val miniPlayerContainerRect: Rect? get() = miniContainerRect.value
+internal val miniPlayerContainerRect: Rect? get() = miniContainerSlot.value
 
 /**
  * Call on the mini player's outermost pill box. Purely observational: it records the
- * pill's bounds and changes nothing about how the pill renders.
+ * pill's bounds and changes nothing about how the pill renders. Released when the pill
+ * leaves composition (keyboard up, rail layout, a screen with no bar), so the morph falls
+ * back to a plain slide instead of growing out of a pill that is not there.
  */
-fun Modifier.registerMiniContainerRect(): Modifier = onGloballyPositioned {
-    if (!it.isAttached) return@onGloballyPositioned
-    val bounds = it.boundsInRoot()
-    val previous = miniContainerRect.value
-    // A resized pill (layout branch change, rotation) invalidates its last recording --
-    // that frame was captured at the old size, not this one. See PlayerMorph.invalidateMiniFrame.
-    if (previous != null && previous.size != bounds.size) PlayerMorph.invalidateMiniFrame()
-    miniContainerRect.value = bounds
+@androidx.compose.runtime.Composable
+fun Modifier.miniContainerMorphSource(): Modifier {
+    val owner = androidx.compose.runtime.remember { Any() }
+    androidx.compose.runtime.DisposableEffect(owner) { onDispose { miniContainerSlot.release(owner) } }
+    // No recording invalidation on resize: a size change always redraws (and so re-records)
+    // the pill, while an invalidation with no redraw after it left the ready flag stuck false.
+    return onGloballyPositioned {
+        if (it.isAttached) miniContainerSlot.report(owner, it.boundsInRoot())
+    }
 }
 
 /**
@@ -140,16 +144,36 @@ fun PlayerContainerMorphOverlay(
             .fillMaxSize()
             .drawWithCache {
                 val clipPath = Path()
-                // This whole block re-runs whenever the overlay's own (screen) size
-                // changes -- rotation, window resize -- so it is the natural hook to
-                // invalidate the full player's recordings, the same way a mini pill
-                // resize invalidates its own (see registerMiniContainerRect).
-                PlayerMorph.invalidateFullFrames()
+                val shadowLayer = obtainGraphicsLayer()
+                // Both pill-side rects frozen for the flight, like the artwork's ends: the
+                // pill's own stretch and the bar's inline/expanded resize move the live rect
+                // mid-gesture, which walked the card's source edge away from the flying cover.
+                var flightMini: Rect? = null
+                var flightControls: Rect? = null
+                // No invalidateFullFrames() here any more: this cache builds on the overlay's
+                // first draw, which comes AFTER the sheet has recorded and marked ready in the
+                // same frame. A static background then never redrew, its flag stayed false and
+                // the morph never engaged (the sheet just slid and faded). A resize re-records
+                // on its own, since a size change always redraws the sheet.
                 onDrawBehind {
                     val fraction = progress().coerceIn(0f, 1f)
-                    if (fraction <= 0f || fraction >= 1f) return@onDrawBehind
-                    if (!PlayerMorph.sharedLayersReady) return@onDrawBehind
-                    val mini = miniContainerRect.value ?: return@onDrawBehind
+                    // Close landing: the sheet has stopped on its bound, the card has not.
+                    val landing = fraction <= 0f && PlayerMorph.landingActive
+                    if ((fraction <= 0f && !landing) || fraction >= 1f || !PlayerMorph.sharedLayersReady) {
+                        flightMini = null
+                        flightControls = null
+                        return@onDrawBehind
+                    }
+                    if (flightMini == null) {
+                        flightMini = miniContainerSlot.value
+                        flightControls = miniPlayerControlsRect
+                    }
+                    // Opening: the frozen source (the pill stretches under the finger). Closing:
+                    // the LIVE pill, so the card lands exactly on the size the pill has now -- a
+                    // frozen rect from flight start landed bigger, then snapped to size.
+                    val mini = (if (PlayerMorph.targetOpen) flightMini else miniContainerSlot.value ?: flightMini)
+                        ?: return@onDrawBehind
+                    val controlsNow = if (PlayerMorph.targetOpen) flightControls else miniPlayerControlsRect ?: flightControls
                     // onGloballyPositioned can fire once with a degenerate size before layout
                     // settles.
                     if (mini.width <= 0f || mini.height <= 0f) return@onDrawBehind
@@ -162,8 +186,8 @@ fun PlayerContainerMorphOverlay(
                     // overlay's own size. Nothing to register at that end, nothing to go
                     // stale.
                     val full = Rect(0f, 0f, size.width, size.height)
-                    val rect = sharedContainerRect(mini, full, fraction)
-                    val radius = sharedContainerCornerRadii(
+                    val rect = if (landing) landingCardRect(mini) else sharedContainerRect(mini, full, fraction)
+                    val radius = if (landing) rect.height / 2f else sharedContainerCornerRadii(
                         // The nav bar draws the pill as a 50%-rounded capsule, so its radius
                         // is half its height by definition. Derived rather than passed in, so
                         // restyling the pill cannot leave the two out of step.
@@ -172,6 +196,25 @@ fun PlayerContainerMorphOverlay(
                         progress = fraction,
                     ).topStart
 
+                    // The pill's drop shadow, cast by the card for as long as the card is still
+                    // the pill (same fade as its plate). Clipped away before, so the real pill's
+                    // shadow popped in on the landing frame.
+                    // Opening only: closing lands shadowless and the real pill's shadow then
+                    // fades in (PlayerMorph.pillShadow) -- a card shadow handing over to the
+                    // pill's own on the landing frame still read as a pop.
+                    val shadowAlpha = if (PlayerMorph.targetOpen) 1f - playerSheetBackgroundAlpha(fraction) else 0f
+                    if (shadowAlpha > 0f && PlayerMorph.miniShadowElevationPx > 0f) {
+                        shadowLayer.topLeft = androidx.compose.ui.unit.IntOffset(
+                            rect.left.roundToInt(),
+                            rect.top.roundToInt(),
+                        )
+                        shadowLayer.setRoundRectOutline(Offset.Zero, rect.size, radius)
+                        shadowLayer.shadowElevation = PlayerMorph.miniShadowElevationPx * shadowAlpha
+                        shadowLayer.record(
+                            androidx.compose.ui.unit.IntSize(rect.width.roundToInt(), rect.height.roundToInt()),
+                        ) { }
+                        drawLayer(shadowLayer)
+                    }
                     clipPath.reset()
                     clipPath.addRoundRect(RoundRect(rect, CornerRadius(radius, radius)))
                     clipPath(clipPath) {
@@ -180,14 +223,47 @@ fun PlayerContainerMorphOverlay(
                         // fifth, and the full recording is opaque from a tenth.
                         // A plate would sit behind translucent glass and read dead.
                         translate(left = rect.left, top = rect.top) {
+                            // The pill's own plate, carried by the card (the real pill hides
+                            // while the morph runs -- see FloatingMiniPlayer): the card starts
+                            // as the pill, not as bare content, and hands to the player
+                            // background over the first fifth (Melox playerSheetBarAlpha).
+                            // Exact complement of the background's rise (drawn over it), so
+                            // the card is never see-through mid-handoff: the pill's surface
+                            // becomes the player's background, one object throughout.
+                            val plateAlpha = 1f - playerSheetBackgroundAlpha(fraction)
+                            if (plateAlpha > 0f) {
+                                val surface = PlayerMorph.miniSurfaceLayer
+                                if (surface != null && surface.size.width > 0 && surface.size.height > 0) {
+                                    // The pill's real glass, stretched to the card: it distorts
+                                    // as it grows, the way Melox's mini surface does.
+                                    surface.alpha = plateAlpha
+                                    scale(
+                                        scaleX = rect.width / surface.size.width,
+                                        scaleY = rect.height / surface.size.height,
+                                        pivot = Offset.Zero,
+                                    ) { drawLayer(surface) }
+                                } else {
+                                    drawRect(color = color, size = rect.size, alpha = plateAlpha)
+                                }
+                            }
                             if (miniLayer.size.width > 0 && fraction < PLAYER_MINI_FADE_END) {
                                 miniLayer.alpha = playerSheetMiniContentAlpha(fraction)
                                 miniLayer.renderEffect = null
-                                drawTrackedMiniLayer(
-                                    miniLayer = miniLayer,
-                                    mini = mini,
-                                    container = rect,
-                                )
+                                if (landing) {
+                                    // The whole pill squashes as one body while it lands.
+                                    scale(
+                                        scaleX = rect.width / miniLayer.size.width,
+                                        scaleY = rect.height / miniLayer.size.height,
+                                        pivot = Offset.Zero,
+                                    ) { drawLayer(miniLayer) }
+                                } else {
+                                    drawTrackedMiniLayer(
+                                        miniLayer = miniLayer,
+                                        mini = mini,
+                                        container = rect,
+                                        controls = controlsNow,
+                                    )
+                                }
                             }
                             // Background leads (first fifth), content follows (tenth
                             // to six tenths): two recordings, staged like Melox.
@@ -213,6 +289,26 @@ fun PlayerContainerMorphOverlay(
     )
 }
 
+/** How much the landing pill flattens at the bottom of its dip, and widens with it. */
+private const val LANDING_SQUASH = 0.14f
+private const val LANDING_SPREAD = 0.04f
+
+/**
+ * The card during a close landing: the pill's own rect carried [PlayerMorph.landingDipPx]
+ * below its slot, flattened and slightly widened in proportion (liquid squash), springing
+ * back to exactly [mini] as the landing settles.
+ */
+private fun landingCardRect(mini: Rect): Rect {
+    val dip = PlayerMorph.landingDipPx()
+    val maxDip = PlayerMorph.landingMaxDipPx
+    val squash = if (maxDip > 0f) (dip / maxDip).coerceIn(-1f, 1f) else 0f
+    val height = mini.height * (1f - LANDING_SQUASH * squash)
+    val width = mini.width * (1f + LANDING_SPREAD * squash)
+    val bottom = mini.bottom + dip
+    val centerX = mini.center.x
+    return Rect(centerX - width / 2f, bottom - height, centerX + width / 2f, bottom)
+}
+
 /**
  * Mini recording drawn as two tracked halves (Melox clip split, pill-origin
  * layer, inside the caller's translate to the container origin).
@@ -226,8 +322,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTrackedMiniLaye
     miniLayer: androidx.compose.ui.graphics.layer.GraphicsLayer,
     mini: Rect,
     container: Rect,
+    controls: Rect?,
 ) {
-    val controls = miniPlayerControlsRect
     if (controls == null || controls.width <= 0f || controls.height <= 0f) {
         drawLayer(miniLayer)
         return

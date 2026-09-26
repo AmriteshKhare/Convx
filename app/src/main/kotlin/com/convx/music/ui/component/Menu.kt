@@ -6,6 +6,10 @@
 package com.convx.music.ui.component
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,12 +23,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.unit.dp
+import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
+import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.sp
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.ios.compat.ProvideTextStyle
 import com.convx.music.ui.ios.foundation.IosMetrics
@@ -32,6 +44,9 @@ import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.ui.ios.foundation.iosRowPress
 import com.convx.music.ui.ios.foundation.LocalIosContentColor
 import com.convx.music.ui.ios.foundation.LocalIosTextStyle
+
+/** Figma Menu glass corner radius (629:22894). Menu-only. */
+val MenuGroupCornerRadius = 32.dp
 
 /**
  * An iOS inset-grouped action list: one continuous-cornered card whose rows are split
@@ -49,18 +64,35 @@ fun IosMenuGroup(
     if (items.isEmpty()) return
     val colors = IosTheme.colors
 
+    // One-shot elastic entrance: the group rises 28dp on a bouncy spring,
+    // draw-phase only, no recomposition per frame.
+    val enterOffset = remember { Animatable(28f) }
+    val enterAlpha = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        launch { enterOffset.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) }
+        launch { enterAlpha.animateTo(1f, tween(180)) }
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(ContinuousRoundedRectangle(IosMetrics.GroupedCornerRadius))
-            .background(colors.secondarySystemGroupedBackground)
+            // Figma Menu glass: radius 32 + soft drop shadow (629:22894).
+            .shadow(20.dp, ContinuousRoundedRectangle(MenuGroupCornerRadius))
+            .clip(ContinuousRoundedRectangle(MenuGroupCornerRadius))
+            // Frosted, not glassed: flat translucent fill, no refraction.
+            .background(colors.secondarySystemGroupedBackground.copy(alpha = 0.72f))
+            .graphicsLayer {
+                translationY = enterOffset.value
+                alpha = enterAlpha.value
+            }
             .animateContentSize()
     ) {
         items.forEachIndexed { index, item ->
             if (index > 0) {
+                // Figma menu separators: uniform 8pt insets, icon or not (393:7946).
                 Box(
                     Modifier
-                        .padding(start = if (item.icon != null) 60.dp else 16.dp)
+                        .padding(horizontal = 8.dp)
                         .fillMaxWidth()
                         .height(IosMetrics.SeparatorThickness)
                         .background(colors.separator)
@@ -77,34 +109,47 @@ private fun IosMenuItemRow(item: IosMenuItemData) {
     // A destructive row colours its label as well as its icon — that, not a red fill,
     // is how iOS marks "Delete" apart from the rows above it.
     val contentColor = if (item.tint.isSpecified) item.tint else colors.label
+    // Finger-tracking press glow over the flat iOS fill.
+    val glowScope = rememberCoroutineScope()
+    val glow = remember(glowScope) { InteractiveHighlight(animationScope = glowScope) }
 
+    // Figma Context Menu item (393:7946): row pads L8/R6/T10/B10, 28 icon +
+    // 8 gap + label column (17/-0.43, 2px to the 13px subtitle), 6 to trailing.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .iosRowPress(onClick = item.onClick)
-            .defaultMinSize(minHeight = IosMetrics.ListRowHeight)
-            .padding(horizontal = 16.dp, vertical = 11.dp),
+            .then(glow.modifier)
+            .then(glow.gestureModifier)
+            .defaultMinSize(minHeight = 40.dp)
+            .padding(start = 8.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         item.icon?.let { icon ->
             Box(Modifier.width(28.dp), contentAlignment = Alignment.CenterStart) {
                 ProvideIosContent(contentColor, IosTheme.typography.body) { icon() }
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(8.dp))
         }
 
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            ProvideIosContent(contentColor, IosTheme.typography.body) { item.title() }
+            ProvideIosContent(
+                contentColor,
+                IosTheme.typography.body.copy(
+                    fontSize = 17.sp,
+                    letterSpacing = (-0.43).sp,
+                )
+            ) { item.title() }
             item.description?.let { desc ->
                 ProvideIosContent(colors.secondaryLabel, IosTheme.typography.footnote) { desc() }
             }
         }
 
         item.trailingContent?.let { trailing ->
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             ProvideIosContent(colors.secondaryLabel, IosTheme.typography.body) { trailing() }
         }
     }

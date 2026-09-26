@@ -744,18 +744,16 @@ private fun ThumbnailItem(
                 // its size), a card is its own corner radius. Also the copy that has to be
                 // hidden while the travelling one is in flight, or the cover is on screen
                 // twice from the handoff onward.
-                .registerFullArtworkRect(
-                    with(artworkDensity) {
+                .fullArtworkMorphTarget(
+                    cornerRadiusPx = with(artworkDensity) {
                         when (artworkStyle) {
                             PlayerArtworkStyle.CARD -> dimensions.cornerRadius.toPx()
                             else -> dimensions.thumbnailSize.toPx() / 2f
                         }
-                    }
-                )
-                // Q5: squared card travels (hidden all flight); vinyl/clover
-                // resolve late in place behind the mini shrink+fade.
-                .hideFullArtworkWhileMorphing(
-                    travelEnabled = artworkStyle == PlayerArtworkStyle.CARD,
+                    },
+                    // Q5: the card travels (hidden all flight); vinyl/clover resolve late
+                    // in place behind the mini shrink+fade. One flag for both ends.
+                    travels = artworkStyle == PlayerArtworkStyle.CARD,
                 )
                 .graphicsLayer {
                     rotationZ = rotation.value
@@ -1051,10 +1049,14 @@ internal fun ThumbnailImage(
     // Exact resized URLs to decode ahead of time, so the melt starts on warm
     // bitmaps instead of stuck-then-jump (V2 passes the neighbour covers).
     preloadUrls: List<String> = emptyList(),
+    /** False adopts a new cover in place with no melt: the V2 swipe has already carried the
+     *  incoming card to centre, so melting into the same picture would play twice. */
+    morphOnChange: Boolean = true,
 ) {
     // Floor: below this the melt is a shimmer the eye never registers and the
     // first-frame shader compile eats the whole window (sometimes -> never-do).
-    val resolvedCrossfadeMillis = maxOf(crossfadeMillis, 450)
+    // Capped: a long DJ crossfade still melts slowly, but not for the whole fade window.
+    val resolvedCrossfadeMillis = crossfadeMillis.coerceIn(450, 8_000)
     val context = LocalContext.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     val shaderMorphSupported = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
@@ -1093,13 +1095,24 @@ internal fun ThumbnailImage(
 
     LaunchedEffect(artworkUri) {
         if (artworkUri == currentUrl) return@LaunchedEffect
+        if (!morphOnChange) {
+            outgoingUrl = null
+            currentUrl = artworkUri
+            currentKey = contentKey
+            morph.snapTo(1f)
+            return@LaunchedEffect
+        }
         if (contentKey != null && contentKey == currentKey) {
             // Same song, new URL rung: adopt silently, no self-melt.
             currentUrl = artworkUri
             return@LaunchedEffect
         }
         ensureLoaded(artworkUri)
-        outgoingUrl = currentUrl
+        // Interrupted melt (rapid skips, a crossfade landing mid-skip): restart from whichever
+        // cover was MOSTLY on screen, so the new melt begins where the eye already is instead
+        // of jumping to the half-arrived one.
+        val interrupted = outgoingUrl != null
+        if (!interrupted || morph.value >= 0.5f) outgoingUrl = currentUrl
         currentUrl = artworkUri
         currentKey = contentKey
         morph.snapTo(0f)
@@ -1114,7 +1127,8 @@ internal fun ThumbnailImage(
             } else {
                 null
             }
-            morph.animateTo(1f, animationSpec = tween(resolvedCrossfadeMillis, easing = LinearEasing))
+            // Eased at both ends: linear progress made the melt visibly start and stop.
+            morph.animateTo(1f, animationSpec = tween(resolvedCrossfadeMillis, easing = SeamlessEasing))
             timeJob?.cancel()
         }
         outgoingUrl = null
@@ -1217,11 +1231,13 @@ internal fun ThumbnailImage(
         val outgoingBitmap = outgoingUrl?.let { rawBitmaps[it] }
         val currentBitmap = currentUrl?.let { rawBitmaps[it] }
         if (outgoingBitmap != null && currentBitmap != null) {
+            // Lambdas, read in the draw phase: passing the values recomposed this whole
+            // composable every frame of the melt -- up to the full length of a DJ crossfade.
             MeltMorphOverlay(
                 outgoing = outgoingBitmap,
                 incoming = currentBitmap,
-                progress = morph.value,
-                timeSeconds = timeSeconds,
+                progress = { morph.value },
+                timeSeconds = { timeSeconds },
             )
         }
     }
@@ -1234,7 +1250,7 @@ internal fun ThumbnailImage(
  */
 @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
 @Composable
-private fun MeltMorphOverlay(outgoing: Bitmap, incoming: Bitmap, progress: Float, timeSeconds: Float) {
+private fun MeltMorphOverlay(outgoing: Bitmap, incoming: Bitmap, progress: () -> Float, timeSeconds: () -> Float) {
     val shader = remember { android.graphics.RuntimeShader(MELT_SHADER_SOURCE) }
     val outgoingShader = remember(outgoing) {
         android.graphics.BitmapShader(outgoing, android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
@@ -1249,11 +1265,11 @@ private fun MeltMorphOverlay(outgoing: Bitmap, incoming: Bitmap, progress: Float
         shader.setFloatUniform("uResolution", size.width, size.height)
         shader.setFloatUniform("uCurrentSize", outgoing.width.toFloat(), outgoing.height.toFloat())
         shader.setFloatUniform("uNextSize", incoming.width.toFloat(), incoming.height.toFloat())
-        shader.setFloatUniform("uProgress", progress)
+        shader.setFloatUniform("uProgress", progress())
         shader.setFloatUniform("uIntensity", MeltIntensity)
         shader.setFloatUniform("uScale", MeltScale)
         shader.setFloatUniform("uAberration", MeltAberration)
-        shader.setFloatUniform("uTime", timeSeconds)
+        shader.setFloatUniform("uTime", timeSeconds())
         drawIntoCanvas { canvas ->
             val paint = android.graphics.Paint().apply { this.shader = shader }
             canvas.nativeCanvas.drawRect(0f, 0f, size.width, size.height, paint)

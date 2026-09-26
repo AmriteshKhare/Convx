@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import com.music.innertube.SearchFilter
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
 import com.convx.music.LocalDatabase
@@ -252,7 +253,7 @@ fun AddToPlaylistDialogOnline(
 
                                 coroutineScope.launch {
                                     try {
-                                        YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
+                                        YouTube.search(query, SearchFilter.FILTER_SONG)
                                             .onSuccess { result ->
                                                 val items = result.items.distinctBy { it.id }
                                                 if (items.isNotEmpty()) {
@@ -323,7 +324,7 @@ fun AddToPlaylistDialogOnline(
 
                                 coroutineScope.launch {
                                     try {
-                                        YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
+                                        YouTube.search(query, SearchFilter.FILTER_SONG)
                                             .onSuccess { result ->
                                                 val items = result.items.distinctBy { it.id }
                                                 if (items.isNotEmpty()) {

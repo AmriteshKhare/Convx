@@ -17,6 +17,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import com.music.innertube.SearchFilter
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
 import com.music.innertube.models.ArtistItem
@@ -120,7 +121,7 @@ class SuggestionsViewModel @Inject constructor() : ViewModel() {
     fun playTrack(track: SuggestionTrack, playerConnection: PlayerConnection?) {
         viewModelScope.launch(Dispatchers.IO) {
             val query = "${track.title} ${track.artist}"
-            YouTube.search(query, YouTube.SearchFilter.FILTER_SONG).onSuccess { searchResult ->
+            YouTube.search(query, SearchFilter.FILTER_SONG).onSuccess { searchResult ->
                 val songs = searchResult.items.filterIsInstance<SongItem>()
                 
                 // 1. Try to find an exact title match with at least one matching artist
@@ -151,7 +152,7 @@ class SuggestionsViewModel @Inject constructor() : ViewModel() {
 
     fun navigateToArtist(artist: SuggestionArtist, navController: NavController) {
         viewModelScope.launch(Dispatchers.IO) {
-            YouTube.search(artist.name, YouTube.SearchFilter.FILTER_ARTIST)
+            YouTube.search(artist.name, SearchFilter.FILTER_ARTIST)
                 .onSuccess { searchResult ->
                     val firstArtist =
                         searchResult.items.filterIsInstance<ArtistItem>().firstOrNull()
@@ -166,7 +167,7 @@ class SuggestionsViewModel @Inject constructor() : ViewModel() {
     fun navigateToAlbum(album: SuggestionAlbum, navController: NavController) {
         viewModelScope.launch(Dispatchers.IO) {
             val query = "${album.title} ${album.artist}"
-            YouTube.search(query, YouTube.SearchFilter.FILTER_ALBUM)
+            YouTube.search(query, SearchFilter.FILTER_ALBUM)
                 .onSuccess { searchResult ->
                     val firstAlbum =
                         searchResult.items.filterIsInstance<com.music.innertube.models.AlbumItem>().firstOrNull()
@@ -182,7 +183,7 @@ class SuggestionsViewModel @Inject constructor() : ViewModel() {
     fun playVideo(video: SuggestionTrack, playerConnection: PlayerConnection?) {
         viewModelScope.launch(Dispatchers.IO) {
             val query = "${video.title} ${video.artist}"
-            YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
+            YouTube.search(query, SearchFilter.FILTER_SONG)
                 .onSuccess { searchResult ->
                     val songs = searchResult.items.filterIsInstance<SongItem>()
 

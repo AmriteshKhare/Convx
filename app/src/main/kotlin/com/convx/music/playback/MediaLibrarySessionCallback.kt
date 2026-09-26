@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
+import com.music.innertube.SearchFilter
 import com.music.innertube.YouTube
 import com.music.innertube.models.PlaylistItem
 import com.music.innertube.models.SongItem
@@ -343,7 +344,7 @@ constructor(
                 }
 
                 try {
-                    val onlineResults = YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
+                    val onlineResults = YouTube.search(query, SearchFilter.FILTER_SONG)
                         .getOrNull()
                         ?.items
                         ?.filterIsInstance<SongItem>()
@@ -532,7 +533,7 @@ constructor(
                     searchResults.addAll(allLocalSongs)
                     
                     try {
-                        val onlineResults = YouTube.search(searchQuery, YouTube.SearchFilter.FILTER_SONG)
+                        val onlineResults = YouTube.search(searchQuery, SearchFilter.FILTER_SONG)
                             .getOrNull()
                             ?.items
                             ?.filterIsInstance<SongItem>()

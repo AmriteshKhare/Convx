@@ -162,6 +162,41 @@ fun sharedArtworkRect(source: Rect, target: Rect, progress: Float): Rect {
 }
 
 /**
+ * The travelling cover's visible window at [progress]: centre on the same curves as
+ * [sharedArtworkRect], but width and height interpolate per axis, so a square pill cover
+ * can open into a non-square target (V2's Hero, 0.65 of the screen tall) and land on
+ * exactly that rect instead of a square that pops to the real shape on arrival.
+ */
+fun sharedArtworkWindow(source: Rect, target: Rect, progress: Float): Rect {
+    val fraction = sanitizedProgress(progress)
+    val centerX = lerp(source.center.x, target.center.x, easeOutCubic(fraction))
+    val centerY = lerp(
+        source.center.y,
+        target.center.y,
+        lerp(easeInCubic(fraction), fraction, ARTWORK_VERTICAL_LINEAR_WEIGHT),
+    )
+    val halfWidth = lerp(source.width, target.width, fraction).coerceAtLeast(1f) / 2f
+    val halfHeight = lerp(source.height, target.height, fraction).coerceAtLeast(1f) / 2f
+    return Rect(centerX - halfWidth, centerY - halfHeight, centerX + halfWidth, centerY + halfHeight)
+}
+
+/**
+ * Ease-in-out sine: zero velocity at both ends, so a fade or colour change has no
+ * visible start or finish -- the curve every "ambient" transition (background colour,
+ * video fade, artwork melt) uses.
+ */
+val SeamlessEasing = androidx.compose.animation.core.CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
+
+/**
+ * Length of an ambient track-change transition: the DJ crossfade's own length while
+ * one is running, so the backdrop turns over with the audio, else a slow default.
+ */
+fun ambientTransitionMillis(crossfadeMs: Long): Int =
+    if (crossfadeMs > 0L) crossfadeMs.coerceIn(900L, 8_000L).toInt() else AMBIENT_TRANSITION_DEFAULT_MS
+
+const val AMBIENT_TRANSITION_DEFAULT_MS = 1_100
+
+/**
  * Width of the progress band over which the screen-corner expansion fades out.
  *
  * Gating the expansion on `progress == 1f` exactly is fine on the way

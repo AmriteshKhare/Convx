@@ -7,6 +7,9 @@ package com.convx.music
 
 import android.Manifest
 import android.annotation.SuppressLint
+import androidx.annotation.StringRes
+import com.convx.music.ui.ios.component.IosMenuItem
+import com.convx.music.ui.ios.component.IosMenuSection
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
@@ -91,7 +94,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -245,13 +247,13 @@ import com.convx.music.ui.component.LocalNavSearchState
 import com.convx.music.ui.component.rememberAppBackgroundTint
 import com.convx.music.ui.component.rememberItemPrefs
 import com.convx.music.ui.component.FrostedTopBar
-import com.convx.music.ui.component.LocalHomeTopBarLogoProgress
 import com.convx.music.ui.component.TopFadeBlur
 import com.convx.music.ui.component.NavSearchState
 import com.convx.music.ui.component.GlassEffectConfig
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalAppBackdropFrozen
+import com.convx.music.ui.component.LocalAppMotionFrozen
 import com.convx.music.ui.component.GlassStyle
 import com.convx.music.ui.component.glassContentColorFor
 import com.convx.music.ui.component.backdrop.GlassPoolScale
@@ -282,6 +284,8 @@ import com.convx.music.ui.component.ListenTogetherOverlay
 import com.convx.music.ui.component.QueueConflictDialog
 import com.convx.music.ui.component.QueueReplacedUndoSnackbar
 import com.convx.music.ui.component.LocalBottomSheetPageState
+import com.convx.music.ui.utils.ShowMediaInfo
+import com.convx.music.ui.menu.PlayerMenu
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.iosSheetPresentation
 import com.convx.music.ui.component.LocalSheetPresentation
@@ -301,13 +305,11 @@ import com.convx.music.ui.screens.navigationBuilder
 import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.screens.settings.NavigationTab
 import com.convx.music.ui.theme.AppleTokens
-import com.convx.music.ui.theme.BrandName
 import androidx.compose.ui.graphics.isSpecified
 import com.convx.music.ui.theme.DefaultThemeColor
 import com.convx.music.ui.theme.GlassTintTokens
 import com.convx.music.ui.theme.LocalAccentTextColor
 import com.convx.music.ui.theme.isHueless
-import com.convx.music.ui.theme.rememberBrandFontFamily
 import com.convx.music.ui.theme.vivimusicTheme
 import com.convx.music.ui.utils.appBarScrollBehavior
 import com.convx.music.ui.utils.resetHeightOffset
@@ -321,6 +323,7 @@ import com.convx.music.ui.utils.rememberIosOverscrollFactory
 import com.convx.music.utils.reportException
 import com.convx.music.utils.setAppLocale
 import com.convx.music.viewmodels.HistoryViewModel
+import com.convx.music.ui.component.floatingtabbar.FloatingTabBarInlineBehavior
 import com.convx.music.ui.component.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.convx.music.viewmodels.HomeViewModel
 import com.convx.music.vivimusic.UpdateNotificationHelper
@@ -360,10 +363,9 @@ private val TabRootRoutes = setOf(
 )
 
 private const val DIAG_DISABLE_BACKDROP = false
-// Melox's measured-fast path lets the few visible chrome surfaces sample the
-// shared backdrop directly. A full-screen pre-blur/flatten pool added ~4.5 ms
-// issue-draw time on the SM-M346B when only nav/search/mini chrome consumed it.
-private const val USE_SHARED_GLASS_POOL = false
+// Shared backdrop pool: one blur for every glass surface (Home carries eight).
+// A/B against the direct-sampling path on-device before treating as permanent.
+private const val USE_SHARED_GLASS_POOL = true
 
 /**
  * Routes whose whole screen is an `AndroidView` WebView. They opt out of the app
@@ -776,7 +778,12 @@ class MainActivity : ComponentActivity() {
                 val floatingNavigationItems = remember(navigationItems) {
                     navigationItems + Screens.Explore
                 }
-                val floatingNavBarScrollConnection = rememberFloatingTabBarScrollConnection()
+                // Expanded only at the very top of a screen: any scroll away from the top
+                // goes inline, and it only comes back on arriving back at the top -- not
+                // on the first upward flick partway down the list.
+                val floatingNavBarScrollConnection = rememberFloatingTabBarScrollConnection(
+                    inlineBehavior = FloatingTabBarInlineBehavior.ExpandedAtTopOnly,
+                )
                 val (liquidGlassGlobalEnabled) = rememberPreference(LiquidGlassGlobalEnabledKey, defaultValue = true)
                 val (liquidGlassVibrancy) = rememberPreference(LiquidGlassVibrancyKey, defaultValue = 2.0f)
                 val (liquidGlassBlurRadius) = rememberPreference(LiquidGlassBlurRadiusKey, defaultValue = 3f)
@@ -1203,10 +1210,18 @@ class MainActivity : ComponentActivity() {
                         // collapsed, same as before minus the always-true config check.
                         !playerBottomSheetState.isCollapsed
 
+                // A standalone mini strip above the bar only exists when the sheet's collapsed
+                // anchor sits above its dismissed one. Here both are 0 (the mini always docks),
+                // so isDismissed flipped together with isCollapsed on every close and open:
+                // the app-wide bottom padding jumped by MiniPlayerHeight and the whole visible
+                // page re-laid out on the landing frame -- the ~125ms freeze that read as the
+                // player "snapping" into the pill before its overshoot.
+                val reservesStandaloneMini = playerBottomSheetState.collapsedBound > playerBottomSheetState.dismissedBound &&
+                    !playerBottomSheetState.isDismissed
                 val playerAwareWindowInsets = remember(
                     bottomInset,
                     shouldShowNavigationBar,
-                    playerBottomSheetState.isDismissed,
+                    reservesStandaloneMini,
                     showRail,
                     hasDockedPlayerAccessory,
                     sideBarContentInset,
@@ -1216,7 +1231,7 @@ class MainActivity : ComponentActivity() {
                     if (shouldShowNavigationBar && !showRail) {
                         bottom += NavigationBarHeight
                     }
-                    if (!playerBottomSheetState.isDismissed && !inSearchInputScreen) bottom += MiniPlayerHeight
+                    if (reservesStandaloneMini && !inSearchInputScreen) bottom += MiniPlayerHeight
                     if (hasDockedPlayerAccessory) bottom += DockedAccessoryHeight
                     windowsInsets
                         .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
@@ -1333,6 +1348,8 @@ class MainActivity : ComponentActivity() {
                     shouldShowTopBar = !showRail &&
                         effectiveRoute in topLevelScreens &&
                         effectiveRoute != "settings" &&
+                        // Home draws its own large-title-collapsing bar (HomeScreen).
+                        effectiveRoute != Screens.Home.route &&
                         !(isListenTogetherScreen && listenTogetherInTopBar)
                 }
 
@@ -1449,6 +1466,20 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Reactive mirror of the provider above for composition-time gates
+                // (infinite anims, inputScale). The provider is draw-phase-safe but
+                // non-reactive; polling it ~8×/s is one cheap lambda call and only
+                // invalidates readers when the boolean actually flips — one
+                // recomposition per scroll start/end, not per frame.
+                val appMotionFrozen = remember { mutableStateOf(false) }
+                LaunchedEffect(backdropFrozenProvider) {
+                    while (true) {
+                        val f = backdropFrozenProvider()
+                        if (appMotionFrozen.value != f) appMotionFrozen.value = f
+                        delay(120L)
+                    }
+                }
+
                 // One provider replaces Android's stretch/glow edge effect with the
                 // iOS rubber-band for every scroll container in the app.
                 val iosOverscroll by rememberPreference(IosOverscrollKey, defaultValue = true)
@@ -1529,10 +1560,6 @@ class MainActivity : ComponentActivity() {
                 // itself through the shared presenter -- see PresentingSheetEffect.
                 val sheetPresentationState = remember { SheetPresentationState() }
 
-                // See HomeTopBarState.kt — Home writes into this from its own
-                // scroll state, the top bar's leading logo reads it.
-                val homeTopBarLogoProgress = remember { mutableFloatStateOf(0f) }
-
                 CompositionLocalProvider(
                     LocalOverscrollFactory provides
                         if (iosOverscroll) iosOverscrollFactory else LocalOverscrollFactory.current,
@@ -1558,6 +1585,7 @@ class MainActivity : ComponentActivity() {
                     // Same backdrop, for the ios/ component library's glass surfaces.
                     LocalIosBackdrop provides appBackdrop,
                     LocalAppBackdropFrozen provides backdropFrozenProvider,
+                    LocalAppMotionFrozen provides appMotionFrozen,
                     LocalRingtoneViewModel provides ringtoneViewModel,
                     // Read once here instead of inside every list row and grid tile —
                     // see ItemPrefs for what that was costing on scroll.
@@ -1565,10 +1593,6 @@ class MainActivity : ComponentActivity() {
                     // One collector for the whole app instead of one per list row —
                     // see LocalDownloads.
                     LocalDownloads provides downloadUtil.downloads.collectAsState().value,
-                    // Hand-off between Home's own scroll state and the top bar's
-                    // logo, which live in different parts of the composition — see
-                    // HomeTopBarState.kt.
-                    LocalHomeTopBarLogoProgress provides homeTopBarLogoProgress,
                 ) {
 
                     // The screen a sheet is covering shrinks back behind it, the way
@@ -1696,7 +1720,6 @@ class MainActivity : ComponentActivity() {
                                                 AppTheme.colorScheme.background
                                             ),
                                         )
-                                        val isHome = effectiveRoute == Screens.Home.route
                                         // Titles/wordmark stay neutral per theme; only hero-tinted
                                         // screens keep the artwork-derived accent text.
                                         val topBarAmbient = LocalAmbientBackgroundColor.current.value
@@ -1707,32 +1730,14 @@ class MainActivity : ComponentActivity() {
                                         }
                                         FrostedTopBar(
                                             leading = {
-                                                if (isHome) {
-                                                    // Home's own big logo (first item of its list)
-                                                    // fades OUT with the same progress this fades
-                                                    // IN with — see LocalHomeTopBarLogoProgress.
-                                                    val logoProgress = LocalHomeTopBarLogoProgress.current
-                                                    Text(
-                                                        text = BrandName,
-                                                        style = AppTheme.typography.titleLarge.copy(
-                                                            fontFamily = rememberBrandFontFamily(),
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            fontSize = 26.sp,
-                                                            letterSpacing = 1.5.sp,
-                                                        ),
-                                                        color = topBarTitleColor,
-                                                        modifier = Modifier.graphicsLayer { alpha = logoProgress.floatValue },
-                                                    )
-                                                } else {
-                                                    Text(
-                                                        text = currentTitleRes?.let { stringResource(it) } ?: "",
-                                                        style = AppTheme.typography.titleLarge.copy(
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontSize = 24.sp,
-                                                        ),
-                                                        color = topBarTitleColor,
-                                                    )
-                                                }
+                                                Text(
+                                                    text = currentTitleRes?.let { stringResource(it) } ?: "",
+                                                    style = AppTheme.typography.titleLarge.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 24.sp,
+                                                    ),
+                                                    color = topBarTitleColor,
+                                                )
                                             },
                                             actions = {
                                                 // History/Stats/Together moved to Settings (see
@@ -2301,6 +2306,8 @@ class MainActivity : ComponentActivity() {
                                 // content closes a RenderNode cycle -- HWUI recurses through
                                 // prepareTree until it crashes.
                                 CompositionLocalProvider(LocalPooledGlass provides pooledGlass) {
+                                    val menuState = LocalMenuState.current
+                                    val bottomSheetPageState = LocalBottomSheetPageState.current
                                     AppFloatingNavBar(
                                         navigationItems = floatingNavigationItems,
                                         currentRoute = effectiveRoute,
@@ -2317,6 +2324,28 @@ class MainActivity : ComponentActivity() {
                                             playerBottomSheetState.expandSoft()
                                             playerConnection?.requestShowQueue?.value = true
                                         },
+                                        // Long-press the mini bar for the same quick-actions menu a
+                                        // long-pressed row opens elsewhere (reference: menu pop up.jpg).
+                                        onAccessoryLongClick = {
+                                            val metadata = playerConnection?.mediaMetadata?.value
+                                            if (metadata != null) {
+                                                menuState.show {
+                                                    PlayerMenu(
+                                                        mediaMetadata = metadata,
+                                                        navController = navController,
+                                                        playerBottomSheetState = playerBottomSheetState,
+                                                        onShowDetailsDialog = {
+                                                            bottomSheetPageState.show { ShowMediaInfo(metadata.id) }
+                                                        },
+                                                        onDismiss = menuState::dismiss,
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        // Press and hold a tab for its shortcuts, the way iOS's
+                                        // own tab bar does. Built here because this is where the
+                                        // nav controller is; the bar itself stays navigation-free.
+                                        tabContextMenu = { screen -> navTabContextMenu(screen, navController) },
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
                                             .widthIn(max = 500.dp)
@@ -2604,6 +2633,47 @@ fun PublishAmbientBackgroundColor(color: Color) {
     DisposableEffect(Unit) {
         onDispose { ambient.value = Color.Unspecified }
     }
+}
+
+/**
+ * The shortcuts behind a press-and-hold on a nav bar tab.
+ *
+ * iOS's own tab bar opens a context menu on hold with the destinations that tab leads to
+ * but the bar has no room for. Only real routes here -- a menu entry that navigates
+ * nowhere is worse than no menu, so a destination with nothing to offer returns an empty
+ * list and simply has no menu (see FloatingNavBar's tabContextMenu).
+ */
+@Composable
+private fun navTabContextMenu(
+    screen: Screens,
+    navController: NavController,
+): List<IosMenuSection> {
+    @Composable
+    fun item(@StringRes titleId: Int, route: String) = IosMenuItem(
+        title = stringResource(titleId),
+        onClick = { navController.navigate(route) },
+    )
+
+    val items = when (screen) {
+        Screens.Home -> listOf(
+            item(R.string.history, "history"),
+            item(R.string.stats, "stats"),
+            item(R.string.together, Screens.ListenTogether.route),
+        )
+        Screens.Library -> listOf(
+            item(R.string.history, "history"),
+            item(R.string.stats, "stats"),
+            item(R.string.account, "account"),
+        )
+        Screens.Search -> listOf(
+            item(R.string.tab_explore, Screens.Explore.route),
+            item(R.string.charts, "charts_screen"),
+            item(R.string.new_release_albums, "new_release"),
+            item(R.string.mood_and_genres, "mood_and_genres"),
+        )
+        else -> emptyList()
+    }
+    return if (items.isEmpty()) emptyList() else listOf(IosMenuSection(items))
 }
 
 /**

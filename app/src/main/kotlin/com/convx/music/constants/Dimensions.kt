@@ -56,6 +56,18 @@ val ThumbnailCornerRadius = 8.dp
 // the scroll cost, and because the redesign uses one corner vocabulary.
 val ThumbnailRoundedShape = RoundedCornerShape(ThumbnailCornerRadius)
 
+/**
+ * Figma track rows (Queue 279:887, Row Default 495:15280): 48/52 artwork at
+ * radius 5. List-row-only — grids/tiles keep [ThumbnailRoundedShape].
+ */
+val ListRowArtShape = RoundedCornerShape(5.dp)
+
+/**
+ * Figma Music cards (244:1279 small, 465:13871 big): tile art at radius 10.
+ * Grid-only — list rows use [ListRowArtShape].
+ */
+val GridCardArtShape = RoundedCornerShape(10.dp)
+
 val PlayerHorizontalPadding = 32.dp
 
 /** Expanded player's width cap in tab view when "Compact player in tab view" is on —

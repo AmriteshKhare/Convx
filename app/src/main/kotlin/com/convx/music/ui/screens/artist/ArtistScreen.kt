@@ -32,6 +32,10 @@ import com.convx.music.ui.utils.plusStart
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.graphics.luminance
+import com.convx.music.ui.component.BlurredBackdropImage
+import com.convx.music.ui.component.bakeRamp
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -637,29 +641,61 @@ fun ArtistScreen(
                                     },
                                 ),
                         ) {
-                            if (!tabView) {
-                                Box(
-                                    contentAlignment = Alignment.BottomCenter,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(ArtistWordmarkHeight)
-                                        .padding(horizontal = 20.dp),
+                            // Figma beta Details scrim (652:25701): a real 25px
+                            // backdrop blur of the artwork behind the wordmark
+                            // and actions, ramped transparent to solid.
+                            BoxWithConstraints(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.BottomCenter,
+                            ) {
+                                val scrimArt = appleArtist?.hero?.sized(800) ?: thumbnail
+                                val scrimAspect = maxWidth / maxHeight.coerceAtLeast(1.dp)
+                                BlurredBackdropImage(
+                                    model = scrimArt,
+                                    screenBlurRadiusDp = 25f,
+                                    contentScale = ContentScale.Crop,
+                                    finish = {
+                                        bakeRamp(
+                                            it,
+                                            scrimAspect,
+                                            flip = false,
+                                            matrix = null,
+                                            rampStops = floatArrayOf(0f, 0.89f, 1f),
+                                            rampAlphas = floatArrayOf(0f, 1f, 1f),
+                                        )
+                                    },
+                                    finishKey = "artist-details-scrim-${scrimArt?.hashCode() ?: 0}",
+                                    modifier = Modifier.matchParentSize(),
+                                )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.fillMaxWidth(),
                                 ) {
-                                    // No name while Apple settles, so a logo never replaces text mid-view.
-                                    if (!appleLoading) ArtistWordmark(logo = appleArtist?.logo, name = displayArtistName)
-                                }
-                                Spacer(modifier = Modifier.height(ArtistWordmarkFootInset + 2.dp))
-                            }
+                                    if (!tabView) {
+                                        Box(
+                                            contentAlignment = Alignment.BottomCenter,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(ArtistWordmarkHeight)
+                                                .padding(horizontal = 20.dp),
+                                        ) {
+                                            // No name while Apple settles, so a logo never replaces text mid-view.
+                                            if (!appleLoading) ArtistWordmark(logo = appleArtist?.logo, name = displayArtistName)
+                                        }
+                                        Spacer(modifier = Modifier.height(ArtistWordmarkFootInset + 2.dp))
+                                    }
 
-                            ArtistActionRow(
-                                keyColor = appleArtist?.keyColor,
-                                pageBgRgb = pageBgRgb,
-                                isPlaying = isPlayingThisArtist,
-                                isSubscribed = isSubscribed,
-                                onInfo = { showAbout = !showAbout },
-                                onPlay = onPlay,
-                                onSubscribe = onSubscribe,
-                            )
+                                    ArtistActionRow(
+                                        keyColor = appleArtist?.keyColor,
+                                        pageBgRgb = pageBgRgb,
+                                        isPlaying = isPlayingThisArtist,
+                                        isSubscribed = isSubscribed,
+                                        onInfo = { showAbout = !showAbout },
+                                        onPlay = onPlay,
+                                        onSubscribe = onSubscribe,
+                                    )
+                                }
+                            }
 
                             val description = artistPage?.description
                             val descriptionRuns = artistPage?.descriptionRuns
@@ -1095,15 +1131,20 @@ fun ArtistScreen(
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
         ) {
+            // The nav fade follows the app theme, not the (always dark)
+            // artwork tint: a light fade behind the chrome in light mode.
+            val navScrimBase =
+                if (AppTheme.colorScheme.surface.luminance() <= 0.5f) Color.Black
+                else Color.White
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(AppBarHeight * 2.5f)
                     .background(
                         Brush.verticalGradient(
-                            0f to Color.Black.copy(alpha = 0.55f * chromeScrimAlpha),
-                            0.35f to Color.Black.copy(alpha = 0.4f * chromeScrimAlpha),
-                            0.7f to Color.Black.copy(alpha = 0.12f * chromeScrimAlpha),
+                            0f to navScrimBase.copy(alpha = 0.55f * chromeScrimAlpha),
+                            0.35f to navScrimBase.copy(alpha = 0.4f * chromeScrimAlpha),
+                            0.7f to navScrimBase.copy(alpha = 0.12f * chromeScrimAlpha),
                             1f to Color.Transparent,
                         )
                     )
@@ -1271,7 +1312,8 @@ private fun ArtistActionRow(
             AnimatedPlayPauseIcon(
                 isPlaying = isPlaying,
                 tint = AppleColors.color(AppleColors.playGlyph(pageBgRgb)),
-                size = 30.dp,
+                // Figma beta Play action: 36px glyph in the 73 circle (652:25705).
+                size = 36.dp,
             )
         }
         ArtistControlCircle(size = 48.dp, fill = controlFill, onClick = onSubscribe) {
@@ -1305,7 +1347,7 @@ private fun ArtistControlCircle(
 }
 
 /**
- * Featured release card: 120 tall, 24 corners, 12 padding, 96 artwork with 10 corners, caption
+ * Featured release card: 114 tall, 22 corners, 12 padding, 90 artwork with 10 corners, caption
  * and subtitle 15pt at 60% white around a 17pt semibold title, and a 32pt add button. The fill
  * is the measured white wash for this page colour ([AppleColors.cardFillAlpha]).
  */
@@ -1317,12 +1359,13 @@ private fun FeaturedReleaseCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    // Figma beta Featured card: r22, 114 tall, 90 art r10, gap 10 (652:25709).
+    val shape = RoundedCornerShape(22.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(114.dp)
             .clip(shape)
             .background(Color.White.copy(alpha = AppleColors.cardFillAlpha(pageBgRgb)))
             .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
@@ -1334,10 +1377,10 @@ private fun FeaturedReleaseCard(
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(96.dp)
+                .size(90.dp)
                 .clip(RoundedCornerShape(10.dp)),
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = caption,

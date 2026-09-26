@@ -69,6 +69,7 @@ class BeatTracker(private val context: Context) {
         synchronized(lock) {
             session?.let { return it }
             return runCatching {
+                File(context.filesDir, STALE_MODEL_ASSET).delete()
                 val file = File(context.filesDir, MODEL_ASSET)
                 if (!file.exists() || file.length() == 0L) {
                     context.assets.open(MODEL_ASSET).use { input ->
@@ -205,7 +206,12 @@ class BeatTracker(private val context: Context) {
 
     companion object {
         private const val TAG = "ViviBeatTracker"
-        private const val MODEL_ASSET = "beat_this_int8.onnx"
+        // ConvInteger weights shifted int8 -> uint8 (+128, zero points too; exact): the
+        // shipped onnxruntime-android has no int8-weight ConvInteger kernel, so the
+        // original failed createSession with ORT_NOT_IMPLEMENTED and DJ ran gridless.
+        // Renamed so the stale copy session() cached in filesDir is not reused.
+        private const val MODEL_ASSET = "beat_this_u8.onnx"
+        private const val STALE_MODEL_ASSET = "beat_this_int8.onnx"
         private const val INFERENCE_THREADS = 4
 
         /** The window the model was trained on, and the margin discarded from each chunk's edges. */

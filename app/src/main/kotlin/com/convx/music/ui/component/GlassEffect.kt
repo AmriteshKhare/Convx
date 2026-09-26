@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.convx.music.ui.ios.compat.AppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.remember
@@ -382,6 +383,20 @@ val LocalPooledGlass = staticCompositionLocalOf<PooledGlass?> { null }
 val LocalAppBackdropFrozen = staticCompositionLocalOf<() -> Boolean> { { false } }
 
 /**
+ * Composition-time mirror of [LocalAppBackdropFrozen] for gating infinite animations
+ * and other per-frame invalidation. The lambda above is intentionally non-reactive
+ * (plain-array clocks, draw-phase safe); reading it in composition would not recompose
+ * when freeze flips. MainActivity maintains this State by polling the provider — one
+ * recomposition per scroll start/end, which is exactly what stopping an infinite
+ * transition needs. Default never-frozen.
+ */
+val LocalAppMotionFrozen = staticCompositionLocalOf<State<Boolean>> {
+    object : State<Boolean> {
+        override val value: Boolean get() = false
+    }
+}
+
+/**
  * When set, glass surfaces in scope pool one recorded+effect-processed layer
  * per bucket this returns instead of a single reused layer — see
  * `drawBackdrop`'s `loopBucket` parameter. Meant for surfaces sampling a
@@ -433,11 +448,13 @@ fun Modifier.liquidGlass(
     // glass buttons whose whole look is clear content, not heavy frost.
     backdropScale: Float = glassResolutionScale(blurRadiusDp),
     // Forwarded to drawBackdrop: while this returns true the surface holds its
-    // last capture instead of re-recording the screen. Used by the floating tab
-    // bar for the frames of its inline/expanded/search transition, where the
-    // bar's bounds animate and would otherwise force a full-screen re-capture
-    // plus effect chain on every frame.
-    frozen: () -> Boolean = { false },
+    // last capture instead of re-recording the screen. Defaults to the app-wide
+    // freeze (scroll / nav transition / tab-bar motion) so every glass surface
+    // stops re-recording while list pixels move — without this, a moving chrome
+    // surface re-issues its full effect chain every frame even when the source
+    // layer is frozen. Callers that own a narrower freeze (sidebar width fold)
+    // should OR this in themselves.
+    frozen: () -> Boolean = LocalAppBackdropFrozen.current,
     // Forwarded to drawBackdrop: see LocalBackdropLoopBucket's doc. Defaults to
     // whatever's provided in composition, so player control pills over a
     // looping video pick this up without every call site naming it explicitly.

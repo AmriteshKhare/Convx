@@ -99,8 +99,6 @@ import com.convx.music.ui.component.IosMenuGroup
 import com.convx.music.ui.component.IosMenuItemData
 import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
-import com.convx.music.ui.component.VolumeSlider
-import com.convx.music.ui.theme.rememberGlobalAccentColors
 import com.convx.music.constants.EnableSaavnStreamingKey
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
@@ -123,20 +121,6 @@ fun PlayerMenu(
     val ringtoneViewModel = com.convx.music.LocalRingtoneViewModel.current
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val playerVolume = playerConnection.service.playerVolume.collectAsState()
-    
-    // Cast state for volume control - safely access castConnectionHandler to prevent crashes
-    val castHandler = remember(playerConnection) {
-        try {
-            playerConnection.service.castConnectionHandler
-        } catch (e: Exception) {
-            null
-        }
-    }
-    val isCasting by castHandler?.isCasting?.collectAsState() ?: remember { mutableStateOf(false) }
-    val castVolume by castHandler?.castVolume?.collectAsState() ?: remember { mutableFloatStateOf(1f) }
-    val castDeviceName by castHandler?.castDeviceName?.collectAsState() ?: remember { mutableStateOf<String?>(null) }
-    
     val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
     val (saavnEnabled) = rememberPreference(EnableSaavnStreamingKey, defaultValue = false)
@@ -229,55 +213,6 @@ fun PlayerMenu(
         TempoPitchDialog(
             onDismiss = { showPitchTempoDialog = false },
         )
-    }
-
-    if (isQueueTrigger != true) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(top = 24.dp, bottom = 6.dp),
-        ) {
-            // Show Cast indicator when casting
-            if (isCasting && castDeviceName != null) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.cast),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = AppTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = stringResource(R.string.casting_to, castDeviceName ?: ""),
-                        style = AppTheme.typography.bodyMedium,
-                        color = AppTheme.colorScheme.primary
-                    )
-                }
-            }
-            
-            // "Hide Volume Bar" only affects the player's own inline volume
-            // row now — this menu copy is the only volume control left once
-            // that row is hidden, so it always shows regardless of the setting.
-            VolumeSlider(
-                value = if (isCasting) castVolume else playerVolume.value,
-                onValueChange = { volume ->
-                    if (isCasting) {
-                        castHandler?.setVolume(volume)
-                    } else {
-                        playerConnection.service.playerVolume.value = volume
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                accentColor = rememberGlobalAccentColors().first
-            )
-        }
     }
 
     Spacer(modifier = Modifier.height(20.dp))

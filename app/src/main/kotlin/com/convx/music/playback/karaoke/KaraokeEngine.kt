@@ -131,6 +131,9 @@ class KaraokeEngine(private val context: Context) {
 
     @Volatile private var bgId: String? = null
 
+    /** Set by [analyseWindow] when inference itself failed (not a cache miss). Executor-thread only. */
+    private var modelFailed = false
+
     /**
      * Analyses a track that is not playing yet (the queue's next item) so its
      * masks are ready when the transition lands instead of starting from zero
@@ -182,7 +185,8 @@ class KaraokeEngine(private val context: Context) {
             if (background) ({ track?.mediaId != t.mediaId }) else ({ track?.mediaId == t.mediaId })
         val done = BooleanArray(windows) { w -> mask.ready[w * VocalTracker.FIXED_FRAMES] }
         var idlePasses = 0
-        while (_state.value.enabled && owned() && !done.all { it }) {
+        modelFailed = false
+        while (_state.value.enabled && owned() && !done.all { it } && !modelFailed) {
             var progressed = false
             for (w in order) {
                 if (done[w] || !_state.value.enabled || !owned()) continue
@@ -192,6 +196,7 @@ class KaraokeEngine(private val context: Context) {
                     _state.update { if (it.mediaId == t.mediaId) it.copy(progress = progressOf(mask)) else it }
                 }
             }
+            if (modelFailed) break
             if (!progressed) {
                 // Not cached yet: wait for the player's buffer to grow, give up after ~2 min idle.
                 if (++idlePasses > 60) break
@@ -219,7 +224,12 @@ class KaraokeEngine(private val context: Context) {
         val right = pcm.right.copyOfRange(skip, minOf(pcm.right.size, skip + wanted))
         val model = tracker ?: VocalTracker(context).also { tracker = it }
         val started = System.currentTimeMillis()
-        val (bands, frames) = model.separationMask(left, right, pcm.sampleRate) ?: return false
+        val (bands, frames) = model.separationMask(left, right, pcm.sampleRate) ?: run {
+            // The audio was there and the model still failed: retrying just re-runs
+            // the whole inference every 2s for two minutes. Stop this track instead.
+            modelFailed = true
+            return false
+        }
         val base = window * VocalTracker.FIXED_FRAMES
         for (f in 0 until frames) {
             val target = base + f

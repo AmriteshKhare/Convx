@@ -11,6 +11,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.shadow
 import com.convx.music.ui.ios.compat.LocalContentColor
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.ripple
@@ -186,6 +187,8 @@ fun GlassCircleButton(
         modifier = modifier
             .graphicsLayer(elasticStretchLayerBlock(elasticStretch))
             .size(size)
+            // Figma chrome shadow under top-bar buttons.
+            .shadow(12.dp, GlassCircleShape, spotColor = Color.Black.copy(alpha = 0.35f))
             .clip(GlassCircleShape)
             .then(backgroundModifier)
             .combinedClickable(
@@ -243,6 +246,8 @@ fun ContrastCircleButton(
         modifier = modifier
             .graphicsLayer(elasticStretchLayerBlock(elasticStretch))
             .size(size)
+            // Figma chrome shadow under top-bar buttons.
+            .shadow(12.dp, GlassCircleShape, spotColor = Color.Black.copy(alpha = 0.35f))
             .clip(GlassCircleShape)
             .background(bg)
             .combinedClickable(

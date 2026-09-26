@@ -44,10 +44,13 @@ class PlayerConnection(
     context: Context,
     binder: MusicBinder,
     val database: MusicDatabase,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
 ) : Player.Listener {
     private companion object {
         private const val TAG = "PlayerConnection"
+        /** Tap -> seek gap: long enough for the press animation to lead, short enough to
+         *  still read as instant. Also the window rapid taps coalesce in. */
+        private const val SKIP_COMMIT_DELAY_MS = 140L
         private const val PLAYER_INIT_TIMEOUT_MS = 5000L // 5 second timeout for player initialization
     }
 
@@ -490,6 +493,66 @@ class PlayerConnection(
             }
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error in seekTo")
+        }
+    }
+
+    private var pendingSkip = 0
+    private var skipCommitJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Tap-first skip for the transport buttons: the button's own animation plays on the tap,
+     * and the actual seek lands [SKIP_COMMIT_DELAY_MS] later, off the tap's frame. Taps inside
+     * that window coalesce into ONE jump (+3 = the third track ahead), so rapid tapping runs a
+     * single track transition instead of stacking a player seek + UI transition per tap.
+     */
+    fun requestSkip(forward: Boolean) {
+        pendingSkip += if (forward) 1 else -1
+        skipCommitJob?.cancel()
+        skipCommitJob = scope.launch {
+            kotlinx.coroutines.delay(SKIP_COMMIT_DELAY_MS)
+            val steps = pendingSkip
+            pendingSkip = 0
+            when {
+                steps == 1 -> seekToNext()
+                steps == -1 -> seekToPrevious()
+                steps != 0 -> jumpBy(steps)
+            }
+        }
+    }
+
+    /** Several skips at once: walk the timeline (repeat/shuffle aware), one seek. Also the
+     *  swipe-to-skip path: a swiped-in PREVIOUS card must land on the previous track even
+     *  3s into this one, where [seekToPrevious] would restart instead. */
+    fun jumpBy(steps: Int) {
+        try {
+            val castHandler = service.castConnectionHandler
+            if (castHandler?.isCasting?.value == true) {
+                repeat(kotlin.math.abs(steps)) { if (steps > 0) castHandler.skipToNext() else castHandler.skipToPrevious() }
+                return
+            }
+            val timeline = player.currentTimeline
+            if (timeline.isEmpty) return
+            // Repeat-one repeats the track, not the skip: step as if repeat were off.
+            val mode = if (player.repeatMode == Player.REPEAT_MODE_ONE) Player.REPEAT_MODE_OFF else player.repeatMode
+            var index = player.currentMediaItemIndex
+            for (step in 0 until kotlin.math.abs(steps)) {
+                val next = if (steps > 0) {
+                    timeline.getNextWindowIndex(index, mode, player.shuffleModeEnabled)
+                } else {
+                    timeline.getPreviousWindowIndex(index, mode, player.shuffleModeEnabled)
+                }
+                if (next == androidx.media3.common.C.INDEX_UNSET) break
+                index = next
+            }
+            if (index == player.currentMediaItemIndex) return
+            player.seekTo(index, 0)
+            if (player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
+                player.prepare()
+            }
+            player.playWhenReady = true
+            if (steps > 0) onSkipNext?.invoke() else onSkipPrevious?.invoke()
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Error in jumpBy($steps)")
         }
     }
 

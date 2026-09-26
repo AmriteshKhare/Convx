@@ -230,7 +230,8 @@ fun ViviMusicLyricsLine(
                             1.0f to textColor.copy(alpha = 0.45f)
                         ),
                         fontWeight = finalFontWeight,
-//                        letterSpacing = (-0.5).sp,
+                        // Figma main tracking: +0.4px @ 34px ≈ +1.2% (642:23917).
+                        letterSpacing = (textSize * 0.012f).sp,
                         // Cap internal line height for wrapped words
                         lineHeight = (textSize * lineSpacing.coerceAtMost(1.3f)).sp,
                         textAlign = agentTextAlign,
@@ -287,7 +288,9 @@ fun ViviMusicLyricsLine(
                     fontSize = (textSize * 0.7f).sp,
                     color = textColor.copy(alpha = 0.8f),
                     textAlign = agentTextAlign,
-                    fontWeight = FontWeight.Medium,
+                    // Figma translation: Bold, -1.2% tracking (642:23917).
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (textSize * 0.7f * -0.012f).sp,
                     modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
                     lineHeight = (textSize * 0.7f * lineSpacing.coerceAtMost(1.3f)).sp
                 )

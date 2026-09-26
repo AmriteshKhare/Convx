@@ -5,7 +5,6 @@
 
 package com.convx.music.ui.component
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector1D
@@ -26,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -86,7 +84,19 @@ internal const val PLAYER_CONTENT_APPEAR_END = 0.6f
  *  the first capture after the glass fades in is warm, not a stale frame. */
 internal const val PLAYER_GLASS_UNFREEZE_PROGRESS = 0.75f
 
+/**
+ * Open/close settle spring: Melox PlayerSheetTransitionState.animateToTarget exactly --
+ * NoBouncy, stiffness 360, velocity-seeded on release (user: morph identical to Melox).
+ */
+private const val PlayerSheetStiffness = 360f
+
 private const val BackdropFreezeSafetyNs = 900_000_000L
+
+/** Close spring damping when the sheet lands into the mini pill with speed. */
+private const val COLLAPSE_LANDING_DAMPING = 0.72f
+
+/** How far (of the collapse travel) a full predictive-back swipe previews. */
+private const val PREDICTIVE_BACK_TRAVEL = 0.35f
 
 /** ponytail: diagnostic slow-motion; leave at 1f except to re-diagnose transitions. */
 private const val DIAG_SLOWDOWN = 1f
@@ -131,6 +141,17 @@ fun BottomSheet(
     val density = LocalDensity.current
     var hasBeenShown by remember { mutableStateOf(false) }
     if (!state.isCollapsed) hasBeenShown = true
+    // Resident content is composed a moment after launch instead of on the first open:
+    // composing the whole player inside the first morph frame stalled it (the card
+    // skipped to full size on the first tap after launch).
+    if (keepContentComposed) {
+        LaunchedEffect(Unit) {
+            // 600ms: late enough to stay out of the launch frames, early enough that a quick
+            // first tap no longer cold-composes the whole player inside the first morph frame.
+            kotlinx.coroutines.delay(600)
+            hasBeenShown = true
+        }
+    }
 
     // Once the sheet has settled at full size, its corners open to square on their own
     // short beat, so the player fills the display edge to edge with the glass rounding.
@@ -139,7 +160,9 @@ fun BottomSheet(
     LaunchedEffect(state.isExpanded) {
         cornerExpansion.animateTo(
             targetValue = if (state.isExpanded) 1f else 0f,
-            animationSpec = spring(dampingRatio = 0.78f, stiffness = 550f),
+            // Critically damped: the underdamped 0.78 overshot past square into a negative
+            // radius for a few frames.
+            animationSpec = spring(dampingRatio = 1f, stiffness = 550f),
         )
     }
 
@@ -204,7 +227,9 @@ fun BottomSheet(
                     onDragCancel = {
                         state.dragClockNs[0] = 0L
                         velocityTracker.resetTracking()
-                        state.snapTo(state.collapsedBound)
+                        // Settle to the nearest anchor: snapping shut here slammed the player
+                        // closed in one frame whenever the system took the pointer.
+                        state.performFling(0f, onDismiss = null)
                     },
                     onDragEnd = {
                         state.dragClockNs[0] = 0L
@@ -237,7 +262,18 @@ fun BottomSheet(
             }
     ) {
         if (handleBack && !state.isCollapsed && !state.isDismissed) {
-            BackHandler(onBack = state::collapseSoft)
+            // Predictive back drives the sheet itself: the swipe pulls the player part of the
+            // way toward the mini (the morph engages and the card starts shrinking into the
+            // pill under the thumb), release commits, cancel springs it back open.
+            androidx.activity.compose.PredictiveBackHandler { events ->
+                try {
+                    events.collect { event -> state.previewBack(event.progress) }
+                    state.collapseSoft()
+                } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                    state.expandSoft()
+                    throw e
+                }
+            }
         }
 
         // main content
@@ -247,13 +283,14 @@ fun BottomSheet(
                     .fillMaxSize()
                     .then(
                         if (state.isCollapsed) {
-                            Modifier
-                                .clearAndSetSemantics {}
-                                .layout { measurable, constraints ->
-                                    val placeable = measurable.measure(constraints)
-                                    // Not placed: skips draw and hit-testing entirely.
-                                    layout(placeable.width, placeable.height) {}
-                                }
+                            // Placed and drawn (at alpha 0, see below, and translated a full
+                            // sheet height off screen, so no input reaches it) rather than
+                            // left unplaced: HWUI destroys the offscreen layers of nodes that
+                            // leave the render tree, so an unplaced player rebuilt every one of
+                            // them on the first morph frame -- measured 355ms, the animation
+                            // clock jumped and the card appeared at full size. Alpha-0 nodes
+                            // are still prepared, so their layers stay warm for the morph.
+                            Modifier.clearAndSetSemantics {}
                         } else {
                             Modifier
                         },
@@ -378,7 +415,7 @@ class BottomSheetState(
         (started != 0L && System.nanoTime() - started < BackdropFreezeSafetyNs) ||
             // Q3 lock: tap-driven open/close runs no drag, so without this the
             // backdrop re-samples every animation frame into the morph recording.
-            (PlayerMorph.active && PlayerMorph.progress < PLAYER_GLASS_UNFREEZE_PROGRESS)
+            PlayerMorph.glassFrozen
     }
 
     val value by animatable.asState()
@@ -400,13 +437,47 @@ class BottomSheetState(
         if (totalRange <= 0f) 0f else ((animatable.value - collapsedBound).value / totalRange).coerceIn(0f, 1f)
     }
 
+    /**
+     * Set by the player sheet: its collapse lands WITH speed (slightly underdamped, stopped
+     * by the collapsed bound) and hands that speed (dp/s, negative = downward) here, so the
+     * mini pill can carry it on as an overshoot dip below its slot and settle.
+     */
+    var onCollapseLanded: ((velocityDpPerSec: Float) -> Unit)? = null
+
+    /**
+     * true when a collapse starts, false when it ends WITHOUT landing (interrupted, or
+     * already at rest). Lets the landing take over on the very frame the sheet reaches its
+     * bound: flagged only from [onCollapseLanded], that frame had nobody drawing the card.
+     */
+    var onCollapseArmed: ((armed: Boolean) -> Unit)? = null
+    private var collapseGeneration = 0
+
     fun collapse(animationSpec: AnimationSpec<Dp>, initialVelocity: Dp = 0.dp) {
         onAnchorChanged(collapsedAnchor)
         publishTarget(false)
         coroutineScope.launch {
-            animatable.animateTo(collapsedBound, animationSpec, initialVelocity)
+            val generation = ++collapseGeneration
+            onCollapseArmed?.invoke(true)
+            var landed = false
+            try {
+                val result = animatable.animateTo(collapsedBound, animationSpec, initialVelocity)
+                if (result.endReason == androidx.compose.animation.core.AnimationEndReason.BoundReached) {
+                    landed = true
+                    onCollapseLanded?.invoke(result.endState.velocity.value)
+                }
+            } finally {
+                // A newer collapse cancelled this one and has already re-armed.
+                if (!landed && generation == collapseGeneration) onCollapseArmed?.invoke(false)
+            }
         }
     }
+
+    /** Critically damped normally; a touch underdamped when a landing handler wants the
+     *  arrival speed (only reachable because the collapsed bound stops the overshoot). */
+    private fun collapseSpring() = spring<Dp>(
+        dampingRatio = if (onCollapseLanded != null) COLLAPSE_LANDING_DAMPING else Spring.DampingRatioNoBouncy,
+        stiffness = PlayerSheetStiffness,
+    )
 
     fun expand(animationSpec: AnimationSpec<Dp>, initialVelocity: Dp = 0.dp) {
         onAnchorChanged(expandedAnchor)
@@ -426,20 +497,14 @@ class BottomSheetState(
      * visibly different curve than a tap-open right next to it.
      */
     private fun collapse(velocityPxPerSec: Float = 0f) {
-        collapse(
-            spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = 360f,
-            ),
-            initialVelocity = with(density) { velocityPxPerSec.toDp() },
-        )
+        collapse(collapseSpring(), initialVelocity = with(density) { velocityPxPerSec.toDp() })
     }
 
     private fun expand(velocityPxPerSec: Float = 0f) {
         expand(
             spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = 360f,
+                stiffness = PlayerSheetStiffness,
             ),
             initialVelocity = with(density) { velocityPxPerSec.toDp() },
         )
@@ -449,12 +514,7 @@ class BottomSheetState(
         // Melox PlayerSheetTransition.animateToTarget: critically damped
         // (NoBouncy), stiffness 360, velocity-seeded on fling release.
         endDragState()
-        collapse(
-            spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = 360f,
-            ),
-        )
+        collapse(collapseSpring())
     }
 
     fun expandSoft() {
@@ -463,7 +523,7 @@ class BottomSheetState(
         expand(
             spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = 360f,
+                stiffness = PlayerSheetStiffness,
             ),
         )
     }
@@ -482,6 +542,16 @@ class BottomSheetState(
         endDragState()
         publishTarget(false)
         animatable.animateTo(dismissedBound)
+    }
+
+    /** Predictive-back preview: [fraction] 0..1 of the gesture moves the sheet up to
+     *  [PREDICTIVE_BACK_TRAVEL] of the way down. Eased so the first pixels are gentle. */
+    fun previewBack(fraction: Float) {
+        val eased = 1f - (1f - fraction.coerceIn(0f, 1f)).pow(2)
+        val target = expandedBound - (expandedBound - collapsedBound) * (PREDICTIVE_BACK_TRAVEL * eased)
+        coroutineScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            animatable.snapTo(target)
+        }
     }
 
     fun snapTo(value: Dp) {
@@ -598,15 +668,19 @@ fun rememberBottomSheetState(
     expandedBound: Dp,
     collapsedBound: Dp = dismissedBound,
     initialAnchor: Int = dismissedAnchor,
+    // A sheet whose bounds ARE the pane it lives in (Player v2's queue pane, sized to
+    // maxHeight, not the screen) has nowhere to bounce from -- animating its mount is the
+    // one-frame-old bug where it overshoots past its own ceiling and springs back, which
+    // reads as "expand then shrink". Those callers pass false to seed the Animatable at its
+    // resting value directly. Every other sheet (mini player, real screen-edge sheets) keeps
+    // the reveal animation, so this defaults to on.
+    animateOnMount: Boolean = true,
 ): BottomSheetState {
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
 
     var previousAnchor by rememberSaveable {
         mutableIntStateOf(initialAnchor)
-    }
-    val animatable = remember {
-        Animatable(0.dp, Dp.VectorConverter)
     }
 
     return remember(dismissedBound, expandedBound, collapsedBound, coroutineScope) {
@@ -616,15 +690,20 @@ fun rememberBottomSheetState(
             dismissedAnchor -> dismissedBound
             else -> error("Unknown BottomSheet anchor")
         }
+        val animatable = Animatable(if (animateOnMount) 0.dp else initialValue, Dp.VectorConverter)
 
         animatable.updateBounds(dismissedBound.coerceAtMost(expandedBound), null)
-        coroutineScope.launch {
-            animatable.animateTo(initialValue, NavigationBarAnimationSpec)
+        if (animateOnMount) {
+            coroutineScope.launch {
+                animatable.animateTo(initialValue, NavigationBarAnimationSpec)
+            }
         }
 
         BottomSheetState(
             draggableState = DraggableState { delta ->
-                coroutineScope.launch {
+                // UNDISPATCHED: the snap lands in this input event, not a dispatch later --
+                // the card was trailing the finger by a frame.
+                coroutineScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                     // Stop AT the top, don't run past it. The animatable's upper bound is
                     // deliberately null so the settle springs have room to overshoot, but a
                     // raw drag using that room carried the sheet arbitrarily far above the

@@ -273,6 +273,8 @@
     <string name="prevent_duplicate_tracks_in_queue_desc">When adding a track to queue, remove it from its previous position if already present</string>
     <string name="show_wrapped_card">Show Wrapped card</string>
     <string name="skip_silence_desc">Fast forward through silent parts of songs</string>
+    <string name="karaoke_mode">Karaoke mode</string>
+    <string name="karaoke_mode_desc">Show the Sing control in lyrics to lower vocals. Uses extra battery while on</string>
     <string name="skip_silence_instant">Instantly skip silence</string>
     <string name="skip_silence_instant_desc">Jump ahead during silent moments instead of speeding up playback</string>
 

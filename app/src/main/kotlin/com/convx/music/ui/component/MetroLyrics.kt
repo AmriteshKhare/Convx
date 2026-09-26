@@ -209,7 +209,8 @@ fun MetroLyricsLine(
         fontWeight = FontWeight.Bold,
         fontStyle = if (entry.isBackground) FontStyle.Italic else FontStyle.Normal,
         lineHeight = (lyricsTextSize * lyricsLineSpacing).sp,
-        letterSpacing = (-0.5).sp,
+        // Figma main tracking is positive: +0.4px @ 34px ≈ +1.2% (642:23917).
+        letterSpacing = (lyricsTextSize * 0.012f).sp,
         textAlign = agentTextAlign,
         platformStyle = PlatformTextStyle(includeFontPadding = false),
         lineHeightStyle = LineHeightStyle(
@@ -293,7 +294,9 @@ fun MetroLyricsLine(
                     fontSize = 16.sp,
                     color = expressiveAccent.copy(alpha = 0.8f),
                     textAlign = agentTextAlign,
-                    fontWeight = FontWeight.Medium,
+                    // Figma translation: Bold (642:23917).
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (16 * -0.012f).sp,
                     modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
                     lineHeight = (16 * lyricsLineSpacing.coerceAtMost(1.3f)).sp
                 )

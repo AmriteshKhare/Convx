@@ -158,6 +158,7 @@ import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.elasticStretchLayerBlock
 import com.convx.music.ui.component.isGlassAllowed
 import com.convx.music.ui.component.liquidGlass
+import com.convx.music.ui.component.LocalAppMotionFrozen
 import com.convx.music.ui.theme.PlayerColorExtractor
 import com.convx.music.ui.theme.colorengine.ColorEngine
 import com.convx.music.utils.rememberEnumPreference
@@ -241,7 +242,7 @@ private fun NewMiniPlayer(
     }
     
     val miniPlayerBackground by rememberEnumPreference(MiniPlayerBackgroundStyleKey, defaultValue = PlayerBackgroundStyle.DEFAULT)
-    val miniPlayerWaveform by rememberPreference(MiniPlayerWaveformKey, defaultValue = true)
+    val miniPlayerWaveform by rememberPreference(MiniPlayerWaveformKey, defaultValue = false)
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
     val waveFraction = rememberPlaybackFraction(playerConnection.player, isPlaying)
     
@@ -1302,7 +1303,11 @@ internal fun MiniPlayerBackgroundLayer(
         }
         PlayerBackgroundStyle.GLOW_ANIMATED -> {
             if (gradientColors.isNotEmpty()) {
-                val progress: ComposeState<Float> = if (isPlaying) {
+                // Gate on app motion freeze: this mini sits over Home while its
+                // infinite transition would otherwise invalidate every frame of
+                // every scroll. One recomposition per scroll start/end.
+                val motionFrozen = LocalAppMotionFrozen.current
+                val progress: ComposeState<Float> = if (isPlaying && !motionFrozen.value) {
                     val infiniteTransition = rememberInfiniteTransition(label = "GlowAnimation")
                     infiniteTransition.animateFloat(
                         initialValue = 0f,
@@ -1368,7 +1373,8 @@ internal fun MiniPlayerBackgroundLayer(
         }
 
         PlayerBackgroundStyle.LIVE_MESH -> {
-            val rotation: ComposeState<Float> = if (isPlaying) {
+            val motionFrozen = LocalAppMotionFrozen.current
+            val rotation: ComposeState<Float> = if (isPlaying && !motionFrozen.value) {
                 val infiniteTransition = rememberInfiniteTransition(label = "liveMesh")
                 infiniteTransition.animateFloat(
                     initialValue = 0f,

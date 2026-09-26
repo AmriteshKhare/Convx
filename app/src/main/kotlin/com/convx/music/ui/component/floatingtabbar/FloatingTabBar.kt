@@ -39,6 +39,9 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
@@ -52,6 +55,7 @@ import androidx.compose.foundation.Indication
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +73,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import com.convx.music.ui.ios.compat.AppTheme
@@ -85,6 +90,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -95,6 +101,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.ColorFilter
@@ -103,6 +110,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -150,7 +159,36 @@ private const val DIAG_SLOWDOWN = 1
 
 // Gooey merge/split pulse duration; not derived from the fades, just a reasonable match.
 private val GooeyPeakBlur = 12.dp
-private const val GooeyDurationMs = 300 * DIAG_SLOWDOWN
+
+// Apple's bar collapse/expand is a critically damped spring (k440 collapse, k700 expand;
+// measured in PLAN_navbar_player_motion.md). It is front-loaded: 28% of the travel is done
+// at 50ms, where our old 300ms FastOutSlowIn tween was at ~4%, which read as lag. This
+// bezier is the fit of that spring (RMSE 0.01) and stays a fixed-duration tween on purpose:
+// every clock in a transition (size, fades, shared bounds) must share one end frame or the
+// overlay copy and real layout drift apart and the icons pop.
+// Same fit, with the reference's terminal overshoot put back (y2 > 1 peaks a few
+// percent past the target and settles on the end frame). Measured off
+// m2-res_854p.mp4: expand overshoots ~3% of the travel, collapse ~1.5%. It is the
+// SAME curve for the container SizeTransform and every sharedElement bounds, so
+// putting the bounce back costs no extra clock -- which is what made the earlier
+// attempt drift and pop.
+private fun barEasing(collapsing: Boolean) =
+    if (collapsing) BarMotion.BarSurfaceCollapseSpring else BarMotion.BarSurfaceExpandSpring
+// Time for the spring to reach 99%.
+private const val CollapseMs = 317 * DIAG_SLOWDOWN
+private const val ExpandMs = 251 * DIAG_SLOWDOWN
+private fun barMs(collapsing: Boolean) = if (collapsing) CollapseMs else ExpandMs
+// Bounds/size clocks for the spring-shaped morph: longer than the fades so the overshoot
+// rises and settles slowly (user: the bounce read "too fast"). Fades keep the measured
+// CollapseMs/ExpandMs above.
+private const val CollapseMorphMs = 560 * DIAG_SLOWDOWN
+private const val ExpandMorphMs = 470 * DIAG_SLOWDOWN
+private fun barMorphMs(collapsing: Boolean) = if (collapsing) CollapseMorphMs else ExpandMorphMs
+
+// The container's own size animation must outlast every element inside it, or the mini
+// player would still be sliding when the bar it sits in has already stopped resizing.
+private fun barTotalMs(collapsing: Boolean) =
+    (if (collapsing) BarMotion.CollapseAccessory else BarMotion.ExpandAccessory).durationMs
 
 // Rest-state puck shadow: with zero press it would be invisible against a dark bar.
 private const val PuckRestShadowAlpha = 0.35f
@@ -164,7 +202,11 @@ private const val ScrollFreezeTailNs = 120_000_000L
 private const val MomentumVelocityEmaAlpha = 0.35f
 
 // Vendored addition: the three shapes the bar can render (INLINE, EXPANDED, SEARCH_EXPANDED).
-private enum class FloatingTabBarVisual { INLINE, EXPANDED, SEARCH_EXPANDED }
+internal enum class FloatingTabBarVisual { INLINE, EXPANDED, SEARCH_EXPANDED }
+
+// The accessory's expanded height before it has measured itself once (the default mini
+// strip: 38dp art + 8dp padding each side).
+private val ExpandedAccessoryFallbackHeight = 54.dp
 
 // Matches the mini player's 48dp row height so the shrunk states all read as one height.
 internal val SearchBarRowHeight = 48.dp
@@ -181,8 +223,9 @@ internal val SearchBarRowHeight = 48.dp
  * @param elevations the elevation values used by the tab bar components
  * @param tabBarContentModifier modifier applied to the tab bar sections containing the grouped tabs and standalone tab.
  * It is applied after the default styling (background, shadow, clip) but before any content padding.
- * @param inlineAccessory the accessory composable that appears in inline state (e.g., compact media player)
- * @param expandedAccessory the accessory composable that appears in expanded state (e.g., full media player)
+ * @param accessory the accessory (e.g. the mini player), composed ONCE and moved between its
+ * inline and expanded slots rather than rebuilt per state -- see [AccessoryHost]. Receives the
+ * surface modifier to apply and whether it currently targets the inline slot.
  * @param content the content defining the tabs
  */
 @Composable
@@ -191,8 +234,7 @@ fun FloatingTabBar(
     scrollConnection: FloatingTabBarScrollConnection,
     modifier: Modifier = Modifier,
     tabBarContentModifier: Modifier = Modifier,
-    inlineAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
-    expandedAccessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)? = null,
+    accessory: (@Composable (modifier: Modifier, isInline: Boolean) -> Unit)? = null,
     colors: FloatingTabBarColors = FloatingTabBarDefaults.colors(),
     shapes: FloatingTabBarShapes = FloatingTabBarDefaults.shapes(),
     sizes: FloatingTabBarSizes = FloatingTabBarDefaults.sizes(),
@@ -224,7 +266,10 @@ fun FloatingTabBar(
     // unrepresentable.
     val scope = FloatingTabBarScopeImpl().apply { content() }
 
-    val isAccessoryShared = inlineAccessory != null && expandedAccessory != null
+    // Where the accessory's slot sits in each bar shape; the host flies the one accessory
+    // between them. Null = no accessory, the bars reserve no slot.
+    val accessoryFallbackHeightPx = with(LocalDensity.current) { ExpandedAccessoryFallbackHeight.roundToPx() }
+    val accessorySlots = if (accessory != null) remember { AccessorySlots(accessoryFallbackHeightPx) } else null
 
     val visual = when {
         scrollConnection.isInline -> FloatingTabBarVisual.INLINE
@@ -248,11 +293,12 @@ fun FloatingTabBar(
     // from a start/end value, since the steady-state target is always 0.
     val gooeyProgress by transition.animateFloat(
         transitionSpec = {
+            val ms = barMs(targetState == FloatingTabBarVisual.INLINE)
             keyframes {
-                durationMillis = GooeyDurationMs
+                durationMillis = ms
                 0f at 0
                 1f atFraction 0.5f using FastOutSlowInEasing
-                0f at GooeyDurationMs
+                0f at ms
             }
         },
         label = "gooeyProgress"
@@ -279,7 +325,7 @@ fun FloatingTabBar(
                     // PLAN 4 + Q3: bar is covered by the morph card, re-sampling
                     // under it is wasted work. Unfreezes at 0.75 so the capture
                     // is live before the glass resolves at the end of flight.
-                    (PlayerMorph.active && PlayerMorph.progress < 0.75f)
+                    PlayerMorph.glassFrozen
             }
         }
         val collapsing = transition.targetState == FloatingTabBarVisual.INLINE
@@ -298,6 +344,7 @@ fun FloatingTabBar(
             // layer (see GooeyTransition.kt), so the outgoing/incoming edges bleed
             // together through the blur and snap back to a crisp, molten seam
             // instead of a hard-clipped rectangle edge.
+            Box {
             Box(
                 Modifier
                     .gooey { if (meltTransitionEnabled) gooeyBlurPx * gooeyProgress else 0f }
@@ -307,25 +354,48 @@ fun FloatingTabBar(
             ) {
                 transition.AnimatedContent(
                     transitionSpec = {
-                        // Preserve the inline/expanded size morph, but hand icon
-                        // ownership over once: old tree fades out in the first half,
-                        // new tree fades in in the second. This removes the overlap/
-                        // readjust glitch while keeping the requested animation.
+                        val collapsing = targetState == FloatingTabBarVisual.INLINE
+                        val ms = barMs(collapsing)
+                        val sizeMs = barTotalMs(collapsing)
+                        // Frame-counted off m2-res_854p.mp4 (30fps). The old
+                        // half-out-then-half-in split left BOTH trees near zero at the
+                        // midpoint -- the visible blink, and the reason the icons read
+                        // as "fading badly". The reference never blinks: the outgoing
+                        // glyphs wash out inside the first ~3 frames while the pill is
+                        // still near full width, and the incoming ones are already
+                        // faintly up as the pill grows. Short out, early overlapping in.
                         (fadeIn(
                             tween(
-                                durationMillis = GooeyDurationMs / 2,
-                                delayMillis = GooeyDurationMs / 2,
-                                easing = FastOutSlowInEasing,
+                                durationMillis = (ms * 0.62f).toInt(),
+                                delayMillis = (ms * 0.16f).toInt(),
+                                easing = LinearOutSlowInEasing,
                             )
                         ) togetherWith fadeOut(
+                            // Outgoing icons stay up while the pill retracts over them and
+                            // only dissolve at the end (user: the left icon "faded away" and
+                            // looked buggy with the old 0.32*ms linear wash-out).
                             tween(
-                                durationMillis = GooeyDurationMs / 2,
-                                easing = FastOutSlowInEasing,
+                                durationMillis = (barMorphMs(collapsing) * 0.6f).toInt(),
+                                easing = FastOutLinearInEasing,
                             )
                         ))
                             .using(
                                 SizeTransform(clip = false) { _, _ ->
-                                    tween(GooeyDurationMs, easing = FastOutSlowInEasing)
+                                    // The mini player's VERTICAL travel is container-driven: it
+                                    // drops because the bar loses its upper row, not because its
+                                    // own accessory bounds move on BarMotion's y curve. That is
+                                    // why the measured y ran from frame one (ours .08/.24/.44 at
+                                    // 42/75/108ms) while the reference holds (.03/.03/.03 for
+                                    // ~100ms) and only then follows. Put BarMotion's y delay on
+                                    // the container's own size clock, where it is actually read.
+                                    // Same end frame as before (67 + 340 = 407 = sizeMs), so no
+                                    // clock drifts against the shared bounds.
+                                    val yDelay = if (collapsing) BarMotion.CollapseYDelayMs else 0
+                                    tween(
+                                        durationMillis = sizeMs - yDelay,
+                                        delayMillis = yDelay,
+                                        easing = barEasing(collapsing),
+                                    )
                                 }
                             )
                     },
@@ -335,8 +405,7 @@ fun FloatingTabBar(
                 FloatingTabBarVisual.INLINE -> InlineBar(
                     scope = scope,
                     selectedTabKey = selectedTabKey,
-                    accessory = inlineAccessory,
-                    isAccessoryShared = isAccessoryShared,
+                    accessorySlots = accessorySlots,
                     onInlineTabClick = { scrollConnection.expand() },
                     colors = colors,
                     shapes = shapes,
@@ -349,8 +418,8 @@ fun FloatingTabBar(
                     scope = scope,
                     selectedTabKey = selectedTabKey,
                     tabPosition = tabPosition,
-                    accessory = expandedAccessory,
-                    isAccessoryShared = isAccessoryShared,
+                    accessorySlots = accessorySlots,
+                    initialTabRowWidthPx = expandedContentWidthPx,
                     colors = colors,
                     shapes = shapes,
                     sizes = sizes,
@@ -364,8 +433,7 @@ fun FloatingTabBar(
                 FloatingTabBarVisual.SEARCH_EXPANDED -> SearchExpandedBar(
                     scope = scope,
                     selectedTabKey = selectedTabKey,
-                    accessory = expandedAccessory,
-                    isAccessoryShared = isAccessoryShared,
+                    accessorySlots = accessorySlots,
                     colors = colors,
                     shapes = shapes,
                     sizes = sizes,
@@ -374,6 +442,18 @@ fun FloatingTabBar(
                     animatedVisibilityScope = this@AnimatedContent,
                     searchBarContent = searchBarContent ?: {},
                     targetWidthPx = expandedContentWidthPx
+                )
+            }
+            }
+            if (accessory != null && accessorySlots != null) {
+                AccessoryHost(
+                    accessory = accessory,
+                    slots = accessorySlots,
+                    targetVisual = { transition.targetState },
+                    colors = colors,
+                    shapes = shapes,
+                    elevations = elevations,
+                    modifier = Modifier.matchParentSize(),
                 )
             }
             }
@@ -522,6 +602,10 @@ class FloatingTabBarScrollConnection(
                 }
             }
 
+            FloatingTabBarInlineBehavior.ExpandedAtTopOnly -> {
+                // Decided in onPostScroll, where what the content actually consumed is known.
+            }
+
             FloatingTabBarInlineBehavior.Never -> {
                 // Already handled above, but included for completeness
             }
@@ -529,7 +613,35 @@ class FloatingTabBarScrollConnection(
 
         return Offset.Zero // Don't consume the scroll, let it pass through
     }
+
+    /**
+     * Runs after the content has taken its share. Anything it consumed means it moved, so
+     * the top is behind us and the bar goes inline; anything left over travelling UP means
+     * the content had nowhere further to go, i.e. it is sitting at the top, and the bar
+     * comes back. Content too short to scroll never consumes, so it stays expanded.
+     */
+    override fun onPostScroll(
+        consumed: Offset,
+        available: Offset,
+        source: NestedScrollSource,
+    ): Offset {
+        if (inlineBehavior != FloatingTabBarInlineBehavior.ExpandedAtTopOnly) return Offset.Zero
+
+        if (available.y > AtTopSlopPx) {
+            if (isInline) {
+                isInline = false
+                accumulatedScroll = 0f
+            }
+        } else if (abs(consumed.y) > AtTopSlopPx && !isInline) {
+            isInline = true
+            accumulatedScroll = 0f
+        }
+        return Offset.Zero
+    }
 }
+
+/** Below this many pixels a scroll event is rounding noise, not a move. */
+private const val AtTopSlopPx = 0.5f
 
 /**
  * Creates and remembers a [FloatingTabBarScrollConnection] instance.
@@ -572,7 +684,17 @@ enum class FloatingTabBarInlineBehavior {
     OnScrollDown,
 
     /** Transition to inline when scrolling up */
-    OnScrollUp
+    OnScrollUp,
+
+    /**
+     * Expanded only while the content is at its top; inline the moment it scrolls away,
+     * in either direction, and expanded again only on arriving back at the top.
+     *
+     * No thresholds and no accumulated distance: "at the top" is read from the scroll the
+     * content could NOT consume upward, which is the only thing a nested-scroll connection
+     * actually knows about the list's position.
+     */
+    ExpandedAtTopOnly
 }
 
 interface FloatingTabBarScope {
@@ -584,13 +706,16 @@ interface FloatingTabBarScope {
      * @param icon Composable content for the tab icon
      * @param onClick Callback invoked when the tab is clicked
      * @param indication Optional indication provider for touch feedback, defaults to LocalIndication.current
+     * @param onLongClick Callback for a press-and-hold, handed the cell's own bounds in window
+     * coordinates so the caller can anchor a context menu to the tab that was actually held.
      */
     fun tab(
         key: Any,
         title: @Composable () -> Unit,
         icon: @Composable () -> Unit,
         onClick: () -> Unit,
-        indication: (@Composable () -> Indication)? = { LocalIndication.current }
+        indication: (@Composable () -> Indication)? = { LocalIndication.current },
+        onLongClick: ((Rect) -> Unit)? = null
     )
 
     /**
@@ -611,7 +736,8 @@ interface FloatingTabBarScope {
         icon: @Composable () -> Unit,
         onClick: () -> Unit,
         indication: (@Composable () -> Indication)? = { LocalIndication.current },
-        title: @Composable () -> Unit = {}
+        title: @Composable () -> Unit = {},
+        onLongClick: ((Rect) -> Unit)? = null
     )
 }
 
@@ -626,21 +752,35 @@ interface FloatingTabBarScope {
 private fun Modifier.tapClickable(
     indication: Indication?,
     onClick: () -> Unit,
+    onLongClick: ((Rect) -> Unit)? = null,
 ): Modifier {
     val interactionSource = remember { MutableInteractionSource() }
-    return clickable(
-        onClick = onClick,
-        indication = indication,
-        interactionSource = interactionSource
-    )
+    if (onLongClick == null) {
+        return clickable(
+            onClick = onClick,
+            indication = indication,
+            interactionSource = interactionSource
+        )
+    }
+    // Hold-to-open needs to tell the caller WHERE it was held, so the context menu can grow
+    // out of that tab rather than out of the middle of the bar. Written from layout, read
+    // from the gesture callback: a plain array, never snapshot state, so reporting bounds
+    // every layout pass costs no recomposition (same technique as the scroll clocks above).
+    val bounds = remember { arrayOf(Rect.Zero) }
+    return onGloballyPositioned { bounds[0] = it.boundsInWindow() }
+        .combinedClickable(
+            onClick = onClick,
+            onLongClick = { onLongClick(bounds[0]) },
+            indication = indication,
+            interactionSource = interactionSource
+        )
 }
 
 @Composable
 private fun SharedTransitionScope.InlineBar(
     scope: FloatingTabBarScopeImpl,
     selectedTabKey: Any?,
-    accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
-    isAccessoryShared: Boolean,
+    accessorySlots: AccessorySlots?,
     onInlineTabClick: () -> Unit,
     colors: FloatingTabBarColors,
     shapes: FloatingTabBarShapes,
@@ -660,7 +800,7 @@ private fun SharedTransitionScope.InlineBar(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (accessory == null) Modifier.wrapContentWidth() else Modifier)
+            .then(if (accessorySlots == null) Modifier.wrapContentWidth() else Modifier)
             .height(SearchBarRowHeight)
     ) {
         if (hasInlineTab) {
@@ -675,21 +815,22 @@ private fun SharedTransitionScope.InlineBar(
                 tabBarContentModifier = tabBarContentModifier,
                 // Pinned to the row height so the shrunk tab pill always
                 // matches the mini + search pills at 48dp.
-                modifier = Modifier.fillMaxHeight()
+                // A true circle (row height square), like the search circle; the mini
+                // player's weight(1f) takes whatever width is left between the two.
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .aspectRatio(1f, matchHeightConstraintsFirst = true)
+                    .then(tabPillBounds(animatedVisibilityScope))
             )
         }
 
-        if (accessory != null) {
-            InlineAccessory(
-                accessory = accessory,
-                isAccessoryShared = isAccessoryShared,
-                shapes = shapes,
-                colors = colors,
-                elevations = elevations,
-                animatedVisibilityScope = animatedVisibilityScope,
-                modifier = Modifier
+        if (accessorySlots != null) {
+            // Empty slot: the accessory itself is drawn by AccessoryHost.
+            Box(
+                Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .then(accessorySlot(accessorySlots, FloatingTabBarVisual.INLINE, animatedVisibilityScope))
             )
         }
 
@@ -739,6 +880,7 @@ private fun SharedTransitionScope.InlineTab(
 
     Box(
         modifier = modifier
+            .landingEcho()
             // Outside sharedElement: draw-only, so bounds tracking is
             // unaffected, and no overlay clipping can cut the stretch.
             .graphicsLayer(elasticStretchLayerBlock(glow))
@@ -757,6 +899,7 @@ private fun SharedTransitionScope.InlineTab(
             .then(glow.modifier)
             .tapClickable(
                 indication = inlineTab.indication?.invoke(),
+                onLongClick = inlineTab.onLongClick,
                 onClick = {
                     onInlineTabClick()
                     inlineTab.onClick()
@@ -765,10 +908,24 @@ private fun SharedTransitionScope.InlineTab(
             .padding(sizes.tabInlineContentPadding)
     ) {
         Tab(
-            // Q1 fix: no per-icon sharedElement -- the icon rides the tabGroup's
-            // own shared bounds. A nested shared node double-drove the icon
-            // (overlay bounds inside overlay bounds) = self-readjust glitch.
-            icon = { inlineTab.icon() },
+            icon = {
+                Box(
+                    // Reference (measured off m2-res_854p.mp4): the selected icon travels
+                    // into the circle rather than cross-fading between two independent
+                    // instances. One shared bounds node for the icon only -- the Q1 fix
+                    // above still holds for the pill/label group as a whole, this is a
+                    // second, narrower shared element scoped to just the glyph.
+                    modifier = Modifier.sharedElement(
+                        sharedContentState = rememberSharedContentState("navIcon"),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        boundsTransform = LocalBarBoundsTransforms.current.item,
+                        // Just above its pill (z 1) -- at z 0 it was drawn UNDER its own pill's
+                        // overlay copy and vanished mid-morph -- and under the mini (z 2), which
+                        // it passes behind on its way down, as on iOS.
+                        zIndexInOverlay = 1.5f,
+                    ),
+                ) { inlineTab.icon() }
+            },
             title = { inlineTab.title() },
             isInline = true
         )
@@ -803,6 +960,7 @@ private fun SharedTransitionScope.InlineStandaloneTab(
             // unclipped bar shows on purpose.
             // Outside sharedElement: draw-only, so bounds tracking is
             // unaffected, and no overlay clipping can cut the stretch.
+            .landingEcho()
             .graphicsLayer(elasticStretchLayerBlock(glow))
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
@@ -825,7 +983,8 @@ private fun SharedTransitionScope.InlineStandaloneTab(
             .then(glow.modifier)
             .tapClickable(
                 indication = standaloneTab.indication?.invoke(),
-                onClick = standaloneTab.onClick
+                onClick = standaloneTab.onClick,
+                onLongClick = standaloneTab.onLongClick
             )
             // Unlike the regular tab pill (InlineTab, ExpandedTabs), this circle had
             // no inset at all — the icon sat flush against its edge.
@@ -834,56 +993,14 @@ private fun SharedTransitionScope.InlineStandaloneTab(
 }
 
 @Composable
-private fun SharedTransitionScope.InlineAccessory(
-    accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
-    isAccessoryShared: Boolean,
-    colors: FloatingTabBarColors,
-    shapes: FloatingTabBarShapes,
-    elevations: FloatingTabBarElevations,
-    animatedVisibilityScope: AnimatedVisibilityScope,
-    modifier: Modifier
-) {
-    accessory?.let { accessory ->
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = modifier
-                .then(
-                    if (isAccessoryShared) {
-                        Modifier.sharedElement(
-                            sharedContentState = rememberSharedContentState("accessory"),
-                            animatedVisibilityScope = animatedVisibilityScope,
-                            boundsTransform = LocalBarBoundsTransforms.current.accessory,
-                        )
-                    } else {
-                        Modifier.animateEnterExitAccessory(
-                            sharedTransitionScope = this,
-                            animatedVisibilityScope = animatedVisibilityScope
-                        )
-                    }
-                )
-        ) {
-            accessory(
-                Modifier
-                    .fillMaxSize()
-                    .shadow(
-                        shape = shapes.accessoryShape,
-                        elevation = elevations.inlineElevation
-                    )
-                    .background(color = colors.accessoryBackgroundColor, shapes.accessoryShape)
-                    .clip(shapes.accessoryShape),
-                animatedVisibilityScope
-            )
-        }
-    }
-}
-
-@Composable
 private fun SharedTransitionScope.ExpandedBar(
     scope: FloatingTabBarScopeImpl,
     selectedTabKey: Any?,
     tabPosition: (() -> Float?)?,
-    accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
-    isAccessoryShared: Boolean,
+    accessorySlots: AccessorySlots?,
+    // Last width the tab row reported (held by the caller across remounts): seeding with it
+    // keeps the accessory slot from spending its first frame at full width.
+    initialTabRowWidthPx: Int?,
     colors: FloatingTabBarColors,
     shapes: FloatingTabBarShapes,
     sizes: FloatingTabBarSizes,
@@ -906,7 +1023,7 @@ private fun SharedTransitionScope.ExpandedBar(
     // that first measurement lands — a one-frame lag, same pattern as
     // FloatingMiniPlayer's measuredHeightPx.
     val density = LocalDensity.current
-    var tabRowWidthPx by remember { mutableIntStateOf(0) }
+    var tabRowWidthPx by remember { mutableIntStateOf(initialTabRowWidthPx ?: 0) }
 
     // The standalone tab (search) is always its own floating circle — same as
     // the inline (collapsed) state — never merged into the tab group pill, so
@@ -918,19 +1035,15 @@ private fun SharedTransitionScope.ExpandedBar(
         verticalArrangement = Arrangement.spacedBy(sizes.componentSpacing),
         modifier = Modifier.fillMaxWidth()
     ) {
-        if (accessory != null) {
-            ExpandedAccessory(
-                accessory = accessory,
-                isAccessoryShared = isAccessoryShared,
-                shapes = shapes,
-                colors = colors,
-                elevations = elevations,
-                animatedVisibilityScope = animatedVisibilityScope,
-                modifier = if (tabRowWidthPx > 0) {
+        if (accessorySlots != null) {
+            Box(
+                (if (tabRowWidthPx > 0) {
                     Modifier.width(with(density) { tabRowWidthPx.toDp() })
                 } else {
                     Modifier.fillMaxWidth()
-                }
+                })
+                    .height(with(density) { accessorySlots.expandedHeightPx.toDp() })
+                    .then(accessorySlot(accessorySlots, FloatingTabBarVisual.EXPANDED, animatedVisibilityScope))
             )
         }
 
@@ -957,7 +1070,7 @@ private fun SharedTransitionScope.ExpandedBar(
                     tabBarContentModifier = tabBarContentModifier,
                     backdrop = backdrop,
                     accentColor = accentColor ?: colors.backgroundColor,
-                    modifier = Modifier
+                    modifier = Modifier.then(tabPillBounds(animatedVisibilityScope))
                 )
             }
 
@@ -999,8 +1112,7 @@ private fun SharedTransitionScope.ExpandedBar(
 private fun SharedTransitionScope.SearchExpandedBar(
     scope: FloatingTabBarScopeImpl,
     selectedTabKey: Any?,
-    accessory: (@Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit)?,
-    isAccessoryShared: Boolean,
+    accessorySlots: AccessorySlots?,
     colors: FloatingTabBarColors,
     shapes: FloatingTabBarShapes,
     sizes: FloatingTabBarSizes,
@@ -1033,15 +1145,11 @@ private fun SharedTransitionScope.SearchExpandedBar(
         verticalArrangement = Arrangement.spacedBy(sizes.componentSpacing),
         modifier = Modifier.fillMaxWidth()
     ) {
-        if (accessory != null) {
-            ExpandedAccessory(
-                accessory = accessory,
-                isAccessoryShared = isAccessoryShared,
-                shapes = shapes,
-                colors = colors,
-                elevations = elevations,
-                animatedVisibilityScope = animatedVisibilityScope,
-                modifier = targetWidthModifier
+        if (accessorySlots != null) {
+            Box(
+                targetWidthModifier
+                    .height(with(density) { accessorySlots.expandedHeightPx.toDp() })
+                    .then(accessorySlot(accessorySlots, FloatingTabBarVisual.SEARCH_EXPANDED, animatedVisibilityScope))
             )
         }
 
@@ -1126,6 +1234,7 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
             // exactly as tall as the nav bar (see InlineStandaloneTab).
             // Outside sharedElement: draw-only, so bounds tracking is
             // unaffected, and no overlay clipping can cut the stretch.
+            .landingEcho()
             .graphicsLayer(elasticStretchLayerBlock(glow))
             .sharedElement(
                 sharedContentState = rememberSharedContentState("standaloneTab"),
@@ -1148,7 +1257,8 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
             .then(glow.modifier)
             .tapClickable(
                 indication = standaloneTab.indication?.invoke(),
-                onClick = standaloneTab.onClick
+                onClick = standaloneTab.onClick,
+                onLongClick = standaloneTab.onLongClick
             )
             // Unlike the regular tab pill (ExpandedTabs), this circle had no inset
             // at all — the icon sat flush against its edge.
@@ -1156,45 +1266,6 @@ private fun SharedTransitionScope.ExpandedStandaloneTab(
     )
 }
 
-@Composable
-private fun SharedTransitionScope.ExpandedAccessory(
-    accessory: @Composable SharedTransitionScope.(Modifier, AnimatedVisibilityScope) -> Unit,
-    isAccessoryShared: Boolean,
-    colors: FloatingTabBarColors,
-    shapes: FloatingTabBarShapes,
-    elevations: FloatingTabBarElevations,
-    animatedVisibilityScope: AnimatedVisibilityScope,
-    modifier: Modifier
-) {
-    Box(
-        modifier = modifier
-            .then(
-                if (isAccessoryShared) {
-                    Modifier.sharedElement(
-                        sharedContentState = rememberSharedContentState("accessory"),
-                        animatedVisibilityScope = animatedVisibilityScope,
-                        boundsTransform = LocalBarBoundsTransforms.current.accessory,
-                    )
-                } else {
-                    Modifier.animateEnterExitAccessory(
-                        sharedTransitionScope = this,
-                        animatedVisibilityScope = animatedVisibilityScope
-                    )
-                }
-            )
-    ) {
-        accessory(
-            Modifier
-                .shadow(
-                    shape = shapes.accessoryShape,
-                    elevation = elevations.expandedElevation
-                )
-                .background(color = colors.accessoryBackgroundColor, shapes.accessoryShape)
-                .clip(shapes.accessoryShape),
-            animatedVisibilityScope
-        )
-    }
-}
 @Composable
 private fun SharedTransitionScope.ExpandedTabs(
     scope: FloatingTabBarScopeImpl,
@@ -1227,6 +1298,7 @@ private fun SharedTransitionScope.ExpandedTabs(
     val layoutDirection = LocalLayoutDirection.current
     val isLtr = layoutDirection == LayoutDirection.Ltr
     val animationScope = rememberCoroutineScope()
+    val tabLabelAlpha = animatedVisibilityScope.labelAlpha()
     val glassConfig = LocalGlassEffectConfig.current
     // Puck wash. Explicit user color wins; on hero-art screens the pill takes
     // the mesh hue lighter than the surface with just a hint of tint; unset
@@ -1375,10 +1447,36 @@ private fun SharedTransitionScope.ExpandedTabs(
         derivedStateOf { dampedDragAnimation.pressProgress > 0f }
     }
 
-    Box(modifier.width(with(density) { totalWidthPx.toDp() })) {
+    val pillWidth = with(density) { totalWidthPx.toDp() }
+    // Reference (m2-res_854p.mp4, n259-263): the pill retracts from its RIGHT edge
+    // across icons that DO NOT move -- Home and New sit exactly where they were while
+    // the closing end eats Radio and Library. The shared pill bounds use
+    // RemeasureToBounds, so the row was being re-laid out into the shrinking width
+    // every frame instead, sliding all four icons inward and bunching them: the
+    // "icons adjust badly" readjust. Pin the row to its own width with requiredWidth
+    // (ignores the animating constraints, unlike width()) and let the pill clip it.
+    // The clip is on only while the morph runs, so the puck's press stretch and the
+    // per-item elastic overshoot still protrude at rest.
+    val morphing = remember(animatedVisibilityScope) {
+        derivedStateOf {
+            animatedVisibilityScope.transition.currentState !=
+                animatedVisibilityScope.transition.targetState
+        }
+    }
+    Box(
+        modifier
+            .landingEcho()
+            .width(pillWidth)
+            .graphicsLayer {
+                shape = shapes.tabBarShape
+                clip = morphing.value
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
         Row(
             Modifier
-                .fillMaxSize()
+                .requiredWidth(pillWidth)
+                .fillMaxHeight()
                 .graphicsLayer {
                     translationX = panelOffset
                     val width = size.width.coerceAtLeast(1f)
@@ -1422,12 +1520,34 @@ private fun SharedTransitionScope.ExpandedTabs(
                                     // animateEnterExitAccessory already makes.
                                     compositingStrategy = CompositingStrategy.ModulateAlpha
                                 }
+                                // Only the selected tab's icon shares the travel key with
+                                // InlineTab's -- the rest have nothing to travel to and
+                                // just cross-fade out with the rest of the expanded pill.
+                                .then(
+                                    if (tab.key == selectedTabKey) {
+                                        Modifier.sharedElement(
+                                            sharedContentState = rememberSharedContentState("navIcon"),
+                                            animatedVisibilityScope = animatedVisibilityScope,
+                                            boundsTransform = LocalBarBoundsTransforms.current.item,
+                                            zIndexInOverlay = 1.5f,
+                                        )
+                                    } else {
+                                        Modifier
+                                    }
+                                )
                         ) {
                             tab.icon()
                         }
                     },
                     title = {
-                        Box {
+                        Box(
+                            // Labels leave a frame ahead of the icons and arrive a
+                            // frame behind them -- see labelAlpha().
+                            modifier = Modifier.graphicsLayer {
+                                alpha = tabLabelAlpha.value
+                                compositingStrategy = CompositingStrategy.ModulateAlpha
+                            }
+                        ) {
                             tab.title()
                         }
                     },
@@ -1445,7 +1565,8 @@ private fun SharedTransitionScope.ExpandedTabs(
                         .clip(shapes.tabShape)
                         .tapClickable(
                             indication = tab.indication?.invoke(),
-                            onClick = { currentIndex = index }
+                            onClick = { currentIndex = index },
+                            onLongClick = tab.onLongClick
                         )
                         .padding(sizes.tabExpandedContentPadding)
                 )
@@ -1534,7 +1655,8 @@ private fun SharedTransitionScope.ExpandedTabs(
                         // press progress so it grows out of the flat rest state below.
                         Modifier.drawBackdrop(
                             backdrop = combinedBackdrop,
-                            shape = { shapes.tabShape },
+                            // The bar's own shape family: puck and bar concentric.
+                            shape = { shapes.tabBarShape },
                             effects = {
                                 val progress = dampedDragAnimation.pressProgress
                                 lens(
@@ -1595,7 +1717,8 @@ private fun SharedTransitionScope.ExpandedTabs(
                         // opaque black capsule over the icons. The puck sits above the
                         // tab row, so it has to stay see-through at every press level.
                         .drawWithCache {
-                            val outline = shapes.tabShape.createOutline(size, layoutDirection, this)
+                            // Bar's shape family (continuous on the nav bar), drawn not clipped.
+                            val outline = shapes.tabBarShape.createOutline(size, layoutDirection, this)
                             val wash = if (themeDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.1f)
                             onDrawBehind {
                                 val progress = dampedDragAnimation.pressProgress
@@ -1626,7 +1749,8 @@ private fun Tab(
         // position without growing the Column's measured height and gets it
         // clipped by the tab bar's own bounds.
         verticalArrangement = if (showTitle) {
-            Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
+            // Figma tab cell icon-to-label gap: 1 (348:2524).
+            Arrangement.spacedBy(1.dp, Alignment.CenterVertically)
         } else {
             Arrangement.Center
         },
@@ -1651,30 +1775,30 @@ private fun Tab(
 }
 
 /**
- * A custom modifier that provides smooth enter/exit animations without clipping shadows or other content.
- * This is an alternative to animateEnterExit that uses renderInSharedTransitionScopeOverlay to prevent clipping.
+ * The tab labels' own clock, on top of whatever the container fade is doing.
+ *
+ * Reference (m2-res_854p.mp4, 30fps): on collapse the labels are already gone on the
+ * FIRST frame of the move, a good two frames before the unselected icons finish washing
+ * out and long before the pill has visibly narrowed; on expand they are the last thing
+ * to arrive, after the pill has reached full width. One fast tween each way reproduces
+ * that ordering without adding a transform clock -- alpha only, on a single text draw.
  */
 @Composable
-private fun Modifier.animateEnterExitAccessory(
-    sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope
-): Modifier = with(sharedTransitionScope) {
-    with(animatedVisibilityScope) {
-        val animatedAlpha by transition.animateFloat { targetState ->
-            when (targetState) {
-                EnterExitState.Visible -> 1f
-                else -> 0f
+private fun AnimatedVisibilityScope.labelAlpha(): State<Float> =
+    transition.animateFloat(
+        transitionSpec = {
+            if (targetState == EnterExitState.Visible) {
+                tween(
+                    durationMillis = 80,
+                    delayMillis = (ExpandMs - 90).coerceAtLeast(0),
+                    easing = LinearEasing,
+                )
+            } else {
+                tween(durationMillis = 45, easing = LinearEasing)
             }
-        }
-
-        this@animateEnterExitAccessory
-            .renderInSharedTransitionScopeOverlay()
-            .graphicsLayer(
-                compositingStrategy = CompositingStrategy.ModulateAlpha,
-                alpha = animatedAlpha
-            )
-    }
-}
+        },
+        label = "labelAlpha",
+    ) { if (it == EnterExitState.Visible) 1f else 0f }
 
 /**
  * A custom modifier that provides smooth enter/exit animations with fade and blur effects.
@@ -1743,7 +1867,8 @@ private class FloatingTabBarScopeImpl : FloatingTabBarScope {
         title: @Composable () -> Unit,
         icon: @Composable () -> Unit,
         onClick: () -> Unit,
-        indication: (@Composable () -> Indication)?
+        indication: (@Composable () -> Indication)?,
+        onLongClick: ((Rect) -> Unit)?
     ) {
         tabs.add(
             FloatingTabBarTab(
@@ -1751,24 +1876,27 @@ private class FloatingTabBarScopeImpl : FloatingTabBarScope {
                 title = title,
                 icon = icon,
                 onClick = onClick,
-                indication = indication
+                indication = indication,
+                onLongClick = onLongClick
             )
         )
     }
-    
+
     override fun standaloneTab(
         key: Any,
         icon: @Composable () -> Unit,
         onClick: () -> Unit,
         indication: (@Composable () -> Indication)?,
-        title: @Composable () -> Unit
+        title: @Composable () -> Unit,
+        onLongClick: ((Rect) -> Unit)?
     ) {
         standaloneTab = FloatingTabBarTab(
             key = key,
             title = title,
             icon = icon,
             onClick = onClick,
-            indication = indication
+            indication = indication,
+            onLongClick = onLongClick
         )
     }
 }
@@ -1778,7 +1906,8 @@ private data class FloatingTabBarTab(
     val title: @Composable () -> Unit,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit,
-    val indication: (@Composable () -> Indication)?
+    val indication: (@Composable () -> Indication)?,
+    val onLongClick: ((Rect) -> Unit)? = null
 )
 
 /**
@@ -1924,6 +2053,28 @@ object FloatingTabBarDefaults {
 }
 
 /**
+ * The tab pill and the inline Home circle are one shape to the eye: on collapse the pill's
+ * right edge retracts into the circle, on expand the circle grows back out. Sharing their
+ * bounds makes that a continuous resize; before, they were two unrelated trees that
+ * cross-faded (pill vanished, circle popped in).
+ *
+ * Both backgrounds sit inside the shared node, so the fades are short and overlap: the
+ * outgoing labels have to clear in about two frames (the reference blurs them out first)
+ * without the glass thinning out between the two backgrounds.
+ */
+@Composable
+private fun SharedTransitionScope.tabPillBounds(animatedVisibilityScope: AnimatedVisibilityScope): Modifier =
+    Modifier.sharedBounds(
+        sharedContentState = rememberSharedContentState("tabPill"),
+        animatedVisibilityScope = animatedVisibilityScope,
+        enter = fadeIn(tween(60)),
+        exit = fadeOut(tween(70)),
+        boundsTransform = LocalBarBoundsTransforms.current.bar,
+        resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
+        zIndexInOverlay = 1f,
+    )
+
+/**
  * Inline/expand choreography, reverted to the pre-yesterday behaviour: one
  * fixed-duration tween drives the outer SizeTransform, the fades AND every
  * sharedElement bounds, zero delay, both directions. Tweens share one end
@@ -1932,20 +2083,45 @@ object FloatingTabBarDefaults {
  * which is what read as the icon pop. Stagger/bounce sacrificed on purpose:
  * each was its own clock on the same pixels.
  */
-internal class BarBoundsTransforms(val bar: BoundsTransform, val accessory: BoundsTransform) {
+internal class BarBoundsTransforms(
+    /** Surfaces (tab pill, standalone circle, search field): body bounces, centre does not. */
+    val bar: BoundsTransform,
+    /** Items riding the morph (the travelling tab glyph): no overshoot at all. */
+    val item: BoundsTransform,
+) {
     companion object {
-        private fun <T> morphTween() =
-            tween<T>(GooeyDurationMs, easing = FastOutSlowInEasing)
-
         val Collapse = BarBoundsTransforms(
-            bar = BoundsTransform { _, _ -> morphTween() },
-            accessory = BoundsTransform { _, _ -> morphTween() },
+            bar = BoundsTransform { _, _ -> BarMotion.surface(CollapseMorphMs, BarMotion.BarSurfaceCollapseSpring) },
+            item = BoundsTransform { _, _ -> tween(CollapseMorphMs, easing = BarMotion.Travel) },
         )
         val Expand = BarBoundsTransforms(
-            bar = BoundsTransform { _, _ -> morphTween() },
-            accessory = BoundsTransform { _, _ -> morphTween() },
+            bar = BoundsTransform { _, _ -> BarMotion.surface(ExpandMorphMs, BarMotion.BarSurfaceExpandSpring) },
+            item = BoundsTransform { _, _ -> tween(ExpandMorphMs, easing = BarMotion.Travel) },
         )
     }
 }
 
 internal val LocalBarBoundsTransforms = staticCompositionLocalOf { BarBoundsTransforms.Collapse }
+
+/** How much of the docked mini's landing dip the bar's other items carry. */
+private const val LandingEchoShare = 0.4f
+
+/**
+ * The tab pill and the side circles answer the mini's landing overshoot
+ * ([com.convx.music.ui.player.PlayerMorph.landingDipPx]) with a smaller dip of their own, so
+ * the bar lands as one piece instead of the pill bouncing alone. Draw-phase read; 0 at rest.
+ */
+private fun Modifier.landingEcho(): Modifier = graphicsLayer {
+    translationY = PlayerMorph.landingDipPx() * LandingEchoShare
+}
+
+/**
+ * The docked mini pill's drop shadow, scaled by [com.convx.music.ui.player.PlayerMorph.pillShadow]
+ * so it fades back in after the player lands instead of popping. Same as `.shadow()`
+ * (elevation + shape + clip), with the elevation read in the draw phase.
+ */
+internal fun Modifier.pillShadow(shape: Shape, elevation: Dp): Modifier = graphicsLayer {
+    shadowElevation = elevation.toPx() * com.convx.music.ui.player.PlayerMorph.pillShadow.value
+    this.shape = shape
+    clip = true
+}

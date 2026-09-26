@@ -47,6 +47,8 @@ import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
 import kotlin.math.roundToInt
 import kotlin.math.pow
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.produceState
 import com.valentinilk.shimmer.shimmer
 import androidx.compose.ui.graphics.asImageBitmap
@@ -66,6 +68,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -248,18 +251,24 @@ val HeroMergeBandHeight: Dp = 320.dp
 @Composable
 fun HeroTopBlur(
     hazeState: HazeState?,
-    progress: Float,
+    progress: State<Float>,
     pageColor: Color = AppTheme.colorScheme.background,
     modifier: Modifier = Modifier,
     /** Height of the blur strip + the run below it the fade needs to disappear. */
     height: Dp = 140.dp,
 ) {
     val reduceBlur by rememberPreference(ReduceDynamicBlurKey, false)
+    // Capability gate only — never a continuous scroll read in composition.
+    // progress lives as State and is read in graphicsLayer/hazeEffect (draw phase);
+    // a coarse derived boolean gates the haze path so idle frames skip the SkSL
+    // pipeline entirely (flips ~twice per scroll session, not per pixel).
     val useHaze =
         hazeState != null &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !reduceBlur &&
-            progress > 0.001f
+            !reduceBlur
+    val hazeActive by remember(progress) {
+        androidx.compose.runtime.derivedStateOf { progress.value > 0.001f }
+    }
 
     if (!useHaze) {
         // Below 13 / blur reduced: a translucent scrim in the page's colour that
@@ -269,9 +278,16 @@ fun HeroTopBlur(
             modifier
                 .fillMaxWidth()
                 .height(height)
-                .graphicsLayer { alpha = progress.coerceIn(0f, 1f) }
+                .graphicsLayer { alpha = progress.value.coerceIn(0f, 1f) }
                 .background(pageColor),
         )
+        return
+    }
+
+    if (!hazeActive) {
+        // Same footprint (no layout jump) but no haze node, so a motionless hero
+        // does not pay progressive-blur cost for an invisible strip.
+        Box(modifier.fillMaxWidth().height(height))
         return
     }
 
@@ -286,12 +302,12 @@ fun HeroTopBlur(
             ) {
                 blurRadius = 36.dp
                 noiseFactor = 0f
-                // Half-size input (see TopFadeBlur): the progressive SkSL blur costs
-                // one tap per pixel of radius, so full size was the frame budget.
-                inputScale = HazeInputScale.Auto
-                // The whole strip's intensity follows scroll: zero blur when the
-                // hero is fully visible, full when it has scrolled under the bar.
-                alpha = progress.coerceIn(0f, 1f)
+                // Fixed 1/3 input (BitChord OptimizedHaze): Auto only steps down once
+                // blur is large enough to be confident, which left this strip sampling
+                // near full-res on every scroll frame. Blur hides the upscale.
+                inputScale = HazeInputScale.Fixed(0.33f)
+                // Draw-phase read: intensity follows scroll without recomposing.
+                alpha = progress.value.coerceIn(0f, 1f)
                 // Within the strip itself, blur keeps full strength down to the
                 // foot and ramps to nothing at the very bottom edge, so the glass
                 // stops before the strip does and never reads as a hard pane.
@@ -317,57 +333,73 @@ fun HeroTopBlur(
 @Composable
 fun HeroScrollBlur(
     artworkUrl: String?,
-    progress: Float,
+    progress: State<Float>,
     modifier: Modifier = Modifier,
     blurRadius: Dp = HeroBlurRadius,
     decodeSize: Int = 160,
 ) {
     val reduceBlur by rememberPreference(ReduceDynamicBlurKey, false)
-    val p = progress.coerceIn(0f, 1f)
-    if (reduceBlur || artworkUrl.isNullOrBlank() || p <= 0.01f) return
-
-    // Three-step eased crossfade: soft arrives first, hands to mid, hands to
-    // full — reads as growing blur (iOS-style) while scroll drives alpha only,
-    // no per-frame RenderEffect. Same foot mask as the hero so blur never
-    // invents a new edge.
-    val eased = androidx.compose.animation.core.EaseOutCubic.transform(p)
-    val softAlpha = heroBlurBand(eased, start = 0.02f, peak = 0.30f, end = 0.70f)
-    val midAlpha = heroBlurBand(eased, start = 0.25f, peak = 0.60f, end = 0.90f)
-    val fullAlpha = ((eased - 0.55f) / 0.45f).coerceIn(0f, 1f)
-    if (softAlpha <= 0f && midAlpha <= 0f && fullAlpha <= 0f) return
+    // Coarse composition gates: flip at fixed progress thresholds, not per pixel.
+    // Plate alphas are read only inside graphicsLayer (draw phase).
+    val softOn by remember(progress) {
+        androidx.compose.runtime.derivedStateOf { heroBandOn(progress.value, 0.02f, 0.70f) }
+    }
+    val midOn by remember(progress) {
+        androidx.compose.runtime.derivedStateOf { heroBandOn(progress.value, 0.25f, 0.90f) }
+    }
+    val fullOn by remember(progress) {
+        androidx.compose.runtime.derivedStateOf { progress.value > 0.55f }
+    }
+    if (reduceBlur || artworkUrl.isNullOrBlank()) return
+    if (!softOn && !midOn && !fullOn) return
 
     Box(modifier.fillMaxSize()) {
-        if (softAlpha > 0f) {
+        if (softOn) {
             BlurredBackdropImage(
                 model = artworkUrl,
                 screenBlurRadiusDp = (blurRadius * 0.3f).value,
                 decodeSize = decodeSize,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = softAlpha },
+                    .graphicsLayer { alpha = heroPlateAlpha(progress.value, start = 0.02f, peak = 0.30f, end = 0.70f) },
             )
         }
-        if (midAlpha > 0f) {
+        if (midOn) {
             BlurredBackdropImage(
                 model = artworkUrl,
                 screenBlurRadiusDp = (blurRadius * 0.6f).value,
                 decodeSize = decodeSize,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = midAlpha },
+                    .graphicsLayer { alpha = heroPlateAlpha(progress.value, start = 0.25f, peak = 0.60f, end = 0.90f) },
             )
         }
-        if (fullAlpha > 0f) {
+        if (fullOn) {
             BlurredBackdropImage(
                 model = artworkUrl,
                 screenBlurRadiusDp = blurRadius.value,
                 decodeSize = decodeSize,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = fullAlpha },
+                    .graphicsLayer {
+                        val eased = androidx.compose.animation.core.EaseOutCubic.transform(progress.value.coerceIn(0f, 1f))
+                        alpha = ((eased - 0.55f) / 0.45f).coerceIn(0f, 1f)
+                    },
             )
         }
     }
+}
+
+/** True when the triangular band for (start, end) can be non-zero at [p]. */
+private fun heroBandOn(p: Float, start: Float, end: Float): Boolean {
+    val t = p.coerceIn(0f, 1f)
+    return t > start && t < end
+}
+
+/** Draw-phase plate alpha: eased triangular band (same curve as before). */
+private fun heroPlateAlpha(p: Float, start: Float, peak: Float, end: Float): Float {
+    val eased = androidx.compose.animation.core.EaseOutCubic.transform(p.coerceIn(0f, 1f))
+    return heroBlurBand(eased, start = start, peak = peak, end = end)
 }
 
 /** Triangular 0→1→0 window: full at [peak], gone at [start]/[end]. */
@@ -402,18 +434,15 @@ private val heroPaletteCache = android.util.LruCache<String, HeroPalette>(128)
 fun rememberHeroTopBlur(
     state: androidx.compose.foundation.lazy.LazyListState,
     thresholdPx: Float = 300f,
-): Float {
-    val progress by remember(state) {
-        androidx.compose.runtime.derivedStateOf {
-            val scrolledPx = if (state.firstVisibleItemIndex == 0) {
-                state.firstVisibleItemScrollOffset.toFloat()
-            } else {
-                thresholdPx
-            }
-            (scrolledPx / thresholdPx).coerceIn(0f, 1f)
+): State<Float> = remember(state) {
+    androidx.compose.runtime.derivedStateOf {
+        val scrolledPx = if (state.firstVisibleItemIndex == 0) {
+            state.firstVisibleItemScrollOffset.toFloat()
+        } else {
+            thresholdPx
         }
+        (scrolledPx / thresholdPx).coerceIn(0f, 1f)
     }
-    return progress
 }
 
 /** [rememberHeroTopBlur], for a header that leads a grid instead of a list. */
@@ -421,18 +450,20 @@ fun rememberHeroTopBlur(
 fun rememberHeroTopBlur(
     state: androidx.compose.foundation.lazy.grid.LazyGridState,
     thresholdPx: Float = 300f,
-): Float {
-    val progress by remember(state) {
-        androidx.compose.runtime.derivedStateOf {
-            val scrolledPx = if (state.firstVisibleItemIndex == 0) {
-                state.firstVisibleItemScrollOffset.toFloat()
-            } else {
-                thresholdPx
-            }
-            (scrolledPx / thresholdPx).coerceIn(0f, 1f)
+): State<Float> = remember(state) {
+    androidx.compose.runtime.derivedStateOf {
+        val scrolledPx = if (state.firstVisibleItemIndex == 0) {
+            state.firstVisibleItemScrollOffset.toFloat()
+        } else {
+            thresholdPx
         }
+        (scrolledPx / thresholdPx).coerceIn(0f, 1f)
     }
-    return progress
+}
+
+/** Constant 0 for optional scroll-progress params that default to "no ramp". */
+val ZeroScrollProgress: State<Float> = object : State<Float> {
+    override val value: Float get() = 0f
 }
 
 /**
@@ -778,7 +809,7 @@ fun AlbumStyleHeroImage(
     pageColor: Color = Color.Black,
     // 0..1 scroll progress (e.g. from rememberHeroTopBlur): the artwork blurs
     // progressively as it scrolls up, sharpening back on the way down.
-    scrollBlurProgress: Float = 0f,
+    scrollBlurProgress: State<Float> = ZeroScrollProgress,
 ) {
     // Pixel-copy of the artist hero (W x 1.36h foot, knee 0.78 wash): one seam
     // everywhere. extraPullUp/hazeState kept for call-site compat — the foot's own
@@ -790,7 +821,7 @@ fun AlbumStyleHeroImage(
         heroScale = heroScale,
         loading = false,
         liveOverlay = false,
-        scrollBlur = { scrollBlurProgress },
+        scrollBlur = { scrollBlurProgress.value },
     )
 }
 
@@ -823,7 +854,8 @@ fun HeroBackground(
     // came from so the wash matches the artwork, not the user's accent.
     meshWash: HeroPalette? = null,
     // 0..1 — extra blur ramped onto the crisp upper artwork as the list scrolls up.
-    topBlurProgress: Float = 0f,
+    // State so the snapshot read stays out of composition (F1).
+    topBlurProgress: State<Float> = ZeroScrollProgress,
     // Pull-to-zoom scale for the hero artwork (1 = rest; >1 while overscrolling the top).
     heroScale: Float = 1f,
     content: @Composable BoxScope.() -> Unit = {},
@@ -851,7 +883,15 @@ fun HeroBackground(
                 )
 
                 if (blurArtwork) {
-                    val blurP = topBlurProgress.coerceIn(0f, 1f)
+                    // Coarse gates only in composition; plate alphas read in graphicsLayer.
+                    val midActive by remember(topBlurProgress) {
+                        androidx.compose.runtime.derivedStateOf {
+                            topBlurProgress.value in 0.05f..0.95f
+                        }
+                    }
+                    val heavyActive by remember(topBlurProgress) {
+                        androidx.compose.runtime.derivedStateOf { topBlurProgress.value > 0.60f }
+                    }
                     // Blurred lower layer: fills behind the list and dissolves
                     // into the tint (the primary-color gradient) toward the
                     // bottom. Decoded at low resolution — a 48dp blur erases all
@@ -894,8 +934,7 @@ fun HeroBackground(
                     // departs as the heavy base takes over, so the scroll blur
                     // reads as growing rather than one hard sharp-to-blurred cut.
                     // Same footprint (scale, foot fade) as the base it blends into.
-                    val midAlpha = alpha * heroBlurBand(blurP, start = 0.05f, peak = 0.50f, end = 0.95f)
-                    if (midAlpha > 0.01f) {
+                    if (midActive) {
                         BlurredBackdropImage(
                             model = heroSource.url,
                             screenBlurRadiusDp = (HeroBlurRadius * 0.45f).value,
@@ -904,6 +943,12 @@ fun HeroBackground(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
+                                    val midAlpha = alpha * heroPlateAlpha(
+                                        topBlurProgress.value,
+                                        start = 0.05f,
+                                        peak = 0.50f,
+                                        end = 0.95f,
+                                    )
                                     this.alpha = midAlpha
                                     scaleX = heroScale
                                     scaleY = heroScale
@@ -924,8 +969,7 @@ fun HeroBackground(
                     }
                     // Past-the-base push at the top of the scroll, so full scroll
                     // reads as very blurred rather than settling at the base radius.
-                    val heavyAlpha = alpha * ((blurP - 0.60f) / 0.40f).coerceIn(0f, 1f)
-                    if (heavyAlpha > 0.01f) {
+                    if (heavyActive) {
                         BlurredBackdropImage(
                             model = heroSource.url,
                             screenBlurRadiusDp = (HeroBlurRadius * 1.5f).value,
@@ -934,7 +978,8 @@ fun HeroBackground(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer {
-                                    this.alpha = heavyAlpha
+                                    val p = topBlurProgress.value.coerceIn(0f, 1f)
+                                    this.alpha = alpha * ((p - 0.60f) / 0.40f).coerceIn(0f, 1f)
                                     scaleX = heroScale
                                     scaleY = heroScale
                                     compositingStrategy = CompositingStrategy.Offscreen
@@ -971,7 +1016,8 @@ fun HeroBackground(
                                 // Hands over to the mid plate above (gone by mid
                                 // scroll) rather than straight to the heavy base —
                                 // no per-frame RenderEffect, so it stays smooth.
-                                this.alpha = alpha * (1f - ((blurP - 0.05f) / 0.45f).coerceIn(0f, 1f))
+                                val p = topBlurProgress.value.coerceIn(0f, 1f)
+                                this.alpha = alpha * (1f - ((p - 0.05f) / 0.45f).coerceIn(0f, 1f))
                                 scaleX = heroScale
                                 scaleY = heroScale
                                 compositingStrategy = CompositingStrategy.Offscreen
@@ -1610,9 +1656,16 @@ fun heroFadeOutBrush(start: Float = 0.78f, end: Float = 1f, steps: Int = 24): Br
 /** Shows this layer only from [start] (transparent) to [end] (opaque) of its height, eased. */
 private fun Modifier.heroBandMask(start: Float, end: Float): Modifier =
     graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            drawRect(brush = smoothRamp(start, end), blendMode = BlendMode.DstIn)
+        // drawWithCache, not drawWithContent: this is a plain Modifier factory with no
+        // composable scope to remember() the brush in, and drawWithContent's lambda re-runs
+        // every draw pass -- smoothRamp() was rebuilding its gradient every frame this layer
+        // was on screen. The cache block only reruns when size/start/end change.
+        .drawWithCache {
+            val brush = smoothRamp(start, end)
+            onDrawWithContent {
+                drawContent()
+                drawRect(brush = brush, blendMode = BlendMode.DstIn)
+            }
         }
 
 /**

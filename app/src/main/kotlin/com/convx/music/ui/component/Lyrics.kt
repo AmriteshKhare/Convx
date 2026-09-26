@@ -209,13 +209,23 @@ import kotlin.time.Duration.Companion.seconds
  */
 private val LyricScrollSpec = spring<Float>(dampingRatio = 1f, stiffness = 160f)
 
+/** Intro glide (V2 open): starts with the player's own expansion, slow enough to follow. */
+private const val LyricsIntroMsPerDp = 1.4f
+private const val LyricsIntroMinMs = 650
+private const val LyricsIntroMaxMs = 1500
+/** Gentle acceleration out of the top, long deceleration into the line. */
+private val LyricsIntroEasing = androidx.compose.animation.core.CubicBezierEasing(0.5f, 0f, 0.15f, 1f)
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedBoxWithConstraintsScope", "StringFormatInvalid")
 @Composable
 fun Lyrics(
     sliderPositionProvider: () -> Long?,
     modifier: Modifier = Modifier,
-    showLyrics: Boolean
+    showLyrics: Boolean,
+    // Opt-in (V2): every change resets the list to the top, and the first scroll to the
+    // current line then glides there slowly instead of jumping. 0 = never reset.
+    introKey: Int = 0,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val database = LocalDatabase.current
@@ -701,6 +711,43 @@ fun Lyrics(
             isAnimating = false
         }
     }
+    // Glides from wherever the list is (the top, after an intro reset) to the target line:
+    // one accelerate-decelerate pass, started with the player's expansion and slow enough to
+    // read, then the normal centring pass corrects any estimate error with no visible jump.
+    suspend fun performIntroScroll(targetIndex: Int) {
+        val info = lazyListState.layoutInfo
+        val visible = info.visibleItemsInfo
+        if (visible.isNotEmpty()) {
+            val lookUpIndex = if (isLyricsProviderShown) targetIndex + 1 else targetIndex
+            val viewportHeight = info.viewportEndOffset - info.viewportStartOffset
+            val anchor = info.viewportStartOffset + viewportHeight / 3f
+            val target = visible.firstOrNull { it.index == lookUpIndex }
+            // Off screen: estimate from the laid-out rows' average height.
+            val distance = if (target != null) {
+                target.offset + target.size / 2f - anchor
+            } else {
+                val first = visible.first()
+                val average = visible.sumOf { it.size }.toFloat() / visible.size
+                first.offset + (lookUpIndex - first.index + 0.5f) * average - anchor
+            }
+            if (distance > 10f) {
+                val ms = (distance / density.density * LyricsIntroMsPerDp).toInt()
+                    .coerceIn(LyricsIntroMinMs, LyricsIntroMaxMs)
+                isAnimating = true
+                try {
+                    lazyListState.animateScrollBy(distance, tween(ms, easing = LyricsIntroEasing))
+                } finally {
+                    isAnimating = false
+                }
+            }
+        }
+        performSmoothPageScroll(targetIndex)
+    }
+    LaunchedEffect(introKey) {
+        if (introKey == 0) return@LaunchedEffect
+        lazyListState.scrollToItem(0)
+        initialScrollDone = false
+    }
     LaunchedEffect(currentLineIndex, lastPreviewTime, initialScrollDone, isAutoScrollEnabled) {
         if (!isSynced) return@LaunchedEffect
         if (isAutoScrollEnabled) {
@@ -708,7 +755,11 @@ fun Lyrics(
             shouldScrollToFirstLine = false
             // Initial scroll to center the first line with medium animation (600ms)
             val initialCenterIndex = kotlin.math.max(0, currentLineIndex)
-            performSmoothPageScroll(initialCenterIndex) // Initial scroll duration
+            if (introKey != 0 && !initialScrollDone) {
+                performIntroScroll(initialCenterIndex)
+            } else {
+                performSmoothPageScroll(initialCenterIndex) // Initial scroll duration
+            }
             if(!isAppMinimized) {
                 initialScrollDone = true
             }
@@ -1710,7 +1761,9 @@ fun Lyrics(
                                             fontSize = (lyricsTextSize * 0.7f).sp,
                                             color = expressiveAccent.copy(alpha = if (isActiveLine) 0.8f else 0.3f),
                                             textAlign = agentTextAlign,
-                                            fontWeight = FontWeight.Medium,
+                                            // Figma translation: Bold, -1.2% tracking (642:23917).
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = (lyricsTextSize * 0.7f * -0.012f).sp,
                                             modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
                                             lineHeight = (lyricsTextSize * 0.7f * lyricsLineSpacing.coerceAtMost(1.3f)).sp
                                         )
@@ -1867,13 +1920,15 @@ fun Lyrics(
                             lyricsAnimationStyle != LyricsAnimationStyle.APPLE_V2) {
                             val translatedText by item.translatedTextFlow.collectAsState()
                             translatedText?.let { translated ->
-                                Text(
-                                    text = translated,
-                                    fontSize = (lyricsTextSize * 0.7f).sp,
-                                    color = expressiveAccent.copy(alpha = 0.8f),
-                                    textAlign = agentTextAlign,
-                                    fontWeight = FontWeight.Medium,
-                                    modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
+                                        Text(
+                                            text = translated,
+                                            fontSize = (lyricsTextSize * 0.7f).sp,
+                                            color = expressiveAccent.copy(alpha = 0.8f),
+                                            textAlign = agentTextAlign,
+                                            // Figma translation: Bold, -1.2% tracking (642:23917).
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = (lyricsTextSize * 0.7f * -0.012f).sp,
+                                            modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
                                     lineHeight = (lyricsTextSize * 0.7f * lyricsLineSpacing.coerceAtMost(1.3f)).sp
                                 )
                             }

@@ -101,7 +101,10 @@ fun LyricsLineV2(
             text = entry.text,
             style = AppTheme.typography.headlineMedium.copy(
                 fontSize = if (entry.isBackground) (baseFontSize * 0.85f).sp else baseFontSize.sp,
-                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                // Figma Lyric Line: Bold in every state (642:23917).
+                fontWeight = FontWeight.Bold,
+                // Figma main tracking: +0.4px @ 34px ≈ +1.2% of size.
+                letterSpacing = ((if (entry.isBackground) baseFontSize * 0.85f else baseFontSize) * 0.012f).sp,
                 fontStyle = if (entry.isBackground) FontStyle.Italic else FontStyle.Normal,
                 lineHeight = lineHeight.coerceAtMost(baseFontSize * 1.3f).sp,
             ),
@@ -120,7 +123,9 @@ fun LyricsLineV2(
                 fontSize = (baseFontSize * 0.7f).sp,
                 color = expressiveAccent.copy(alpha = if (isActive) 0.8f else inactiveAlpha * 0.8f),
                 textAlign = agentTextAlign,
-                fontWeight = FontWeight.Medium,
+                // Figma translation: Bold, -0.26px @ 22px ≈ -1.2% (642:23917).
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (baseFontSize * 0.7f * -0.012f).sp,
                 modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
                 lineHeight = (baseFontSize * 0.7f * (lineHeight / baseFontSize).coerceAtMost(1.3f)).sp
             )
@@ -174,7 +179,8 @@ fun AnimatedWordV2(
     val glowRadius = if (isWordActive) glowProgress * 12f else 0f
 
     val density = LocalDensity.current
-    val fontWeight = if (isLineActive) FontWeight.Bold else FontWeight.SemiBold
+    // Figma Lyric Line: Bold in every state (642:23917).
+    val fontWeight = FontWeight.Bold
 
     Box(
         modifier = Modifier
@@ -190,6 +196,7 @@ fun AnimatedWordV2(
             style = AppTheme.typography.headlineMedium.copy(
                 fontSize = fontSize.sp,
                 fontWeight = fontWeight,
+                letterSpacing = (fontSize * 0.012f).sp,
                 fontStyle = if (isBackground) FontStyle.Italic else FontStyle.Normal,
                 lineHeight = lineHeight.sp,
             ),
@@ -203,6 +210,7 @@ fun AnimatedWordV2(
                 style = AppTheme.typography.headlineMedium.copy(
                     fontSize = fontSize.sp,
                     fontWeight = fontWeight,
+                    letterSpacing = (fontSize * 0.012f).sp,
                     fontStyle = if (isBackground) FontStyle.Italic else FontStyle.Normal,
                     lineHeight = lineHeight.sp,
                     shadow = if (glowAlpha > 0f) {

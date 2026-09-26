@@ -104,7 +104,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -741,6 +740,10 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
             HorizontalPager(
                 state = pagerState,
                 userScrollEnabled = false,
+                // Four light pages: compose them all up front. With the default (0) the next
+                // page is composed the moment the transition starts, on the UI thread, in the
+                // middle of the animation.
+                beyondViewportPageCount = pages.size - 1,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -749,24 +752,16 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            // iOS-style crossfade: the outgoing page blurs, shrinks
-                            // slightly and slides out while the incoming page does
-                            // the reverse — driven by the pager's own scroll
-                            // animation, so it plays during animateScrollToPage too.
+                            // iOS-style crossfade: the outgoing page shrinks slightly and
+                            // slides out while the incoming page does the reverse, driven by
+                            // the pager's own scroll so it plays during animateScrollToPage.
+                            // No RenderEffect blur: a full-page blur per frame blows the budget.
                             val pageOffset = pagerState.getOffsetDistanceInPages(index)
                             val absOffset = pageOffset.absoluteValue.coerceIn(0f, 1f)
                             alpha = 1f - absOffset
                             translationX = pageOffset * size.width * 0.2f
                             scaleX = 1f - absOffset * 0.08f
                             scaleY = 1f - absOffset * 0.08f
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                val blurPx = absOffset * 32.dp.toPx()
-                                renderEffect = if (blurPx > 0f) {
-                                    android.graphics.RenderEffect
-                                        .createBlurEffect(blurPx, blurPx, android.graphics.Shader.TileMode.CLAMP)
-                                        .asComposeRenderEffect()
-                                } else null
-                            }
                         }
                 ) {
                     pages[index].content { scrolledToEnd ->
@@ -923,13 +918,13 @@ fun RotatingShapeContainer(modifier: Modifier = Modifier) {
             tint = primaryColor,
             modifier = Modifier
                 .fillMaxSize()
-                .rotate(rotation)
+                .graphicsLayer { rotationZ = rotation }
         )
 
         Icon(
-            painter = painterResource(com.convx.music.R.mipmap.ic_launcher_monochrome),
+            painter = painterResource(com.convx.music.R.drawable.convx_logo),
             contentDescription = null,
-            modifier = Modifier.size(220.dp),
+            modifier = Modifier.size(150.dp),
             tint = backgroundColor
         )
     }
@@ -1024,7 +1019,7 @@ fun PermissionCard(
                     color = iconColor,
                     modifier = Modifier.size(48.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             painter = icon,
                             contentDescription = null,
@@ -1078,7 +1073,7 @@ fun FeatureCard(
                     color = iconColor,
                     modifier = Modifier.size(48.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Icon(
                             painter = icon,
                             contentDescription = null,

@@ -17,13 +17,19 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.blur
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.component.LocalItemPrefs
+import com.convx.music.ui.utils.rememberGridSpacing
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,11 +38,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.em
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
@@ -65,6 +69,7 @@ import androidx.compose.material3.surfaceColorAtElevation
 import com.convx.music.ui.ios.compat.Text
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -95,6 +100,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.NavController
@@ -132,9 +138,7 @@ import com.convx.music.constants.ThumbnailCornerRadius
 import com.convx.music.db.MusicDatabase
 import com.convx.music.ui.component.SpotlightCard
 import com.convx.music.ui.component.SpotlightCardArtworkSize
-import com.convx.music.ui.component.SpotlightCardHeight
 import com.convx.music.ui.component.SpotlightCardInfoHeight
-import com.convx.music.ui.component.SpotlightCardSpacing
 import com.convx.music.db.entities.Album
 import com.convx.music.db.entities.Artist
 import com.convx.music.db.entities.LocalItem
@@ -175,13 +179,21 @@ import com.convx.music.ui.component.HideOnScrollFAB
 import com.convx.music.ui.component.HomeHeroCard
 import com.convx.music.ui.component.HomeImageBackground
 import com.convx.music.ui.component.LocalBottomSheetPageState
-import com.convx.music.ui.component.LocalHomeTopBarLogoProgress
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.MenuState
 import com.convx.music.ui.component.NavigationTitle
+import com.convx.music.ui.component.YouTubeGridItem
+import com.music.innertube.pages.ChartsPage.ChartType
+import com.convx.music.viewmodels.ChartsViewModel
+import com.convx.music.viewmodels.NewReleaseViewModel
 import com.convx.music.ui.component.rememberAppBackgroundColor
 import com.convx.music.ui.component.rememberTitleCollapseProgress
 import com.convx.music.ui.component.rememberTitleCollapseProgressState
+import com.convx.music.ui.component.FrostedTopBar
+import com.convx.music.ui.component.rememberAppBackgroundTint
+import com.convx.music.ui.component.TopFadeBlur
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.component.shimmer.GridItemPlaceHolder
 import com.convx.music.ui.component.shimmer.ShimmerHost
 import com.convx.music.ui.component.shimmer.TextPlaceholder
@@ -195,6 +207,8 @@ import com.convx.music.ui.menu.YouTubeArtistMenu
 import com.convx.music.ui.menu.YouTubePlaylistMenu
 import com.convx.music.ui.menu.YouTubeSongMenu
 import com.convx.music.ui.theme.AppleTokens
+import com.convx.music.ui.theme.BitChordPage
+import com.convx.music.ui.theme.LocalPageMetrics
 import com.convx.music.ui.theme.BrandName
 import com.convx.music.ui.theme.rememberBrandFontFamily
 import com.convx.music.ui.theme.rememberGlobalAccentColors
@@ -265,49 +279,48 @@ fun HomeScreen(
 
     val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+    LaunchedEffect(mediaMetadata?.id) { viewModel.onNowPlaying(mediaMetadata?.id) }
 
-    val quickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
-    val forgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
-    val keepListening by viewModel.keepListening.collectAsStateWithLifecycle()
-    val topSongs by viewModel.topSongs.collectAsStateWithLifecycle()
-    val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
-    val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
-    val homePage by viewModel.homePage.collectAsStateWithLifecycle()
-    val explorePage by viewModel.explorePage.collectAsStateWithLifecycle()
-    val dailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
-    val communityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
-
-    val allLocalItems by viewModel.allLocalItems.collectAsStateWithLifecycle()
-    val allYtItems by viewModel.allYtItems.collectAsStateWithLifecycle()
+    // One immutable snapshot: one State read, one collector — was ~26 separate collectors.
+    val homeState by viewModel.uiState.collectAsStateWithLifecycle()
+    val quickPicks = homeState.quickPicks
+    val forgottenFavorites = homeState.forgottenFavorites
+    val keepListening = homeState.keepListening
+    val topSongs = homeState.topSongs
+    val similarRecommendations = homeState.similarRecommendations
+    val accountPlaylists = homeState.accountPlaylists
+    val homePage = homeState.homePage
+    val explorePage = homeState.explorePage
+    val dailyDiscover = homeState.dailyDiscover
+    val communityPlaylists = homeState.communityPlaylists
+    val allLocalItems = homeState.allLocalItems
+    val allYtItems = homeState.allYtItems
 
     // Local-only mode: same route, same chrome, on-device library instead of the feed.
-    val localOnly by viewModel.localOnlyMode.collectAsStateWithLifecycle()
-    val localSongs by viewModel.localSongs.collectAsStateWithLifecycle()
-    val localAlbums by viewModel.localAlbums.collectAsStateWithLifecycle()
-    val localArtists by viewModel.localArtists.collectAsStateWithLifecycle()
-    val localPlaylists by viewModel.localPlaylists.collectAsStateWithLifecycle()
-    val localFolders by viewModel.localFolders.collectAsStateWithLifecycle()
+    val localOnly = homeState.localOnlyMode
+    val localSongs = homeState.localSongs
+    val localAlbums = homeState.localAlbums
+    val localArtists = homeState.localArtists
+    val localPlaylists = homeState.localPlaylists
+    val localFolders = homeState.localFolders
 
     // Wide layout: Home's recently-played row grows a hero tile (see keepListeningSection).
     val tabView = LocalTabView.current
-    val speedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
-    val selectedChip by viewModel.selectedChip.collectAsStateWithLifecycle()
+    val selectedChip = homeState.selectedChip
 
-    val isLoading: Boolean by viewModel.isLoading.collectAsStateWithLifecycle()
-    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-    val isRandomizing by viewModel.isRandomizing.collectAsStateWithLifecycle()
+    val isLoading = homeState.isLoading
+    val isRefreshing = homeState.isRefreshing
     val pullRefreshState = rememberPullToRefreshState()
 
 
-    val accountName by viewModel.accountName.collectAsStateWithLifecycle()
-    val accountImageUrl by viewModel.accountImageUrl.collectAsStateWithLifecycle()
+    val accountImageUrl = homeState.accountImageUrl
     val innerTubeCookie by rememberPreference(InnerTubeCookieKey, "")
     // Default flipped to false: 2 of 3 survey responses asked for a fixed order
     // ("fixed order, I can find things faster"); the third wanted only the top section
     // pinned. Users who explicitly enabled shuffling keep it.
     val (randomizeHomeOrder) = rememberPreference(RandomizeHomeOrderKey, false)
 
-    val shouldShowWrappedCard by viewModel.showWrappedCard.collectAsStateWithLifecycle()
+    val shouldShowWrappedCard = homeState.showWrappedCard
     val wrappedState by viewModel.wrappedManager.state.collectAsStateWithLifecycle()
     val isWrappedDataReady = wrappedState.isDataReady
 
@@ -322,16 +335,6 @@ fun HomeScreen(
     val randomizeJob = remember { mutableStateOf<Job?>(null) }
 
     val lazylistState = rememberLazyListState()
-    // Drives the crossfade between this screen's own big logo item and the
-    // small one MainActivity's top bar shows once it's scrolled away — see
-    // LocalHomeTopBarLogoProgress for why the hand-off is a shared float
-    // rather than something threaded through the Scaffold.
-    val homeTopBarLogoProgress = LocalHomeTopBarLogoProgress.current
-    val logoCollapseProgress = rememberTitleCollapseProgressState(lazylistState)
-    LaunchedEffect(logoCollapseProgress, homeTopBarLogoProgress) {
-        snapshotFlow { logoCollapseProgress.value }
-            .collect { homeTopBarLogoProgress.floatValue = it }
-    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val scrollToTop =
         backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
@@ -516,16 +519,7 @@ fun HomeScreen(
         savedSectionOrder,
         hiddenSectionIds,
         randomSeed,
-        speedDialItems,
-        quickPicks,
-        dailyDiscover,
-        keepListening,
-        accountPlaylists,
-        forgottenFavorites,
-        communityPlaylists,
-        similarRecommendations,
-        homePage?.sections,
-        explorePage?.moodAndGenres
+        homeState,
     ) {
         val hidden = hiddenSectionIds.lineSequence()
             .map(String::trim)
@@ -673,6 +667,25 @@ fun HomeScreen(
         remember(forgottenFavorites) { forgottenFavorites.orEmpty().map { it.id } },
     )
 
+    // Figma Home rails data (section 353:2498): charts + new releases carry
+    // the Top Picks / Trending / New Albums rails.
+    val chartsViewModel: ChartsViewModel = hiltViewModel()
+    val chartsPage by chartsViewModel.chartsPage.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        if (chartsPage == null) chartsViewModel.loadCharts()
+    }
+    val newReleaseViewModel: NewReleaseViewModel = hiltViewModel()
+    val newReleaseAlbums by newReleaseViewModel.newReleaseAlbums.collectAsStateWithLifecycle()
+    val topPicks = remember(chartsPage) {
+        chartsPage?.sections?.firstOrNull { it.chartType == ChartType.TOP }?.items.orEmpty()
+    }
+    val trending = remember(chartsPage) {
+        chartsPage?.sections?.firstOrNull { it.chartType == ChartType.TRENDING }?.items.orEmpty()
+    }
+    val topPicksTitle = stringResource(R.string.charts)
+    val newReleaseTitle = stringResource(R.string.new_release_albums)
+    val trendingTitle = stringResource(R.string.trending)
+
     PullToRefreshBox(
         state = pullRefreshState,
         // Local mode has nothing to pull for: there is no feed to re-fetch, and the
@@ -699,310 +712,314 @@ fun HomeScreen(
             }
         }
     ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.TopStart
-        ) {
-            // Flat fill behind everything — a no-op (matches the default
-            // Scaffold background) unless the user picked a specific custom
-            // theme color, in which case that becomes Home's actual background.
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(rememberAppBackgroundColor(AppTheme.colorScheme.background))
-            )
-            HomeImageBackground(contentLoaded = homePage != null)
-
-            // Space the floating side bar occupies. The vertical list keeps it as
-            // content padding so rows stay clear of the panel; the carousels below
-            // give it back with bleedStart so their cards run underneath the glass
-            // instead of stopping at its edge.
-            val sideInset = LocalPlayerAwareWindowInsets.current
-                .asPaddingValues()
-                .calculateStartPadding(LocalLayoutDirection.current)
-
-            val deps = HomeSectionDeps(
-                viewModel = viewModel,
-                navController = navController,
-                playerConnection = playerConnection,
-                menuState = menuState,
-                haptic = haptic,
-                scope = scope,
-                sideInset = sideInset,
-                localGridItem = localGridItem,
-                onLocalItemClick = onLocalItemClick,
-            )
-
-            LazyColumn(
-                state = lazylistState,
-                modifier = Modifier,
-                // Sections had nothing but NavigationTitle's own 12dp padding
-                // between them — ran into each other, felt cramped.
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
+        // Apple-style bar: empty over the large title, the centred compact "Home"
+        // fades in once that title has scrolled away. Only the scrolling content is
+        // the haze source; the blur and bar are siblings of it.
+        val homeHaze = remember { HazeState() }
+        val homeTitle = stringResource(R.string.home)
+        val homeTitleProgress = rememberTitleCollapseProgressState(lazylistState, titleItemKey = "figma_home_header")
+        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().hazeSource(homeHaze)) {
+        CompositionLocalProvider(LocalPageMetrics provides BitChordPage.Metrics) {
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopStart
             ) {
-                // The big logo, scrolled with the content rather than pinned in the
-                // app bar: the bar is transparent chrome here, and this is what
-                // gives the first screenful its weight. Fades out as the small
-                // wordmark in MainActivity's top bar fades in — see
-                // logoCollapseProgress above.
-                item(key = "listen_now_title", contentType = "section_title") {
-                    Text(
-                        text = stringResource(R.string.home),
-                        style = AppTheme.typography.displayLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.02).em,
-                        ),
-                        color = LocalContentColor.current,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .windowInsetsPadding(
-                                WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)
-                            )
-                            .padding(
-                                start = AppleTokens.Gutter,
-                                end = AppleTokens.Gutter,
-                                top = AppleTokens.ItemGap,
-                                bottom = AppleTokens.TextGap,
-                            )
-                            .graphicsLayer { alpha = 1f - logoCollapseProgress.value }
-                            .animateItem(),
-                    )
-                }
+                // Flat fill behind everything — a no-op (matches the default
+                // Scaffold background) unless the user picked a specific custom
+                // theme color, in which case that becomes Home's actual background.
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(rememberAppBackgroundColor(AppTheme.colorScheme.background))
+                )
+                HomeImageBackground(contentLoaded = homePage != null)
 
-                // YouTube's own mood/genre filter chips (Energize, Relax, Feel good...),
-                // pinned right under the title rather than folded into the reorderable
-                // "Mood and Genres" shelf below — a filter control belongs where it's
-                // always reachable, not wherever that shelf happens to sort to.
-                val moodChips = homePage?.chips
-                if (showMoodFilters && !localOnly && !moodChips.isNullOrEmpty()) {
-                    item(key = "mood_filters", contentType = "mood_filters") {
-                        ChipsRow(
-                            // null is a real option, not a placeholder: it is how the user
-                            // clears the filter and returns to the unfiltered feed.
-                            chips = listOf<Pair<HomePage.Chip?, String>>(
-                                null to stringResource(R.string.filter_all),
-                            ) + moodChips.map { chip -> chip to chip.title },
-                            currentValue = selectedChip,
-                            onValueUpdate = { chip -> viewModel.toggleChip(chip) },
-                            modifier = Modifier.animateItem(),
+                // Space the floating side bar occupies. The vertical list keeps it as
+                // content padding so rows stay clear of the panel; the carousels below
+                // give it back with bleedStart so their cards run underneath the glass
+                // instead of stopping at its edge.
+                val sideInset = LocalPlayerAwareWindowInsets.current
+                    .asPaddingValues()
+                    .calculateStartPadding(LocalLayoutDirection.current)
+
+                val deps = HomeSectionDeps(
+                    viewModel = viewModel,
+                    navController = navController,
+                    playerConnection = playerConnection,
+                    menuState = menuState,
+                    haptic = haptic,
+                    scope = scope,
+                    sideInset = sideInset,
+                    localGridItem = localGridItem,
+                    onLocalItemClick = onLocalItemClick,
+                )
+
+                LazyColumn(
+                    state = lazylistState,
+                    modifier = Modifier,
+                    // Sections had nothing but NavigationTitle's own 12dp padding
+                    // between them — ran into each other, felt cramped.
+                    verticalArrangement = Arrangement.spacedBy(BitChordPage.ItemSpacing),
+                    contentPadding = run {
+                        val ins = LocalPlayerAwareWindowInsets.current.asPaddingValues()
+                        val dir = LocalLayoutDirection.current
+                        PaddingValues(
+                            start = ins.calculateStartPadding(dir),
+                            top = androidx.compose.foundation.layout.WindowInsets.Companion.statusBars
+                                .asPaddingValues().calculateTopPadding(),
+                            end = ins.calculateRightPadding(dir),
+                            bottom = ins.calculateBottomPadding(),
                         )
+                    },
+                ) {
+                    // YouTube's own mood/genre filter chips (Energize, Relax, Feel good...),
+                    // pinned right under the title rather than folded into the reorderable
+                    // "Mood and Genres" shelf below — a filter control belongs where it's
+                    // always reachable, not wherever that shelf happens to sort to.
+                    val moodChips = homePage?.chips
+                    if (showMoodFilters && !localOnly && !moodChips.isNullOrEmpty()) {
+                        item(key = "mood_filters", contentType = "mood_filters") {
+                            ChipsRow(
+                                // null is a real option, not a placeholder: it is how the user
+                                // clears the filter and returns to the unfiltered feed.
+                                chips = listOf<Pair<HomePage.Chip?, String>>(
+                                    null to stringResource(R.string.filter_all),
+                                ) + moodChips.map { chip -> chip to chip.title },
+                                currentValue = selectedChip,
+                                onValueUpdate = { chip -> viewModel.toggleChip(chip) },
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
                     }
-                }
 
-                if (selectedChip == null && !localOnly) {
-                    item(key = "wrapped_card", contentType = "wrapped_card") {
-                        AnimatedVisibility(visible = shouldShowWrappedCard) {
-                            val wrappedCardShape = rememberHomeCardShape()
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
-                                    .homeCardRim(wrappedCardShape),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = LocalContentColor.current.copy(alpha = 0.1f),
-                                ),
-                                shape = wrappedCardShape
-                            ) {
-                                Box(
+                    if (selectedChip == null && !localOnly) {
+                        item(key = "wrapped_card", contentType = "wrapped_card") {
+                            AnimatedVisibility(visible = shouldShowWrappedCard) {
+                                val wrappedCardShape = rememberHomeCardShape()
+                                Card(
                                     modifier = Modifier
-                                        .fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .padding(16.dp)
+                                        .homeCardRim(wrappedCardShape),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = LocalContentColor.current.copy(alpha = 0.1f),
+                                    ),
+                                    shape = wrappedCardShape
                                 ) {
-                                    if (isWrappedDataReady) {
-                                        val bbhFont = try {
-                                            FontFamily(Font(R.font.bbh_bartle_regular))
-                                        } catch (e: Exception) {
-                                            FontFamily.Default
-                                        }
-                                        Column(
-                                            modifier = Modifier.padding(16.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
-                                        ) {
-                                            Text(
-                                                text = stringResource(R.string.wrapped_ready_title),
-                                                style = AppTheme.typography.headlineLarge.copy(
-                                                    fontFamily = bbhFont,
-                                                    textAlign = TextAlign.Center
-                                                )
-                                            )
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Text(
-                                                text = stringResource(R.string.wrapped_ready_subtitle),
-                                                style = AppTheme.typography.bodyLarge.copy(
-                                                    textAlign = TextAlign.Center
-                                                )
-                                            )
-                                            Spacer(modifier = Modifier.height(16.dp))
-                                            Button(onClick = {
-                                                navController.navigate("wrapped")
-                                            }) {
-                                                Text(stringResource(R.string.open))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (isWrappedDataReady) {
+                                            val bbhFont = try {
+                                                FontFamily(Font(R.font.bbh_bartle_regular))
+                                            } catch (e: Exception) {
+                                                FontFamily.Default
                                             }
+                                            Column(
+                                                modifier = Modifier.padding(16.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.wrapped_ready_title),
+                                                    style = AppTheme.typography.headlineLarge.copy(
+                                                        fontFamily = bbhFont,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                )
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text(
+                                                    text = stringResource(R.string.wrapped_ready_subtitle),
+                                                    style = AppTheme.typography.bodyLarge.copy(
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                )
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                Button(onClick = {
+                                                    navController.navigate("wrapped")
+                                                }) {
+                                                    Text(stringResource(R.string.open))
+                                                }
+                                            }
+                                        } else {
+                                            com.convx.music.ui.component.ShimmerBox(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(16.dp)
+                                                    .height(160.dp),
+                                            )
                                         }
-                                    } else {
-                                        com.convx.music.ui.component.ShimmerBox(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(16.dp)
-                                                .height(160.dp),
-                                        )
                                     }
                                 }
                             }
                         }
                     }
-                }
 
-                if (localOnly) {
-                    localHomeContent(
-                        deps = deps,
-                        songs = localSongs,
-                        albums = localAlbums,
-                        artists = localArtists,
-                        playlists = localPlaylists,
-                        folders = localFolders,
-                        columns = keepListeningColumns,
-                    )
-                } else homeSectionsContent(
-                    sections = homeSections,
-                    deps = deps,
-                    speedDialItems = speedDialItems,
-                    quickPicks = quickPicks,
-                    forgottenFavorites = forgottenFavorites,
-                    dailyDiscover = dailyDiscover,
-                    keepListening = keepListening,
-                    topSongs = topSongs,
-                    accountPlaylists = accountPlaylists,
-                    communityPlaylists = communityPlaylists,
-                    similarRecommendations = similarRecommendations,
-                    homePage = homePage,
-                    explorePage = explorePage,
-                    mediaMetadata = mediaMetadata,
-                    isPlaying = isPlaying,
-                    isRandomizing = isRandomizing,
-                    randomizeJob = randomizeJob,
-                    quickPicksSongMap = quickPicksSongMap,
-                    forgottenFavoritesSongMap = forgottenFavoritesSongMap,
-                    accountName = accountName,
-                    url = url,
-                    keepListeningColumns = keepListeningColumns,
-                    tabView = tabView,
-                )
-                // Only while a fetch is actually in flight. The old condition also kept this
-                // composed whenever a continuation merely EXISTED, so parking at the bottom of
-                // Home left the shimmer mounted forever — and its infinite transition drove
-                // ~65 recompositions/s with nothing on screen moving (328 Recomposer:animation
-                // sections in a 5s trace). Reaching the bottom triggers loadMoreYouTubeItems
-                // immediately, so the placeholder still appears for every real load.
-                if (isLoading) {
-                    item(key = "loading_shimmer", contentType = "shimmer") {
-                        ShimmerHost(
-                            modifier = Modifier.animateItem()
-                        ) {
-                            repeat(2) {
+                    if (localOnly) {
+                        localHomeContent(
+                            deps = deps,
+                            songs = localSongs,
+                            albums = localAlbums,
+                            artists = localArtists,
+                            playlists = localPlaylists,
+                            folders = localFolders,
+                            columns = keepListeningColumns,
+                        )
+                    } else {
+                        // Figma rails first, then the full existing feed untouched.
+                        figmaHomeContent(
+                            deps = deps,
+                            url = url,
+                            mediaMetadata = mediaMetadata,
+                            isPlaying = isPlaying,
+                            topPicks = topPicks,
+                            topPicksTitle = topPicksTitle,
+                            newReleaseAlbums = newReleaseAlbums,
+                            newReleaseTitle = newReleaseTitle,
+                            trending = trending,
+                            trendingTitle = trendingTitle,
+                        )
+                        homeSectionsContent(
+                            sections = homeSections,
+                            deps = deps,
+                            ui = homeState,
+                            mediaMetadata = mediaMetadata,
+                            isPlaying = isPlaying,
+                            randomizeJob = randomizeJob,
+                            quickPicksSongMap = quickPicksSongMap,
+                            forgottenFavoritesSongMap = forgottenFavoritesSongMap,
+                            url = url,
+                            keepListeningColumns = keepListeningColumns,
+                            tabView = tabView,
+                        )
+                    }
+                    // Only while a fetch is actually in flight. The old condition also kept this
+                    // composed whenever a continuation merely EXISTED, so parking at the bottom of
+                    // Home left the shimmer mounted forever — and its infinite transition drove
+                    // ~65 recompositions/s with nothing on screen moving (328 Recomposer:animation
+                    // sections in a 5s trace). Reaching the bottom triggers loadMoreYouTubeItems
+                    // immediately, so the placeholder still appears for every real load.
+                    if (isLoading) {
+                        item(key = "loading_shimmer", contentType = "shimmer") {
+                            ShimmerHost(
+                                modifier = Modifier.animateItem()
+                            ) {
+                                repeat(2) {
+                                    TextPlaceholder(
+                                        height = 36.dp,
+                                        modifier = Modifier
+                                            .padding(BitChordPage.Gutter)
+                                            .width(250.dp),
+                                    )
+                                    LazyRow(
+                                        modifier = Modifier.bleedStart(sideInset),
+                                        contentPadding = PaddingValues(horizontal = AppleTokens.ItemGap / 2)
+                                            .plusStart(sideInset),
+                                    ) {
+                                        items(4) {
+                                            GridItemPlaceHolder()
+                                        }
+                                    }
+                                }
+
                                 TextPlaceholder(
                                     height = 36.dp,
                                     modifier = Modifier
-                                        .padding(AppleTokens.Gutter)
+                                        .padding(BitChordPage.Gutter)
                                         .width(250.dp),
                                 )
-                                LazyRow(
-                                    modifier = Modifier.bleedStart(sideInset),
-                                    contentPadding = PaddingValues(horizontal = AppleTokens.ItemGap / 2)
-                                        .plusStart(sideInset),
-                                ) {
-                                    items(4) {
-                                        GridItemPlaceHolder()
-                                    }
-                                }
-                            }
-
-                            TextPlaceholder(
-                                height = 36.dp,
-                                modifier = Modifier
-                                    .padding(AppleTokens.Gutter)
-                                    .width(250.dp),
-                            )
-                            repeat(4) {
-                                Row {
-                                    repeat(2) {
-                                        TextPlaceholder(
-                                            height = MoodAndGenresButtonHeight,
-                                            shape = RoundedCornerShape(AppleTokens.Control),
-                                            modifier = Modifier
-                                                .padding(AppleTokens.ItemGap / 2)
-                                                .width(200.dp)
-                                        )
+                                repeat(4) {
+                                    Row {
+                                        repeat(2) {
+                                            TextPlaceholder(
+                                                height = MoodAndGenresButtonHeight,
+                                                shape = RoundedCornerShape(AppleTokens.Control),
+                                                modifier = Modifier
+                                                    .padding(AppleTokens.ItemGap / 2)
+                                                    .width(200.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+
+                    item(key = "bottom_spacer", contentType = "spacer") {
+                        Spacer(modifier = Modifier.height(30.dp))
+                    }
                 }
 
-                item(key = "bottom_spacer", contentType = "spacer") {
-                    Spacer(modifier = Modifier.height(30.dp))
-                }
-            }
-
-            val (showHomeFab) = rememberPreference(ShowHomeFabKey, true)
-            if (showHomeFab) {
-                HideOnScrollFAB(
-                    visible = if (localOnly) localSongs.isNotEmpty()
-                    else allLocalItems.isNotEmpty() || allYtItems.isNotEmpty(),
-                    lazyListState = lazylistState,
-                    icon = R.drawable.shuffle,
-                    onClick = {
-                        if (localOnly) {
-                            // Nothing to pick a radio from offline — shuffle the library itself.
-                            playerConnection.playQueue(
-                                ListQueue(items = localSongs.shuffled().map { it.toMediaItem() }, startIndex = 0),
-                            )
-                            return@HideOnScrollFAB
-                        }
-                        val local = when {
-                            allLocalItems.isNotEmpty() && allYtItems.isNotEmpty() -> Random.nextFloat() < 0.5
-                            allLocalItems.isNotEmpty() -> true
-                            else -> false
-                        }
-                        scope.launch(Dispatchers.Main) {
-                            if (local) {
-                                when (val luckyItem = allLocalItems.random()) {
-                                    is Song -> playerConnection.playQueue(YouTubeQueue.radio(luckyItem.toMediaMetadata()))
-                                    is Album -> {
-                                        val albumWithSongs = withContext(Dispatchers.IO) {
-                                            database.albumWithSongs(luckyItem.id).first()
+                val (showHomeFab) = rememberPreference(ShowHomeFabKey, true)
+                if (showHomeFab) {
+                    HideOnScrollFAB(
+                        visible = if (localOnly) localSongs.isNotEmpty()
+                        else allLocalItems.isNotEmpty() || allYtItems.isNotEmpty(),
+                        lazyListState = lazylistState,
+                        icon = R.drawable.shuffle,
+                        onClick = {
+                            if (localOnly) {
+                                // Nothing to pick a radio from offline — shuffle the library itself.
+                                playerConnection.playQueue(
+                                    ListQueue(items = localSongs.shuffled().map { it.toMediaItem() }, startIndex = 0),
+                                )
+                                return@HideOnScrollFAB
+                            }
+                            val local = when {
+                                allLocalItems.isNotEmpty() && allYtItems.isNotEmpty() -> Random.nextFloat() < 0.5
+                                allLocalItems.isNotEmpty() -> true
+                                else -> false
+                            }
+                            scope.launch(Dispatchers.Main) {
+                                if (local) {
+                                    when (val luckyItem = allLocalItems.random()) {
+                                        is Song -> playerConnection.playQueue(YouTubeQueue.radio(luckyItem.toMediaMetadata()))
+                                        is Album -> {
+                                            val albumWithSongs = withContext(Dispatchers.IO) {
+                                                database.albumWithSongs(luckyItem.id).first()
+                                            }
+                                            albumWithSongs?.let {
+                                                playerConnection.playQueue(LocalAlbumRadio(it))
+                                            }
                                         }
-                                        albumWithSongs?.let {
-                                            playerConnection.playQueue(LocalAlbumRadio(it))
+                                        is Artist -> {}
+                                        is Playlist -> {}
+                                    }
+                                } else {
+                                    when (val luckyItem = allYtItems.random()) {
+                                        is SongItem -> playerConnection.playQueue(YouTubeQueue.radio(luckyItem.toMediaMetadata()))
+                                        is AlbumItem -> playerConnection.playQueue(YouTubeAlbumRadio(luckyItem.playlistId))
+                                        is ArtistItem -> luckyItem.radioEndpoint?.let {
+                                            playerConnection.playQueue(YouTubeQueue(it))
                                         }
-                                    }
-                                    is Artist -> {}
-                                    is Playlist -> {}
-                                }
-                            } else {
-                                when (val luckyItem = allYtItems.random()) {
-                                    is SongItem -> playerConnection.playQueue(YouTubeQueue.radio(luckyItem.toMediaMetadata()))
-                                    is AlbumItem -> playerConnection.playQueue(YouTubeAlbumRadio(luckyItem.playlistId))
-                                    is ArtistItem -> luckyItem.radioEndpoint?.let {
-                                        playerConnection.playQueue(YouTubeQueue(it))
-                                    }
-                                    is PlaylistItem -> luckyItem.playEndpoint?.let {
-                                        playerConnection.playQueue(YouTubeQueue(it))
+                                        is PlaylistItem -> luckyItem.playEndpoint?.let {
+                                            playerConnection.playQueue(YouTubeQueue(it))
+                                        }
                                     }
                                 }
                             }
+                        },
+                        onRecognitionClick = {
+                            navController.navigate("recognition")
                         }
-                    },
-                    onRecognitionClick = {
-                        navController.navigate("recognition")
-                    }
-                )
+                    )
+                }
             }
+        }
+        }
+        TopFadeBlur(
+            hazeState = homeHaze,
+            pageColor = rememberAppBackgroundTint(AppTheme.colorScheme.background),
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+        FrostedTopBar(
+            title = homeTitle,
+            titleAlphaProvider = { homeTitleProgress.value },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
         }
     }
 }
@@ -1030,58 +1047,324 @@ private data class HomeSectionDeps(
 private fun LazyListScope.homeSectionsContent(
     sections: List<HomeSection>,
     deps: HomeSectionDeps,
-    speedDialItems: List<YTItem>,
-    quickPicks: List<Song>?,
-    forgottenFavorites: List<Song>?,
-    dailyDiscover: List<DailyDiscoverItem>?,
-    keepListening: List<LocalItem>?,
-    topSongs: List<Song>?,
-    accountPlaylists: List<PlaylistItem>?,
-    communityPlaylists: List<CommunityPlaylistItem>?,
-    similarRecommendations: List<SimilarRecommendation>?,
-    homePage: HomePage?,
-    explorePage: ExplorePage?,
+    ui: com.convx.music.viewmodels.HomeUiState,
     mediaMetadata: MediaMetadata?,
     isPlaying: Boolean,
-    isRandomizing: Boolean,
     randomizeJob: MutableState<Job?>,
     quickPicksSongMap: Map<String, Song>,
     forgottenFavoritesSongMap: Map<String, Song>,
-    accountName: String,
     url: String?,
     keepListeningColumns: Int,
     tabView: Boolean,
 ) {
     sections.forEach { section ->
         when (section) {
-            HomeSection.Hero -> heroSection(deps, quickPicks)
+            HomeSection.Hero -> heroSection(deps, ui.quickPicks)
             HomeSection.SpeedDial -> speedDialSection(
                 deps = deps,
-                items = speedDialItems,
-                isRandomizing = isRandomizing,
+                items = ui.speedDialItems,
+                isRandomizing = ui.isRandomizing,
                 randomizeJob = randomizeJob,
             )
-            HomeSection.QuickPicks -> quickPicksSection(deps, quickPicks, mediaMetadata, quickPicksSongMap)
-            HomeSection.FromTheCommunity -> communityPlaylistsSection(deps, communityPlaylists)
-            HomeSection.DailyDiscover -> dailyDiscoverSection(deps, dailyDiscover)
+            HomeSection.QuickPicks -> quickPicksSection(deps, ui.quickPicks, mediaMetadata, quickPicksSongMap)
+            HomeSection.FromTheCommunity -> communityPlaylistsSection(deps, ui.communityPlaylists)
+            HomeSection.DailyDiscover -> dailyDiscoverSection(deps, ui.dailyDiscover)
             HomeSection.KeepListening ->
-                keepListeningSection(deps, keepListening, mediaMetadata, isPlaying, keepListeningColumns, tabView)
+                keepListeningSection(deps, ui.keepListening, mediaMetadata, isPlaying, keepListeningColumns, tabView)
             HomeSection.TopSongs ->
-                topSongsSection(deps, topSongs, mediaMetadata)
+                topSongsSection(deps, ui.topSongs, mediaMetadata)
             HomeSection.AccountPlaylists -> accountPlaylistsSection(
                 deps = deps,
-                accountPlaylists = accountPlaylists,
-                accountName = accountName,
+                accountPlaylists = ui.accountPlaylists,
+                accountName = ui.accountName,
                 url = url,
             )
             HomeSection.ForgottenFavorites -> forgottenFavoritesSection(
-                deps, forgottenFavorites, mediaMetadata, forgottenFavoritesSongMap,
+                deps, ui.forgottenFavorites, mediaMetadata, forgottenFavoritesSongMap,
             )
             is HomeSection.SimilarRecommendation -> similarRecommendationsSection(
-                section, deps, similarRecommendations,
+                section, deps, ui.similarRecommendations,
             )
-            is HomeSection.HomePageSection -> homePageSection(section, deps, homePage)
-            HomeSection.MoodAndGenres -> moodAndGenresSection(deps, explorePage)
+            is HomeSection.HomePageSection -> homePageSection(section, deps, ui.homePage)
+            HomeSection.MoodAndGenres -> moodAndGenresSection(deps, ui.explorePage)
+        }
+    }
+}
+
+/**
+ * Figma-identical Home (section 353:2498): header with the account avatar,
+ * Top Picks rail (charts), New Albums rail, Trending rail, Community rail —
+ * our feed, Figma's layout and card style. No app logo anywhere on this
+ * screen (there never was one — the header carries the account avatar).
+ */
+private fun LazyListScope.figmaHomeContent(
+    deps: HomeSectionDeps,
+    url: String?,
+    mediaMetadata: MediaMetadata?,
+    isPlaying: Boolean,
+    topPicks: List<YTItem>,
+    topPicksTitle: String,
+    newReleaseAlbums: List<AlbumItem>,
+    newReleaseTitle: String,
+    trending: List<YTItem>,
+    trendingTitle: String,
+) {
+    // Header: 34sp bold "Home" + 44dp account avatar (Figma 635:27606). The
+    // compact centred title takes over from it as it scrolls away (HomeScreen).
+    item(key = "figma_home_header", contentType = "section_title") {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = 10.dp)
+                .animateItem(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.home),
+                style = AppTheme.typography.headlineLarge.copy(
+                    fontSize = 34.sp,
+                    lineHeight = 41.sp,
+                    letterSpacing = 0.4.sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = AppTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            val avatarModifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .clickable { deps.navController.navigate("settings") }
+            if (url != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(url)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .diskCacheKey(url)
+                        .crossfade(false)
+                        .build(),
+                    placeholder = painterResource(id = R.drawable.person),
+                    error = painterResource(id = R.drawable.person),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = avatarModifier,
+                )
+            } else {
+                Icon(
+                    imageVector = SfSymbols.Monochrome.SFPersonCropCircle,
+                    contentDescription = null,
+                    modifier = avatarModifier,
+                )
+            }
+        }
+    }
+
+    figmaRail(
+        deps = deps,
+        mediaMetadata = mediaMetadata,
+        isPlaying = isPlaying,
+        key = "top_picks",
+        title = topPicksTitle,
+        route = "charts_screen",
+        items = topPicks,
+        hero = true,
+    )
+    figmaRail(
+        deps = deps,
+        mediaMetadata = mediaMetadata,
+        isPlaying = isPlaying,
+        key = "new_albums",
+        title = newReleaseTitle,
+        route = "new_release",
+        items = newReleaseAlbums,
+    )
+    figmaRail(
+        deps = deps,
+        mediaMetadata = mediaMetadata,
+        isPlaying = isPlaying,
+        key = "trending",
+        title = trendingTitle,
+        route = "charts_screen",
+        items = trending,
+    )
+}
+
+/**
+ * One Figma Home rail (section 353:2498): section header plus a horizontal
+ * row of Figma-styled cards carrying our feed items.
+ */
+private fun LazyListScope.figmaRail(
+    deps: HomeSectionDeps,
+    mediaMetadata: MediaMetadata?,
+    isPlaying: Boolean,
+    key: String,
+    title: String,
+    route: String,
+    items: List<YTItem>,
+    hero: Boolean = false,
+) {
+    if (items.isEmpty()) return
+    item(key = "${key}_title", contentType = "section_title") {
+        NavigationTitle(
+            title = title,
+            modifier = Modifier.animateItem(),
+            onClick = { deps.navController.navigate(route) },
+        )
+    }
+    item(key = "${key}_list", contentType = "rail") {
+        // Figma Music cards are 154dp covers on a 14dp gap, 20dp from the edge; the
+        // item's own grid padding (gs/2 per side) is netted out of both.
+        val gs = rememberGridSpacing()
+        val prefs = LocalItemPrefs.current
+        CompositionLocalProvider(LocalItemPrefs provides prefs.copy(gridCardHeightOverrideDp = 154)) {
+            LazyRow(
+                contentPadding = PaddingValues(
+                    horizontal = if (hero) 16.dp else (20.dp - gs / 2).coerceAtLeast(0.dp),
+                ),
+                horizontalArrangement = Arrangement.spacedBy(if (hero) 10.dp else (14.dp - gs).coerceAtLeast(0.dp)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .animateItem(),
+            ) {
+                items(items, key = { it.id }, contentType = { if (hero) "figma_hero" else "figma_card" }) { item ->
+                    if (hero) {
+                        FigmaTopPickCard(
+                            item = item,
+                            modifier = Modifier
+                                .combinedBounceClick(
+                                    onClick = { deps.openYtItem(item) },
+                                    onLongClick = { deps.showYtItemMenu(item) },
+                                )
+                                .animateItem(),
+                        )
+                    } else {
+                        YouTubeGridItem(
+                            item = item,
+                            isActive = item.id == mediaMetadata?.id,
+                            isPlaying = isPlaying,
+                            modifier = Modifier
+                                .combinedBounceClick(
+                                    onClick = { deps.openYtItem(item) },
+                                    onLongClick = { deps.showYtItemMenu(item) },
+                                )
+                                .animateItem(),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Figma "Top Picks" card (293:1271): 242x323, 20dp corner, drop shadow 0/10/20 @16%.
+ * Square art on top; the bottom 81dp is the art mirrored, frosted and darkened, with
+ * white centred text over it. A grey 15sp label sits above the card.
+ */
+@Composable
+private fun FigmaTopPickCard(item: YTItem, modifier: Modifier = Modifier) {
+    val shape = ContinuousRoundedRectangle(20.dp)
+    val label = when (item) {
+        is SongItem -> item.artists.firstOrNull()?.name
+        is AlbumItem -> item.artists?.firstOrNull()?.name
+        is PlaylistItem -> item.author?.name
+        is ArtistItem -> null
+    }
+    val detail = when (item) {
+        is AlbumItem -> item.year?.toString()
+        is SongItem -> item.album?.name
+        else -> null
+    }
+    val context = LocalContext.current
+    val request = remember(item.thumbnail) {
+        ImageRequest.Builder(context).data(item.thumbnail).crossfade(false).build()
+    }
+    Column(modifier = modifier.width(242.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label.orEmpty(),
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            letterSpacing = (-0.23).sp,
+            color = AppleTokens.Metadata,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Box(
+            Modifier
+                .height(323.dp)
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 20.dp,
+                    shape = shape,
+                    ambientColor = Color.Black.copy(alpha = 0.16f),
+                    spotColor = Color.Black.copy(alpha = 0.16f),
+                )
+                .clip(shape),
+        ) {
+            AsyncImage(
+                model = request,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(242.dp),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .height(81.dp),
+            ) {
+                AsyncImage(
+                    model = request,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.BottomCenter,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .graphicsLayer { scaleY = -1f }
+                        .blur(40.dp),
+                )
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.28f)))
+                Column(
+                    modifier = Modifier.matchParentSize().padding(horizontal = 8.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = item.title,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp,
+                        letterSpacing = (-0.23).sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                    if (label != null) {
+                        Text(
+                            text = label,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            letterSpacing = (-0.08).sp,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    if (detail != null) {
+                        Text(
+                            text = detail,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            letterSpacing = (-0.08).sp,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1115,7 +1398,7 @@ private fun LazyListScope.localHomeContent(
                 color = AppTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(AppleTokens.Gutter),
+                    .padding(BitChordPage.Gutter),
             )
         }
         return
@@ -1126,7 +1409,7 @@ private fun LazyListScope.localHomeContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = AppleTokens.Gutter)
+                .padding(horizontal = BitChordPage.Gutter)
                 .animateItem(),
             horizontalArrangement = Arrangement.spacedBy(AppleTokens.ItemGap),
         ) {
@@ -1303,22 +1586,14 @@ private fun LazyListScope.localSongShelf(
         )
     }
     item(key = key, contentType = "spotlight_row") {
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = AppleTokens.Gutter)
-                .plusStart(deps.sideInset),
-            horizontalArrangement = Arrangement.spacedBy(SpotlightCardSpacing),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(SpotlightCardHeight)
-                .animateItem()
-                .bleedStart(deps.sideInset),
-        ) {
+        SpotlightRow(deps.sideInset, Modifier.animateItem()) { cardWidth ->
             items(songs, key = { it.id }, contentType = { "spotlight_card" }) { song ->
                 SpotlightCard(
                     thumbnailUrl = song.thumbnailUrl,
                     title = song.title,
                     subtitle = song.artists.joinToString(", ") { it.name },
                     onClick = { deps.onLocalItemClick(song) },
+                    artworkSize = cardWidth,
                 )
             }
         }
@@ -1340,7 +1615,7 @@ private fun LazyListScope.localItemRows(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = AppleTokens.Gutter - AppleTokens.ItemGap / 2),
+                    .padding(horizontal = BitChordPage.Gutter - AppleTokens.ItemGap / 2),
             ) {
                 rowItems.forEach { localItem ->
                     Box(modifier = Modifier.weight(1f)) {
@@ -1382,7 +1657,6 @@ private fun LazyListScope.shelfRow(
     key: String,
     deps: HomeSectionDeps,
     entries: List<ShelfEntry>,
-    artworkSize: Dp = SpotlightCardArtworkSize,
     // Recent (keepListeningSection's own inline row) and Discover keep the tall
     // reflection SpotlightCard treatment — everything else on Home shrinks to
     // BitChord's flatter, square shelf card, so one screen doesn't read as nine
@@ -1391,17 +1665,17 @@ private fun LazyListScope.shelfRow(
 ) {
     if (entries.isEmpty()) return
     item(key = key, contentType = if (compact) "shelf_row" else "spotlight_row") {
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = AppleTokens.Gutter).plusStart(deps.sideInset),
-            horizontalArrangement = Arrangement.spacedBy(if (compact) HomeShelfCardSpacing else SpotlightCardSpacing),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(if (compact) HomeShelfCardHeight else artworkSize + SpotlightCardInfoHeight)
-                .animateItem()
-                .bleedStart(deps.sideInset),
-        ) {
-            items(entries, key = { it.id }, contentType = { if (compact) "shelf_card" else "spotlight_card" }) { entry ->
-                if (compact) {
+        if (compact) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = BitChordPage.Gutter).plusStart(deps.sideInset),
+                horizontalArrangement = Arrangement.spacedBy(HomeShelfCardSpacing),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(HomeShelfCardHeight)
+                    .animateItem()
+                    .bleedStart(deps.sideInset),
+            ) {
+                items(entries, key = { it.id }, contentType = { "shelf_card" }) { entry ->
                     HomeShelfCard(
                         thumbnailUrl = entry.thumbnailUrl,
                         title = entry.title,
@@ -1409,18 +1683,46 @@ private fun LazyListScope.shelfRow(
                         onClick = entry.onClick,
                         onLongClick = entry.onLongClick,
                     )
-                } else {
+                }
+            }
+        } else {
+            SpotlightRow(deps.sideInset, Modifier.animateItem()) { cardWidth ->
+                items(entries, key = { it.id }, contentType = { "spotlight_card" }) { entry ->
                     SpotlightCard(
                         thumbnailUrl = entry.thumbnailUrl,
                         title = entry.title,
                         subtitle = entry.subtitle,
                         onClick = entry.onClick,
                         onLongClick = entry.onLongClick,
-                        artworkSize = artworkSize,
+                        artworkSize = cardWidth,
                     )
                 }
             }
         }
+    }
+}
+
+/**
+ * A sideways row of [SpotlightCard]s on BitChord's hero rhythm: each card is 70% of the row
+ * wide (at most 320dp) so the next one peeks in, and the row is exactly as tall as a card.
+ * [content] gets the card width to hand to each [SpotlightCard]'s `artworkSize`.
+ */
+@Composable
+private fun SpotlightRow(
+    sideInset: Dp,
+    modifier: Modifier = Modifier,
+    content: LazyListScope.(cardWidth: Dp) -> Unit,
+) {
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val cardWidth = BitChordPage.heroCardWidth(maxWidth)
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = BitChordPage.Gutter).plusStart(sideInset),
+            horizontalArrangement = Arrangement.spacedBy(BitChordPage.HeroCardGap),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(cardWidth + SpotlightCardInfoHeight)
+                .bleedStart(sideInset),
+        ) { content(cardWidth) }
     }
 }
 
@@ -1460,11 +1762,15 @@ private fun HomeShelfCard(
                 .clip(cardShape)
                 .homeCardRim(cardShape),
         )
-        Spacer(Modifier.height(8.dp))
+        // Figma Music card: 4 gap, Regular 15/-0.23 title, 15/20 sub (244:1279).
+        Spacer(Modifier.height(4.dp))
         Text(
             text = title,
             style = AppTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Normal,
+            letterSpacing = (-0.23).sp,
             color = LocalContentColor.current,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1472,6 +1778,8 @@ private fun HomeShelfCard(
         Text(
             text = subtitle,
             style = AppTheme.typography.bodySmall,
+            fontSize = 15.sp,
+            lineHeight = 20.sp,
             color = LocalContentColor.current.copy(alpha = 0.6f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1590,7 +1898,7 @@ private fun LazyListScope.heroSection(
                     )
                 },
                 modifier = Modifier
-                    .padding(horizontal = AppleTokens.Gutter)
+                    .padding(horizontal = BitChordPage.Gutter)
                     .animateItem(),
             )
         }
@@ -1766,7 +2074,7 @@ private fun LazyListScope.keepListeningSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = AppleTokens.Gutter)
+                        .padding(horizontal = BitChordPage.Gutter)
                         .animateItem(),
                     horizontalArrangement = Arrangement.spacedBy(AppleTokens.ItemGap),
                 ) {
@@ -1802,29 +2110,25 @@ private fun LazyListScope.keepListeningSection(
             item(key = "keep_listening_spotlight", contentType = "spotlight_row") {
                 // See the local shelf above: a pager spends the whole fling on one page,
                 // so this row felt inert next to the vertical list it sits in.
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = AppleTokens.Gutter)
-                        .plusStart(deps.sideInset),
-                    horizontalArrangement = Arrangement.spacedBy(SpotlightCardSpacing),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(SpotlightCardHeight)
-                        .animateItem()
-                        .bleedStart(deps.sideInset),
+                // Figma "Recently Played": the same 154dp cover row as every other rail.
+                val gs = rememberGridSpacing()
+                CompositionLocalProvider(
+                    LocalItemPrefs provides LocalItemPrefs.current.copy(gridCardHeightOverrideDp = 154),
                 ) {
-                    items(
-                        spotlightItems,
-                        key = { it.id },
-                        contentType = { "spotlight_card" },
-                    ) { localItem ->
-                        SpotlightCard(
-                            thumbnailUrl = localItem.thumbnailUrl,
-                            title = localItem.title,
-                            subtitle = localItem.spotlightSubtitle(),
-                            onClick = { deps.onLocalItemClick(localItem) },
-                            // The card is the artwork here, so it is the morph source.
-                            modifier = Modifier.sharedArtworkSource(localItem.id, localItem.thumbnailUrl),
-                        )
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = (20.dp - gs / 2).coerceAtLeast(0.dp)),
+                        horizontalArrangement = Arrangement.spacedBy((14.dp - gs).coerceAtLeast(0.dp)),
+                        modifier = Modifier.fillMaxWidth().animateItem(),
+                    ) {
+                        items(
+                            spotlightItems,
+                            key = { it.id },
+                            contentType = { "figma_card" },
+                        ) { localItem ->
+                            Box(Modifier.sharedArtworkSource(localItem.id, localItem.thumbnailUrl)) {
+                                deps.localGridItem(localItem)
+                            }
+                        }
                     }
                 }
             }
@@ -2090,9 +2394,9 @@ private fun LazyListScope.moodAndGenresSection(
             // has no artwork, so the tile stays a gradient card rather than a
             // SpotlightCard with nothing in it — same width and corner, no reflection.
             LazyRow(
-                contentPadding = PaddingValues(horizontal = AppleTokens.Gutter)
+                contentPadding = PaddingValues(horizontal = BitChordPage.Gutter)
                     .plusStart(deps.sideInset),
-                horizontalArrangement = Arrangement.spacedBy(SpotlightCardSpacing),
+                horizontalArrangement = Arrangement.spacedBy(BitChordPage.HeroCardGap),
                 modifier = Modifier
                     .fillMaxWidth()
                     .animateItem()

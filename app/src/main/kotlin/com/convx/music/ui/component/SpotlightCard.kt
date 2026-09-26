@@ -20,7 +20,10 @@ import androidx.compose.foundation.layout.width
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +61,9 @@ private const val ReflectionDarken = 0.51f
 private const val ReflectionSaturation = 1.5f
 
 private val ReflectionBlurRadius = 24.dp
+
+/** Width/height above which artwork counts as wide (a video frame) and is not cropped. */
+private const val WideArtRatio = 1.15f
 
 /**
  * A tall artwork card whose lower portion is the same artwork mirrored, blurred and
@@ -120,10 +126,29 @@ fun SpotlightCard(
                     .size(artworkSize),
             )
         } else {
+            // A 16:9 video frame centre-cropped into this square loses over 40% of the image
+            // (titles, faces). Wide art is shown whole instead, over a blurred copy of
+            // itself so the square still reads as filled. Square album art is unchanged.
+            var wideArt by remember(thumbnailUrl) { mutableStateOf(false) }
+            if (wideArt) {
+                BlurredBackdropImage(
+                    model = thumbnailUrl,
+                    screenBlurRadiusDp = ReflectionBlurRadius.value *
+                        (LocalConfiguration.current.screenWidthDp / artworkSize.value),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .size(artworkSize),
+                )
+            }
             AsyncImage(
                 model = thumbnailUrl,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                contentScale = if (wideArt) ContentScale.Fit else ContentScale.Crop,
+                onSuccess = { state ->
+                    val image = state.result.image
+                    wideArt = image.width > image.height * WideArtRatio
+                },
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .size(artworkSize),

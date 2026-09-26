@@ -60,19 +60,50 @@ fun DiyStickerLayer(
     orientation: DiyOrientation,
     modifier: Modifier = Modifier,
     zFilter: (Int) -> Boolean = { true },
+    // Player sheet progress (0 closed, 1 open). When set, each sticker pops in on its own
+    // staggered, overshooting beat as the player opens (and back out in reverse on close).
+    entranceProgress: (() -> Float)? = null,
 ) {
     if (layout.isEmpty) return
     val visible = remember(layout, zFilter) {
         layout.stickers.filter { zFilter(it.z) }.sortedBy { it.z }
     }
     if (visible.isEmpty()) return
+    // Landing order: a diagonal sweep from top-left to bottom-right, rank 0..1.
+    val ranks = remember(visible, orientation) {
+        val order = visible.sortedBy { val t = it.transformFor(orientation); t.y + EntranceSweepSlant * t.x }
+        val last = (order.size - 1).coerceAtLeast(1)
+        order.withIndex().associate { (i, sticker) -> sticker to i.toFloat() / last }
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val bounds = DiyBounds(maxWidth, maxHeight)
         visible.forEach { sticker ->
-            DiyStickerContent(sticker = sticker, orientation = orientation, bounds = bounds)
+            val rank = ranks[sticker] ?: 0f
+            DiyStickerContent(
+                sticker = sticker,
+                orientation = orientation,
+                bounds = bounds,
+                entrance = entranceProgress?.let { progress -> { stickerEntrance(progress(), rank) } },
+            )
         }
     }
+}
+
+/** How much x counts against y in the landing sweep: mostly top-to-bottom, left breaking ties. */
+private const val EntranceSweepSlant = 0.35f
+/** Where in the open the first / last sticker starts popping, and how long each pop runs.
+ *  Windows overlap heavily: never one-at-a-time, never all as one block. */
+private const val EntranceFirstStart = 0.35f
+private const val EntranceStartSpread = 0.3f
+private const val EntranceSpan = 0.35f
+/** Lively overshoot (~25%) that still settles exactly at the end of its window. */
+private val EntranceSpring = com.convx.music.ui.component.floatingtabbar.SpringEasing(zeta = 0.4f, omegaT = 9f)
+
+/** 0..1(+overshoot) pop scale driver for the sticker at [rank] at sheet [progress]. */
+private fun stickerEntrance(progress: Float, rank: Float): Float {
+    val start = EntranceFirstStart + EntranceStartSpread * rank
+    return ((progress - start) / EntranceSpan).coerceIn(0f, 1f)
 }
 
 /** Player-relative geometry a sticker's normalised transform resolves against. */
@@ -94,6 +125,8 @@ fun DiyStickerContent(
     orientation: DiyOrientation,
     bounds: DiyBounds,
     modifier: Modifier = Modifier,
+    // Local 0..1 pop fraction (see stickerEntrance); null = always fully shown (editor).
+    entrance: (() -> Float)? = null,
 ) {
     val context = LocalContext.current
     val transform = sticker.transformFor(orientation)
@@ -109,8 +142,12 @@ fun DiyStickerContent(
             translationX = offsetX
             translationY = offsetY
             rotationZ = transform.rotation
-            alpha = sticker.opacity
-            if (sticker.flipHorizontal) scaleX = -1f
+            val t = entrance?.invoke() ?: 1f
+            // Pops from a third of its size, overshoots, settles; fades in over its first third.
+            val pop = if (t >= 1f) 1f else 0.3f + 0.7f * EntranceSpring.transform(t)
+            alpha = sticker.opacity * (t * 3f).coerceAtMost(1f)
+            scaleX = if (sticker.flipHorizontal) -pop else pop
+            scaleY = pop
         }
 
     when (sticker.kind) {

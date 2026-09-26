@@ -219,7 +219,12 @@ fun AppFloatingSideBar(
     // the panel is moving, so a frame-old backdrop behind it is not perceptible.
     // Shared with the tab group below, which draws two more backdrops of its own
     // and was re-capturing both through the whole fold.
-    val backdropFrozen: () -> Boolean = { panelWidth != targetPanelWidth }
+    // OR the app-wide freeze: passing `frozen` explicitly overrides liquidGlass's
+    // default, so list scroll / nav transitions must be folded in here too.
+    val appBackdropFrozen = LocalAppBackdropFrozen.current
+    val backdropFrozen: () -> Boolean = remember(appBackdropFrozen, panelWidth, targetPanelWidth) {
+        { panelWidth != targetPanelWidth || appBackdropFrozen() }
+    }
     val panelSurface = if (useGlass) {
         Modifier.liquidGlass(
             config = glassConfig.forSidePanel(),

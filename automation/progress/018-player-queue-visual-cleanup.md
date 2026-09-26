@@ -15,7 +15,7 @@ the "Continue Playing" header were eating most of it before a single queue
 row was drawn.
 
 Every element the task names lives in
-`E:\AndroidStudioProjects\vivi-music-main\app\src\main\kotlin\com\convx\music\ui\player\Queue.kt`,
+`E:\AndroidStudioProjects\convx\app\src\main\kotlin\com\convx\music\ui\player\Queue.kt`,
 so that is the only file edited.
 
 ## What was actually wrong (diagnosis, not taste)

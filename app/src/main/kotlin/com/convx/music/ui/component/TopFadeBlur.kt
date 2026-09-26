@@ -140,15 +140,22 @@ fun TopFadeBlur(
                     easing = EaseOutCubic,
                     startIntensity = PEAK,
                     endIntensity = 0f,
+                    // One uniform blur faded in by the gradient mask, instead of the
+                    // SkSL variable-radius blur, which split Home's main render pass
+                    // ~7 times per scroll frame (~1.5ms, measured against Melox).
+                    preferPerformance = true,
                 )
                 // Uniform across the layer, so it would show as texture over
                 // the untouched foot of the ramp — the edge being hidden.
                 noiseFactor = 0f
                 // Progressive blur on 13+ is Haze's SkSL loop: one texture tap per
                 // pixel of radius, two passes, over this whole strip, every scroll
-                // frame. Auto samples it at half size (Haze's own pick for
-                // progressive), cutting that work ~8x for the same ramp.
-                inputScale = HazeInputScale.Auto
+                // frame. Auto only steps down once blur is large enough to be
+                // confident — which left this sampling near full-res. Sacrifice-grade
+                // 1/4 res (was 1/3): still under the liquid-glass floor; blur hides
+                // the upscale. Permanent, no fling gate — one less composition-time
+                // dependency for a difference the eye cannot find under the ramp.
+                inputScale = HazeInputScale.Fixed(0.25f)
             },
     )
 

@@ -175,7 +175,7 @@ fun LibraryMixScreen(
             .sortedByDescending { it.playlist.pinnedAt }
     }
 
-    val libraryBackgroundMode by rememberEnumPreference(LibraryBackgroundModeKey, LibraryBackgroundMode.THUMBNAIL_BLUR)
+    val libraryBackgroundMode by rememberEnumPreference(LibraryBackgroundModeKey, LibraryBackgroundMode.PLAIN)
 
     // LibraryBackgroundMode only applies when no custom image is set. Without this
     // the blurred-artwork hero and its scrim kept rendering under the user's own
