@@ -725,7 +725,8 @@ suspend fun checkForUpdate(
             for (i in 0 until releases.length()) {
                 val release = releases.getJSONObject(i)
                 val tagName = release.getString("tag_name")
-                val isBeta = tagName.startsWith("b")
+                // Pre-releases (nightly) only reach users who opted into beta updates.
+                val isBeta = tagName.startsWith("b") || release.optBoolean("prerelease", false)
                 
                 if (!isBeta) {
                     if (bestStableRelease == null || isNewerVersion(tagName, bestStableRelease.getString("tag_name"))) {

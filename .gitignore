@@ -166,3 +166,7 @@ agent/
 .kiro-prof/
 .shots/
 sh.exe.stackdump
+
+# Release notes read by CI
+!.github/release-notes/
+!.github/release-notes/*.md

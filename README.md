@@ -11,6 +11,10 @@
     <b><a href="https://github.com/cosmictaserdev-creator/Convx/releases/tag/v1.5.2">⬇️ DOWNLOAD CONVX 1.5.2</a></b>
     — Latest release. Works on Android 8.0+.
   </p>
+  <p>
+    <b><a href="https://github.com/cosmictaserdev-creator/Convx/releases/tag/2.0.0-nightly">⬇️ DOWNLOAD CONVX 2.0.0 NIGHTLY</a></b>
+    — Pre-release, rebuilt every night from <code>main</code>. May be unstable. Works on Android 8.0+.
+  </p>
 
   <h3>📸 Screenshots</h3>
   <div>
