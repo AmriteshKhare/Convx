@@ -79,6 +79,8 @@ import com.convx.music.constants.NavBarMeltTransitionKey
 import com.convx.music.constants.PureBlackKey
 import com.convx.music.constants.PureBlackMiniPlayerKey
 import com.convx.music.constants.ReduceDynamicBlurKey
+import com.convx.music.constants.TopBarBlurStyle
+import com.convx.music.constants.TopBarBlurStyleKey
 import com.convx.music.constants.ShowAudioQualityBadgeKey
 import com.convx.music.constants.ShowCommentButtonKey
 import com.convx.music.constants.ShowHomeFabKey
@@ -119,10 +121,7 @@ fun AppearanceAdvancedSettings(
     scrollBehavior: TopAppBarScrollBehavior,
     activity: Activity,
 ) {
-    // Pure Black (AMOLED) -- demoted from the simple Theme picker (task 011):
-    // still fully functional, just not a top-level choice for a beginner. The
-    // mini-player variant is kept linked to the main toggle, matching the
-    // behavior ThemeScreen.kt used to drive directly.
+    // Keep the mini-player setting in sync with the main pure-black setting.
     val (pureBlack, onPureBlackChangeRaw) = rememberPreference(PureBlackKey, defaultValue = false)
     val (_, onPureBlackMiniPlayerChange) = rememberPreference(PureBlackMiniPlayerKey, defaultValue = false)
     val onPureBlackChange: (Boolean) -> Unit = { enabled ->
@@ -212,6 +211,8 @@ fun AppearanceAdvancedSettings(
     }
 
     val (reduceDynamicBlur, onReduceDynamicBlurChange) = rememberPreference(ReduceDynamicBlurKey, false)
+    val (topBarBlurStyle, onTopBarBlurStyleChange) = rememberEnumPreference(TopBarBlurStyleKey, TopBarBlurStyle.HAZE_PROGRESSIVE)
+    var showTopBarBlurDialog by rememberSaveable { mutableStateOf(false) }
     val (showHomeFab, onShowHomeFabChange) = rememberPreference(ShowHomeFabKey, defaultValue = true)
     val (hideHomeFavoriteIcon, onHideHomeFavoriteIconChange) = rememberPreference(
         HideHomeFavoriteIconKey,
@@ -225,14 +226,10 @@ fun AppearanceAdvancedSettings(
     val (homeHeroCardHeightOverride, onHomeHeroCardHeightOverrideChange) = rememberPreference(HomeHeroCardHeightOverrideKey, 0)
     val (speedDialCardHeightOverride, onSpeedDialCardHeightOverrideChange) = rememberPreference(SpeedDialCardHeightOverrideKey, 0)
     val (homeCardCornerRadiusOverride, onHomeCardCornerRadiusOverrideChange) = rememberPreference(HomeCardCornerRadiusOverrideKey, 0)
-    // Moved from PlayerAdvancedSettings (task 011): a display/sort preference for
-    // the local Albums shelf, not a playback setting -- belongs with the rest of
-    // Appearance's niche display toggles.
+    // Controls the sort order for the local Albums shelf.
     val (localAlbumsByYear, onLocalAlbumsByYearChange) = rememberPreference(LocalAlbumsByYearKey, defaultValue = true)
 
-    // App-wide background/text color, moved here from ThemeScreen.kt (task 011):
-    // independent of Liquid Glass, and niche enough to belong with the rest of
-    // Advanced Appearance rather than the beginner-facing theme picker.
+    // These colors control the app-wide background and text appearance.
     val (backgroundColorInt, onBackgroundColorChange) = rememberPreference(AppBackgroundColorKey, defaultValue = 0)
     val (textColorInt, onTextColorChange) = rememberPreference(AppTextColorKey, defaultValue = 0)
     val backgroundColor = if (backgroundColorInt == 0) AppTheme.colorScheme.surfaceContainerHigh else Color(backgroundColorInt)
@@ -286,6 +283,27 @@ fun AppearanceAdvancedSettings(
         )
     }
 
+    if (showTopBarBlurDialog) {
+        EnumDialog(
+            onDismiss = { showTopBarBlurDialog = false },
+            onSelect = {
+                onTopBarBlurStyleChange(it)
+                showTopBarBlurDialog = false
+            },
+            title = stringResource(R.string.top_bar_blur_style),
+            current = topBarBlurStyle,
+            values = TopBarBlurStyle.entries,
+            valueText = {
+                stringResource(
+                    when (it) {
+                        TopBarBlurStyle.SINGLE_PASS -> R.string.top_bar_blur_single_pass
+                        TopBarBlurStyle.HAZE_PROGRESSIVE -> R.string.top_bar_blur_haze_progressive
+                    },
+                )
+            },
+        )
+    }
+
     if (showDefaultChipDialog) {
         EnumDialog(
             onDismiss = { showDefaultChipDialog = false },
@@ -303,6 +321,7 @@ fun AppearanceAdvancedSettings(
                     LibraryFilter.ALBUMS -> stringResource(R.string.albums)
                     LibraryFilter.PLAYLISTS -> stringResource(R.string.playlists)
                     LibraryFilter.LIBRARY -> stringResource(R.string.filter_library)
+                    LibraryFilter.LOCAL -> stringResource(R.string.filter_local)
                 }
             }
         )
@@ -421,7 +440,7 @@ fun AppearanceAdvancedSettings(
                 Spacer(modifier = Modifier.height(27.dp))
 
                 IosSettingsGroup(
-                    title = stringResource(R.string.appearance),
+                    title = "Layout & behaviour",
                     items = listOf(
                         IosSettingsItem(
                             icon = painterResource(R.drawable.tune),
@@ -459,7 +478,7 @@ fun AppearanceAdvancedSettings(
                 Spacer(modifier = Modifier.height(27.dp))
 
                 IosSettingsGroup(
-                    title = stringResource(R.string.player),
+                    title = "Player",
                     items = listOf(
                         IosSettingsItem(
                             icon = painterResource(R.drawable.hide_image),
@@ -545,7 +564,7 @@ fun AppearanceAdvancedSettings(
                 Spacer(modifier = Modifier.height(27.dp))
 
                 IosSettingsGroup(
-                    title = stringResource(R.string.lyrics),
+                    title = "Lyrics effects",
                     items = listOf(
                         IosSettingsItem(
                             icon = painterResource(R.drawable.lyrics),
@@ -610,7 +629,7 @@ fun AppearanceAdvancedSettings(
                 Spacer(modifier = Modifier.height(27.dp))
 
                 IosSettingsGroup(
-                    title = stringResource(R.string.misc),
+                    title = "Other",
                     items = listOf(
                         IosSettingsItem(
                             icon = painterResource(R.drawable.tab),
@@ -623,6 +642,7 @@ fun AppearanceAdvancedSettings(
                                         LibraryFilter.ALBUMS -> stringResource(R.string.albums)
                                         LibraryFilter.PLAYLISTS -> stringResource(R.string.playlists)
                                         LibraryFilter.LIBRARY -> stringResource(R.string.filter_library)
+                    LibraryFilter.LOCAL -> stringResource(R.string.filter_local)
                                     }
                                 )
                             },
@@ -672,6 +692,19 @@ fun AppearanceAdvancedSettings(
                                 Switch(checked = reduceDynamicBlur, onCheckedChange = onReduceDynamicBlurChange)
                             },
                             onClick = { onReduceDynamicBlurChange(!reduceDynamicBlur) }
+                        ),
+                        IosSettingsItem(
+                            icon = painterResource(R.drawable.grid_view),
+                            title = { Text(stringResource(R.string.top_bar_blur_style)) },
+                            description = {
+                                Text(stringResource(
+                                    when (topBarBlurStyle) {
+                                        TopBarBlurStyle.SINGLE_PASS -> R.string.top_bar_blur_single_pass
+                                        TopBarBlurStyle.HAZE_PROGRESSIVE -> R.string.top_bar_blur_haze_progressive
+                                    },
+                                ))
+                            },
+                            onClick = { showTopBarBlurDialog = true },
                         ),
                         IosSettingsItem(
                             icon = painterResource(R.drawable.mic),

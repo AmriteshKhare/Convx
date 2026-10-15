@@ -53,10 +53,7 @@ fun LibraryArtistListItem(
                 }
             }
         ) {
-            Icon(
-                painter = painterResource(R.drawable.more_horiz),
-                contentDescription = null
-            )
+            SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
         }
     },
     modifier = modifier
@@ -123,10 +120,7 @@ fun LibraryAlbumListItem(
                 }
             }
         ) {
-            Icon(
-                painter = painterResource(R.drawable.more_horiz),
-                contentDescription = null
-            )
+            SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
         }
     },
     modifier = modifier
@@ -183,6 +177,8 @@ fun LibraryPlaylistListItem(
 ) = PlaylistListItem(
     playlist = playlist,
     showIconOnly = showIconOnly,
+    sharedArtworkId = if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.remoteSongCount != 0)
+        playlist.playlist.browseId else playlist.id,
     trailingContent = {
         androidx.compose.material3.IconButton(
             onClick = {
@@ -224,10 +220,7 @@ fun LibraryPlaylistListItem(
                 }
             }
         ) {
-            Icon(
-                painter = painterResource(R.drawable.more_horiz),
-                contentDescription = null
-            )
+            SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
         }
     },
     modifier = modifier
@@ -253,6 +246,8 @@ fun LibraryPlaylistGridItem(
     playlist = playlist,
     fillMaxWidth = true,
     showIconOnly = showIconOnly,
+    sharedArtworkId = if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.remoteSongCount != 0)
+        playlist.playlist.browseId else playlist.id,
     modifier = modifier
         .fillMaxWidth()
         .combinedClickable(

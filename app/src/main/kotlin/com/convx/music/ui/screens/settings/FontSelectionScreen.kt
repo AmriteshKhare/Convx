@@ -75,7 +75,7 @@ fun FontSelectionScreen(
 ) {
     val (selectedFont, onSelectedFontChange) = rememberPreference(
         SelectedFontKey,
-        defaultValue = AppFont.SYSTEM.value
+        defaultValue = AppFont.PLUS_JAKARTA_SANS.value
     )
 
     val (brandFont, onBrandFontChange) = rememberPreference(
@@ -134,8 +134,8 @@ fun FontSelectionScreen(
             Card(
                 shape = AppTheme.shapes.large,
                 colors = CardDefaults.cardColors(
-                    containerColor = AppTheme.colorScheme.primaryContainer,
-                    contentColor = AppTheme.colorScheme.onPrimaryContainer
+                    containerColor = AppTheme.colorScheme.surfaceVariant,
+                    contentColor = AppTheme.colorScheme.onSurface
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -158,21 +158,20 @@ fun FontSelectionScreen(
                         text = stringResource(R.string.preview_text_quote),
                         fontFamily = activeFontFamily,
                         style = AppTheme.typography.headlineMedium,
-                        color = AppTheme.colorScheme.onPrimaryContainer,
+                        color = AppTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
                     Text(
                         text = "Expressive typeface is applied to display, headlines, and titles. Body copy and labels remain in the system font for maximum readability.",
                         style = AppTheme.typography.bodyMedium,
-                        color = AppTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        color = AppTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Options settings group
             IosSettingsGroup(
                 title = stringResource(R.string.font_selection),
                 items = listOf(

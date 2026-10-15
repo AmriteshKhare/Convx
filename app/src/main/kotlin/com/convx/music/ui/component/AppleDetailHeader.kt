@@ -63,17 +63,14 @@ import com.convx.music.utils.rememberPreference
  */
 
 /**
- * Fraction of the screen width the artwork card occupies. Measured off the
- * reference screenshots (~0.66), which is also what leaves the button row below
- * it visibly wider than the art — the proportion that makes the card read as an
- * object on the page rather than as the page's top edge.
+ * Fraction of screen width occupied by the artwork card. This keeps the action
+ * row visibly wider than the artwork, so the card reads as an object on the page.
  */
 const val DetailArtworkFraction = 0.66f
 
 /**
- * Height of the play pill and of the circles flanking it. One value: the three
- * controls are a single optical band in the reference, not a big centre button
- * with two small satellites.
+ * Height shared by the play pill and the two side buttons. The equal heights make
+ * the three controls read as one optical group.
  */
 val DetailActionHeight = 52.dp
 
@@ -157,12 +154,7 @@ fun DetailMetaLine(
         horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
     ) {
         if (explicit) {
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFECircle,
-                contentDescription = stringResource(R.string.explicit),
-                tint = color,
-                modifier = Modifier.size(14.dp),
-            )
+            SymbolIcon(symbol = sf("SFECircle"), contentDescription = stringResource(R.string.explicit), size = 14.dp, tint = color)
         }
         if (visible.isNotEmpty()) {
             Text(
@@ -227,11 +219,7 @@ fun DetailActionRow(
             onClick = onShuffle,
             size = DetailActionHeight,
         ) {
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFShuffle,
-                contentDescription = stringResource(R.string.shuffle_label),
-                modifier = Modifier.size(22.dp),
-            )
+            SymbolIcon(symbol = sf("SFShuffle"), contentDescription = stringResource(R.string.shuffle_label), size = 22.dp)
         }
 
         Box(
@@ -245,14 +233,12 @@ fun DetailActionRow(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                // Figma Button: icon-label gap 4 (225:2439).
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 AnimatedPlayPauseIcon(isPlaying = isPlaying, tint = tint, size = 17.dp)
                 Text(
                     text = stringResource(if (isPlaying) R.string.pause else R.string.play),
                     fontSize = 17.sp,
-                    // Figma Button label: SemiBold 17, -0.43 tracking (225:2439).
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = (-0.43).sp,
                     color = tint,
@@ -265,20 +251,7 @@ fun DetailActionRow(
     }
 }
 
-/**
- * Whether this release can actually be delivered losslessly, for [DetailMetaLine]'s badge.
- *
- * Deliberately narrow, because a badge that lies is worse than no badge. Two sources are
- * knowable without a schema change:
- *
- * - a local file whose container carries the original samples ([readLocalAudioProperties]);
- *   [localSongId] is one of the release's local songs (for a local song the row id *is* its
- *   content URI, the same thing `ShowMediaInfo` reads).
- * - Tidal lossless streaming being switched on, which is the only online path in the app
- *   that fetches FLAC.
- *
- * A YouTube release with the setting off gets no badge, which is the truth.
- */
+/** True when a local file or enabled Tidal streaming can provide lossless audio. */
 @Composable
 fun rememberLosslessBadge(localSongId: String?): Boolean {
     val tidalLossless by rememberPreference(EnableTidalStreamingKey, defaultValue = false)

@@ -259,7 +259,6 @@ internal class SwipeableV2State<T>(
      * The fraction of the progress going from [currentValue] to [targetValue], within [0f..1f]
      * bounds.
      */
-    // @FloatRange(from = 0f, to = 1f)
     val progress: Float by derivedStateOf {
         val a = anchors[currentValue] ?: 0f
         val b = anchors[targetValue] ?: 0f
@@ -531,8 +530,6 @@ internal class SwipeableV2State<T>(
 }
 
 /**
- * Create and remember a [SwipeableV2State].
- *
  * @param initialValue The initial value.
  * @param animationSpec The default animation that will be used to animate to a new value.
  * @param confirmValueChange Optional callback invoked to confirm or veto a pending value change.

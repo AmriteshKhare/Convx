@@ -12,14 +12,14 @@ depends_on: []
 
 ## Goal
 
-Artist page background uses a BitChord-style color mesh, and everything on
+Artist page background uses a reference-style color mesh, and everything on
 the page needing contrast against it gets an adaptive chroma tint derived
 from that same mesh/hero color.
 
 ## Acceptance criteria
 
 - Artist page background renders via the mesh-gradient approach (see
-  `MeshGradientBackground.kt`, `BITCHORD_MESH` preference, `BitChord/`
+  `MeshGradientBackground.kt`, `FLUID_MESH` preference, `the reference app/`
   reference clone for the original look).
 - These elements are tinted with a color adaptively derived from the current
   mesh/hero color (via `ColorEngineCore.kt`/the color engine, not a hardcoded
@@ -36,5 +36,5 @@ from that same mesh/hero color.
 
 Color derivation: `app/src/main/kotlin/com/convx/music/ui/theme/colorengine/ColorEngineCore.kt`
 and the Swift reference under `app/src/main/kotlin/com/convx/Color Engine/`.
-Artist screen: `ui/screens/artist/ArtistScreen.kt`. BitChord reference for
-the mesh look: `BitChord/app/src/main/java/com/music/bitchord/ui/`.
+Artist screen: `ui/screens/artist/ArtistScreen.kt`. the reference app reference for
+the mesh look: `the reference app/app/src/main/java/com/music/reference/ui/`.

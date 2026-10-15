@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.library
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,7 +61,6 @@ import com.convx.music.R
 import com.convx.music.ui.utils.rememberGridColumns
 import com.convx.music.constants.AlbumFilter
 import com.convx.music.constants.AlbumFilterKey
-import com.convx.music.constants.LocalOnlyModeKey
 import com.convx.music.constants.AlbumSortDescendingKey
 import com.convx.music.constants.AlbumSortType
 import com.convx.music.constants.AlbumSortTypeKey
@@ -94,6 +95,7 @@ import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.utils.rememberHeroZoom
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -106,12 +108,12 @@ fun LibraryAlbumsScreen(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
     var viewType by rememberEnumPreference(AlbumViewTypeKey, LibraryViewType.GRID)
     var storedFilter by rememberEnumPreference(AlbumFilterKey, AlbumFilter.LIKED)
-    val (localOnly) = rememberPreference(LocalOnlyModeKey, false)
+    val localOnly = com.convx.music.LocalLocalOnlyMode.current
     // Mirrors what the view model actually queries while local-only mode is on.
     val filter = if (localOnly) AlbumFilter.LOCAL else storedFilter
     val (sortType, onSortTypeChange) = rememberEnumPreference(
@@ -136,7 +138,7 @@ fun LibraryAlbumsScreen(
                 onClick = onDeselect,
                 shape = RoundedCornerShape(16.dp),
                 leadingIcon = {
-                    Icon(imageVector = SfSymbols.Monochrome.SFXmark, contentDescription = "")
+                    SymbolIcon(bounceOnEnter = true, symbol = sf("SFXmark"), contentDescription = "")
                 },
             )
             if (!localOnly) {
@@ -166,7 +168,7 @@ fun LibraryAlbumsScreen(
         }
     }
 
-    val albums by viewModel.allAlbums.collectAsState()
+    val albums by viewModel.allAlbums.collectAsStateWithLifecycle()
 
     val lazyListState = rememberLazyListState()
     val lazyGridState = rememberLazyGridState()
@@ -177,7 +179,7 @@ fun LibraryAlbumsScreen(
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val scrollToTop =
-        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsState()
+        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTop?.value) {
         if (scrollToTop?.value == true) {
@@ -228,13 +230,10 @@ fun LibraryAlbumsScreen(
                         selected = viewType == type,
                         onClick = { viewType = type },
                         icon = {
-                            Icon(
-                                imageVector = when (type) {
-                                    LibraryViewType.LIST -> SfSymbols.Monochrome.SFListBullet
-                                    LibraryViewType.GRID -> SfSymbols.Monochrome.SFSquareGrid2x2
-                                },
-                                contentDescription = null,
-                            )
+                            SymbolIcon(bounceOnEnter = true, symbol = when (type) {
+                                    LibraryViewType.LIST -> sf("SFListBullet")
+                                    LibraryViewType.GRID -> sf("SFSquareGrid2x2")
+                                }, contentDescription = null)
                         },
                     )
                 }
@@ -243,10 +242,18 @@ fun LibraryAlbumsScreen(
     }
 
     // Hoisted: both view types and the scroll rail share this deduped list.
-    val visibleAlbums = remember(albums, hideExplicit) {
+    val localAlbums by viewModel.localAlbums.collectAsStateWithLifecycle()
+    val sectioned = !localOnly && filter != AlbumFilter.LOCAL
+    // Online albums first; device albums follow below a divider.
+    val onlineAlbums = remember(albums, hideExplicit, sectioned) {
         (if (hideExplicit) albums.filter { !it.album.explicit } else albums)
+            .filter { !sectioned || !it.album.isLocal }
             .distinctBy { it.id }
     }
+    val deviceAlbums = remember(onlineAlbums, localAlbums, sectioned) {
+        if (!sectioned) emptyList() else localAlbums.distinctBy { it.id }.filter { local -> onlineAlbums.none { it.id == local.id } }
+    }
+    val visibleAlbums = remember(onlineAlbums, deviceAlbums) { onlineAlbums + deviceAlbums }
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -292,7 +299,7 @@ fun LibraryAlbumsScreen(
                         }
 
                         items(
-                            items = visibleAlbums,
+                            items = onlineAlbums,
                             key = { it.id },
                             contentType = { CONTENT_TYPE_ALBUM },
                         ) { album ->
@@ -306,6 +313,27 @@ fun LibraryAlbumsScreen(
                                 modifier = Modifier
                                     .animateItem()
                             )
+                        }
+
+                        if (deviceAlbums.isNotEmpty()) {
+                            item(key = "local_divider", contentType = CONTENT_TYPE_HEADER) {
+                                LocalSectionDivider()
+                            }
+                            items(
+                                items = deviceAlbums,
+                                key = { "local_${it.id}" },
+                                contentType = { CONTENT_TYPE_ALBUM },
+                            ) { album ->
+                                LibraryAlbumListItem(
+                                    navController = navController,
+                                    menuState = menuState,
+                                    album = album,
+                                    isActive = album.id == mediaMetadata?.album?.id,
+                                    isPlaying = isPlaying,
+                                    showIconOnly = libraryIconsOnly,
+                                    modifier = Modifier.animateItem()
+                                )
+                            }
                         }
                     }
                 }
@@ -354,7 +382,7 @@ fun LibraryAlbumsScreen(
                         }
 
                         items(
-                            items = visibleAlbums,
+                            items = onlineAlbums,
                             key = { it.id },
                             contentType = { CONTENT_TYPE_ALBUM },
                         ) { album ->
@@ -369,6 +397,32 @@ fun LibraryAlbumsScreen(
                                 modifier = Modifier
                                     .animateItem()
                             )
+                        }
+
+                        if (deviceAlbums.isNotEmpty()) {
+                            item(
+                                key = "local_divider",
+                                span = { GridItemSpan(maxLineSpan) },
+                                contentType = CONTENT_TYPE_HEADER,
+                            ) {
+                                LocalSectionDivider()
+                            }
+                            items(
+                                items = deviceAlbums,
+                                key = { "local_${it.id}" },
+                                contentType = { CONTENT_TYPE_ALBUM },
+                            ) { album ->
+                                LibraryAlbumGridItem(
+                                    navController = navController,
+                                    menuState = menuState,
+                                    coroutineScope = coroutineScope,
+                                    album = album,
+                                    isActive = album.id == mediaMetadata?.album?.id,
+                                    isPlaying = isPlaying,
+                                    showIconOnly = libraryIconsOnly,
+                                    modifier = Modifier.animateItem()
+                                )
+                            }
                         }
                     }
                 }

@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.artist
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.R
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
@@ -33,7 +35,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -53,7 +54,7 @@ import com.convx.music.ui.theme.LocalMetadataColor
 import com.convx.music.ui.utils.additiveChrome
 
 /**
- * Static preview of the artist header treatment — BitChord-style hero with the
+ * Static preview of the artist header treatment — reference-style hero with the
  * progressive blur foot, the play trio starting on the fade, and song rows at
  * the 20.dp gutter with additive-chrome secondary text — without running the
  * app. Artwork is a stand-in wash (no photo in previews); layout, spacing and
@@ -115,11 +116,7 @@ private fun ArtistScreenPreview() {
                         size = 48.dp,
                         modifier = Modifier.offset(y = 8.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Info,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        SymbolIcon(symbol = sf("info.circle.fill"), contentDescription = null, size = 20.dp)
                     }
                     ContrastCircleButton(
                         onTint = Color.White,
@@ -127,12 +124,7 @@ private fun ArtistScreenPreview() {
                         onClick = {},
                         size = 72.dp,
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.Black,
-                            modifier = Modifier.size(32.dp),
-                        )
+                        SymbolIcon(symbol = sf("play.fill"), contentDescription = null, size = 32.dp, tint = Color.Black)
                     }
                     ContrastCircleButton(
                         onTint = Color.White,
@@ -140,11 +132,7 @@ private fun ArtistScreenPreview() {
                         size = 48.dp,
                         modifier = Modifier.offset(y = 8.dp),
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Favorite,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        SymbolIcon(symbol = sf("heart.fill"), contentDescription = null, size = 20.dp)
                     }
                 }
                 // Flat faded stat pill, like the real header's.
@@ -199,15 +187,10 @@ private fun ArtistScreenPreview() {
                                     modifier = Modifier.size(40.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.more_horiz),
-                                        contentDescription = null,
-                                        tint = LocalContentColor.current,
-                                        modifier = Modifier
-                                            .size(22.dp)
+                                    SymbolIcon(symbol = sf("ellipsis"), contentDescription = null, size = 22.dp, modifier = Modifier
+                                            
                                             .additiveChrome()
-                                            .graphicsLayer { alpha = 0.45f },
-                                    )
+                                            .graphicsLayer { alpha = 0.45f }, tint = LocalContentColor.current)
                                 }
                             },
                             flat = true,

@@ -40,32 +40,37 @@ internal object SearchMapper {
         val contents = response.contents?.tabbedSearchResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer?.contents.orEmpty()
 
-        val shelfSummaries = contents.mapNotNull { it ->
-            if (it.musicCardShelfRenderer != null) {
-                SearchSummary(
-                    title = it.musicCardShelfRenderer.header?.musicCardShelfHeaderBasicRenderer?.title?.runs?.firstOrNull()?.text ?: YouTubeConstants.DEFAULT_TOP_RESULT,
-                    items = listOfNotNull(SearchSummaryPage.fromMusicCardShelfRenderer(it.musicCardShelfRenderer))
-                        .plus(
-                            it.musicCardShelfRenderer.contents
+        val shelfSummaries = contents.mapNotNull { content ->
+            val cardShelf = content.musicCardShelfRenderer
+            val musicShelf = content.musicShelfRenderer
+
+            when {
+                cardShelf != null -> {
+                    val title = cardShelf.header?.musicCardShelfHeaderBasicRenderer?.title
+                        ?.runs?.firstOrNull()?.text ?: YouTubeConstants.DEFAULT_TOP_RESULT
+                    val items = (
+                        listOfNotNull(SearchSummaryPage.fromMusicCardShelfRenderer(cardShelf)) +
+                            cardShelf.contents
                                 ?.mapNotNull { it.musicResponsiveListItemRenderer }
                                 ?.mapNotNull(SearchSummaryPage.Companion::fromMusicResponsiveListItemRenderer)
                                 .orEmpty()
-                        )
-                        .distinctBy { it.id }
-                        .ifEmpty { null } ?: return@mapNotNull null
-                )
-            } else if (it.musicShelfRenderer != null) {
-                SearchSummary(
-                    title = it.musicShelfRenderer.title?.runs?.firstOrNull()?.text ?: YouTubeConstants.DEFAULT_OTHER_RESULTS,
-                    items = it.musicShelfRenderer.contents?.getItems()
-                        ?.mapNotNull {
-                            SearchSummaryPage.fromMusicResponsiveListItemRenderer(it)
-                        }
+                        ).distinctBy { it.id }
+
+                    if (items.isEmpty()) null else SearchSummary(title, items)
+                }
+
+                musicShelf != null -> {
+                    val title = musicShelf.title?.runs?.firstOrNull()?.text
+                        ?: YouTubeConstants.DEFAULT_OTHER_RESULTS
+                    val items = musicShelf.contents?.getItems()
+                        ?.mapNotNull(SearchSummaryPage.Companion::fromMusicResponsiveListItemRenderer)
                         ?.distinctBy { it.id }
-                        ?.ifEmpty { null } ?: return@mapNotNull null
-                )
-            } else {
-                null
+                        .orEmpty()
+
+                    if (items.isEmpty()) null else SearchSummary(title, items)
+                }
+
+                else -> null
             }
         }
 

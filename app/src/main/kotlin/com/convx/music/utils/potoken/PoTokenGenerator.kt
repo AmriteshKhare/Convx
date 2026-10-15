@@ -71,10 +71,11 @@ class PoTokenGenerator {
 
         val (poTokenGenerator, streamingPot, hasBeenRecreated) =
             webPoTokenGenLock.withLock {
+                val currentGenerator = webPoTokenGenerator
                 val shouldRecreate =
-                    forceRecreate || webPoTokenGenerator == null || webPoTokenGenerator!!.isExpired || webPoTokenSessionId != sessionId
+                    forceRecreate || currentGenerator == null || currentGenerator.isExpired || webPoTokenSessionId != sessionId
 
-                if (shouldRecreate) {
+                val activeGenerator = if (shouldRecreate) {
                     Timber.tag(TAG).d("Creating new PoTokenWebView (forceRecreate=$forceRecreate)")
                     webPoTokenSessionId = sessionId
 
@@ -82,16 +83,21 @@ class PoTokenGenerator {
                         webPoTokenGenerator?.close()
                     }
 
-                    // create a new webPoTokenGenerator
-                    webPoTokenGenerator = PoTokenWebView.getNewPoTokenGenerator(CipherDeobfuscator.appContext)
+                    val newGenerator = PoTokenWebView.getNewPoTokenGenerator(CipherDeobfuscator.appContext)
+                    webPoTokenGenerator = newGenerator
 
                     // The streaming poToken needs to be generated exactly once before generating
                     // any other (player) tokens.
-                    webPoTokenStreamingPot = webPoTokenGenerator!!.generatePoToken(webPoTokenSessionId!!)
+                    webPoTokenStreamingPot = newGenerator.generatePoToken(sessionId)
                     Timber.tag(TAG).d("Streaming poToken generated for sessionId=${webPoTokenSessionId?.take(20)}...")
+
+                    newGenerator
+                } else {
+                    currentGenerator
                 }
 
-                Triple(webPoTokenGenerator!!, webPoTokenStreamingPot!!, shouldRecreate)
+                val streamingPot = webPoTokenStreamingPot ?: error("Streaming poToken is unavailable")
+                Triple(activeGenerator, streamingPot, shouldRecreate)
             }
 
         val playerPot = try {

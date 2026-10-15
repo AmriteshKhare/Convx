@@ -54,7 +54,7 @@ fun rememberPlaylistCoverPicker(
     onCoverSaved: (String) -> Unit = {},
 ): () -> Unit {
     val context = LocalContext.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val (darkMode) = rememberEnumPreference(DarkModeKey, DarkMode.AUTO)
     val darkTheme = darkMode == DarkMode.ON || (darkMode == DarkMode.AUTO && isSystemInDarkTheme())
     val cropColor = AppTheme.colorScheme
@@ -145,7 +145,7 @@ fun rememberPlaylistCoverPicker(
  * eviction, using a fresh timestamped filename (which also busts Coil's uri-keyed cache) and
  * deleting any prior cover for this playlist. Returns the persisted file uri, or null on failure.
  */
-private fun persistPlaylistCover(context: Context, src: Uri, playlistId: String): Uri? = runCatching {
+internal fun persistPlaylistCover(context: Context, src: Uri, playlistId: String): Uri? = runCatching {
     val safeId = playlistId.replace(Regex("[^A-Za-z0-9_-]"), "_")
     val dir = File(context.filesDir, "playlist_covers").apply { mkdirs() }
     dir.listFiles { f -> f.name.startsWith("${safeId}_") }?.forEach { it.delete() }

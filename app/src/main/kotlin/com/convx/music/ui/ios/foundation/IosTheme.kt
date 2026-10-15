@@ -138,7 +138,7 @@ object IosMetrics {
     val ListRowInset: Dp = 16.dp
     val SectionSpacing: Dp = 35.dp
     val SeparatorThickness: Dp = 0.33.dp
-    /** iOS 26 inset-grouped sections use a continuous 26pt radius, not the old 10pt. */
+    /** Corner radius for inset-grouped sections. */
     val GroupedCornerRadius: Dp = 26.dp
     val SheetCornerRadius: Dp = 38.dp
     val TabBarHeight: Dp = 56.dp

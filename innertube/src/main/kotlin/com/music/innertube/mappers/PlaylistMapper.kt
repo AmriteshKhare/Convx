@@ -51,10 +51,7 @@ internal object PlaylistMapper {
         PlaylistPage(
             playlist = PlaylistItem(
                 id = playlistId,
-                // Auto playlists like Liked Music (LM) ship a minimal header: no cover
-                // thumbnail, no shuffle button. Force-unwrapping those threw an NPE that
-                // runCatching swallowed, so the whole playlist (and its songs) silently
-                // failed to load. Parse defensively instead.
+                // Auto playlists may omit header fields such as title or thumbnail.
                 title = header?.title?.runs?.firstOrNull()?.text ?: "",
                 author = header?.straplineTextOne?.runs?.firstOrNull()?.let {
                     Artist(

@@ -12,17 +12,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.ColorUtils
 
-/**
- * Adaptive Dark/Light Glass Tinting System Design Tokens and Color Computations
- *
- * Implements the full spec:
- * - Base surface tokens (§1)
- * - Material values per mode (§2)
- * - Neutral & Hero tint system with +10% opacity boost (§3)
- * - Red default bug fix (§3.3)
- * - Title and icon Dim + Hue-blending (§4)
- * - Per-component explicit dark and light specifications (§5B)
- */
+/** Theme and component-specific glass color tokens and calculations. */
 object GlassTintTokens {
     // §1. Base Surface Tokens
     val SurfaceBaseDark = Color(0xFF171717)        // #171717, rgb: 23, 23, 23
@@ -67,7 +57,7 @@ object GlassTintTokens {
     const val DragHandleOpacity = 0.30f
     const val SecondaryLabelAlpha = 0.60f
 
-    // Per-theme glass defaults (grilled spec Q3/Q4).
+    // Per-theme glass defaults.
     val DefaultSurfaceDark = Color(0xFF171717)
     const val DefaultSurfaceOpacityDark = 0.50f
     val DefaultPuckDark = Color(0xFF2E2E2E)
@@ -128,35 +118,27 @@ object GlassTintTokens {
     /** Base of a live liquid-glass surface: white lift in dark (see [BaseSurfaceOpacityDark]), #F5F5F7 in light. */
     fun glassBaseColor(isDark: Boolean): Color = if (isDark) Color.White else SurfaceBaseLight
 
-    /** Returns the base surface color (#171717 dark, #F5F5F7 light) — opaque/fallback fills. */
     fun baseSurfaceColor(isDark: Boolean): Color =
         if (isDark) SurfaceBaseDark else SurfaceBaseLight
 
-    /** Returns the neutral tint color (desaturated neutral gray). */
     fun neutralTintColor(isDark: Boolean): Color =
         if (isDark) TintNeutralDark else TintNeutralLight
 
-    /** Returns the hero tint contribution opacity (0.30 dark, 0.25 light). */
     fun heroTintOpacity(isDark: Boolean): Float =
         if (isDark) HeroTintOpacityDark else HeroTintOpacityLight
 
-    /** Returns the fixed system red token for selected state. */
     fun selectedRedColor(isDark: Boolean): Color =
         if (isDark) AccentSelectedRedDark else AccentSelectedRedLight
 
-    /** Returns the border hairline color per mode. */
     fun borderColor(isDark: Boolean): Color =
         if (isDark) BorderDark else BorderLight
 
-    /** Returns top navigation bar blur radius per mode. */
     fun navBarBlur(isDark: Boolean): Dp =
         if (isDark) NavBarBlurDark else NavBarBlurLight
 
-    /** Returns tab bar blur radius per mode. */
     fun tabBarBlur(isDark: Boolean): Dp =
         if (isDark) TabBarBlurDark else TabBarBlurLight
 
-    /** Returns saturation multiplier per mode. */
     fun navBarSaturation(isDark: Boolean): Float =
         if (isDark) NavBarSaturationDark else NavBarSaturationLight
 
@@ -179,7 +161,6 @@ object GlassTintTokens {
         }
     }
 
-    /** Returns the specular highlight ("pluck") opacity adapted to theme and hero context. */
     fun pluckOpacity(isDark: Boolean, isHeroContext: Boolean): Float {
         return if (isDark) {
             if (isHeroContext) PluckAlphaHeroDark else PluckAlphaNeutralDark
@@ -188,7 +169,6 @@ object GlassTintTokens {
         }
     }
 
-    /** Returns the selection pill ("puck") wash opacity adapted to theme and hero context. */
     fun puckOpacity(isDark: Boolean, isHeroContext: Boolean): Float {
         return if (isDark) {
             if (isHeroContext) 0.80f else 0.55f
@@ -197,13 +177,7 @@ object GlassTintTokens {
         }
     }
 
-    /**
-     * Computes the final glass content color with Step 1 Dimming + Step 2 Hue-Blending (§4):
-     * - For selected state: fixed red (#FF453A dark / #FF3B30 light).
-     * - In light mode: opaque blackish with NO transparency (alpha = 1.0f) for icons and labels on glass surfaces.
-     * - In dark mode: hue-shifted against [activeTint] (hero tint or neutral tint)
-     *   with [IconDimOpacity] (0.85) or [TitleDimOpacity] (0.92) or [UnselectedTabLabelOpacity] (0.75).
-     */
+    /** Selected content uses red; light mode uses opaque black, while dark mode adapts to [activeTint]. */
     fun glassContentColor(
         isDark: Boolean,
         activeTint: Color = Color.Unspecified,
@@ -222,7 +196,6 @@ object GlassTintTokens {
             return red.copy(alpha = alpha)
         }
 
-        // In light mode: icons and text on glass surfaces are opaque blackish with NO transparency (alpha = 1.0f)
         if (!isDark) {
             return when {
                 isTitle -> TitleOpaqueBlackishLight

@@ -66,13 +66,15 @@ internal object PlayerMapper {
             endpoint.index,
             endpoint.params,
             continuation).body<NextResponse>()
+        val tabs = response.contents.singleColumnMusicWatchNextResultsRenderer
+            ?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs
+        val firstTab = tabs?.get(0)
         val playlistPanelRenderer = response.continuationContents?.playlistPanelContinuation
-            ?: response.contents.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer
-                ?.watchNextTabbedResultsRenderer?.tabs?.get(0)?.tabRenderer?.content?.musicQueueRenderer
-                ?.content?.playlistPanelRenderer!!
-        val title = response.contents.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer
-            ?.watchNextTabbedResultsRenderer?.tabs?.get(0)?.tabRenderer?.content?.musicQueueRenderer
+            ?: firstTab?.tabRenderer?.content?.musicQueueRenderer?.content?.playlistPanelRenderer!!
+        val title = firstTab?.tabRenderer?.content?.musicQueueRenderer
             ?.header?.musicQueueHeaderRenderer?.subtitle?.runs?.firstOrNull()?.text
+        val lyricsEndpoint = tabs?.getOrNull(1)?.tabRenderer?.endpoint?.browseEndpoint
+        val relatedEndpoint = tabs?.getOrNull(2)?.tabRenderer?.endpoint?.browseEndpoint
         val items = playlistPanelRenderer.contents.mapNotNull { content ->
             content.playlistPanelVideoRenderer
                 ?.let(NextPage::fromPlaylistPanelVideoRenderer)
@@ -87,8 +89,8 @@ internal object PlayerMapper {
                 result.copy(
                     title = title,
                     items = songs + result.items,
-                    lyricsEndpoint = response.contents.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs?.getOrNull(1)?.tabRenderer?.endpoint?.browseEndpoint,
-                    relatedEndpoint = response.contents.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs?.getOrNull(2)?.tabRenderer?.endpoint?.browseEndpoint,
+                    lyricsEndpoint = lyricsEndpoint,
+                    relatedEndpoint = relatedEndpoint,
                     currentIndex = currentIndex,
                     endpoint = watchPlaylistEndpoint
                 )
@@ -98,8 +100,8 @@ internal object PlayerMapper {
             title = title,
             items = songs,
             currentIndex = currentIndex,
-            lyricsEndpoint = response.contents.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs?.getOrNull(1)?.tabRenderer?.endpoint?.browseEndpoint,
-            relatedEndpoint = response.contents.singleColumnMusicWatchNextResultsRenderer?.tabbedRenderer?.watchNextTabbedResultsRenderer?.tabs?.getOrNull(2)?.tabRenderer?.endpoint?.browseEndpoint,
+            lyricsEndpoint = lyricsEndpoint,
+            relatedEndpoint = relatedEndpoint,
             continuation = playlistPanelRenderer.continuations?.getContinuation(),
             endpoint = endpoint
         )
@@ -139,7 +141,6 @@ internal object PlayerMapper {
         }
 
         response.contents?.sectionListRenderer?.contents?.forEach { sectionContent ->
-            // Music Carousel
             sectionContent.musicCarouselShelfRenderer?.contents?.forEach { content ->
                 val item = content.musicResponsiveListItemRenderer?.let(RelatedPage.Companion::fromMusicResponsiveListItemRenderer)
                     ?: content.musicTwoRowItemRenderer?.let(RelatedPage.Companion::fromMusicTwoRowItemRenderer)
@@ -148,7 +149,6 @@ internal object PlayerMapper {
                 }
             }
 
-            // Music Shelf
             sectionContent.musicShelfRenderer?.contents?.forEach { content ->
                 val item = content.musicResponsiveListItemRenderer?.let(RelatedPage.Companion::fromMusicResponsiveListItemRenderer)
                 if (item != null) {
@@ -156,7 +156,6 @@ internal object PlayerMapper {
                 }
             }
 
-            // Item Section
             sectionContent.itemSectionRenderer?.contents?.forEach { content ->
                 val item = content.musicResponsiveListItemRenderer?.let(RelatedPage.Companion::fromMusicResponsiveListItemRenderer)
                 if (item != null) {

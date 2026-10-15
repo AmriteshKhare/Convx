@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.menuBottomInset
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.PaddingValues
@@ -56,7 +59,7 @@ fun ArtistMenu(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val playerConnection = LocalPlayerConnection.current ?: return
     val listenTogetherManager = LocalListenTogetherManager.current
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
@@ -82,7 +85,7 @@ fun ArtistMenu(
             start = 0.dp,
             top = 0.dp,
             end = 0.dp,
-            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+            bottom = 8.dp + menuBottomInset(),
         ),
     ) {
         item {
@@ -93,12 +96,7 @@ fun ArtistMenu(
                             add(
                                 NewAction(
                                     icon = {
-                                        Icon(
-                                            painter = painterResource(R.drawable.play),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(28.dp),
-                                            tint = AppTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        SymbolIcon(symbol = sf("play.fill"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                                     },
                                     text = stringResource(R.string.play),
                                     onClick = {
@@ -124,12 +122,7 @@ fun ArtistMenu(
                             add(
                                 NewAction(
                                     icon = {
-                                        Icon(
-                                            painter = painterResource(R.drawable.shuffle),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(28.dp),
-                                            tint = AppTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        SymbolIcon(symbol = sf("shuffle"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                                     },
                                     text = stringResource(R.string.shuffle),
                                     onClick = {
@@ -158,12 +151,7 @@ fun ArtistMenu(
                     add(
                         NewAction(
                             icon = {
-                                Icon(
-                                    painter = painterResource(if (isPinned) R.drawable.remove else R.drawable.add),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = if (isPinned) sf("minus") else sf("plus"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             text = if (isPinned) "Unpin" else "Pin",
                             onClick = {
@@ -191,12 +179,7 @@ fun ArtistMenu(
                         add(
                             NewAction(
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ios_share),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(28.dp),
-                                        tint = AppTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                                 },
                                 text = stringResource(R.string.share),
                                 onClick = {
@@ -228,10 +211,7 @@ fun ArtistMenu(
                             Text(text = if (artist.artist.bookmarkedAt != null) stringResource(R.string.subscribed) else stringResource(R.string.subscribe))
                         },
                         icon = {
-                            Icon(
-                                painter = painterResource(if (artist.artist.bookmarkedAt != null) R.drawable.subscribed else R.drawable.subscribe),
-                                contentDescription = null,
-                            )
+                            SymbolIcon(symbol = if (artist.artist.bookmarkedAt != null) sf("bell.fill") else sf("bell.badge"), contentDescription = null)
                         },
                         onClick = {
                             database.transaction {

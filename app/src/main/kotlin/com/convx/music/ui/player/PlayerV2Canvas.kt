@@ -2,10 +2,11 @@
  * Convx Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
-// Apple Music player UI ported from vivizzz007/vivi-music (https://github.com/vivizzz007/vivi-music), GPL-3.0.
+// Apple Music player UI adapted from an open-source (GPL-3.0) base.
 
 package com.convx.music.ui.player
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.view.TextureView
 import android.view.ViewGroup
@@ -48,26 +49,22 @@ import com.convx.music.constants.CanvasThumbnailAnimationKey
 import com.convx.music.models.MediaMetadata
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
-import com.convx.music.vivimusiccanvas.ViviMusicCanvasProvider
+import com.convx.music.convxcanvas.ConvxCanvasProvider
+import com.convx.music.utils.SpotifyCanvasLookup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
 /*
- * V2's canvas (motion artwork) video: ONE decoder per player, shared by every surface that
- * shows it (the cover, the lyrics/queue header), instead of one ExoPlayer per surface.
- *
- * Before, the header mounted its own player on every cover -> lyrics switch: a second
- * network fetch and decoder, and the header's video popped in ~300ms after the pane had
- * already landed. Now the most recently attached surface takes the output, the texture it
- * leaves keeps its last frame, and each surface dissolves in on its own first frame.
- *
- * Track changes dissolve the old loop OUT before the next one loads (while the cover melts
- * underneath), then the new loop dissolves IN on its first frame -- nothing cuts.
+ * One muted canvas player and decoder are shared by the cover and lyrics/queue surfaces.
+ * The latest attached surface receives video; each surface fades in on its first frame.
+ * Track changes fade out the current loop before loading and fading in the next one.
  */
 
 /** A canvas video's colour identity: a few small frames sampled once, stitched. */
@@ -78,6 +75,7 @@ class CanvasVideoLook(
     val stitched: Bitmap,
     /** One representative frame, for the blurred-artwork backgrounds. */
     val representative: Bitmap,
+    val liveFrameVersion: Long = 0L,
 )
 
 /**
@@ -100,6 +98,12 @@ object CanvasVideoLooks {
 
     internal fun publish(look: CanvasVideoLook) {
         cache.put(look.mediaId, look)
+        latest.value = look
+    }
+
+    internal fun publishLiveFrame(mediaId: String, frame: Bitmap, stitched: Bitmap) {
+        val look = CanvasVideoLook(mediaId, stitched, frame, android.os.SystemClock.uptimeMillis())
+        cache.put(mediaId, look)
         latest.value = look
     }
 }
@@ -141,6 +145,25 @@ internal suspend fun sampleCanvasVideoLook(mediaId: String, texture: () -> Textu
     CanvasVideoLooks.publish(CanvasVideoLook(mediaId, stitched, frames[frames.size / 2]))
 }
 
+private const val LIVE_FRAME_SAMPLE_MS = 1_200L
+private const val LIVE_FRAME_SAMPLE_PX = 48
+
+internal suspend fun sampleLiveCanvasVideoLook(mediaId: String, texture: () -> TextureView?) {
+    while (currentCoroutineContext().isActive) {
+        delay(LIVE_FRAME_SAMPLE_MS)
+        val frame = texture()?.takeIf { it.isAvailable }?.getBitmap(LIVE_FRAME_SAMPLE_PX, LIVE_FRAME_SAMPLE_PX) ?: continue
+        val stitched = withContext(Dispatchers.Default) {
+            Bitmap.createBitmap(LIVE_FRAME_SAMPLE_PX * 2, LIVE_FRAME_SAMPLE_PX * 2, Bitmap.Config.ARGB_8888).also { bitmap ->
+                val canvas = android.graphics.Canvas(bitmap)
+                for (y in 0..1) for (x in 0..1) {
+                    canvas.drawBitmap(frame, x * LIVE_FRAME_SAMPLE_PX.toFloat(), y * LIVE_FRAME_SAMPLE_PX.toFloat(), null)
+                }
+            }
+        }
+        CanvasVideoLooks.publishLiveFrame(mediaId, frame, stitched)
+    }
+}
+
 /**
  * The morph's hook into the live video: at flight start the overlay grabs one poster of
  * the frame on screen (paused while collapsed, so it is also the frame the open lands on)
@@ -171,10 +194,18 @@ class CanvasVideoController internal constructor(
     private var loadingUrl: String? = null
     private var primary: String? = null
     private var fallback: String? = null
+    private var loadingVideoStream: com.convx.music.utils.YTPlayerUtils.VideoStream? = null
     private var frameMediaId: String? = null
     private var boundTexture: TextureView? = null
     private val attached = ArrayList<Pair<Any, TextureView>>()
     private var fadeInJob: Job? = null
+    private var liveSampleJob: Job? = null
+    internal var videoReady by mutableStateOf(false)
+        private set
+    internal var videoFailed by mutableStateOf(false)
+        private set
+    internal var videoLoading by mutableStateOf(false)
+        private set
 
     internal fun attach(token: Any, view: TextureView) {
         attached.removeAll { it.first === token }
@@ -188,6 +219,10 @@ class CanvasVideoController internal constructor(
         if (wasTop) bind(attached.lastOrNull()?.second)
     }
 
+    internal fun onSurfaceFrame(view: TextureView) {
+        if (boundTexture === view && surfaceWithFrame !== view) surfaceWithFrame = view
+    }
+
     private fun bind(view: TextureView?) {
         if (boundTexture === view) return
         boundTexture = view
@@ -198,10 +233,19 @@ class CanvasVideoController internal constructor(
     internal fun onFirstFrame() {
         frameMediaId = loadingMediaId
         surfaceWithFrame = boundTexture
+        if (loadingVideoStream != null) {
+            videoReady = true
+            videoFailed = false
+            videoLoading = false
+        }
         fadeInJob?.cancel()
         fadeInJob = scope.launch { fade.animateTo(1f, tween(VIDEO_FADE_IN_MS, easing = SeamlessEasing)) }
         val id = loadingMediaId ?: return
-        scope.launch { sampleCanvasVideoLook(id) { boundTexture } }
+        if (loadingVideoStream != null) {
+            if (liveSampleJob?.isActive != true) liveSampleJob = scope.launch { sampleLiveCanvasVideoLook(id) { boundTexture } }
+        } else {
+            scope.launch { sampleCanvasVideoLook(id) { boundTexture } }
+        }
     }
 
     internal fun onVideoSize(size: VideoSize) {
@@ -209,6 +253,12 @@ class CanvasVideoController internal constructor(
     }
 
     internal fun onError() {
+        if (loadingVideoStream != null) {
+            videoReady = false
+            videoFailed = true
+            videoLoading = false
+            return
+        }
         val next = if (loadingUrl == primary) fallback else null
         val id = loadingMediaId
         if (id != null && !next.isNullOrBlank() && next != loadingUrl) {
@@ -219,12 +269,20 @@ class CanvasVideoController internal constructor(
     }
 
     internal suspend fun load(mediaId: String?, primary: String?, fallback: String?, fadeOutMillis: Int) {
+        if (loadingVideoStream != null) {
+            loadingVideoStream = null
+            liveSampleJob?.cancel()
+            liveSampleJob = null
+        }
         val url = primary ?: fallback
         if (mediaId == loadingMediaId && url == loadingUrl) return
         fadeInJob?.cancel()
         if (fade.value > 0f) fade.animateTo(0f, tween(fadeOutMillis, easing = SeamlessEasing))
         loadingMediaId = mediaId
         loadingUrl = url
+        videoReady = false
+        videoFailed = false
+        videoLoading = false
         this.primary = primary
         this.fallback = fallback
         frameMediaId = null
@@ -233,6 +291,61 @@ class CanvasVideoController internal constructor(
         exoPlayer.clearMediaItems()
         if (mediaId == null || url == null) return
         exoPlayer.setMediaItem(mediaItem(mediaId, url))
+        exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
+        exoPlayer.prepare()
+    }
+
+    internal suspend fun loadVideo(
+        stream: com.convx.music.utils.YTPlayerUtils.VideoStream,
+        startPositionMs: Long,
+        fadeOutMillis: Int,
+    ) {
+        if (loadingVideoStream?.videoId == stream.videoId && loadingVideoStream?.url == stream.url) return
+        fadeInJob?.cancel()
+        liveSampleJob?.cancel()
+        liveSampleJob = null
+        if (fade.value > 0f) fade.animateTo(0f, tween(fadeOutMillis, easing = SeamlessEasing))
+        loadingVideoStream = stream
+        loadingMediaId = stream.mediaId
+        loadingUrl = stream.url
+        primary = stream.url
+        fallback = null
+        frameMediaId = null
+        surfaceWithFrame = null
+        videoReady = false
+        videoFailed = false
+        videoLoading = true
+        exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        exoPlayer.setMediaItem(
+            MediaItem.Builder()
+                .setUri(stream.url.trim())
+                .setMimeType(stream.mimeType)
+                .setCustomCacheKey("convx-video-picture:${stream.videoId}")
+                .build(),
+            startPositionMs.coerceAtLeast(0L),
+        )
+        exoPlayer.prepare()
+    }
+
+    internal fun seekTo(positionMs: Long) {
+        if (loadingVideoStream != null) exoPlayer.seekTo(positionMs.coerceAtLeast(0L))
+    }
+
+    internal fun retryVideo() {
+        val stream = loadingVideoStream ?: return
+        videoReady = false
+        videoFailed = false
+        videoLoading = true
+        exoPlayer.setMediaItem(
+            MediaItem.Builder()
+                .setUri(stream.url.trim())
+                .setMimeType(stream.mimeType)
+                .setCustomCacheKey("convx-video-picture:${stream.videoId}")
+                .build(),
+            exoPlayer.currentPosition.coerceAtLeast(0L),
+        )
         exoPlayer.prepare()
     }
 
@@ -273,6 +386,8 @@ fun rememberCanvasVideoController(
     mediaMetadata: MediaMetadata?,
     isPlaying: Boolean,
     trackFadeMillis: Int,
+    videoStream: com.convx.music.utils.YTPlayerUtils.VideoStream? = null,
+    videoStartPositionMs: Long = 0L,
 ): CanvasVideoController {
     val context = LocalContext.current
     val mediaSourceFactory = rememberCanvasMediaSourceFactory()
@@ -338,19 +453,18 @@ fun rememberCanvasVideoController(
     val (canvasSource) = rememberEnumPreference(CanvasSourceKey, defaultValue = CanvasSource.AUTO)
     val mediaId = mediaMetadata?.id
     val latestMetadata by rememberUpdatedState(mediaMetadata)
-    // Tagged with its track: produceState keeps its last value across a key change, so an
-    // untagged result let the NEW track load and fade in the OLD track's loop until the
-    // fetch returned.
+    // produceState keeps its previous value while keys change, so tag each result with its track ID.
     val fetched by produceState<Pair<String?, CanvasArtwork?>?>(null, mediaId, canvasSource, enableCanvas) {
         val metadata = latestMetadata
-        value = mediaId to if (!enableCanvas || metadata == null) null else fetchCanvasArtwork(metadata, canvasSource)
+        value = mediaId to if (!enableCanvas || metadata == null) null else fetchCanvasArtwork(context, metadata, canvasSource)
     }
     val artwork = fetched?.takeIf { it.first == mediaId }?.second
     val fadeOut = trackFadeMillis.coerceAtMost(VIDEO_FADE_OUT_MAX_MS)
     val primary = artwork?.preferredAnimationUrl?.takeIf { it.isNotBlank() }
     val fallback = artwork?.animated?.takeIf { it.isNotBlank() }
-    LaunchedEffect(mediaId, primary, fallback) {
-        controller.load(mediaId, primary, fallback, fadeOut)
+    LaunchedEffect(mediaId, primary, fallback, videoStream) {
+        if (videoStream != null) controller.loadVideo(videoStream, videoStartPositionMs, fadeOut)
+        else controller.load(mediaId, primary, fallback, fadeOut)
     }
     return controller
 }
@@ -360,7 +474,12 @@ fun rememberCanvasVideoController(
  * captures is drawn the same way), and dissolves in on its own first frame.
  */
 @Composable
-fun CanvasVideoSurface(controller: CanvasVideoController?, modifier: Modifier = Modifier) {
+fun CanvasVideoSurface(
+    controller: CanvasVideoController?,
+    modifier: Modifier = Modifier,
+    crop: Boolean = true,
+    onFrame: (() -> Unit)? = null,
+) {
     if (controller == null) return
     val token = remember { Any() }
     var texture by remember { mutableStateOf<TextureView?>(null) }
@@ -377,17 +496,31 @@ fun CanvasVideoSurface(controller: CanvasVideoController?, modifier: Modifier = 
         factory = { viewContext ->
             AspectRatioFrameLayout(viewContext).apply {
                 layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                resizeMode = if (crop) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                val view = TextureView(viewContext).apply {
+                val view = com.convx.music.artistvideo.VideoFrameTextureView(viewContext).apply {
                     layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                }
+                view.onFrame = {
+                    controller.onSurfaceFrame(view)
+                    onFrame?.invoke()
                 }
                 addView(view)
                 texture = view
                 controller.attach(token, view)
             }
         },
-        update = { it.setAspectRatio(aspect) },
+        update = {
+            it.setAspectRatio(aspect)
+            it.resizeMode = if (crop) AspectRatioFrameLayout.RESIZE_MODE_ZOOM else AspectRatioFrameLayout.RESIZE_MODE_FIT
+            val frameView = it.getChildAt(0) as? com.convx.music.artistvideo.VideoFrameTextureView
+            frameView?.let { view ->
+                view.onFrame = {
+                    controller.onSurfaceFrame(view)
+                    onFrame?.invoke()
+                }
+            }
+        },
         modifier = modifier.graphicsLayer {
             clip = true
             alpha = controller.fade.value * surfaceAlpha.value
@@ -397,10 +530,11 @@ fun CanvasVideoSurface(controller: CanvasVideoController?, modifier: Modifier = 
 
 private const val SURFACE_FADE_IN_MS = 420
 
-private suspend fun fetchCanvasArtwork(metadata: MediaMetadata, canvasSource: CanvasSource): CanvasArtwork? {
+private suspend fun fetchCanvasArtwork(context: Context, metadata: MediaMetadata, canvasSource: CanvasSource): CanvasArtwork? {
     val cacheKey = "${metadata.id}:${canvasSource.name}"
     CanvasArtworkPlaybackCache.get(cacheKey)?.let { return it }
-    val storefront = Locale.getDefault().country.let { if (it.length == 2) it.lowercase(Locale.ROOT) else "us" }
+    val countryCode = Locale.getDefault().country
+    val storefront = if (countryCode.length == 2) countryCode.lowercase(Locale.ROOT) else "us"
     val fetched = withContext(Dispatchers.IO) {
         runCatching {
             val songTitle = metadata.title
@@ -408,22 +542,24 @@ private suspend fun fetchCanvasArtwork(metadata: MediaMetadata, canvasSource: Ca
             val albumName = metadata.album?.title ?: ""
             when (canvasSource) {
                 CanvasSource.AUTO ->
-                    AppleMusicCanvasProvider.getBySongArtist(songTitle, artistName, albumName, storefront)
+                    SpotifyCanvasLookup.getBySongArtist(context, songTitle, artistName)
+                        ?: AppleMusicCanvasProvider.getBySongArtist(songTitle, artistName, albumName, storefront)
                         ?.takeIf { !it.animated.isNullOrBlank() }
                         ?: TidalCanvasProvider.getBySongArtist(songTitle, artistName, albumName)
                             ?.takeIf { !it.animated.isNullOrBlank() }
-                        ?: ViviMusicCanvasProvider.getBySongArtist(songTitle, artistName)
+                        ?: ConvxCanvasProvider.getBySongArtist(songTitle, artistName)
                             ?.takeIf { !it.animated.isNullOrBlank() }
                 CanvasSource.APPLE_MUSIC ->
                     AppleMusicCanvasProvider.getBySongArtist(songTitle, artistName, albumName, storefront)
                         ?.takeIf { !it.animated.isNullOrBlank() }
-                CanvasSource.VIVIMUSIC ->
-                    ViviMusicCanvasProvider.getBySongArtist(songTitle, artistName)
+                CanvasSource.CONVX ->
+                    ConvxCanvasProvider.getBySongArtist(songTitle, artistName)
                         ?.takeIf { !it.animated.isNullOrBlank() }
                 CanvasSource.TIDAL ->
                     TidalCanvasProvider.getBySongArtist(songTitle, artistName, albumName)
                         ?.takeIf { !it.animated.isNullOrBlank() }
-                else -> null
+                CanvasSource.SPOTIFY ->
+                    SpotifyCanvasLookup.getBySongArtist(context, songTitle, artistName)
             }
         }.getOrNull()
     }

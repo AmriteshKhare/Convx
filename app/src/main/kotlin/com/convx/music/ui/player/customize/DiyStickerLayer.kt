@@ -94,9 +94,9 @@ fun DiyStickerLayer(
 private const val EntranceSweepSlant = 0.35f
 /** Where in the open the first / last sticker starts popping, and how long each pop runs.
  *  Windows overlap heavily: never one-at-a-time, never all as one block. */
-private const val EntranceFirstStart = 0.35f
-private const val EntranceStartSpread = 0.3f
-private const val EntranceSpan = 0.35f
+private const val EntranceFirstStart = 0.2f
+private const val EntranceStartSpread = 0.2f
+private const val EntranceSpan = 0.6f
 /** Lively overshoot (~25%) that still settles exactly at the end of its window. */
 private val EntranceSpring = com.convx.music.ui.component.floatingtabbar.SpringEasing(zeta = 0.4f, omegaT = 9f)
 
@@ -188,23 +188,9 @@ fun rememberDiyLayout(): DiyLayout {
 fun rememberHasDiyStickers(): Boolean = !rememberDiyLayout().isEmpty
 
 /**
- * A sticker layer that resolves against [rootCoordinates]' absolute frame instead of
- * whatever space its own immediate parent hands it.
- *
- * Exists for the z < 0 sticker band specifically: it has to stay nested between a
- * player skin's background and artwork to keep that z-order, so it can't simply move to
- * a topmost overlay slot the way the z >= 0 band did. But classic Player.kt and V17
- * (Player_v2.kt) give that nesting point a different amount of space -- V17 draws its
- * own drag handle and a separate controls row inside the same content area, shrinking
- * what its sticker canvas sees below what classic's (and the DIY editor's, which always
- * previews via classic) does. [rootCoordinates] -- captured once from a plain sibling
- * Box the whole player content shares -- is the one frame both skins can agree on.
- *
- * [requiredSize] forces this layer to [rootCoordinates]' size regardless of its actual
- * (possibly smaller) parent, and the [offset] cancels out wherever that parent placed it
- * so the layer paints at [rootCoordinates]' exact position. One frame of lag while
- * [selfCoordinates] settles on first composition is expected and invisible here -- this
- * is a static overlay, not something read every frame.
+ * Aligns the sticker layer to the shared player frame. Player layouts give this
+ * negative-z layer different parent sizes, so it uses root coordinates and offsets
+ * back to the root position. Its coordinates may settle one frame after composition.
  */
 @Composable
 fun AbsoluteFrameDiyStickers(

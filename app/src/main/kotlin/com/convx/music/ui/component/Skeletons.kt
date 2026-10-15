@@ -2,7 +2,7 @@
  * Convx Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  *
- * Ported from BitChord (`ui/components/Skeletons.kt`): grey shimmer
+ * Ported from the reference app (`ui/components/Skeletons.kt`): grey shimmer
  * placeholders replacing the app's red/black spinner-based loading state.
  */
 

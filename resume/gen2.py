@@ -1,0 +1,33 @@
+import sys
+CSS="""<style>@page{size:A4;margin:0}body{font:10.2pt/1.38 Arial,Helvetica,sans-serif;color:#000;margin:0;padding:12mm 17mm}
+h1{font-size:19pt;text-align:center;margin:0 0 3px}.c{text-align:center;margin:1px 0}a{color:#1155cc}
+h2{font-size:10.5pt;margin:11px 0 3px}.r{font-style:italic;margin-top:7px}
+ul{margin:3px 0;padding-left:22px}li{margin:3px 0}p{margin:2px 0}</style>"""
+def li(l):return "".join(f"<li>{x}</li>" for x in l)
+def build(v):
+    jobs="".join(f"<div class=r>{j['t']} | {j['d']}</div><ul>{li(j['b'])}</ul>" for j in v['jobs'])
+    return f"""<!doctype html><meta charset=utf-8><title>Aryan Sharma - Android Developer</title>{CSS}
+<h1>Aryan Sharma</h1>
+<p class=c>Android Developer (Kotlin, Jetpack Compose) | Agra, India | Open to relocate</p>
+<p class=c>+91 84390 95289 | <a href="mailto:cosmictaser.dev@gmail.com">cosmictaser.dev@gmail.com</a> | <a href="https://github.com/cosmictaserdev-creator">github.com/cosmictaserdev-creator</a></p>
+<h2>Projects</h2>{jobs}
+<h2>Open Source Contribution</h2>
+<ul><li>Added a custom UI feature to <b>Echo Music</b>, an open-source Android music app. The maintainers accepted my pull request (the project has since been removed).</li></ul>
+<h2>Education &amp; Certificates</h2>
+<div class=r>MCA (Master of Computer Applications), Dr. Bhimrao Ambedkar University, Graduated 2025</div>
+<div class=r>B.Voc in Robotics and Artificial Intelligence, Dayalbagh Educational Institute, Graduated 2022</div>
+<h2>Skills</h2><p>Kotlin, Java, Jetpack Compose, Android SDK, Media3/ExoPlayer, Room, Hilt, Coroutines, MVVM, REST APIs, Git, GitHub Actions</p>"""
+CX=dict(t="Convx, free unofficial Android music app (open-source, personal use)",d="Jul 2026 to Current",b=[
+"Turned a fork of convx into my own product in <b>Kotlin and Jetpack Compose</b>: <b>63,000+ downloads</b> of my own 8 releases since July 2026, 489 stars. I wrote 289 commits, 53% of today's Kotlin code.",
+"On a mid-range Galaxy M34 (120 Hz), cut median scroll frame time from 17 ms to 12 ms with the glass effects on, by blurring at lower resolution. Removed all idle redraws (288 to 0 per 5 seconds) found with profiling.",
+"Built the frosted-glass look: live backdrop blur and refraction drawn on the GPU inside Compose, so buttons visibly bend the album art behind them.",
+"Extended an <b>MVVM, Hilt and Room</b> codebase with one <b>Media3/ExoPlayer</b> player for YouTube Music and JioSaavn sources, offline downloads and Android Auto.",
+"Own every release: <b>CI/CD with GitHub Actions</b> builds signed APKs and the app updates itself. I review pull requests from outside developers."])
+WH=dict(t="Whispry, voice typing app for Android (solo project)",d="May 2026 to Current",b=[
+"Built alone in <b>Kotlin and Compose</b>: hold a button, speak, and the text is typed into any app, through a floating button or a keyboard button.",
+"Design choice: users bring their own AI key (Groq or any OpenAI-compatible <b>REST API</b>), so their voice goes straight to the AI company, never through my server, and hosting costs me nothing.",
+"Long recordings are transcribed in the background with <b>Coroutines and WorkManager</b>, even if the app is closed. 11-language interface and Hinglish output.",
+"Signed releases are built by <b>CI/CD</b> on every git tag. Unit tests cover the transcription and formatting logic."])
+MED=dict(t="Medical app: patient records and appointment booking (personal learning project, not finished)",d="2024 to 2025",b=[
+"Where I learned Android: built the app first with XML layouts, then rewrote it in <b>Jetpack Compose</b>. Stopped midway when the project ended; the code was on an old GitHub account I no longer have."])
+open("Aryan_Sharma_v6.html","w",encoding="utf-8").write(build(dict(jobs=[WH,CX,MED])))

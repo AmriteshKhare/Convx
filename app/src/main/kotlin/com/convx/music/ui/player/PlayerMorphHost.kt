@@ -15,9 +15,9 @@ import androidx.compose.ui.unit.Dp
  * One composition driven by one [progress] source, composing (in z order):
  * the interpolated container ([PlayerContainerMorphOverlay]) with the mini
  * recording fading out early and the full recording fading in late, then the
- * artwork ([PlayerArtworkMorphOverlay]) -- a travelling window for every V2 look
- * and the classic card, shrink+fade in place for classic vinyl / clover. The
- * overlay contract is progress in, draw-phase reads only.
+ * artwork ([PlayerArtworkMorphOverlay]) -- a travelling window for Squared and
+ * the classic card, with stationary fades for Hero Bleed and vinyl / clover.
+ * The overlay contract is progress in, draw-phase reads only.
  */
 @Composable
 fun BoxScope.PlayerMorphHost(

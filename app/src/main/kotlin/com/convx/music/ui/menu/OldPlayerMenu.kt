@@ -1,5 +1,9 @@
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.DownloadRingIcon
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.menuBottomInset
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.clickable
@@ -73,6 +77,7 @@ import com.convx.music.constants.EnableSaavnStreamingKey
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun OldPlayerMenu(
@@ -85,10 +90,10 @@ fun OldPlayerMenu(
     mediaMetadata ?: return
     val context = LocalContext.current
     val ringtoneViewModel = com.convx.music.LocalRingtoneViewModel.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val playerConnection = LocalPlayerConnection.current ?: return
     val coroutineScope = rememberCoroutineScope()
-    val playerVolume = playerConnection.service.playerVolume.collectAsState()
+    val playerVolume = playerConnection.service.playerVolume.collectAsStateWithLifecycle()
 
     // Cast state for volume control
     val castHandler = remember(playerConnection) {
@@ -98,11 +103,11 @@ fun OldPlayerMenu(
             null
         }
     }
-    val isCasting by castHandler?.isCasting?.collectAsState() ?: remember { mutableStateOf(false) }
-    val castVolume by castHandler?.castVolume?.collectAsState() ?: remember { mutableFloatStateOf(1f) }
-    val castDeviceName by castHandler?.castDeviceName?.collectAsState() ?: remember { mutableStateOf<String?>(null) }
+    val isCasting by castHandler?.isCasting?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
+    val castVolume by castHandler?.castVolume?.collectAsStateWithLifecycle() ?: remember { mutableFloatStateOf(1f) }
+    val castDeviceName by castHandler?.castDeviceName?.collectAsStateWithLifecycle() ?: remember { mutableStateOf<String?>(null) }
 
-    val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id).collectAsState(initial = null)
+    val download by LocalDownloadUtil.current.get().getDownload(mediaMetadata.id).collectAsState(initial = null)
 
     val listenTogetherManager = LocalListenTogetherManager.current
     val listenTogetherRoleState = listenTogetherManager?.role?.collectAsState(initial = RoomRole.NONE)
@@ -112,8 +117,8 @@ fun OldPlayerMenu(
 
     val currentSong by playerConnection.currentSong.collectAsState(initial = null)
     val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
-    val repeatMode by playerConnection.repeatMode.collectAsState()
-    val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsState()
+    val repeatMode by playerConnection.repeatMode.collectAsStateWithLifecycle()
+    val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsStateWithLifecycle()
     val (saavnEnabled) = rememberPreference(EnableSaavnStreamingKey, defaultValue = false)
 
     val artists = remember(mediaMetadata.artists) {
@@ -146,7 +151,7 @@ fun OldPlayerMenu(
 
     if (showSelectArtistDialog) {
         ListDialog(onDismiss = { showSelectArtistDialog = false }) {
-            items(artists) { artist ->
+            items(artists, key = { it.id!! }) { artist ->
                 Box(
                     contentAlignment = Alignment.CenterStart,
                     modifier = Modifier
@@ -191,12 +196,7 @@ fun OldPlayerMenu(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.cast),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = AppTheme.colorScheme.primary
-                )
+                SymbolIcon(symbol = sf("airplayvideo"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = stringResource(R.string.casting_to, castDeviceName ?: ""),
@@ -233,7 +233,7 @@ fun OldPlayerMenu(
             start = 0.dp,
             top = 0.dp,
             end = 0.dp,
-            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+            bottom = 8.dp + menuBottomInset(),
         ),
     ) {
         // Share & Playlist Add
@@ -244,12 +244,7 @@ fun OldPlayerMenu(
                     if (!isListenTogetherGuest) {
                         NewAction(
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.radio),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(32.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("dot.radiowaves.left.and.right"), contentDescription = null, size = 32.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             text = stringResource(R.string.start_an_radio),
                             onClick = {
@@ -261,24 +256,14 @@ fun OldPlayerMenu(
                     } else null,
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.playlist_add),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("text.badge.plus"), contentDescription = null, size = 32.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.add_to_an_playlist),
                         onClick = { showChoosePlaylistDialog = true }
                     ),
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ios_share),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null, size = 32.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.share),
                         onClick = {
@@ -302,22 +287,15 @@ fun OldPlayerMenu(
 
         item { Spacer(modifier = Modifier.height(8.dp)) }
 
-        // Core Old Player Items
         item {
             IosMenuGroup(
                 items = buildList {
-                    // Shuffle
                     if (!isListenTogetherGuest) {
                         add(
                             IosMenuItemData(
                                 title = { Text(stringResource(R.string.shuffle)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.shuffle),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp),
-                                        tint = if (shuffleModeEnabled) AppTheme.colorScheme.primary else androidx.compose.material3.LocalContentColor.current
-                                    )
+                                    SymbolIcon(symbol = sf("shuffle"), contentDescription = null, size = 24.dp, tint = if (shuffleModeEnabled) AppTheme.colorScheme.primary else androidx.compose.material3.LocalContentColor.current)
                                 },
                                 onClick = {
                                     playerConnection.player.shuffleModeEnabled = !shuffleModeEnabled
@@ -327,18 +305,13 @@ fun OldPlayerMenu(
                         )
                     }
 
-                    // Download
                     when (download?.state) {
                         Download.STATE_COMPLETED -> {
                             add(
                                 IosMenuItemData(
                                     title = { Text(stringResource(R.string.remove_download)) },
                                     icon = {
-                                        Icon(
-                                            painter = painterResource(R.drawable.offline),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null, size = 24.dp)
                                     },
                                     onClick = {
                                         DownloadService.sendRemoveDownload(context, ExoDownloadService::class.java, mediaMetadata.id, false)
@@ -352,7 +325,7 @@ fun OldPlayerMenu(
                                 IosMenuItemData(
                                     title = { Text(stringResource(R.string.downloading)) },
                                     icon = {
-                                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                                        DownloadRingIcon(download)
                                     },
                                     onClick = {
                                         DownloadService.sendRemoveDownload(context, ExoDownloadService::class.java, mediaMetadata.id, false)
@@ -366,11 +339,7 @@ fun OldPlayerMenu(
                                 IosMenuItemData(
                                     title = { Text(stringResource(R.string.action_download)) },
                                     icon = {
-                                        Icon(
-                                            painter = painterResource(R.drawable.download),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null, size = 24.dp)
                                     },
                                     onClick = {
                                         database.transaction { insert(mediaMetadata) }
@@ -386,18 +355,12 @@ fun OldPlayerMenu(
                         }
                     }
 
-                    // Like
                     val isLiked = currentSong?.song?.liked == true
                     add(
                         IosMenuItemData(
                             title = { Text(stringResource(if (isLiked) R.string.liked else R.string.like)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(if (isLiked) R.drawable.favorite else R.drawable.favorite_border),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp),
-                                    tint = if (isLiked) AppTheme.colorScheme.error else androidx.compose.material3.LocalContentColor.current
-                                )
+                                SymbolIcon(symbol = if (isLiked) sf("heart.fill") else sf("heart"), contentDescription = null, size = 24.dp, tint = if (isLiked) AppTheme.colorScheme.error else androidx.compose.material3.LocalContentColor.current)
                             },
                             onClick = {
                                 playerConnection.toggleLike()
@@ -406,7 +369,6 @@ fun OldPlayerMenu(
                         )
                     )
 
-                    // Repeat
                     if (!isListenTogetherGuest) {
                         add(
                             IosMenuItemData(
@@ -441,7 +403,6 @@ fun OldPlayerMenu(
         item {
             IosMenuGroup(
                 items = buildList {
-                    // ── Single smart Retry button ────────────────────────────
                     // Always visible. Re-triggers the full resolution chain.
                     add(
                         IosMenuItemData(
@@ -455,11 +416,7 @@ fun OldPlayerMenu(
                                 )
                             },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.replay),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("arrow.counterclockwise"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 val player = playerConnection.player
@@ -483,11 +440,7 @@ fun OldPlayerMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.artist),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("music.mic"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     if (mediaMetadata.artists.size == 1) {
@@ -514,11 +467,7 @@ fun OldPlayerMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.album),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("square.stack"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     navController.navigate("album/${mediaMetadata.album.id}")
@@ -529,7 +478,6 @@ fun OldPlayerMenu(
                         )
                     }
 
-                    // Add to Library option
                     val isInLibrary = librarySong?.song?.inLibrary != null
                     add(
                         IosMenuItemData(
@@ -542,14 +490,10 @@ fun OldPlayerMenu(
                                 )
                             },
                             icon = {
-                                Icon(
-                                    painter = painterResource(
-                                        if (isInLibrary) R.drawable.library_add_check
-                                        else R.drawable.library_add
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = 
+                                        if (isInLibrary) sf("text.badge.checkmark")
+                                        else sf("text.badge.plus")
+                                    , contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 playerConnection.toggleLibrary()
@@ -571,13 +515,9 @@ fun OldPlayerMenu(
                         IosMenuItemData(
                             title = { Text(text = stringResource(R.string.listen_together)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.group),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("person.2.fill"), contentDescription = null, size = 24.dp)
                             },
-                            onClick = { showListenTogetherDialog = true }
+                            onClick = { onDismiss(); navController.navigate("listen_together/party") }
                         )
                     )
                     if (isListenTogetherGuest) {
@@ -585,14 +525,10 @@ fun OldPlayerMenu(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.resync)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.replay),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.counterclockwise"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
-                                    listenTogetherManager?.requestSync()
+                                    listenTogetherManager.requestSync()
                                     onDismiss()
                                 }
                             )
@@ -613,11 +549,7 @@ fun OldPlayerMenu(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.info),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("info.circle"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 onShowDetailsDialog()
@@ -631,14 +563,10 @@ fun OldPlayerMenu(
                             title = { Text(text = stringResource(R.string.equalizer)) },
                             description = { Text(text = stringResource(R.string.equalizer_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.equalizer),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("slider.vertical.3"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
-                                navController.navigate("equalizer")
+                                navController.navigate("settings/equalizer")
                                 onDismiss()
                             }
                         )
@@ -649,11 +577,7 @@ fun OldPlayerMenu(
                             title = { Text(text = stringResource(R.string.advanced)) },
                             description = { Text(text = stringResource(R.string.advanced_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.tune),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("slider.horizontal.3"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 showPitchTempoDialog = true
@@ -664,23 +588,15 @@ fun OldPlayerMenu(
                         IosMenuItemData(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
-                                Icon(
-                                    imageVector = SfSymbols.Monochrome.SFBellFill,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("SFBellFill"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
-                                if (ringtoneViewModel.hasSettingsPermission(context)) {
-                                    ringtoneViewModel.showTrimmer(
-                                        mediaMetadata.id,
-                                        mediaMetadata.title,
-                                        mediaMetadata.artists.joinToString { it.name },
-                                        mediaMetadata.duration
-                                    )
-                                } else {
-                                    ringtoneViewModel.requestSettingsPermission(context)
-                                }
+                                ringtoneViewModel.showTrimmer(
+                                    mediaMetadata.id,
+                                    mediaMetadata.title,
+                                    mediaMetadata.artists.joinToString { it.name },
+                                    mediaMetadata.duration
+                                )
                                 onDismiss()
                             }
                         )
@@ -689,11 +605,7 @@ fun OldPlayerMenu(
                         IosMenuItemData(
                             title = { Text(text = stringResource(R.string.ambient_mode)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.fullscreen),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("arrow.up.left.and.arrow.down.right"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 navController.navigate("ambient_mode")

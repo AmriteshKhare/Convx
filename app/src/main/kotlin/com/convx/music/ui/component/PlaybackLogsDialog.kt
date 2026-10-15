@@ -59,7 +59,7 @@ fun PlaybackLogsDialog(
 
     DefaultDialog(
         onDismiss = onDismiss,
-        icon = { Icon(painterResource(R.drawable.bug_report), contentDescription = null) },
+        icon = { SymbolIcon(symbol = sf("ladybug"), contentDescription = null) },
         title = { Text(stringResource(R.string.playback_logs_title)) },
         buttons = {
             TextButton(

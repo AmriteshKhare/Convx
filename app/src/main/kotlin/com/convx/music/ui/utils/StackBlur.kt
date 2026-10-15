@@ -6,15 +6,7 @@ package com.convx.music.ui.utils
 
 import android.graphics.Bitmap
 
-/**
- * In-memory box blur (three passes) for small bitmaps, approximating a gaussian.
- *
- * Used to bake blurs into tiny decoded artwork sources (48-160px) once per
- * track instead of running a full-screen RenderEffect blur every frame: the
- * source is upscaled 7-20x to fill the screen, so a blur at this size is
- * visually identical to the screen-space blur it replaces while costing a few
- * milliseconds of CPU, once, on decode.
- */
+/** Blurs a small bitmap once so playback can reuse it instead of filtering a full-screen layer every frame. */
 fun Bitmap.stackBlur(radius: Int): Bitmap {
     if (radius < 1) return this
     val w = width
@@ -28,10 +20,8 @@ fun Bitmap.stackBlur(radius: Int): Bitmap {
 }
 
 /**
- * The blur itself, over a plain ARGB pixel array — split out from [stackBlur] so it is
- * reachable from a JVM test, where `android.graphics.Bitmap` is not.
- *
- * Blurs [pixels] in place. Alpha is preserved per pixel; only RGB is averaged.
+ * Blurs [pixels] in place. Alpha is preserved; RGB is averaged.
+ * Kept separate from [stackBlur] so JVM tests can exercise it without Android's Bitmap class.
  */
 internal fun stackBlurPixels(pixels: IntArray, w: Int, h: Int, radius: Int) {
     if (radius < 1 || w <= 0 || h <= 0) return
@@ -46,14 +36,7 @@ internal fun stackBlurPixels(pixels: IntArray, w: Int, h: Int, radius: Int) {
     for (i in dv.indices) dv[i] = i / div
 
     // Horizontal pass: sliding-window sums into r/g/b planes.
-    //
-    // `rowStart` is the row's base offset and must stay FIXED across the row -- the two
-    // window reads below are `rowStart + <column clamped to this row>`. It used to be a
-    // running counter incremented alongside the write cursor, which made both reads
-    // `y*w + x + clamp(...)`: a diagonal walk that drifted a column further into the
-    // next row on every step, and ran off the end of the array entirely on the last row
-    // (ArrayIndexOutOfBoundsException: length=w*h; index=w*h+1 for a square source).
-    // So this was both a crash and, on every row it did not crash, the wrong pixels.
+    // Keep the row offset fixed so clamped window reads stay within this row.
     for (y in 0 until h) {
         val rowStart = y * w
         var ar = 0
@@ -93,13 +76,7 @@ internal fun stackBlurPixels(pixels: IntArray, w: Int, h: Int, radius: Int) {
             for (y in 0 until h) {
                 pixels[yp] = pixels[yp] and 0xff000000.toInt() or
                     (dv[ar] shl 16) or (dv[ag] shl 8) or dv[ab]
-                // Clamp BOTH ends of the window, and always move both -- exactly what the
-                // horizontal pass does. The old form only added when the leading row was
-                // in range and only subtracted when the trailing one was, so at the top
-                // edge (where priming had already counted row 0 `radius + 1` times) the
-                // window grew past `div` terms. The accumulator then exceeded 255 * div
-                // and indexed off the end of the division table: the second half of the
-                // same crash, and a brightening band along the top of every baked blur.
+                // Clamp both rows on every step to keep the window size fixed at image edges.
                 val add = ((y + radius + 1).coerceIn(0, h - 1)) * w + x
                 val sub = ((y - radius).coerceIn(0, h - 1)) * w + x
                 ar += r[add] - r[sub]

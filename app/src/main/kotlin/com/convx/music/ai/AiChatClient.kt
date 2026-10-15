@@ -21,22 +21,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Shared "call the user's configured AI provider" helper. Every provider in
- * Settings > AI (OpenRouter, OpenAI, Groq, custom, ...) speaks the same
- * OpenAI-style chat-completions shape, so one HTTP call covers all of them —
- * only the base URL/model/key differ, and those are already stored under the
- * same [OpenRouterBaseUrlKey]/[OpenRouterModelKey]/[OpenRouterApiKey] regardless
- * of which provider name is selected.
- *
- * Extracted from [AiPlaylistModifier] so a second caller ([AiDjSetBuilder])
- * doesn't duplicate the request/response boilerplate.
- */
+/** Sends chat-completions requests using the configured provider URL, model, and API key. */
 object AiChatClient {
     private val client = OkHttpClient()
 
-    /** Returns the assistant's raw message content, or null after logging why
-     *  (missing key, network error, non-2xx response) it couldn't. */
+    /** Returns the assistant response, or null if the request fails. */
     suspend fun complete(
         context: Context,
         systemPrompt: String,
@@ -82,11 +71,11 @@ object AiChatClient {
         try {
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
-                val errorBody = response.body?.string().orEmpty().take(300)
+                val errorBody = response.body.string().take(300)
                 onLog("AI request failed: ${response.code} $errorBody")
                 return@withContext null
             }
-            val responseString = response.body?.string() ?: return@withContext null
+            val responseString = response.body.string()
             val responseJson = JSONObject(responseString)
             val choices = responseJson.optJSONArray("choices") ?: return@withContext null
             choices.optJSONObject(0)?.optJSONObject("message")?.optString("content")

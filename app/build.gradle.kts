@@ -7,10 +7,7 @@ if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
 
-// Single source of truth for the app version — see version.properties and the
-// bumpVersion task at the bottom of this file. versionCode is DERIVED, not hand-set,
-// so it can never drift from versionName the way it did before (versionCode 5 sat
-// next to versionName "1.5.1" with no relationship between them at all).
+// Derive versionCode from version.properties so it stays in sync with versionName.
 val versionProps = Properties().apply {
     load(rootProject.file("version.properties").inputStream())
 }
@@ -52,7 +49,6 @@ android {
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastFmKey\"")
         buildConfigField("String", "LASTFM_SECRET", "\"$lastFmSecret\"")
 
-//add nightly build label support
         val isNightly = project.hasProperty("nightly") && project.property("nightly") == "true"
         buildConfigField("Boolean", "IS_NIGHTLY", isNightly.toString())
         // CI stamps the workflow run number so a nightly build knows which one it is.
@@ -301,7 +297,7 @@ dependencies {
     implementation(libs.haze.materials)
 
     // Apple-Music-style karaoke lyrics: per-syllable timing, background/accompaniment
-    // lines, and left/right alignment for duets. Same renderer ArchiveTune uses --
+    // lines, and left/right alignment for duets. Same renderer the reference app uses --
     // writing this by hand is ~1400 lines of text layout and interruptible scroll.
     implementation(libs.accompanist.lyrics.ui)
     implementation(libs.accompanist.lyrics.core)
@@ -337,30 +333,22 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     implementation(project(":innertube"))
-    implementation(project(":kugou"))
-    implementation(project(":lrclib"))
-    implementation(project(":kizzy"))
-    implementation(project(":lastfm"))
-    implementation(project(":betterlyrics"))
-    implementation(project(":simpmusic"))
-    implementation(project(":youlyplus"))
-    implementation(project(":canvas"))
-    implementation(project(":shazamkit"))
-    implementation(project(":artistvideo"))
-    implementation(project(":applecanvas"))
-    implementation(project(":vivimusiccanvas"))
-    implementation(project(":paxsenixlyrics"))
-    implementation(project(":musixmatchlyrics"))
-    implementation(project(":jiosaavn"))
+    implementation(project(":lyrics"))
+    implementation(project(":integrations"))
     implementation(project(":spotify"))
+    implementation(project(":artwork"))
+    implementation(project(":network-storage"))
+    implementation(project(":canvas"))
     implementation(project(":spine"))
     implementation(project(":hig"))
 
 
     implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.json)
+    implementation(libs.ktor.client.encoding)
 
     // Protobuf for message serialization (lite version for Android)
     implementation(libs.protobuf.javalite)
@@ -378,11 +366,6 @@ dependencies {
 
     // Smart analysis ONNX models (Beat This + Open-Unmix vocal separator)
     implementation(libs.onnxruntime)
-
-    // Streaming vocal separation (Sing v2): LiteRT runtime + bundled GPU delegate
-    // (no Play Services dependency, so the foss flavor works too).
-    implementation(libs.litert)
-    implementation(libs.litert.gpu)
 
     testImplementation(libs.junit)
 }

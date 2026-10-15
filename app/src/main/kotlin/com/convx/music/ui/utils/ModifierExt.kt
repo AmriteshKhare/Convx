@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -46,52 +47,60 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
-/**
- * Flamingo's player-chrome compositing: draw the content into a single layer over what is
- * behind it, blended with `BlendMode.Plus`.
- *
- * This is how a player takes its chrome colour off the artwork without extracting a palette
- * at all. The seek bar, the transport glyphs and the time text are drawn plain white at a
- * low alpha; the Plus pass adds them on top so the chrome gets *brighter* exactly where the
- * background is dark, letting the artwork's own vivid hue glow through. A palette pass
- * answers the same question with a decode, a quantiser and a frame of lag; this answers it
- * per-pixel, for free, and never disagrees with the pixels it is sitting on.
- *
- * Additive only makes sense over something dark and photographic. Over a flat light surface
- * every white it touches clips, so [enabled] is false on the plain themed background and the
- * chrome falls back to ordinary tinting.
- *
- * Set alpha *after* this modifier (or inside a `graphicsLayer`), never before: alpha applied
- * first is folded into the layer this saves, and the add then happens at full strength.
- */
-// A saturation/brightness colorFilter on the Plus paint is a no-op here: content
-// drawn under additiveChrome is a flat white/gray icon tint (R == G == B), and a
-// saturation matrix leaves any true-gray pixel unchanged by definition -- there is
-// no hue in the source layer to boost. What's actually visible after Plus is the
-// *backdrop's* hue, brightened; the only way to make that read stronger without
-// touching the backdrop itself is to add it again. Two Plus passes accumulate like
-// a second exposure: already-saturated (bright) pixels are already clipped and
-// don't move, but everything short of that ceiling gets pushed further, widening
-// the glow before it clips to white.
+/** Adds the white player controls over dark artwork with additive blending. Apply alpha after this modifier. */
+// Repeating the additive pass strengthens the glow; saturating the gray source layer has no effect.
 private const val AdditiveChromePasses = 2
 
-fun Modifier.additiveChrome(enabled: Boolean = true): Modifier =
+/** Shared strength of the additive chrome on menu and tab-bar glyphs. */
+const val MenuIconChrome = 0.8f
+
+/**
+ * Menu rows and tiles: a light additive lift only, so the glyph stays near-white and readable on the
+ * glass instead of taking the heavier vibrant look the tab bar uses.
+ */
+const val MenuItemChrome = 0.25f
+
+fun Modifier.additiveChrome(enabled: Boolean = true, strength: Float = 1f, bleed: Dp = 0.dp): Modifier =
     if (!enabled) this else drawWithCache {
-        // Recorded once and composited twice, rather than one saveLayer per pass.
-        // The result is the same pixels (dst + L + L), at half the render targets --
-        // and they leave the window's own render pass, which a saveLayer splits in
-        // two. Home was spending ~1.6ms/frame on 15 such splits, each drawing one
-        // icon-sized rect, because every chrome glyph here wraps itself in two.
-        val layer = obtainGraphicsLayer().apply { blendMode = BlendMode.Plus }
+        // Record once and composite the same layer twice.
+        val layer = obtainGraphicsLayer().apply { blendMode = BlendMode.Plus; alpha = strength }
+        // The layer only holds what is drawn inside it, so [bleed] widens it past the node's own box:
+        // a glyph that scales up (a bounce) is then not cut off at the edge of its square.
+        val pad = bleed.toPx()
         val layerSize = IntSize(
-            size.width.toInt().coerceAtLeast(1),
-            size.height.toInt().coerceAtLeast(1),
+            (size.width + 2 * pad).toInt().coerceAtLeast(1),
+            (size.height + 2 * pad).toInt().coerceAtLeast(1),
         )
         onDrawWithContent {
-            layer.record(layerSize) { this@onDrawWithContent.drawContent() }
-            repeat(AdditiveChromePasses) { drawLayer(layer) }
+            layer.record(layerSize) { translate(pad, pad) { this@onDrawWithContent.drawContent() } }
+            translate(-pad, -pad) { repeat(AdditiveChromePasses) { drawLayer(layer) } }
         }
     }
+
+/**
+ * Apple's "vibrant" secondary fill -- the Now Playing unplayed track and time labels.
+ * Content is drawn mid-grey ([VibrantChromeInk]) and colour-dodged onto whatever is
+ * behind it: dodge by 50% grey doubles the backdrop, so a dark green tint comes back
+ * as a brighter, *more saturated* green rather than a washed-out white.
+ *
+ * Draw the content in [VibrantChromeInk]; transparent pixels leave the backdrop alone.
+ */
+fun Modifier.vibrantChrome(enabled: Boolean = true, bleed: Dp = 0.dp): Modifier =
+    if (!enabled) this else drawWithCache {
+        val layer = obtainGraphicsLayer().apply { blendMode = BlendMode.ColorDodge }
+        val pad = bleed.toPx()
+        val layerSize = IntSize(
+            (size.width + 2 * pad).toInt().coerceAtLeast(1),
+            (size.height + 2 * pad).toInt().coerceAtLeast(1),
+        )
+        onDrawWithContent {
+            layer.record(layerSize) { translate(pad, pad) { this@onDrawWithContent.drawContent() } }
+            translate(-pad, -pad) { drawLayer(layer) }
+        }
+    }
+
+/** Ink for [vibrantChrome] content: 50% grey, the dodge amount that doubles the backdrop. */
+val VibrantChromeInk = androidx.compose.ui.graphics.Color(0xFF808080)
 
 /**
  * Springy "wobble" on press for an existing [interactionSource]: the target scales down
@@ -118,21 +127,7 @@ fun Modifier.pressWobble(
     }
 }
 
-/*
- * The two click modifiers below used to add a spring scale-down on press. That is
- * gone. It was built on `composed {}`, which the Compose compiler cannot skip and
- * which defeats modifier reuse, and each instance additionally allocated a
- * MutableInteractionSource, started a collectIsPressedAsState flow collector,
- * started an animateFloatAsState, and added a graphicsLayer — per item, rebuilt
- * every time a row recycled. With ~200 call sites, nearly all of them inside lazy
- * lists, that was the app's largest per-frame scroll cost. The reference app this
- * one is compared against uses plain combinedClickable and has no `composed {}`
- * anywhere.
- *
- * These stay as named wrappers rather than being deleted so the ~200 call sites,
- * and the option of reintroducing the press feedback, both stay in one place. To
- * bring the bounce back, implement it as a Modifier.Node — not with `composed`.
- */
+// Both click wrappers share this scale and the node-based press indication below.
 
 private const val BouncePressedScale = 0.94f
 
@@ -297,9 +292,18 @@ fun Modifier.outerDarkRim(
     alpha: Float = 0.32f,
     /** Light rim's angle, degrees — the dark axis is derived from it. */
     angle: Float = 45f,
+    /**
+     * Draw only the inner half of the stroke, inset so clipping preserves the outline width.
+     */
+    insideOnly: Boolean = false,
 ): Modifier = drawWithCache {
-    val outline = shape.createOutline(size, layoutDirection, this)
-    val stroke = Stroke(width = width.toPx())
+    val inset = if (insideOnly) width.toPx() / 4f else 0f
+    val outline = shape.createOutline(
+        androidx.compose.ui.geometry.Size(size.width - inset * 2f, size.height - inset * 2f),
+        layoutDirection,
+        this,
+    )
+    val stroke = Stroke(width = if (insideOnly) width.toPx() / 2f else width.toPx())
     // One gradient per diagonal axis (canvas coords, y down — same convention
     // as the highlight shader's cos/sin normal). Each is black at both ends
     // fading out at its middle, so the two passes swell on opposite sides.
@@ -321,8 +325,10 @@ fun Modifier.outerDarkRim(
     val secondBrush = flankBrush(angle + 90f)
     onDrawWithContent {
         drawContent()
-        drawOutline(outline = outline, brush = firstBrush, style = stroke)
-        drawOutline(outline = outline, brush = secondBrush, style = stroke)
+        translate(inset, inset) {
+            drawOutline(outline = outline, brush = firstBrush, style = stroke)
+            drawOutline(outline = outline, brush = secondBrush, style = stroke)
+        }
     }
 }
 /**

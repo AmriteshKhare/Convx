@@ -98,7 +98,7 @@ fun ThumbnailCornerRadiusModal(
                 ) {
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // ── Image (left) + Chips (right) ──────────────────────────
+                    // Image (left) + chips (right)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -156,7 +156,6 @@ fun ThumbnailCornerRadiusModal(
                             }
                         )
                     }
-                    // ──────────────────────────────────────────────────────────
 
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(
@@ -328,18 +327,10 @@ fun ThumbnailCornerRadiusModal(
                                 contentColor = AppTheme.colorScheme.onPrimary
                             )
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-//                                Icon(
-//                                    painter = painterResource(R.drawable.check),
-//                                    contentDescription = null,
-//                                    modifier = Modifier.size(18.dp)
-//                                )
-//                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = stringResource(id = android.R.string.ok),
-                                    style = AppTheme.typography.labelLarge
-                                )
-                            }
+                            Text(
+                                text = stringResource(id = android.R.string.ok),
+                                style = AppTheme.typography.labelLarge
+                            )
                         }
                     }
                 }

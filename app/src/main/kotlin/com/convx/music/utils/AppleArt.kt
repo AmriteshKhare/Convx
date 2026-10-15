@@ -15,6 +15,10 @@ import com.convx.music.ui.utils.resize
 import com.convx.music.canvas.AppleArtist
 import com.convx.music.canvas.AppleArtwork
 import com.convx.music.canvas.AppleMusicCatalog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 
 /** What a piece of artwork belongs to, so the same item can be looked up on Apple Music. */
 sealed interface AppleArtQuery {
@@ -23,11 +27,7 @@ sealed interface AppleArtQuery {
     data class Artist(val name: String) : AppleArtQuery
 }
 
-/**
- * Apple Music artwork as the primary image source, YouTube's as the fallback. [enabled]
- * mirrors AppleArtworkKey (off under data saver) and is written by App's preference
- * collector, so list rows read a plain field instead of each subscribing to DataStore.
- */
+
 object AppleArt {
     @Volatile
     var enabled: Boolean = true
@@ -43,82 +43,160 @@ object AppleArt {
      * How long an image waits for Apple before showing YouTube's. The lookup itself keeps running
      * in the catalog's own scope, so a slow answer still lands in the cache for next time.
      */
-    const val WAIT_MS = 10_000L
+    const val WAIT_MS = 2_000L
 
     suspend fun lookup(query: AppleArtQuery): AppleArtwork? = when (query) {
         is AppleArtQuery.Song -> AppleMusicCatalog.song(query.title, query.artist)
         is AppleArtQuery.Album -> AppleMusicCatalog.album(query.title, query.artist)
-        is AppleArtQuery.Artist -> AppleMusicCatalog.artist(query.name)?.hero
+        is AppleArtQuery.Artist -> AppleMusicCatalog.artist(query.name, priority = false)?.hero
     }
+
+    private val prefetchScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+    private val prefetchGate = kotlinx.coroutines.sync.Semaphore(2)
+    private val warming = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /** Resolve a small set of nearby artists as soon as YouTube returns metadata, before navigation. */
+    fun prefetchArtistIds(items: List<com.music.innertube.models.YTItem>) {
+        if (!enabled) return
+        val names = items.asSequence().flatMap { item ->
+            when (item) {
+                is com.music.innertube.models.ArtistItem -> sequenceOf(item.title)
+                is com.music.innertube.models.SongItem -> item.artists.asSequence().map { it.name }
+                is com.music.innertube.models.AlbumItem -> item.artists.orEmpty().asSequence().map { it.name }
+                else -> emptySequence() // A playlist author may be a user, not a recording artist.
+            }
+        }.filter { it.isNotBlank() }.distinctBy(AppleMusicCatalog::normalize).take(4)
+        for (name in names) {
+            if (warming.size >= 4) break
+
+            val key = "id|${AppleMusicCatalog.storefront}|${AppleMusicCatalog.normalize(name)}"
+            if (!warming.add(key)) continue
+            prefetchScope.launch {
+                try {
+                    prefetchGate.acquire()
+                    try {
+                        if (enabled) artworkResult { AppleMusicCatalog.artistId(name) }
+                    } finally { prefetchGate.release() }
+                } finally { warming.remove(key) }
+            }
+        }
+    }
+
+    /** Visible artist cards warm both the hero and wordmark before navigation. */
+    fun prefetch(context: android.content.Context, query: AppleArtQuery) {
+        if (!enabled || query !is AppleArtQuery.Artist) return
+        val identity = AppleMusicCatalog.storefront + "|" + AppleMusicCatalog.normalize(query.name)
+        if (warming.size >= 4 || !warming.add(identity)) return
+        prefetchScope.launch {
+            try {
+                prefetchGate.acquire()
+                try {
+                    if (enabled) artworkResult { AppleMusicCatalog.artist(query.name, priority = false) }
+                        ?.let { prefetchArtistAssets(context.applicationContext, it) }
+                } finally {
+                    prefetchGate.release()
+                }
+            } finally {
+                warming.remove(identity)
+            }
+        }
+    }
+
+    internal suspend fun prefetchArtistAssets(context: android.content.Context, artist: AppleArtist) {
+        if (!enabled) return
+        val loader = coil3.SingletonImageLoader.get(context.applicationContext)
+        kotlinx.coroutines.coroutineScope {
+            listOfNotNull(artist.hero?.let { it to false }, artist.logo?.let { it to true })
+                .map { (art, png) ->
+                    async {
+                        val width = if (png) logoWidthPx(context) else 1200
+                        val height = if (art.width > 0 && art.height > 0) width * art.height / art.width else width
+                        loader.execute(coil3.request.ImageRequest.Builder(context.applicationContext)
+                            .data(art.sized(width, png)).size(width, height.coerceAtLeast(1)).build())
+                    }
+                }.awaitAll()
+        }
+    }
+
+    fun logoWidthPx(context: android.content.Context): Int =
+        (286 * context.resources.displayMetrics.density).toInt().coerceIn(1, 1200)
 }
 
-/** One image's Apple lookup: still waiting (draw a shimmer), or settled on [url] — Apple's, else the fallback. */
+/** Apple artwork is preferred; existing art can paint immediately during a cold lookup. */
 sealed interface ArtState {
     data object Loading : ArtState
     data class Ready(val url: String?) : ArtState
 }
 
-/**
- * Apple's artwork for [query] at [px]; [ArtState.Loading] until the lookup settles, then
- * Apple's URL, or [fallbackUrl] when Apple has no match, fails, or takes longer than
- * [AppleArt.WAIT_MS]. Local files and disabled lookups settle on [fallbackUrl] immediately.
- */
 @Composable
 fun rememberAppleArtwork(query: AppleArtQuery?, fallbackUrl: String?, px: Int): ArtState {
     if (query == null || !AppleArt.enabled || (fallbackUrl != null && !fallbackUrl.startsWith("http"))) {
         return ArtState.Ready(fallbackUrl)
     }
-    val initial = remember(query, px, fallbackUrl) {
-        AppleArt.peek(query)?.let { ArtState.Ready(it.value?.sized(px) ?: fallbackUrl) } ?: ArtState.Loading
-    }
-    val state by produceState(initial, query, px, fallbackUrl) {
-        if (value != ArtState.Loading) return@produceState
-        val art = kotlinx.coroutines.withTimeoutOrNull(AppleArt.WAIT_MS) {
-            runCatching { AppleArt.lookup(query) }.getOrNull()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(query) { AppleArt.prefetch(context, query) }
+    val cached = remember(query, px) { AppleArt.peek(query) }
+    val initial = cached?.let { ArtState.Ready(it.value?.sized(px) ?: fallbackUrl) }
+        ?: fallbackUrl?.let { ArtState.Ready(it) } ?: ArtState.Loading
+    return androidx.compose.runtime.key(query, px, fallbackUrl) {
+        val state by produceState<ArtState>(initial) {
+            if (cached != null) return@produceState
+            kotlinx.coroutines.coroutineScope {
+                val request = async(Dispatchers.IO) { artworkResult { AppleArt.lookup(query) } }
+                val art = kotlinx.coroutines.withTimeoutOrNull(AppleArt.WAIT_MS) { request.await() }
+                value = ArtState.Ready(art?.sized(px) ?: fallbackUrl)
+                if (art == null) request.await()?.let { value = ArtState.Ready(it.sized(px)) }
+            }
         }
-        value = ArtState.Ready(art?.sized(px) ?: fallbackUrl)
+        state
     }
-    return state
 }
 
-/** [rememberAppleArtwork] for callers without a loading state of their own: null while waiting. */
 @Composable
 fun rememberAppleArtworkUrl(query: AppleArtQuery?, fallbackUrl: String?, px: Int): String? =
     (rememberAppleArtwork(query, fallbackUrl, px) as? ArtState.Ready)?.url
 
-/** An artist page's Apple lookup: [loading] until it settles; [artist] null afterwards means no match. */
 data class AppleArtistState(val loading: Boolean, val artist: AppleArtist?)
 
 @Composable
 fun rememberAppleArtist(name: String?): AppleArtistState {
-    if (!AppleArt.enabled) return AppleArtistState(loading = false, artist = null)
-    if (name.isNullOrBlank()) return AppleArtistState(loading = true, artist = null)
-    val initial = remember(name) {
-        AppleMusicCatalog.peekArtist(name)?.let { AppleArtistState(false, it.value) } ?: AppleArtistState(true, null)
-    }
-    val state by produceState(initial, name) {
-        if (!value.loading) return@produceState
-        val artist = kotlinx.coroutines.withTimeoutOrNull(AppleArt.WAIT_MS) {
-            runCatching { AppleMusicCatalog.artist(name) }.getOrNull()
-        }
-        value = AppleArtistState(loading = false, artist = artist)
-        // Past the wait (a cold token renewal can take ~10s): keep listening, and switch to
-        // Apple's profile if it still arrives, rather than leaving YouTube's for good.
-        if (artist == null) {
-            runCatching { AppleMusicCatalog.artist(name) }.getOrNull()?.let {
-                value = AppleArtistState(loading = false, artist = it)
+    if (!AppleArt.enabled) return AppleArtistState(false, null)
+    if (name.isNullOrBlank()) return AppleArtistState(true, null)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val cached = remember(name) { AppleMusicCatalog.peekArtist(name) }
+    val initial = cached?.let { AppleArtistState(false, it.value) } ?: AppleArtistState(true, null)
+    return androidx.compose.runtime.key(name) {
+        val state by produceState(initial) {
+            if (cached != null) {
+                cached.value?.let { AppleArt.prefetchArtistAssets(context, it) }
+                return@produceState
+            }
+            kotlinx.coroutines.coroutineScope {
+                val request = async(Dispatchers.IO) { artworkResult { AppleMusicCatalog.artist(name) } }
+                val artist = kotlinx.coroutines.withTimeoutOrNull(AppleArt.WAIT_MS) { request.await() }
+                value = AppleArtistState(false, artist)
+                artist?.let { AppleArt.prefetchArtistAssets(context, it) }
+                if (artist == null) request.await()?.let {
+                    value = AppleArtistState(false, it)
+                    AppleArt.prefetchArtistAssets(context, it)
+                }
             }
         }
+        state
     }
-    return state
+}
+
+private suspend fun <T> artworkResult(block: suspend () -> T): T? = try {
+    block()
+} catch (e: kotlinx.coroutines.CancellationException) {
+    throw e
+} catch (_: Exception) {
+    null
 }
 
 private val estimatedBgCache = android.util.LruCache<String, Int>(64)
 
-/**
- * On-device estimate of Apple's artwork bgColor ([com.convx.music.ui.theme.AppleColors.estimateArtworkBackground])
- * for art Apple has no entry for. Null until the small decode lands.
- */
+/** Estimates a missing artwork color from a small on-device decode. */
 @Composable
 fun rememberEstimatedArtworkBg(url: String?): Int? {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -141,27 +219,27 @@ fun rememberEstimatedArtworkBg(url: String?): Int? {
     return bg
 }
 
-/** An album page's Apple lookup: [loading] until it settles; [art] null afterwards means no match. */
+/** Cached album artwork is ready on entry; cold lookups get a short loading window. */
 data class AppleAlbumState(val loading: Boolean, val art: AppleArtwork?)
 
 @Composable
 fun rememberAppleAlbum(title: String?, artist: String?): AppleAlbumState {
-    if (!AppleArt.enabled) return AppleAlbumState(loading = false, art = null)
-    if (title.isNullOrBlank()) return AppleAlbumState(loading = true, art = null)
-    val initial = remember(title, artist) {
-        AppleMusicCatalog.peekAlbum(title, artist)?.let { AppleAlbumState(false, it.value) } ?: AppleAlbumState(true, null)
-    }
-    val state by produceState(initial, title, artist) {
-        if (!value.loading) return@produceState
-        val art = kotlinx.coroutines.withTimeoutOrNull(AppleArt.WAIT_MS) {
-            runCatching { AppleMusicCatalog.album(title, artist, priority = true) }.getOrNull()
-        }
-        value = AppleAlbumState(loading = false, art = art)
-        if (art == null) {
-            runCatching { AppleMusicCatalog.album(title, artist, priority = true) }.getOrNull()?.let {
-                value = AppleAlbumState(loading = false, art = it)
+    if (!AppleArt.enabled) return AppleAlbumState(false, null)
+    if (title.isNullOrBlank()) return AppleAlbumState(true, null)
+    val cached = remember(title, artist) { AppleMusicCatalog.peekAlbum(title, artist) }
+    val initial = cached?.let { AppleAlbumState(false, it.value) } ?: AppleAlbumState(true, null)
+    return androidx.compose.runtime.key(title, artist) {
+        val state by produceState(initial) {
+            if (cached != null) return@produceState
+            kotlinx.coroutines.coroutineScope {
+                val request = async(Dispatchers.IO) {
+                    artworkResult { AppleMusicCatalog.album(title, artist, priority = true) }
+                }
+                val art = kotlinx.coroutines.withTimeoutOrNull(AppleArt.WAIT_MS) { request.await() }
+                value = AppleAlbumState(false, art)
+                if (art == null) request.await()?.let { value = AppleAlbumState(false, it) }
             }
         }
+        state
     }
-    return state
 }

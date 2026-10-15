@@ -54,17 +54,11 @@ fun ProvideSectionStyle(
     content: @Composable () -> Unit,
 ) = CompositionLocalProvider(LocalSectionStyle provides style, content = content)
 
-/**
- * Apply this to section title.
- * It will automatically [uppercase] text if needed
- * */
+/** Uppercases section titles for grouped styles. */
 @Composable
 fun String.sectionTitle(style: SectionStyle = LocalSectionStyle.current) = if (style.shouldCapsTitle) uppercase() else this
 
-/**
- * Apply this modifier to the section container.
- * It will automatically set required background
- * */
+/** Applies the background color for this section style. */
 fun Modifier.sectionContainerBackground(style: SectionStyle? = null) =
     composed {
         background(

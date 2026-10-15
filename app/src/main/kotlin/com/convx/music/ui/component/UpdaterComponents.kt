@@ -44,7 +44,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.core.content.ContextCompat
-import com.convx.music.vivimusic.updater.extractUrls
+import com.convx.music.core.updater.extractUrls
 @Composable
 fun AnimatedActionButton(
     text: String,

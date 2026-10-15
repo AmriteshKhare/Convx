@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.ui.res.painterResource
 import android.content.Intent
 import android.os.Bundle
@@ -19,37 +21,44 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.ios.compat.ExtendedFloatingActionButton
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.IconButton
-import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.ios.compat.Scaffold
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.ios.compat.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.convx.music.R
 import com.composables.sfsymbols.SfSymbols
 import com.composables.sfsymbols.monochrome.SFSquareOnSquare
 import com.composables.sfsymbols.monochrome.SFXmark
-import com.convx.music.ui.theme.vivimusicTheme
+import com.convx.music.ui.ios.foundation.IosTheme
+import com.convx.music.ui.ios.foundation.IosControlSize
+import com.convx.music.ui.ios.component.IosButton
+import com.convx.music.ui.ios.component.IosButtonStyle
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.theme.SfProFontFamily
 import com.convx.music.utils.CrashHandler
 import java.io.File
 import java.text.SimpleDateFormat
@@ -57,22 +66,26 @@ import java.util.Date
 import java.util.Locale
 
 class CrashActivity : ComponentActivity() {
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
-        val crashLog = intent.getStringExtra(CrashHandler.EXTRA_CRASH_LOG) ?: getString(R.string.crash_no_log)
-        
-        setContent {
-            val darkTheme = isSystemInDarkTheme()
-            vivimusicTheme(darkTheme = darkTheme) {
-                CrashScreen(
-                    crashLog = crashLog,
-                    onClose = { finishAffinity() },
-                    onShare = { shareCrashLog(crashLog) },
-                    onCopy = { copyToClipboard(crashLog) }
-                )
+
+        lifecycleScope.launch {
+            val crashLog = intent.getStringExtra(CrashHandler.EXTRA_CRASH_LOG) ?: withContext(Dispatchers.IO) {
+                runCatching { File(filesDir, CrashHandler.CRASH_REPORT_FILE).readText() }.getOrNull()
+            } ?: getString(R.string.crash_no_log)
+            setContent {
+                val darkTheme = isSystemInDarkTheme()
+                // Recovery must not read the preference store that may have caused the crash.
+                IosTheme(darkTheme = darkTheme, accent = Color(0xFFFA233B)) {
+                    CrashScreen(
+                        crashLog = crashLog,
+                        onClose = { finishAffinity() },
+                        onShare = { shareCrashLog(crashLog) },
+                        onCopy = { copyToClipboard(crashLog) }
+                    )
+                }
             }
         }
     }
@@ -83,44 +96,43 @@ class CrashActivity : ComponentActivity() {
         cm.setPrimaryClip(clip)
         android.widget.Toast.makeText(this, R.string.copied_to_clipboard, android.widget.Toast.LENGTH_SHORT).show()
     }
-    
+
     private fun shareCrashLog(crashLog: String) {
-        try {
-            // Create crash log file
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-            val fileName = "convx_crash_$timestamp.txt"
-            val crashFile = File(cacheDir, fileName)
-            crashFile.writeText(crashLog)
-            
-            // Get URI using FileProvider
-            val uri = FileProvider.getUriForFile(
-                this,
-                "${packageName}.FileProvider",
-                crashFile
-            )
-            
-            // Create share intent
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, getString(R.string.crash_report_subject))
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        lifecycleScope.launch {
+            try {
+                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val fileName = "convx_crash_$timestamp.txt"
+                val crashFile = withContext(Dispatchers.IO) {
+                    File(cacheDir, fileName).also { it.writeText(crashLog) }
+                }
+
+                val uri = FileProvider.getUriForFile(
+                    this@CrashActivity,
+                    "${packageName}.FileProvider",
+                    crashFile
+                )
+
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, getString(R.string.crash_report_subject))
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                startActivity(Intent.createChooser(shareIntent, getString(R.string.crash_share_title)))
+            } catch (e: Exception) {
+                // Fallback to simple text share if file sharing fails
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, crashLog)
+                    putExtra(Intent.EXTRA_SUBJECT, getString(R.string.crash_report_subject))
+                }
+                startActivity(Intent.createChooser(shareIntent, getString(R.string.crash_share_title)))
             }
-            
-            startActivity(Intent.createChooser(shareIntent, getString(R.string.crash_share_title)))
-        } catch (e: Exception) {
-            // Fallback to simple text share if file sharing fails
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, crashLog)
-                putExtra(Intent.EXTRA_SUBJECT, getString(R.string.crash_report_subject))
-            }
-            startActivity(Intent.createChooser(shareIntent, getString(R.string.crash_share_title)))
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CrashScreen(
     crashLog: String,
@@ -128,102 +140,85 @@ fun CrashScreen(
     onShare: () -> Unit,
     onCopy: () -> Unit
 ) {
-    val context = LocalContext.current
-    
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Text(
-                        text = stringResource(R.string.crash_title),
-                        style = AppTheme.typography.headlineSmall
-                    ) 
-                },
-                actions = {
-                    IconButton(onClick = onCopy) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFSquareOnSquare,
-                            contentDescription = stringResource(R.string.copy_logs)
-                        )
-                    }
-                    IconButton(onClick = onClose) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFXmark,
-                            contentDescription = stringResource(R.string.crash_close)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AppTheme.colorScheme.surface
-                ),
-                // CrashActivity is a standalone activity, not hosted in the app's
-                // usual NavHost/scaffold that normally supplies safe-area insets
-                // to every screen -- the compat TopAppBar's own default is
-                // *zero* insets (by design, so it never draws over empty space
-                // in a page that already handles insets itself), which here
-                // meant the title/close button rendered straight under the
-                // status bar with nothing clearing it.
-                windowInsets = WindowInsets.statusBars
+    val colors = IosTheme.colors
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.systemBackground)
+            .safeDrawingPadding(),
+    ) {
+        // Center the title independently of the trailing controls, as on iPad.
+        Box(Modifier.fillMaxWidth().height(52.dp)) {
+            Text(
+                text = stringResource(R.string.crash_title),
+                fontFamily = SfProFontFamily,
+                fontSize = 17.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 100.dp),
             )
-        },
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onShare,
-                icon = {
-                    Icon(
-                        painter = painterResource(R.drawable.ios_share),
-                        contentDescription = null
-                    )
-                },
-                text = { Text(stringResource(R.string.crash_share_logs)) },
-                containerColor = AppTheme.colorScheme.primaryContainer,
-                contentColor = AppTheme.colorScheme.onPrimaryContainer
-            )
-        },
-        containerColor = AppTheme.colorScheme.surface
-    ) { paddingValues ->
+            Row(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp)) {
+                IconButton(onClick = onCopy) {
+                    SymbolIcon(symbol = sf("SFSquareOnSquare"), contentDescription = stringResource(R.string.copy_logs), size = 22.dp, tint = colors.label)
+                }
+                IconButton(onClick = onClose) {
+                    SymbolIcon(symbol = sf("SFXmark"), contentDescription = stringResource(R.string.crash_close), size = 22.dp, tint = colors.label)
+                }
+            }
+        }
+        // This is the only vertical scroller. weight gives it a finite viewport
+        // in both orientations, even for a long exception report.
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                // Same reason as the TopAppBar's insets above: this screen has
-                // no ancestor scaffold to clear the gesture/nav bar for it, so
-                // the scrollable content (and the FAB space reserved below it)
-                // need it explicitly.
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .weight(1f)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
             Text(
                 text = stringResource(R.string.crash_description),
-                style = AppTheme.typography.bodyLarge,
-                color = AppTheme.colorScheme.onSurfaceVariant
+                fontFamily = SfProFontFamily,
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                color = colors.secondaryLabel,
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Crash log container
+            Spacer(Modifier.height(16.dp))
             Box(
-                modifier = Modifier
+                Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(AppTheme.colorScheme.surfaceContainerHighest)
-                    .padding(16.dp)
+                    .clip(ContinuousRoundedRectangle(16.dp))
+                    .background(if (colors.isDark) colors.systemGray5 else colors.secondarySystemBackground)
+                    .padding(16.dp),
             ) {
-                Text(
-                    text = crashLog,
-                    style = AppTheme.typography.bodySmall.copy(
+                SelectionContainer {
+                    Text(
+                        text = crashLog,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
-                        lineHeight = 16.sp
-                    ),
-                    color = AppTheme.colorScheme.onSurface,
-                    modifier = Modifier.horizontalScroll(rememberScrollState())
-                )
+                        lineHeight = 16.sp,
+                        color = colors.label,
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    )
+                }
             }
-            
-            // Bottom spacing for FAB
-            Spacer(modifier = Modifier.height(88.dp))
+        }
+        // The action owns its space; neither the report nor system gestures
+        // can obscure it on a short landscape viewport.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            IosButton(
+                onClick = onShare,
+                style = IosButtonStyle.Bordered,
+                controlSize = IosControlSize.Large,
+            ) {
+                SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null, size = 18.dp)
+                Text(stringResource(R.string.crash_share_logs))
+            }
         }
     }
 }

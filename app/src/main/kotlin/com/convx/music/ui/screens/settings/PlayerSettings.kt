@@ -25,7 +25,6 @@ import com.convx.music.R
 import com.convx.music.constants.AskBeforeReplacingQueueKey
 import com.convx.music.constants.AudioNormalizationKey
 import com.convx.music.constants.AudioQuality
-import com.convx.music.constants.KaraokeModeKey
 import com.convx.music.constants.AudioQualityKey
 import com.convx.music.constants.AutoDjMixingEnabledKey
 import com.convx.music.constants.AutoDownloadOnLikeKey
@@ -78,10 +77,6 @@ fun PlayerSettings(
         SkipSilenceKey,
         defaultValue = false
     )
-    val (karaokeMode, onKaraokeModeChange) = rememberPreference(
-        KaraokeModeKey,
-        defaultValue = false
-    )
     val (audioNormalization, onAudioNormalizationChange) = rememberPreference(
         AudioNormalizationKey,
         defaultValue = true
@@ -95,6 +90,10 @@ fun PlayerSettings(
     val (autoDownloadOnLike, onAutoDownloadOnLikeChange) = rememberPreference(
         AutoDownloadOnLikeKey,
         defaultValue = false
+    )
+    val (saveDownloadsToMusic, onSaveDownloadsToMusicChange) = rememberPreference(
+        com.convx.music.constants.SaveDownloadsToMusicFolderKey,
+        defaultValue = true
     )
     val (similarContentEnabled, similarContentEnabledChange) = rememberPreference(
         key = SimilarContent,
@@ -156,7 +155,7 @@ fun PlayerSettings(
         item(key = "player_settings_content") {
             Column {
                 IosSettingsGroup(
-                    title = stringResource(R.string.player),
+                    title = "Sound",
                     items = buildList {
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.graphic_eq),
@@ -173,38 +172,15 @@ fun PlayerSettings(
                             onClick = { showAudioQualityDialog = true }
                         ))
                         add(IosSettingsItem(
-                            icon = painterResource(R.drawable.ic_queue_crossfade),
-                            title = { Text(stringResource(R.string.song_transitions)) },
-                            description = {
-                                Text(
-                                    stringResource(
-                                        when {
-                                            !crossfadeEnabled -> R.string.transition_off
-                                            autoDjMixingEnabled -> R.string.transition_automix
-                                            else -> R.string.crossfade
-                                        }
-                                    )
-                                )
-                            },
-                            onClick = { navController.navigate("settings/song_transitions") }
-                        ))
-                        add(IosSettingsItem(
-                            icon = painterResource(R.drawable.music_note),
-                            title = { Text(stringResource(R.string.local_only_mode)) },
-                            description = { Text(stringResource(R.string.local_only_mode_desc)) },
+                            icon = painterResource(R.drawable.volume_up),
+                            title = { Text(stringResource(R.string.audio_normalization)) },
                             trailingContent = {
                                 Switch(
-                                    checked = localOnlyMode,
-                                    onCheckedChange = onLocalOnlyModeChange
+                                    checked = audioNormalization,
+                                    onCheckedChange = onAudioNormalizationChange
                                 )
                             },
-                            onClick = { onLocalOnlyModeChange(!localOnlyMode) }
-                        ))
-                        add(IosSettingsItem(
-                            icon = painterResource(R.drawable.music_note),
-                            title = { Text(stringResource(R.string.scan_local_files)) },
-                            description = { Text(stringResource(R.string.scan_local_files_desc)) },
-                            onClick = { navController.navigate("settings/scan_music") }
+                            onClick = { onAudioNormalizationChange(!audioNormalization) }
                         ))
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.fast_forward),
@@ -219,27 +195,34 @@ fun PlayerSettings(
                             onClick = { onSkipSilenceChange(!skipSilence) }
                         ))
                         add(IosSettingsItem(
-                            icon = painterResource(R.drawable.mic),
-                            title = { Text(stringResource(R.string.karaoke_mode)) },
-                            description = { Text(stringResource(R.string.karaoke_mode_desc)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = karaokeMode,
-                                    onCheckedChange = onKaraokeModeChange
-                                )
-                            },
-                            onClick = { onKaraokeModeChange(!karaokeMode) }
+                            icon = painterResource(R.drawable.convx_equalizer_icon),
+                            title = { Text(stringResource(R.string.convx_equalizer)) },
+                            description = { Text(stringResource(R.string.convx_equalizer_desc)) },
+                            onClick = { navController.navigate("settings/equalizer") }
                         ))
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(27.dp))
+
+                IosSettingsGroup(
+                    title = "Transitions & output",
+                    items = buildList {
                         add(IosSettingsItem(
-                            icon = painterResource(R.drawable.volume_up),
-                            title = { Text(stringResource(R.string.audio_normalization)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = audioNormalization,
-                                    onCheckedChange = onAudioNormalizationChange
+                            icon = painterResource(R.drawable.ic_queue_crossfade),
+                            title = { Text(stringResource(R.string.song_transitions)) },
+                            description = {
+                                Text(
+                                    stringResource(
+                                        when {
+                                            !crossfadeEnabled -> R.string.transition_off
+                                            autoDjMixingEnabled -> R.string.transition_automix
+                                            else -> R.string.crossfade
+                                        }
+                                    )
                                 )
                             },
-                            onClick = { onAudioNormalizationChange(!audioNormalization) }
+                            onClick = { navController.navigate("settings/song_transitions") }
                         ))
                         // Only show Cast setting in GMS builds (not in F-Droid/FOSS)
                         if (BuildConfig.CAST_AVAILABLE) {
@@ -256,19 +239,13 @@ fun PlayerSettings(
                                 onClick = { onEnableGoogleCastChange(!enableGoogleCast) }
                             ))
                         }
-                        add(IosSettingsItem(
-                            icon = painterResource(R.drawable.viviequlizer),
-                            title = { Text(stringResource(R.string.vivi_equalizer)) },
-                            description = { Text(stringResource(R.string.vivi_equalizer_desc)) },
-                            onClick = { navController.navigate("settings/equalizer") }
-                        ))
                     }
                 )
 
                 Spacer(modifier = Modifier.height(27.dp))
 
                 IosSettingsGroup(
-                    title = stringResource(R.string.queue),
+                    title = "Queue & autoplay",
                     items = listOf(
                         IosSettingsItem(
                             icon = painterResource(R.drawable.queue_music),
@@ -281,18 +258,6 @@ fun PlayerSettings(
                                 )
                             },
                             onClick = { onPersistentQueueChange(!persistentQueue) }
-                        ),
-                        IosSettingsItem(
-                            icon = painterResource(R.drawable.download),
-                            title = { Text(stringResource(R.string.auto_download_on_like)) },
-                            description = { Text(stringResource(R.string.auto_download_on_like_desc)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = autoDownloadOnLike,
-                                    onCheckedChange = onAutoDownloadOnLikeChange
-                                )
-                            },
-                            onClick = { onAutoDownloadOnLikeChange(!autoDownloadOnLike) }
                         ),
                         IosSettingsItem(
                             icon = painterResource(R.drawable.similar),
@@ -348,7 +313,65 @@ fun PlayerSettings(
                 Spacer(modifier = Modifier.height(27.dp))
 
                 IosSettingsGroup(
-                    title = stringResource(R.string.misc),
+                    title = "Downloads",
+                    items = listOf(
+                        IosSettingsItem(
+                            icon = painterResource(R.drawable.download),
+                            title = { Text(stringResource(R.string.auto_download_on_like)) },
+                            description = { Text(stringResource(R.string.auto_download_on_like_desc)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = autoDownloadOnLike,
+                                    onCheckedChange = onAutoDownloadOnLikeChange
+                                )
+                            },
+                            onClick = { onAutoDownloadOnLikeChange(!autoDownloadOnLike) }
+                        ),
+                        IosSettingsItem(
+                            icon = painterResource(R.drawable.download),
+                            title = { Text(stringResource(R.string.save_downloads_to_music)) },
+                            description = { Text(stringResource(R.string.save_downloads_to_music_desc)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = saveDownloadsToMusic,
+                                    onCheckedChange = onSaveDownloadsToMusicChange
+                                )
+                            },
+                            onClick = { onSaveDownloadsToMusicChange(!saveDownloadsToMusic) }
+                        )
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(27.dp))
+
+                IosSettingsGroup(
+                    title = "Local music",
+                    items = buildList {
+                        add(IosSettingsItem(
+                            icon = painterResource(R.drawable.music_note),
+                            title = { Text(stringResource(R.string.local_only_mode)) },
+                            description = { Text(stringResource(R.string.local_only_mode_desc)) },
+                            trailingContent = {
+                                Switch(
+                                    checked = localOnlyMode,
+                                    onCheckedChange = onLocalOnlyModeChange
+                                )
+                            },
+                            onClick = { onLocalOnlyModeChange(!localOnlyMode) }
+                        ))
+                        add(IosSettingsItem(
+                            icon = painterResource(R.drawable.music_note),
+                            title = { Text(stringResource(R.string.scan_local_files)) },
+                            description = { Text(stringResource(R.string.scan_local_files_desc)) },
+                            onClick = { navController.navigate("settings/scan_music") }
+                        ))
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(27.dp))
+
+                IosSettingsGroup(
+                    title = "Behaviour",
                     items = listOf(
                         IosSettingsItem(
                             icon = painterResource(R.drawable.volume_off_pause),

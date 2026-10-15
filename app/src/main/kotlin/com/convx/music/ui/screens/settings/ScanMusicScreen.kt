@@ -60,13 +60,17 @@ fun ScanMusicScreen(
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val scanResult by viewModel.scanResult.collectAsStateWithLifecycle()
     val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val permission = com.convx.music.ui.component.rememberLocalAudioPermission { }
+    LaunchedEffect(permission.granted) {
+        if (permission.granted) viewModel.scanDevice(context, force = false)
+    }
 
     var folders by remember { mutableStateOf<List<LocalFolderIndex.Folder>>(emptyList()) }
     // Reloaded when a scan finishes, not on a timer: folders only change when files do.
-    LaunchedEffect(isScanning, songs.size) {
-        if (!isScanning) {
+    LaunchedEffect(isScanning, songs.size, permission.granted) {
+        if (permission.granted && !isScanning) {
             folders = runCatching { LocalFolderIndex.load(context) }.getOrDefault(emptyList())
-        }
+        } else if (!permission.granted) folders = emptyList()
     }
 
     SettingsLazyPage(
@@ -74,6 +78,10 @@ fun ScanMusicScreen(
         title = stringResource(R.string.scan_device),
         pageColor = AppTheme.colorScheme.background,
     ) {
+        if (!permission.granted) {
+            item(key = "audio_access") { com.convx.music.ui.component.LocalMusicPermissionPrompt(permission) }
+            return@SettingsLazyPage
+        }
         item(key = "status") {
             Column(
                 modifier = Modifier
@@ -98,8 +106,7 @@ fun ScanMusicScreen(
                     )
                 }
 
-                // Persisted on the view model, so it survives leaving and returning to
-                // this screen -- the one thing the old silent scan never gave anyone.
+                // Keep scan results available when returning to this screen.
                 scanResult?.let { result ->
                     Text(
                         text = stringResource(
@@ -124,6 +131,12 @@ fun ScanMusicScreen(
                     onClick = { navController.navigate("settings/player/local_folders") },
                 ) {
                     Text(stringResource(R.string.excluded_folders))
+                }
+
+                Button(
+                    onClick = { navController.navigate("settings/network_storage") },
+                ) {
+                    Text(stringResource(R.string.network_storage))
                 }
             }
         }

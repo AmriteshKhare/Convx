@@ -6,109 +6,57 @@
 package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.activity.compose.rememberLauncherForActivityResult
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.activity.result.contract.ActivityResultContracts
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.only
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Box
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.CompositionLocalProvider
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.LaunchedEffect
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableIntStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateListOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.rememberCoroutineScope
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalContext
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.db.entities.Song
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.menu.AddToPlaylistDialogOnline
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.menu.CsvColumnMappingDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.menu.CsvImportProgressDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.menu.LoadingScreen
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.BackupRestoreViewModel
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.ConvertedSongLog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.CsvImportState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.Dispatchers
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.delay
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.launch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import java.time.LocalDateTime
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -224,6 +172,7 @@ fun BackupAndRestore(
                 )
             )
         )
+        AppleMusicPlaylistImport()
     
     }
 
@@ -303,4 +252,3 @@ fun BackupAndRestore(
         },
     )
 }
-

@@ -83,25 +83,8 @@ fun LargeScreenTitle(
 }
 
 /**
- * How far the large title has scrolled away, 0..1. Drives [CollapsedTitleBar]'s
- * (and [FrostedTopBar]'s) fade-in.
- *
- * Reads the title item's own measured size off the list's layout info instead
- * of guessing a fixed scroll distance: a flat `thresholdPx` reaches 1f (compact
- * bar fully opaque) at a fixed pixel offset regardless of how tall the actual
- * title item is, so on any screen whose title is shorter than that guess the
- * compact bar finishes fading in *before* the large title has scrolled out
- * from under it — both render at once, the large one still visible (blurred by
- * [TopFadeBlur]'s haze band) behind the sharp compact one. That double render
- * is the "ghosting" bug: two copies of the same title on screen together.
- * Tying progress to the title item's real height (1f once it has fully
- * scrolled past, whatever its height is) makes the handoff exact instead of a
- * guess, on every screen and every font scale.
- *
- * @param titleItemKey the `key` the caller gave its title item, for a list
- * that puts something ahead of the title (Settings has a `"top_spacer"` item
- * before its `"title"` one). Left null when the title is item 0, as it is on
- * Home/History/Stats.
+ * Progress from 0 to 1 as the large title scrolls out. Uses its measured height
+ * so the compact title appears only after the large title is fully gone.
  */
 @Composable
 fun rememberTitleCollapseProgressState(state: LazyListState, titleItemKey: Any? = null): State<Float> =

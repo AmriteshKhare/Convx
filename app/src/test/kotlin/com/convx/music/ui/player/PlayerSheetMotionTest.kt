@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The container itself interpolates linearly (Melox PlayerSheetGeometry) -- the
+ * The container itself interpolates linearly (the reference app PlayerSheetGeometry) -- the
  * spring driving progress shapes the motion, so the rect adds no second curve.
  * Asymmetry lives in the artwork path and the tracked mini offsets below, and
  * those are what these pin: a refactor must not silently flatten them.

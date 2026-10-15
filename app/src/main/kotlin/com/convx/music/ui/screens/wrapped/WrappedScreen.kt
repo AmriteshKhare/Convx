@@ -21,6 +21,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 
 sealed class WrappedScreenType {
@@ -84,8 +85,8 @@ fun WrappedScreenContent(navController: NavController) {
         }
     }
 
-    val state by manager.state.collectAsState()
-    val isMuted by audioService.isMuted.collectAsState()
+    val state by manager.state.collectAsStateWithLifecycle()
+    val isMuted by audioService.isMuted.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         manager.prepare()
     }

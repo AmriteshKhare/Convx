@@ -14,7 +14,7 @@ Call sites using M3's `ModalBottomSheet` API, and their import:
 | File | Imports bridge `ModalBottomSheet`? |
 |---|---|
 | `app/src/main/kotlin/com/convx/music/ui/component/BottomSheetMenu.kt` (`AnimatedBottomSheet`) | Yes |
-| `app/src/main/kotlin/com/convx/music/vivimusic/AudioDeviceBottomSheet.kt` | Yes |
+| `app/src/main/kotlin/com/convx/music/convx/AudioDeviceBottomSheet.kt` | Yes |
 | `app/src/main/kotlin/com/convx/music/ui/screens/search/suggestions/SuggestionRegionSheet.kt` | Yes |
 | `app/src/main/kotlin/com/convx/music/ui/screens/settings/SpotifyPlaylistBottomSheet.kt` | Yes |
 | `app/src/main/kotlin/com/convx/music/ui/screens/settings/SpotifyScreen.kt` | Yes |

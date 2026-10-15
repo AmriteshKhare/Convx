@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.component
 
+import com.convx.music.ui.utils.MenuItemChrome
+import com.convx.music.ui.utils.MenuIconChrome
+import com.convx.music.ui.utils.additiveChrome
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
@@ -101,7 +104,12 @@ fun LazyGridScope.GridMenuItem(
                     .fillMaxWidth()
                     .weight(1f),
                 contentAlignment = Alignment.Center,
-                content = icon
+                content = {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSymbolChrome provides MenuItemChrome,
+                        LocalSymbolIconSize provides 22.dp,
+                    ) { icon() }
+                }
             )
             Text(
                 text = stringResource(title),
@@ -178,11 +186,7 @@ fun LazyGridScope.SleepTimerGridMenu(
                     .weight(1f),
                 contentAlignment = Alignment.Center,
                 content = {
-                    Icon(
-                        painterResource(R.drawable.bedtime),
-                        contentDescription = null,
-                        modifier = Modifier.alpha(if (enabled) 1f else 0.5f)
-                    )
+                    SymbolIcon(symbol = sf("moon.fill"), contentDescription = null, modifier = Modifier.alpha(if (enabled) 1f else 0.5f))
                 }
             )
             Text(

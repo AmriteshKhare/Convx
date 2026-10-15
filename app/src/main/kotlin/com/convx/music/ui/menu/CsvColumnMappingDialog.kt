@@ -75,7 +75,6 @@ fun CsvColumnMappingDialog(
                 color = AppTheme.colorScheme.onSurface,
             )
 
-            // Preview rows
             if (csvState.previewRows.isNotEmpty()) {
                 Column(
                     modifier = Modifier
@@ -134,7 +133,6 @@ fun CsvColumnMappingDialog(
                 }
             }
 
-            // Header checkbox
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -151,7 +149,6 @@ fun CsvColumnMappingDialog(
                 )
             }
 
-            // Column selectors
             ColumnSelector(
                 label = stringResource(R.string.artist_name_column),
                 selectedIndex = artistColumnIndex,
@@ -174,7 +171,6 @@ fun CsvColumnMappingDialog(
                 onSelected = { urlColumnIndex = it },
             )
 
-            // Buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

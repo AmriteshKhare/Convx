@@ -1,5 +1,7 @@
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.content.res.Configuration
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
@@ -36,10 +38,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -89,7 +89,7 @@ import com.convx.music.ui.ios.compat.ripple
 import com.convx.music.ui.component.ColorPickerDialog
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.DefaultThemeColor
-import com.convx.music.ui.theme.vivimusicTheme
+import com.convx.music.ui.theme.ConvxTheme
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.utils.rememberEnumPreference
@@ -103,16 +103,14 @@ fun ThemeScreen(
     navController: NavController,
 ) {
     val (darkMode, onDarkModeChange) = rememberEnumPreference(DarkModeKey, DarkMode.AUTO)
-    // Pure Black (AMOLED) is read-only here now -- it's a beginner-picker simplification
-    // (task 011): the toggle itself moved to AppearanceAdvancedSettings.kt, this screen
-    // only needs the current value to render the mode mockup/preview correctly.
+    // The preview needs this value even though its toggle lives in advanced settings.
     val (pureBlack) = rememberPreference(PureBlackKey, defaultValue = false)
     val (selectedThemeColorInt, onSelectedThemeColorChange) = rememberPreference(
         SelectedThemeColorKey,
         DefaultThemeColor.toArgb()
     )
     val (_, onDynamicThemeChange) = rememberPreference(DynamicThemeKey, defaultValue = true)
-    val (selectedFontValue) = rememberPreference(SelectedFontKey, defaultValue = AppFont.SYSTEM.value)
+    val (selectedFontValue) = rememberPreference(SelectedFontKey, defaultValue = AppFont.PLUS_JAKARTA_SANS.value)
     val fontLabel = when (AppFont.fromValue(selectedFontValue)) {
         AppFont.SYSTEM -> stringResource(R.string.font_system)
         AppFont.GOOGLE_SANS -> stringResource(R.string.font_google_sans)
@@ -128,15 +126,12 @@ fun ThemeScreen(
 
     val handleColorSelection: (Color) -> Unit = { color ->
         onSelectedThemeColorChange(color.toArgb())
-        // Enable dynamic theme only when selecting the default/dynamic color
-        // Disable it when selecting any other color
+        // The default color follows the system's dynamic palette.
         val isDynamicColor = color == DefaultThemeColor
         onDynamicThemeChange(isDynamicColor)
     }
 
-    // Mode + color back to their defaults. Doesn't touch the home background
-    // image below — that already has its own "Remove image" action, and
-    // clearing it here would silently delete a file the user picked.
+    // Reset theme colors without deleting the selected home background image.
     val onReset: () -> Unit = {
         onDarkModeChange(DarkMode.AUTO)
         onSelectedThemeColorChange(DefaultThemeColor.toArgb())
@@ -228,11 +223,7 @@ fun PortraitThemeLayout(
     }
 }
 
-/**
- * Quick link to [FontSelectionScreen][com.convx.music.ui.screens.settings.FontSelectionScreen]
- * from the Theme screen — the font picker used to live only under Appearance, one level up,
- * with no way to reach or see it from Theme itself.
- */
+/** Opens the app font picker from Theme settings. */
 @Composable
 private fun FontQuickLink(
     fontLabel: String,
@@ -281,7 +272,6 @@ fun LandscapeThemeLayout(
         Column(
             modifier = Modifier
                 .weight(0.4f)
-                .fillMaxHeight()
                 .padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
@@ -303,8 +293,6 @@ fun LandscapeThemeLayout(
         Column(
             modifier = Modifier
                 .weight(0.6f)
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState())
                 .padding(end = 16.dp, top = 16.dp, bottom = 16.dp)
         ) {
             ThemeControls(
@@ -414,8 +402,7 @@ fun ThemeControls(
                             .background(AppTheme.colorScheme.outlineVariant)
                     )
                     
-                    // Manual modes (Light, Dark). Pure Black (AMOLED) moved to
-                    // Advanced Appearance -- task 011 beginner-picker simplification.
+                    // Manual light and dark modes.
                     ModeCircle(
                         darkMode = darkMode,
                         pureBlack = pureBlack,
@@ -561,12 +548,7 @@ fun ModeCircle(
                         animationSpec = tween(150)
                     )
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.check),
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.inversePrimary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    SymbolIcon(symbol = sf("checkmark"), contentDescription = null, size = 20.dp, tint = AppTheme.colorScheme.inversePrimary)
                 }
             }
             else -> {
@@ -594,7 +576,7 @@ fun ThemeMockup(
         DarkMode.OFF -> false
     }
 
-    vivimusicTheme(
+    ConvxTheme(
         darkTheme = useDark,
         pureBlack = pureBlack,
         themeColor = themeColor
@@ -702,7 +684,7 @@ fun ThemeMockupPortrait(
         DarkMode.OFF -> false
     }
 
-    vivimusicTheme(
+    ConvxTheme(
         darkTheme = useDark,
         pureBlack = pureBlack,
         themeColor = themeColor
@@ -720,7 +702,6 @@ fun ThemeMockupPortrait(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header (20% of height)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -747,7 +728,6 @@ fun ThemeMockupPortrait(
                     }
                 }
 
-                // Main Content (60% of height)
                 Column(
                     modifier = Modifier
                         .weight(0.6f)

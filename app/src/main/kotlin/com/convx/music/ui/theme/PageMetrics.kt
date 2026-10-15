@@ -14,30 +14,36 @@ import androidx.compose.ui.unit.dp
  * Horizontal/vertical rhythm of a page, overridable for one subtree. Shared components
  * (section headers, chip rows) read this instead of [AppleTokens.Gutter] directly, so a
  * screen that follows a different reference can retune them without forking them.
+ *
+ * [chevronHeaders]: a tappable section header shows Apple Music's inline chevron after
+ * its title instead of a "See All" link.
  */
 @Immutable
-data class PageMetrics(val gutter: Dp, val headerTop: Dp, val headerBottom: Dp)
+data class PageMetrics(
+    val gutter: Dp,
+    val headerTop: Dp,
+    val headerBottom: Dp,
+    val chevronHeaders: Boolean = false,
+)
 
 /** Default: the Apple rhythm every screen used before per-screen metrics existed. */
 val LocalPageMetrics = staticCompositionLocalOf { PageMetrics(AppleTokens.Gutter, 12.dp, 12.dp) }
 
 /**
- * BitChord's page rhythm, measured from its source (Common.kt PAGE_GUTTER, HomeScreen
- * shelves): 10dp gutter, 10dp between a header and its row, 26dp under each shelf + the
- * next header's own 10dp above it, 14dp between hero cards, hero card = 70% of the row up
- * to 320dp.
+ * Home's page rhythm: 20dp gutter, 16dp between a header and its row, 24dp between a
+ * row and the next header, and 14dp between shelf cards.
  *
- * Home's list spaces every item by [ItemSpacing], so the header takes 0dp below and
- * (26dp + 0) above: header -> row = 10dp, row -> next header = 10 + 26 = 36dp, as in BitChord.
+ * Home's list spaces every item by [ItemSpacing], so the header adds the rest:
+ * header -> row = 10 + 6 = 16dp, row -> next header = 10 + 14 = 24dp.
  */
-object BitChordPage {
-    val Gutter = 10.dp
+object AppPage {
+    val Gutter = 20.dp
     /** Spacing between every item of a page's list. */
     val ItemSpacing = 10.dp
     /** Extra space above a section header, on top of [ItemSpacing]. */
-    val SectionGap = 26.dp
+    val SectionGap = 14.dp
     val HeroCardGap = 14.dp
-    val Metrics = PageMetrics(gutter = Gutter, headerTop = SectionGap, headerBottom = 0.dp)
+    val Metrics = PageMetrics(gutter = Gutter, headerTop = SectionGap, headerBottom = 6.dp, chevronHeaders = true)
 
     private const val HeroCardFraction = 0.70f
     private val HeroCardMaxWidth = 320.dp

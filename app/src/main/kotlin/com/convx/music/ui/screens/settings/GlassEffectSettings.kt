@@ -1,9 +1,19 @@
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -69,6 +79,7 @@ import com.convx.music.constants.HomeBackgroundPathKey
 import com.convx.music.constants.LiquidGlassChromaticAberrationKey
 import com.convx.music.constants.LiquidGlassDepthEffectKey
 import com.convx.music.constants.LiquidGlassBlurRadiusKey
+import com.convx.music.constants.MenuBackdropResolutionKey
 import com.convx.music.constants.LiquidGlassLensAmountKey
 import com.convx.music.constants.LiquidGlassLensHeightKey
 import com.convx.music.constants.LiquidGlassMiniPlayerEnabledKey
@@ -115,6 +126,7 @@ import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 import kotlin.math.roundToInt
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /** Small current-color preview for a color-picker settings row's trailing content. */
 @Composable
@@ -133,12 +145,16 @@ private fun ColorSwatch(color: Color, modifier: Modifier = Modifier) {
 fun GlassEffectSettings(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
+    advanced: Boolean = false,
 ) {
     val (vibrancy, onVibrancyChange) = rememberPreference(
         LiquidGlassVibrancyKey, defaultValue = 2.0f
     )
     val (blurRadius, onBlurRadiusChange) = rememberPreference(
         LiquidGlassBlurRadiusKey, defaultValue = 3f
+    )
+    val (menuResolution, onMenuResolutionChange) = rememberPreference(
+        MenuBackdropResolutionKey, defaultValue = 1f
     )
     val (lensHeight, onLensHeightChange) = rememberPreference(
         LiquidGlassLensHeightKey, defaultValue = 0.60f
@@ -152,12 +168,7 @@ fun GlassEffectSettings(
     val (depthEffect, onDepthEffectChange) = rememberPreference(
         LiquidGlassDepthEffectKey, defaultValue = false
     )
-    // 0 marks the theme-adaptive default tint (see MainActivity); the picker then
-    // shows the color the current theme resolves to.
-    // 0, matching MainActivity. This used to default to a literal dark tint here
-    // while MainActivity defaulted to 0 (the adaptive sentinel), so on a fresh
-    // install the picker showed a fixed dark colour that the app was not actually
-    // using — and reading the two files gave opposite answers about the default.
+    // Zero means use the theme-adaptive tint shown by MainActivity.
     val (surfaceTintColorInt, onSurfaceTintColorChange) = rememberPreference(
         LiquidGlassSurfaceTintColorKey, defaultValue = 0
     )
@@ -230,7 +241,7 @@ fun GlassEffectSettings(
         LiquidGlassSidePanelColorKey, defaultValue = 0
     )
     val (sidePanelSurfaceOpacity, onSidePanelSurfaceOpacityChange) = rememberPreference(
-        LiquidGlassSidePanelSurfaceOpacityKey, defaultValue = 0.5f
+        LiquidGlassSidePanelSurfaceOpacityKey, defaultValue = 0.75f
     )
     val (sidePanelTextColorInt, onSidePanelTextColorChange) = rememberPreference(
         LiquidGlassSidePanelTextColorKey, defaultValue = 0
@@ -238,11 +249,7 @@ fun GlassEffectSettings(
     val sidePanelTextColor = if (sidePanelTextColorInt == 0) adaptiveTextColor else Color(sidePanelTextColorInt)
     val sidePanelTintColor = if (sidePanelColorInt == 0) adaptiveTintColor else Color(sidePanelColorInt)
 
-    // Enabling the side panel override starts it as a copy of the current
-    // global values (rather than fixed defaults that may already differ from
-    // global), so the look doesn't jump and there's an actual starting point
-    // to dial independently from. Nav bar / mini bar has no override — it
-    // always mirrors the global settings directly.
+    // Start the side-panel override with current global values to avoid a visual jump.
     val toggleSidePanel: (Boolean) -> Unit = { enabling ->
         if (enabling) {
             onSidePanelVibrancyChange(vibrancy)
@@ -258,6 +265,7 @@ fun GlassEffectSettings(
 
     var showVibrancyDialog by rememberSaveable { mutableStateOf(false) }
     var showBlurRadiusDialog by rememberSaveable { mutableStateOf(false) }
+    var showMenuResolutionDialog by rememberSaveable { mutableStateOf(false) }
     var showLensHeightDialog by rememberSaveable { mutableStateOf(false) }
     var showLensAmountDialog by rememberSaveable { mutableStateOf(false) }
     var showSurfaceOpacityDialog by rememberSaveable { mutableStateOf(false) }
@@ -291,10 +299,12 @@ fun GlassEffectSettings(
         textColor = textColor,
     )
 
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     Column(
         Modifier
+            .widthIn(max = 720.dp)
+            .fillMaxSize()
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp),
     ) {
         GlassLivePreview(
@@ -303,9 +313,49 @@ fun GlassEffectSettings(
             // narrower than the bar it is previewing. Bleed most of that back out.
             modifier = Modifier
                 .bleedHorizontally(10.dp)
-                .padding(top = 8.dp, bottom = 16.dp),
+                .padding(top = 8.dp, bottom = 16.dp)
+                .animateContentSize(),
         )
 
+        Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Blur strength",
+                    style = AppTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = "${blurRadius.roundToInt()}%",
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.secondary,
+                )
+            }
+            Slider(
+                value = blurRadius.coerceIn(0f, 100f),
+                onValueChange = onBlurRadiusChange,
+                valueRange = 0f..100f,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+        ) {
+        AnimatedVisibility(
+            visible = advanced,
+            enter = expandVertically(animationSpec = tween(240)) + fadeIn(animationSpec = tween(200)),
+            exit = shrinkVertically(animationSpec = tween(180)) + fadeOut(animationSpec = tween(140)),
+        ) {
+        Column {
+        Text(
+            text = "Advanced glass controls",
+            style = AppTheme.typography.titleMedium,
+            color = AppTheme.colorScheme.secondary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 12.dp),
+        )
         IosSettingsGroup(
             title = stringResource(R.string.liquid_glass_effects),
             items = listOf(
@@ -320,6 +370,12 @@ fun GlassEffectSettings(
                     title = { Text(stringResource(R.string.liquid_glass_blur_radius)) },
                     description = { Text(stringResource(R.string.liquid_glass_blur_radius_desc)) },
                     onClick = { showBlurRadiusDialog = true }
+                ),
+                IosSettingsItem(
+                    icon = painterResource(R.drawable.tune),
+                    title = { Text(stringResource(R.string.menu_backdrop_resolution)) },
+                    description = { Text(stringResource(R.string.menu_backdrop_resolution_desc)) },
+                    onClick = { showMenuResolutionDialog = true }
                 ),
                 IosSettingsItem(
                     icon = painterResource(R.drawable.tune),
@@ -535,6 +591,29 @@ fun GlassEffectSettings(
 
 
         Spacer(modifier = Modifier.height(16.dp))
+        }
+        }
+        AnimatedVisibility(
+            visible = !advanced,
+            enter = expandVertically(animationSpec = tween(220)) + fadeIn(animationSpec = tween(180)),
+            exit = shrinkVertically(animationSpec = tween(180)) + fadeOut(animationSpec = tween(140)),
+        ) {
+            Column {
+            IosSettingsGroup(
+                title = "More controls",
+                items = listOf(
+                    IosSettingsItem(
+                        icon = painterResource(R.drawable.tune),
+                        title = { Text("Advanced glass settings") },
+                        description = { Text("Style, color, highlights and per-component effects") },
+                        onClick = { navController.navigate("settings/appearance/liquidglass/advanced") },
+                    ),
+                ),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
     }
 
     if (showVibrancyDialog) {
@@ -571,6 +650,25 @@ fun GlassEffectSettings(
                 Text(text = stringResource(R.string.liquid_glass_blur_radius), style = AppTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
                 Text(text = "%.0f".format(tempValue), style = AppTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
                 Slider(value = tempValue, onValueChange = { tempValue = it }, valueRange = 0f..100f, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+
+    if (showMenuResolutionDialog) {
+        var tempValue by remember { mutableFloatStateOf(menuResolution) }
+        DefaultDialog(
+            onDismiss = { tempValue = menuResolution; showMenuResolutionDialog = false },
+            buttons = {
+                TextButton(onClick = { tempValue = 1f }) { Text(stringResource(R.string.reset)) }
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = { tempValue = menuResolution; showMenuResolutionDialog = false }) { Text(stringResource(android.R.string.cancel)) }
+                TextButton(onClick = { onMenuResolutionChange(tempValue); showMenuResolutionDialog = false }) { Text(stringResource(android.R.string.ok)) }
+            }
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
+                Text(text = stringResource(R.string.menu_backdrop_resolution), style = AppTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+                Text(text = "%d%%".format((tempValue * 100).toInt()), style = AppTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
+                Slider(value = tempValue, onValueChange = { tempValue = it }, valueRange = 0.3f..1f, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -919,6 +1017,8 @@ fun GlassEffectSettings(
         )
     }
 
+    }
+
     TopAppBar(
             windowInsets = appTopBarWindowInsets(),
         title = { Text(stringResource(R.string.liquid_glass_settings)) },
@@ -927,25 +1027,18 @@ fun GlassEffectSettings(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
             ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null,
-                )
+                SymbolIcon(symbol = sf("arrow.left"), contentDescription = null)
             }
         }
     )
 }
 
 /**
- * Live sample of the current glass settings: a mock nav bar over real content.
+ * Live preview of the glass settings: a mock nav bar over real content.
  *
- * The glass surfaces sample [previewBackdrop], which captures ONLY the image panel
- * they sit over. That sibling relationship is load-bearing, not stylistic: a glass
- * surface may sample an attached backdrop only when it is NOT inside that backdrop's
- * layer. Sampling the ambient [LocalAppBackdrop] here would make the app-wide capture
- * include these pills, which re-enters RenderNode::prepareTreeImpl and hard-crashes
- * the renderer — the same cycle that used to kill the artist and playlist screens.
- * So the panel is captured on its own and the bar is drawn next to it, never within it.
+ * Glass surfaces must sit outside the backdrop layer they sample. Capture only the
+ * image panel here; sampling [LocalAppBackdrop] would include the pills and recurse
+ * into `RenderNode::prepareTreeImpl`, crashing the renderer.
  */
 @Composable
 private fun GlassLivePreview(
@@ -960,7 +1053,7 @@ private fun GlassLivePreview(
     val playerConnection = LocalPlayerConnection.current
     val mediaMetadata by remember(playerConnection) {
         playerConnection?.mediaMetadata ?: MutableStateFlow<MediaMetadata?>(null)
-    }.collectAsState()
+    }.collectAsStateWithLifecycle()
 
     // Failing a playing song, the user's own home background — it is literally what
     // sits behind the real nav bar, so it is the most honest thing to preview over.

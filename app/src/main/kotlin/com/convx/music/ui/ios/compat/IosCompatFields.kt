@@ -216,15 +216,8 @@ fun AlertDialog(
         shape = shape ?: ContinuousRoundedRectangle(30.dp),
         properties = properties,
     ) {
-        // Cupertino wants each action as `action(onClick) { label }`, but M3 hands this
-        // function two opaque composable slots with their onClick sealed inside. The slots
-        // are therefore rendered as the action labels and the surrounding row is inert —
-        // the caller's own button still handles the tap.
-        //
-        // What that costs: the tap target is the button rather than the full-width row, so
-        // a tap on the row's outer edge does nothing. Closing that gap means giving this
-        // function cupertino's own `buttons` shape and rewriting all 24 call sites, which
-        // is a different change from swapping what draws the dialog.
+        // Material provides opaque button slots, so the caller's buttons keep handling taps.
+        // Only the button itself is clickable; the rest of each row is inert.
         action(onClick = {}) { confirmButton() }
         dismissButton?.let { button -> action(onClick = {}) { button() } }
     }

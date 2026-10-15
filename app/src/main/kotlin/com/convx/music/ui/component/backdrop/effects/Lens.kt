@@ -56,8 +56,6 @@ fun BackdropEffectScope.lens(
             shader.apply {
                 val w = size.width
                 val h = size.height
-                // A/B legacy: per-pixel `halfSize = size * 0.5` in-shader
-                // setFloatUniform("size", w, h)
                 setFloatUniform("halfSize", w * 0.5f, h * 0.5f)
                 setFloatUniform("minHalf", minOf(w, h) * 0.5f)
                 setFloatUniform("offset", -padding, -padding)

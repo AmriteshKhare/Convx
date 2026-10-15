@@ -5,6 +5,13 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.utils.sideBarInset
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
+import com.convx.music.ui.utils.plusStart
+import com.convx.music.ui.utils.bleedStart
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -76,7 +83,6 @@ import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.NavigationTitle
 import com.convx.music.ui.component.YouTubeGridItem
-import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.component.YouTubeListItem
 import com.convx.music.ui.component.HeroBackground
 import com.convx.music.ui.utils.rememberHeroZoom
@@ -107,6 +113,7 @@ import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.utils.listItemShape
 import com.convx.music.viewmodels.ChartsViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -117,11 +124,11 @@ fun ChartsScreen(
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val chartsPage by viewModel.chartsPage.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val chartsPage by viewModel.chartsPage.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     val lazyListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -158,7 +165,8 @@ fun ChartsScreen(
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeShape = ContinuousRoundedRectangle(percent = 50)
-        
+        val hazeState = remember { HazeState() }
+
         Box(modifier = Modifier.fillMaxSize()) {
             if (isLoading || chartsPage == null) {
                 ShimmerHost(
@@ -236,9 +244,8 @@ fun ChartsScreen(
                 }
             } else {
                 LazyColumn(
-                    // No bounce here: the top pull drives the hero zoom instead.
                     overscrollEffect = heroZoom.listOverscroll(),
-                    modifier = Modifier.heroPullZoom(heroZoom),
+                    modifier = Modifier.heroPullZoom(heroZoom).hazeSource(hazeState),
                     state = lazyListState,
                     contentPadding = LocalPlayerAwareWindowInsets.current
                         .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
@@ -276,6 +283,7 @@ fun ChartsScreen(
                                     )
                                 }
 
+                                val sideInset = sideBarInset()
                                 LazyHorizontalGrid(
                                     state = lazyGridState,
                                     rows = GridCells.Fixed(4),
@@ -285,11 +293,12 @@ fun ChartsScreen(
                                     ),
                                     contentPadding = WindowInsets.systemBars
                                         .only(WindowInsetsSides.Horizontal)
-                                        .asPaddingValues(),
+                                        .asPaddingValues().plusStart(sideInset),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(ListItemHeight * 4)
-                                        .animateItem(),
+                                        .animateItem()
+                                        .bleedStart(sideInset),
                                 ) {
                                     itemsIndexed(
                                         items = section.items.filterIsInstance<SongItem>().distinctBy { it.id },
@@ -314,10 +323,7 @@ fun ChartsScreen(
                                                         }
                                                     },
                                                 ) {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.more_horiz),
-                                                        contentDescription = null,
-                                                    )
+                                                    SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                                                 }
                                             },
                                             modifier = Modifier
@@ -361,11 +367,12 @@ fun ChartsScreen(
                             )
                         }
                         item(key = "top_videos_content") {
+                            val sideInset = sideBarInset()
                             LazyRow(
                                 contentPadding = WindowInsets.systemBars
                                     .only(WindowInsetsSides.Horizontal)
-                                    .asPaddingValues(),
-                                modifier = Modifier.animateItem(),
+                                    .asPaddingValues().plusStart(sideInset),
+                                modifier = Modifier.animateItem().bleedStart(sideInset),
                             ) {
                                 items(
                                     items = topVideosSection.items.filterIsInstance<SongItem>().distinctBy { it.id },
@@ -413,6 +420,11 @@ fun ChartsScreen(
                 }
             }
 
+            com.convx.music.ui.component.TopFadeBlur(
+                hazeState = hazeState,
+                pageColor = tint,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -426,10 +438,7 @@ fun ChartsScreen(
                     onClick = { navController.navigateUp() },
                     onLongClick = { navController.backToMain() },
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.arrow_back_ios),
-                        contentDescription = null,
-                    )
+                    SymbolIcon(symbol = sf("chevron.left"), contentDescription = null)
                 }
 
                 Spacer(Modifier.weight(1f))

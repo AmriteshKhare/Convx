@@ -10,6 +10,7 @@
 
 package com.convx.music.ui.component
 
+import com.convx.music.ui.utils.sharedArtworkTarget
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -19,7 +20,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -83,7 +83,8 @@ fun ThumbThenFullHero(
                 .crossfade(false)
                 .build()
         }
-        AsyncImage(
+        val reused = com.convx.music.ui.utils.SharedArtworkSeedImage(Modifier.fillMaxSize(), contentScale)
+        if (!reused) AsyncImage(
             model = thumbRequest,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
@@ -98,7 +99,7 @@ fun ThumbThenFullHero(
                 .crossfade(fullCrossfadeMillis)
                 .build()
         }
-        AsyncImage(
+        if (!reused || !com.convx.music.ui.utils.artworkTransitionRunning()) AsyncImage(
             model = fullRequest,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
@@ -115,7 +116,7 @@ fun SeededShimmerHero(
     ratio: Float = 1f,
 ) {
     val context = LocalContext.current
-    Box(modifier = modifier.fillMaxWidth().aspectRatio(ratio)) {
+    Box(modifier = modifier.sharedArtworkTarget().fillMaxWidth().aspectRatio(ratio)) {
         val thumbPx = thumbnailPx(GridThumbnailHeight)
         val request = remember(thumbUrl, thumbPx) {
             val resolvedUrl = thumbUrl?.resize(thumbPx, thumbPx)
@@ -126,7 +127,7 @@ fun SeededShimmerHero(
                 .crossfade(false)
                 .build()
         }
-        AsyncImage(
+        if (!com.convx.music.ui.utils.SharedArtworkSeedImage(Modifier.fillMaxSize(), ContentScale.Crop)) AsyncImage(
             model = request,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
@@ -147,14 +148,13 @@ fun pillGlassBackground(shape: androidx.compose.foundation.shape.CornerBasedShap
     // NAV_BAR bar toggle is off. Only old/unsupported devices fall back.
     val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     if (isGlassAllowed()) {
-        // Figma chrome shadow under the top-bar pills.
         return Modifier
-            .shadow(12.dp, shape, spotColor = Color.Black.copy(alpha = 0.35f))
+            .chromeShadow(shape)
             .liquidGlass(config = glassConfig, shape = shape)
     }
     val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     return Modifier
-        .shadow(12.dp, shape, spotColor = Color.Black.copy(alpha = 0.35f))
+        .chromeShadow(shape)
         .background(
             GlassTintTokens.baseSurfaceColor(isDark).copy(
                 alpha = if (isDark) GlassTintTokens.NavPillFillOpacityDark

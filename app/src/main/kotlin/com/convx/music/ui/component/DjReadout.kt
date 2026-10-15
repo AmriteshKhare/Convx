@@ -96,21 +96,18 @@ private fun DjState.describe(): String? {
     return if (next.isEmpty()) head else "$head → ${next.joinToString(" · ")}"
 }
 
-private fun DjState.tierLabel(): String? = when (tier) {
-    DjMixTier.FULL_DJ -> when (style) {
+private fun DjState.tierLabel(): String? {
+    val base = when (tier ?: return null) {
+        DjMixTier.FULL_DJ -> "beatmatched"
+        DjMixTier.SMART_CROSSFADE -> "tempo matched"
+        DjMixTier.PLAIN_CROSSFADE -> "crossfade"
+    }
+    val effect = when (style) {
+        TransitionStyle.REVERB_BLOOM -> "reverb"
+        TransitionStyle.DELAY_BLEND -> "delay"
         TransitionStyle.ECHO_FREEZE -> "echo"
         TransitionStyle.TAPE_STOP -> "brake"
-        else -> "beatmatched"
+        else -> null
     }
-    DjMixTier.SMART_CROSSFADE -> when (style) {
-        TransitionStyle.ECHO_FREEZE -> "echo"
-        TransitionStyle.TAPE_STOP -> "brake"
-        else -> "tempo matched"
-    }
-    DjMixTier.PLAIN_CROSSFADE -> when (style) {
-        TransitionStyle.TAPE_STOP -> "brake"
-        TransitionStyle.ECHO_FREEZE -> "echo"
-        else -> "crossfade"
-    }
-    null -> null
+    return if (effect == null) base else "$base + $effect"
 }

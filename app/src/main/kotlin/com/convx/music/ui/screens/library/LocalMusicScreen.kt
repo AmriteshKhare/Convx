@@ -1,7 +1,12 @@
 package com.convx.music.ui.screens.library
 
+import com.convx.music.ui.utils.sharedArtworkSource
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,6 +88,7 @@ import com.convx.music.ui.menu.SongMenu
 import com.convx.music.ui.utils.albumRoute
 import com.convx.music.ui.utils.artistRoute
 import java.time.LocalDateTime
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,11 +102,11 @@ fun LocalMusicScreen(
     val menuState = LocalMenuState.current
     val (accentColor, onAccentColor) = rememberGlobalAccentColors()
 
-    val songs by viewModel.songs.collectAsState()
-    val albums by viewModel.albums.collectAsState()
-    val artists by viewModel.artists.collectAsState()
-    val isScanning by viewModel.isScanning.collectAsState()
-    val scanResult by viewModel.scanResult.collectAsState()
+    val songs by viewModel.songs.collectAsStateWithLifecycle()
+    val albums by viewModel.albums.collectAsStateWithLifecycle()
+    val artists by viewModel.artists.collectAsStateWithLifecycle()
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
+    val scanResult by viewModel.scanResult.collectAsStateWithLifecycle()
 
     var hasStoragePermission by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -169,17 +175,11 @@ fun LocalMusicScreen(
                                 if (!showSearch) searchQuery = ""
                             },
                         ) {
-                            Icon(
-                                imageVector = if (showSearch) SfSymbols.Monochrome.SFXmark else SfSymbols.Monochrome.SFMagnifyingglass,
-                                contentDescription = "Search",
-                            )
+                            SymbolIcon(bounceOnEnter = true, symbol = if (showSearch) sf("SFXmark") else sf("SFMagnifyingglass"), contentDescription = "Search")
                         }
                         Box {
                             IconButton(onClick = { showSortMenu = true }) {
-                                Icon(
-                                    imageVector = SfSymbols.Monochrome.SFListBullet,
-                                    contentDescription = "Sort",
-                                )
+                                SymbolIcon(bounceOnEnter = true, symbol = sf("SFListBullet"), contentDescription = "Sort")
                             }
                             DropdownMenu(
                                 expanded = showSortMenu,
@@ -210,10 +210,7 @@ fun LocalMusicScreen(
                                     strokeWidth = 2.dp,
                                 )
                             } else {
-                                Icon(
-                                    imageVector = SfSymbols.Monochrome.SFArrowClockwise,
-                                    contentDescription = "Rescan",
-                                )
+                                SymbolIcon(bounceOnEnter = true, symbol = sf("SFArrowClockwise"), contentDescription = "Rescan")
                             }
                         }
                     }
@@ -323,11 +320,7 @@ fun LocalMusicScreen(
                             contentColor = onAccentColor,
                         ),
                     ) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFPlayFill,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
+                        SymbolIcon(bounceOnEnter = true, symbol = sf("SFPlayFill"), contentDescription = null, size = 18.dp)
                         Spacer(Modifier.width(8.dp))
                         Text("Play All")
                     }
@@ -344,11 +337,7 @@ fun LocalMusicScreen(
                             contentColor = onAccentColor,
                         ),
                     ) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFShuffle,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
+                        SymbolIcon(bounceOnEnter = true, symbol = sf("SFShuffle"), contentDescription = null, size = 18.dp)
                         Spacer(Modifier.width(8.dp))
                         Text("Shuffle")
                     }
@@ -462,12 +451,7 @@ fun LocalMusicScreen(
         }
     }
 
-        // This screen stacks three sections in one column, so the rail scrubs raw lazy
-        // indices rather than one block's indices with a header offset. The count is
-        // derived from the data plus the fixed rows around it; a proportional rail maps
-        // a fraction of the rail to a fraction of the list, so being a row or two out
-        // near the very bottom costs nothing, and an over-long index is caught by
-        // scrollToItem's own guards.
+        // The rail indexes the combined song, album, and artist list plus its fixed rows.
         val railItemCount = displaySongs.size.coerceAtMost(LocalMusicSongRowCap) +
             displayAlbums.size + displayArtists.size + LocalMusicFixedRows
         ListScrollRail(
@@ -509,29 +493,34 @@ private fun SectionHeader(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun SongListItem(
     song: Song,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    com.convx.music.ui.utils.ArtworkSourceHost(Modifier) { sourceModifier ->
+    val artworkOwner = com.convx.music.ui.utils.rememberArtworkSourceOwner()
+    val albumArtworkId = song.album?.id ?: song.song.albumId
     Row(
-        modifier = Modifier
+        modifier = sourceModifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Thumbnail
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(song.thumbnailUrl)
                 .size(CoilSize(96, 96))
                 .build(),
+            onSuccess = com.convx.music.ui.utils.sharedArtworkImageListener(artworkOwner, song.thumbnailUrl),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             placeholder = painterResource(R.drawable.thumbnail_fallback),
             error = painterResource(R.drawable.thumbnail_fallback),
             modifier = Modifier
+                .sharedArtworkSource(albumArtworkId, song.thumbnailUrl, artworkOwner)
                 .size(48.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(AppTheme.colorScheme.surfaceVariant),
@@ -539,7 +528,6 @@ private fun SongListItem(
 
         Spacer(Modifier.width(12.dp))
 
-        // Info
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
@@ -558,7 +546,6 @@ private fun SongListItem(
             )
         }
 
-        // Duration
         if (song.song.duration > 0) {
             Text(
                 text = formatDuration(song.song.duration),
@@ -567,6 +554,7 @@ private fun SongListItem(
             )
         }
     }
+    }
 }
 
 @Composable
@@ -574,8 +562,10 @@ private fun AlbumListItem(
     album: Album,
     onClick: () -> Unit,
 ) {
+    com.convx.music.ui.utils.ArtworkSourceHost(Modifier) { sourceModifier ->
+    val artworkOwner = com.convx.music.ui.utils.rememberArtworkSourceOwner()
     Row(
-        modifier = Modifier
+        modifier = sourceModifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 8.dp),
@@ -586,11 +576,13 @@ private fun AlbumListItem(
                 .data(album.thumbnailUrl)
                 .size(CoilSize(112, 112))
                 .build(),
+            onSuccess = com.convx.music.ui.utils.sharedArtworkImageListener(artworkOwner, album.thumbnailUrl),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             placeholder = painterResource(R.drawable.thumbnail_fallback),
             error = painterResource(R.drawable.thumbnail_fallback),
             modifier = Modifier
+                .sharedArtworkSource(album.id, album.thumbnailUrl, artworkOwner)
                 .size(56.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(AppTheme.colorScheme.surfaceVariant),
@@ -614,6 +606,7 @@ private fun AlbumListItem(
                 maxLines = 1,
             )
         }
+    }
     }
 }
 
@@ -639,6 +632,7 @@ private fun ArtistListItem(
             placeholder = painterResource(R.drawable.thumbnail_fallback),
             error = painterResource(R.drawable.thumbnail_fallback),
             modifier = Modifier
+                .sharedArtworkSource(artist.id, artist.thumbnailUrl)
                 .size(48.dp)
                 .clip(ThumbnailRoundedShape)
                 .background(AppTheme.colorScheme.surfaceVariant),

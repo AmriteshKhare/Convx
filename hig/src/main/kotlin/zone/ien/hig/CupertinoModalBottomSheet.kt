@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -68,6 +69,7 @@ fun CupertinoModalBottomSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     sheetState: CupertinoSheetState = rememberCupertinoSheetState(),
+    sheetMaxWidth: Dp = 640.dp,
     shape: Shape = CupertinoBottomSheetDefaults.shape,
     containerColor: Color = CupertinoBottomSheetDefaults.containerColor,
     contentColor: Color = CupertinoBottomSheetDefaults.contentColor,
@@ -156,8 +158,8 @@ fun CupertinoModalBottomSheet(
         Box(
             Modifier
                 .align(Alignment.BottomCenter)
+                .widthIn(max = sheetMaxWidth)
                 .fillMaxWidth()
-                .widthIn(max = 640.dp)
                 .layout { measurable, constraints ->
                     val offset = swipeableState.offset
                     val h = (containerHeightPx - (offset ?: containerHeightPx)).coerceAtLeast(0f).roundToInt()

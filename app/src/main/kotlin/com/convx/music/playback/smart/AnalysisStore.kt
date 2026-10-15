@@ -8,38 +8,9 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Analysis results kept on disk, so a track is measured once and stays measured.
- *
- * ## Why this exists
- *
- * Analysis was in memory only, which meant every app start threw away
- * everything and every track had to earn its result again — from audio that may
- * no longer be on disk to earn it from. Two things conspire against re-earning
- * it:
- *
- *  - The analyzer needs a track's opening, contiguously, and the cache evicts
- *    openings first because they are read once and never touched again. See
- *    [com.convx.music.playback.DynamicLruCacheEvictor], which now holds them
- *    back — but only within a budget, and only for tracks played recently.
- *  - Even with the bytes present, analysis costs a decode plus two model
- *    inferences, several seconds, and it has to finish *before* the transition
- *    that wants it. Losing that work to a restart means the next few
- *    transitions after every launch are plain crossfades.
- *
- * Neither applies to a result already computed. The audio is a means to the
- * numbers, and the numbers are small.
- *
- * ## Shape
- *
- * One file per track, named by cache key rather than written into a single
- * index, so a write cannot corrupt anything but its own entry and a prune is a
- * file delete. Coordinates are seconds on the track's own timeline, which are
- * identical across renditions of the same recording — the whole reason an
- * analysis is worth keeping in the first place.
- *
- * Only fields the planner reads are stored, and the curves are rounded to
- * milliseconds: they are the bulk of the payload and nothing downstream can
- * tell the difference.
+ * Persists compact track analyses so playback does not repeat decoding and
+ * model inference after a restart. Each track has its own file; only planner
+ * fields are stored, with curves rounded to milliseconds.
  */
 class AnalysisStore(private val context: Context) {
 
@@ -63,8 +34,24 @@ class AnalysisStore(private val context: Context) {
         encodeDefaults = true
     }
 
-    /** Reads [trackId]'s stored analysis, or null when there isn't one. */
-    fun load(trackId: String): TrackAnalysis? {
+    /**
+     * Reads [trackId]'s stored analysis, or null when there isn't one.
+     *
+     * A device song keeps its analysis when it is moved or renamed: its id (the file's uri) changes
+     * but its [fingerprint] does not, so the entry stored under the old id is found through the alias.
+     */
+    fun load(trackId: String, fingerprint: (() -> String?)? = null): TrackAnalysis? {
+        val direct = loadStored(trackId)
+        if (direct != null || fingerprint == null) return direct
+        val print = fingerprint() ?: return null
+        val previousId = runCatching { File(directory, aliasName(print)).readText() }.getOrNull()
+            ?.takeIf { it.isNotBlank() && it != trackId } ?: return null
+        val moved = loadStored(previousId) ?: return null
+        save(trackId, moved, print)
+        return moved
+    }
+
+    private fun loadStored(trackId: String): TrackAnalysis? {
         if (trackId.isBlank()) return null
         if (known[trackId] == false) return null
         val file = File(directory, fileNameFor(trackId))
@@ -74,16 +61,12 @@ class AnalysisStore(private val context: Context) {
         }
         return runCatching {
             val stored = json.decodeFromString(Stored.serializer(), file.readText())
-            // An entry from an older build may hold numbers computed a different
-            // way, and a wrong beat grid is worse than none — so it is dropped
-            // and re-earned rather than migrated.
+            // Older analysis may use different calculations, so re-analyze it instead of migrating.
             require(stored.version == SCHEMA_VERSION) { "schema ${stored.version}" }
             stored.toAnalysis(trackId)
         }
             .onFailure {
-                // A half-written or outdated file is worth exactly nothing and
-                // costs a re-analysis to replace, so it goes rather than being
-                // returned as a partly-filled result.
+                // Discard unreadable data and let the next request re-analyze it.
                 Log.w(TAG, "Discarding unreadable analysis for $trackId", it)
                 file.delete()
                 known[trackId] = false
@@ -96,10 +79,11 @@ class AnalysisStore(private val context: Context) {
      * tempo: a failure is cheap to rediscover and worth rediscovering, since
      * the reason for it is usually missing bytes rather than the track itself.
      */
-    fun save(trackId: String, analysis: TrackAnalysis) {
+    fun save(trackId: String, analysis: TrackAnalysis, fingerprint: String? = null) {
         if (trackId.isBlank() || !analysis.isUsable) return
         runCatching {
             directory.mkdirs()
+            fingerprint?.let { File(directory, aliasName(it)).writeText(trackId) }
             val file = File(directory, fileNameFor(trackId))
             // Written aside and renamed, so a kill mid-write leaves the old
             // entry rather than a truncated one.
@@ -119,12 +103,14 @@ class AnalysisStore(private val context: Context) {
      * analysis.
      */
     private fun prune() {
-        val files = directory.listFiles() ?: return
+        val files = directory.listFiles { file -> file.extension == "json" } ?: return
         if (files.size <= MAX_ENTRIES) return
         files.sortedBy { it.lastModified() }
             .take(files.size - MAX_ENTRIES)
             .forEach { it.delete() }
     }
+
+    private fun aliasName(fingerprint: String): String = "fp_$fingerprint.alias"
 
     /** Hashed rather than used raw: a track id is not guaranteed to be a legal filename. */
     private fun fileNameFor(trackId: String): String = "${trackId.hashCode().toUInt()}_${trackId.length}.json"
@@ -237,7 +223,7 @@ class AnalysisStore(private val context: Context) {
     }
 
     private companion object {
-        const val TAG = "ViviAnalysisStore"
+        const val TAG = "ConvxAnalysisStore"
         const val DIRECTORY = "smart_analysis"
 
         /**
@@ -248,11 +234,34 @@ class AnalysisStore(private val context: Context) {
          */
         const val SCHEMA_VERSION = 1
 
-        /** A few thousand tracks' worth, at tens of kilobytes each. */
-        const val MAX_ENTRIES = 2_000
+        /** Sized so a whole library analysed in one pass is not evicted as it is written. */
+        const val MAX_ENTRIES = 6_000
 
         /** Milliseconds is finer than anything downstream distinguishes. */
         fun round(value: Double): Double =
             if (value.isFinite()) Math.round(value * 1000.0) / 1000.0 else 0.0
     }
+}
+
+/** Identity of a song file that survives a move or rename: its size plus a hash of its first and last 64 KB. */
+object SongFingerprint {
+    private const val SAMPLE = 64 * 1024
+
+    /** Null when the file can't be read. */
+    fun of(context: Context, uri: android.net.Uri): String? = runCatching {
+        context.contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
+            java.io.FileInputStream(descriptor.fileDescriptor).channel.use { channel ->
+                val size = channel.size()
+                val digest = java.security.MessageDigest.getInstance("SHA-1")
+                digest.update(size.toString().toByteArray())
+                val buffer = java.nio.ByteBuffer.allocate(SAMPLE)
+                for (position in listOf(0L, (size - SAMPLE).coerceAtLeast(0L))) {
+                    buffer.clear()
+                    val read = channel.read(buffer, position)
+                    if (read > 0) digest.update(buffer.array(), 0, read)
+                }
+                digest.digest().joinToString("") { "%02x".format(it) }
+            }
+        }
+    }.getOrNull()
 }

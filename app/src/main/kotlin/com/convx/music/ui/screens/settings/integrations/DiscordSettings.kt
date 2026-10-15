@@ -5,206 +5,113 @@
 
 package com.convx.music.ui.screens.settings.integrations
 
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.Intent
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.AnimatedVisibility
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.animateContentSize
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.border
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Box
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.only
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.width
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.shape.CircleShape
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Card
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.CardDefaults
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.LinearProgressIndicator
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.LinearWavyProgressIndicator
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SnackbarHostState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.OutlinedButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Surface
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Switch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.LaunchedEffect
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.collectAsState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableLongStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.rememberCoroutineScope
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.draw.alpha
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.draw.clip
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalContext
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.font.FontWeight
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.style.TextAlign
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.style.TextOverflow
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.input.TextFieldValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.sp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.core.net.toUri
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.media3.common.Player.STATE_READY
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import coil3.compose.AsyncImage
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerConnection
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordActivityNameKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordActivityTypeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordAdvancedModeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordAvatarKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordButton1TextKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordButton1VisibleKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordButton2TextKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordButton2VisibleKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordInfoDismissedKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordNameKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordStatusKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordTokenKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordUseDetailsKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DiscordUsernameKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.EnableDiscordRPCKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.db.entities.Song
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.EnumDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.InfoLabel
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.TextFieldDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.DiscordRPC
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.SuperProperties
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.utils.dataStore
 import com.convx.music.utils.makeTimeString
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.my.kizzy.rpc.KizzyRPC
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.Dispatchers
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.delay
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.launch
 import com.convx.music.ui.screens.settings.SettingsPage
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private enum class DiscordStatus { ONLINE, IDLE, DND }
 private enum class DiscordActivityType { LISTENING, PLAYING, WATCHING, COMPETING }
@@ -218,7 +125,7 @@ fun DiscordSettings(
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val song by playerConnection.currentSong.collectAsState(null)
-    val playbackState by playerConnection.playbackState.collectAsState()
+    val playbackState by playerConnection.playbackState.collectAsStateWithLifecycle()
 
     var position by rememberSaveable(playbackState) {
         mutableLongStateOf(playerConnection.player.currentPosition)
@@ -229,6 +136,11 @@ fun DiscordSettings(
 
     // Preferences
     var discordToken by rememberPreference(DiscordTokenKey, "")
+    val loadedToken by remember(context) {
+        context.dataStore.data
+            .map { it[DiscordTokenKey] ?: "" }
+            .distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = null)
     var discordUsername by rememberPreference(DiscordUsernameKey, "")
     var discordName by rememberPreference(DiscordNameKey, "")
     var discordAvatar by rememberPreference(DiscordAvatarKey, "")
@@ -255,7 +167,6 @@ fun DiscordSettings(
     var showButton2TextDialog by rememberSaveable { mutableStateOf(false) }
     var showActivityNameDialog by rememberSaveable { mutableStateOf(false) }
 
-    // Map string prefs to enums for dialogs
     val currentStatus = when (discordStatus) {
         "idle" -> DiscordStatus.IDLE
         "dnd" -> DiscordStatus.DND
@@ -268,9 +179,8 @@ fun DiscordSettings(
         else -> DiscordActivityType.LISTENING
     }
 
-    // Fetch user info when token changes
-    LaunchedEffect(discordToken) {
-        val token = discordToken
+    LaunchedEffect(loadedToken) {
+        val token = loadedToken ?: return@LaunchedEffect
         if (token.isEmpty()) {
             discordUsername = ""
             discordName = ""
@@ -294,7 +204,6 @@ fun DiscordSettings(
         }
     }
 
-    // Update playback position
     LaunchedEffect(playbackState) {
         if (playbackState == STATE_READY) {
             while (isActive) {
@@ -343,7 +252,7 @@ fun DiscordSettings(
                 }
                 if (error != null) {
                     Text(
-                        text = error!!,
+                        text = error.orEmpty(),
                         color = AppTheme.colorScheme.error,
                         style = AppTheme.typography.bodySmall,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -469,12 +378,7 @@ fun DiscordSettings(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.warning),
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp),
-                    )
+                    SymbolIcon(symbol = sf("exclamationmark.triangle.fill"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.onSurface)
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -732,7 +636,6 @@ fun DiscordSettings(
 
                 Spacer(Modifier.height(8.dp))
 
-                // Button customization
                 IosSettingsGroup(
                     title = stringResource(R.string.discord_buttons),
                     items = listOf(
@@ -778,12 +681,7 @@ fun DiscordSettings(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.info),
-                            contentDescription = null,
-                            tint = AppTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        SymbolIcon(symbol = sf("info.circle"), contentDescription = null, size = 20.dp, tint = AppTheme.colorScheme.onSecondaryContainer)
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.discord_button_text_variables),
@@ -839,10 +737,10 @@ fun RichPresence(
     val context = LocalContext.current
 
     val activityLabel = when (activityType) {
-        "playing" -> stringResource(R.string.discord_playing_vivimusic)
-        "watching" -> stringResource(R.string.discord_watching_vivimusic)
-        "competing" -> stringResource(R.string.discord_competing_vivimusic)
-        else -> stringResource(R.string.listening_to_vivimusic)
+        "playing" -> stringResource(R.string.discord_playing_convx)
+        "watching" -> stringResource(R.string.discord_watching_convx)
+        "competing" -> stringResource(R.string.discord_competing_convx)
+        else -> stringResource(R.string.listening_to_convx)
     }
 
     Surface(
@@ -987,7 +885,7 @@ fun RichPresence(
                     onClick = {
                         val intent = Intent(
                             Intent.ACTION_VIEW,
-                            "https://github.com/vivimusicGroup/vivimusic".toUri()
+                            "https://github.com/cosmictaserdev-creator/Convx".toUri()
                         )
                         context.startActivity(intent)
                     },

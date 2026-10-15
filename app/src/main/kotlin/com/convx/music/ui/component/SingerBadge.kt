@@ -2,11 +2,7 @@
  * Convx Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  *
- * Ported from Convx PR #53 (MeYashverma/Convxy) — "who is singing" badge,
- * simplified: no singer-name registry exists in this codebase's providers
- * (no `ttm:name`/`[singers:…]` parsing), so names are always inferred from
- * the track's credited artists (step 2 of the original PR), never read from
- * a registry (step 1, dropped since it would always be empty here).
+ * Shows which credited artist is singing the current lyric line.
  */
 
 package com.convx.music.ui.component
@@ -60,8 +56,10 @@ fun resolveSingerNames(
     if (leadCounts.size < 2) return emptyMap()
 
     val leads = leadCounts.keys.filter { it != GROUP_AGENT_ID }
-    val creditedArtists = trackArtists.map { it.trim() }.filter { it.isNotEmpty() }
-    val ranked = leads.sortedByDescending { leadCounts[it] ?: 0 }
+    val creditedArtists = trackArtists.mapNotNull { artist ->
+        artist.trim().takeIf(String::isNotEmpty)
+    }
+    val ranked = leads.sortedByDescending { id -> leadCounts.getValue(id) }
     val top = leadCounts[ranked.firstOrNull()] ?: 0
     val second = leadCounts[ranked.getOrNull(1)] ?: 0
     val clearMajority = ranked.size == 1 || top >= second * 3 / 2 + 1
@@ -69,7 +67,9 @@ fun resolveSingerNames(
         creditedArtists.size >= 2 && clearMajority
     if (!plausible) return emptyMap()
 
-    return ranked.withIndex().associate { (rank, id) -> id to creditedArtists[rank] }
+    val singerNames = LinkedHashMap<String, String>(ranked.size)
+    ranked.forEachIndexed { rank, id -> singerNames[id] = creditedArtists[rank] }
+    return singerNames
 }
 
 /**

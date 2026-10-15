@@ -47,7 +47,7 @@ data class WidgetConfig(
         private fun prefs(context: Context) = MMKV.mmkvWithID(FILE)
 
         fun load(context: Context, widgetId: Int): WidgetConfig {
-            val p = prefs(context) ?: return WidgetConfig()
+            val p = prefs(context)
             val default = WidgetConfig()
             val backgroundName = p.decodeString(keyOf(widgetId, "bg"))
             return WidgetConfig(
@@ -63,7 +63,7 @@ data class WidgetConfig(
         }
 
         fun save(context: Context, widgetId: Int, config: WidgetConfig) {
-            val p = prefs(context) ?: return
+            val p = prefs(context)
             p.encode(keyOf(widgetId, "bg"), config.background.name)
             p.encode(keyOf(widgetId, "image"), config.imageUri)
             p.encode(keyOf(widgetId, "art"), config.showArtwork)
@@ -74,7 +74,7 @@ data class WidgetConfig(
 
         /** Called from onDeleted so removed widgets don't leak their settings forever. */
         fun delete(context: Context, widgetIds: IntArray) {
-            val p = prefs(context) ?: return
+            val p = prefs(context)
             widgetIds.forEach { id ->
                 listOf("bg", "image", "art", "prevnext", "like", "playlist")
                     .forEach { p.removeValueForKey(keyOf(id, it)) }

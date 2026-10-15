@@ -385,13 +385,7 @@ private fun EditorCanvas(
     val undoPending = remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
-        // DiyEditorScreen is itself a NavHost destination, inside the root
-        // appBackdrop's capture subtree — so BottomSheetPlayer's own glass base
-        // (Player.kt's Modifier.liquidGlass on the `background` slot) must not
-        // resolve LocalAppBackdrop to that root appBackdrop, or its capture
-        // includes itself (RenderNode::prepareTreeImpl SIGSEGV, see
-        // glass-chrome-rendernode-cycle). Provide an UNATTACHED screen-local
-        // backdrop first, same pattern as AlbumScreen/ArtistScreen/DiyPlayerMockup.
+        // Use a screen-local backdrop so the player glass does not capture itself.
         val editorBackdrop = rememberLayerBackdrop()
         CompositionLocalProvider(LocalAppBackdrop provides editorBackdrop) {
             BottomSheetPlayer(
@@ -405,10 +399,8 @@ private fun EditorCanvas(
             )
         }
 
-        // ponytail: every sticker draws above the real player here regardless of its z —
-        // there's no slot to inject "behind artwork, above background" into a composable
-        // this doesn't own the internal stack of. The saved z still applies correctly once
-        // played for real (showDiyStickers back on, outside the editor). Upgrade path: an
+        // The editor cannot place stickers behind player artwork. Saved z-order is
+        // applied when stickers appear in the actual player.
         // injectable content slot in BottomSheetPlayer at that exact point in its stack.
         DiyDesignCanvas(orientation = orientation, modifier = Modifier.fillMaxSize()) { scale ->
             BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -536,13 +528,7 @@ private fun TopControls(
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Modifier.weight needs a bounded main-axis constraint, which
-    // horizontalScroll below deliberately relaxes to unbounded — so the
-    // left/right pill groups can no longer be split by a weighted Spacer.
-    // Arrangement.SpaceBetween achieves the same "push apart" layout at rest
-    // (it only needs the Row's own resolved width, computed after scroll
-    // content is measured) and degrades to scrollable overflow instead of
-    // clipping when the groups don't both fit.
+    // horizontalScroll makes the row unbounded, so use SpaceBetween instead of a weighted spacer.
     Row(
         modifier = modifier
             .statusBarsPadding()
@@ -816,7 +802,7 @@ private fun EmojiPanel(onPick: (String) -> Unit) {
             columns = GridCells.Fixed(6),
             modifier = Modifier.widthIn(max = 280.dp).height(200.dp).padding(horizontal = 12.dp),
         ) {
-            items(EMOJI_PALETTE) { emoji ->
+            items(EMOJI_PALETTE, key = { it }) { emoji ->
                 Text(
                     text = emoji,
                     fontSize = 26.sp,

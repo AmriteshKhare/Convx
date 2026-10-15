@@ -69,6 +69,9 @@ constructor(
                     "liked" -> database.likedSongs(sortType, descending)
                         .map { it.filterExplicit(hideExplicit).filterVideoSongs(hideVideoSongs) }
 
+                    "podcasts" -> database.likedSongs(sortType, descending)
+                        .map { songs -> songs.filter { it.song.isPodcastEpisode }.filterExplicit(hideExplicit) }
+
                     "downloaded" -> database.downloadedSongs(sortType, descending)
                         .map { it.filterExplicit(hideExplicit).filterVideoSongs(hideVideoSongs) }
 
@@ -96,6 +99,7 @@ constructor(
             _isRefreshing.value = true
             when (playlist) {
                 "liked" -> syncUtils.syncLikedSongsSuspend()
+                "podcasts" -> syncUtils.syncLikedSongsSuspend()
                 "uploaded" -> syncUtils.syncUploadedSongsSuspend()
             }
             _isRefreshing.value = false

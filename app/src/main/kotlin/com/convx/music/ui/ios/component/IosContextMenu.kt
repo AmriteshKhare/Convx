@@ -8,6 +8,7 @@ package com.convx.music.ui.ios.component
 import android.os.Build
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -69,6 +70,8 @@ fun IosContextMenu(
     /** Kept off the screen edges by this much, as iOS clamps its menus. */
     screenMargin: Dp = 12.dp,
     onClick: (() -> Unit)? = null,
+    /** Apple Music's Add / Favourite / Share row across the top of the panel. */
+    quickActions: List<IosMenuItem> = emptyList(),
     content: @Composable () -> Unit,
 ) {
     val haptics = LocalHapticFeedback.current
@@ -99,6 +102,7 @@ fun IosContextMenu(
         anchorGap = anchorGap,
         screenMargin = screenMargin,
         liftedContent = content,
+        quickActions = quickActions,
     )
 }
 
@@ -118,6 +122,7 @@ fun IosContextMenuOverlay(
     anchorGap: Dp = 8.dp,
     screenMargin: Dp = 12.dp,
     liftedContent: (@Composable () -> Unit)? = null,
+    quickActions: List<IosMenuItem> = emptyList(),
 ) {
     val density = LocalDensity.current
     // The popup has to stay composed through the exit animation, so the transition -- not
@@ -135,30 +140,17 @@ fun IosContextMenuOverlay(
         // an observable write from layout would invalidate the layout that just made it.
         val goesAbove = remember { booleanArrayOf(true) }
 
-        // Held as State, never unwrapped with `by`: every value below is read from a
-        // graphicsLayer or draw block, so the 150ms of motion costs draw invalidations
-        // rather than a recomposition of the whole panel on every frame.
-        val scale = transition.animateFloat(
+        // Read animation state in draw and layer blocks to avoid recomposing the panel per frame.
+        // One spring drives the menu size, blur, and fade.
+        val progress = transition.animateFloat(
             transitionSpec = {
-                if (targetState) tween(150, easing = MenuEnterEasing) else tween(120, easing = MenuExitEasing)
+                if (targetState) spring(dampingRatio = 0.78f, stiffness = 700f) else tween(150, easing = MenuExitEasing)
             },
-            label = "scale",
-        ) { open -> if (open) 1f else 0.86f }
-
-        val alpha = transition.animateFloat(
-            transitionSpec = {
-                if (targetState) tween(110, easing = MenuEnterEasing) else tween(110, easing = MenuExitEasing)
-            },
-            label = "alpha",
+            label = "morph",
         ) { open -> if (open) 1f else 0f }
-
-        val blurPx = transition.animateFloat(
-            transitionSpec = {
-                // Only on the way in -- the reference's dismissal is a straight fade.
-                if (targetState) tween(150, easing = MenuEnterEasing) else tween(1)
-            },
-            label = "blur",
-        ) { open -> if (open) 0f else with(density) { MenuEnterBlur.toPx() } }
+        val enterBlurPx = with(density) { MenuEnterBlur.toPx() }
+        // Menu's placed top-left, written by layout, read by the layer's pivot.
+        val menuOrigin = remember { intArrayOf(0, 0) }
 
         val scrimAlpha = transition.animateFloat(
             transitionSpec = {
@@ -209,19 +201,24 @@ fun IosContextMenuOverlay(
 
                             Box(
                                 Modifier.graphicsLayer {
-                                    this.alpha = alpha.value
-                                    scaleX = scale.value
-                                    scaleY = scale.value
-                                    // Grows out of the edge facing the anchor, not its own
-                                    // middle -- that is what ties the panel to the thing held.
+                                    val p = progress.value
+                                    // Visible from the first frame as a faint blob (clip f9).
+                                    this.alpha = (p / 0.35f).coerceIn(0f, 1f)
+                                    // Starts the size of the pressed thing, per axis.
+                                    val startX = (anchorRect.width / size.width).coerceIn(0.08f, 1f)
+                                    val startY = (anchorRect.height / size.height).coerceIn(0.08f, 1f)
+                                    scaleX = startX + (1f - startX) * p
+                                    scaleY = startY + (1f - startY) * p
+                                    // Grows out of the anchor itself, wherever it sits
+                                    // relative to the panel.
                                     transformOrigin = TransformOrigin(
-                                        pivotFractionX = 0.5f,
-                                        pivotFractionY = if (goesAbove[0]) 1f else 0f,
+                                        pivotFractionX = ((anchorRect.center.x - menuOrigin[0]) / size.width).coerceIn(0f, 1f),
+                                        pivotFractionY = ((anchorRect.center.y - menuOrigin[1]) / size.height).coerceIn(0f, 1f),
                                     )
-                                    // API 31 is where a layer RenderEffect exists at all;
-                                    // below it the panel simply arrives without the blur,
-                                    // which is the one part of this that degrades cleanly.
-                                    val radius = blurPx.value
+                                    // Heavy blur that clears as it arrives; none on exit
+                                    // (the reference's dismissal is a straight fade).
+                                    // Below API 31 the panel arrives without it.
+                                    val radius = if (transition.targetState) enterBlurPx * (1f - p).coerceIn(0f, 1f) else 0f
                                     if (radius > 0.01f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                         renderEffect = BlurEffect(radius, radius)
                                     }
@@ -229,6 +226,7 @@ fun IosContextMenuOverlay(
                             ) {
                                 IosMenu(
                                     sections = sections,
+                                    quickActions = quickActions,
                                     onDismissRequest = onDismissRequest,
                                 )
                             }
@@ -256,6 +254,8 @@ fun IosContextMenuOverlay(
                         val menuX = (anchorRect.center.x.roundToInt() - menu.width / 2)
                             .coerceIn(marginPx, (width - menu.width - marginPx).coerceAtLeast(marginPx))
 
+                        menuOrigin[0] = menuX
+                        menuOrigin[1] = menuY
                         layout(width, height) {
                             lifted.place(anchorRect.left.roundToInt(), anchorRect.top.roundToInt())
                             menu.place(menuX, menuY)
@@ -271,8 +271,8 @@ fun IosContextMenuOverlay(
 private val MenuEnterEasing = CubicBezierEasing(0.2f, 0.9f, 0.25f, 1.03f)
 private val MenuExitEasing = CubicBezierEasing(0.4f, 0f, 0.9f, 0.5f)
 
-/** How blurred the panel is on its first frame, before it resolves. */
-private val MenuEnterBlur = 14.dp
+/** How blurred the panel is on its first frame (clip f10: content unreadable). */
+private val MenuEnterBlur = 20.dp
 private const val ScrimAlpha = 0.28f
 private const val AnchorLift = 1.05f
 

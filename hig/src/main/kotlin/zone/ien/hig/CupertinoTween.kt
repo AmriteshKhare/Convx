@@ -26,15 +26,8 @@ import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.tween
 
 /**
- * Cupertino [tween] transition spec.
- *
- * Default values are used for iOS view transitions such as
- * UINavigationController, UIAlertController
- *
- * @param durationMillis the duration of the animation in milliseconds
- * @param delayMillis the delay before the animation starts in milliseconds
- * @param easing the easing function to use for the animation
- * @return a TweenSpec for the Cupertino transition
+ * [tween] with Cupertino transition defaults. The default duration and easing match
+ * common iOS view transitions, including navigation and alert animations.
  */
 fun <T> cupertinoTween(
     durationMillis: Int = CupertinoTransitionDuration,
@@ -47,11 +40,6 @@ fun <T> cupertinoTween(
         delayMillis = delayMillis,
     )
 
-/**
- * The easing function used for Cupertino transitions.
- */
+/** Easing curve used by Cupertino transitions. */
 val CupertinoEasing = CubicBezierEasing(0.2833f, 0.99f, 0.31833f, 0.99f)
-/**
- * The default transition duration for Cupertino transitions.
- */
 private val CupertinoTransitionDuration = 400

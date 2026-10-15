@@ -3,7 +3,8 @@ package com.music.innertube.mappers
 import com.music.innertube.InnerTube
 import com.music.innertube.models.AlbumItem
 import com.music.innertube.models.Artist
-import com.music.innertube.models.Run
+import com.music.innertube.models.MusicShelfRenderer
+import com.music.innertube.models.SectionListRenderer
 import com.music.innertube.models.SongItem
 import com.music.innertube.models.YouTubeClient.Companion.WEB_REMIX
 import com.music.innertube.models.getContinuation
@@ -13,154 +14,128 @@ import com.music.innertube.models.response.BrowseResponse
 import com.music.innertube.pages.AlbumPage
 import com.music.innertube.pages.NewReleaseAlbumPage
 import io.ktor.client.call.body
+import kotlinx.coroutines.CancellationException
 
 internal object AlbumMapper {
-    suspend fun album(innerTube: InnerTube, browseId: String, withSongs: Boolean): Result<AlbumPage> = runCatching {
-        val response = innerTube.browse(WEB_REMIX, browseId, setLogin = true).body<BrowseResponse>()
-
-        fun mapRuns(runs: List<Run>?): List<Run>? = runs?.map { run ->
-            Run(
-                text = run.text,
-                navigationEndpoint = run.navigationEndpoint
-            )
+    internal fun sections(response: BrowseResponse): List<SectionListRenderer.Content> = buildList {
+        response.contents?.twoColumnBrowseResultsRenderer?.tabs.orEmpty().forEach {
+            addAll(it?.tabRenderer?.content?.sectionListRenderer?.contents.orEmpty())
         }
-
-        val descriptionRuns = sequence {
-            // Check all tabs in twoColumnBrowseResultsRenderer
-            response.contents?.twoColumnBrowseResultsRenderer?.tabs?.forEach { tab ->
-                tab?.tabRenderer?.content?.sectionListRenderer?.contents?.forEach { content ->
-                    content.musicDescriptionShelfRenderer?.description?.runs?.let { yield(it) }
-                }
-            }
-            // Check all tabs in singleColumnBrowseResultsRenderer
-            response.contents?.singleColumnBrowseResultsRenderer?.tabs?.forEach { tab ->
-                tab.tabRenderer?.content?.sectionListRenderer?.contents?.forEach { content ->
-                    content.musicDescriptionShelfRenderer?.description?.runs?.let { yield(it) }
-                }
-            }
-            // Check headers
-            response.header?.musicDetailHeaderRenderer?.description?.runs?.let { yield(it) }
-            response.header?.musicImmersiveHeaderRenderer?.description?.runs?.let { yield(it) }
-            response.header?.musicEditablePlaylistDetailHeaderRenderer?.header?.musicDetailHeaderRenderer?.description?.runs?.let { yield(it) }
-            response.header?.musicEditablePlaylistDetailHeaderRenderer?.header?.musicResponsiveHeaderRenderer?.description?.runs?.let { yield(it) }
-            
-            // Check musicResponsiveHeaderRenderer in contents
-            response.contents?.twoColumnBrowseResultsRenderer?.tabs?.forEach { tab ->
-                tab?.tabRenderer?.content?.sectionListRenderer?.contents?.forEach { content ->
-                    content.musicResponsiveHeaderRenderer?.description?.runs?.let { yield(it) }
-                }
-            }
-            response.contents?.singleColumnBrowseResultsRenderer?.tabs?.forEach { tab ->
-                tab.tabRenderer?.content?.sectionListRenderer?.contents?.forEach { content ->
-                    content.musicResponsiveHeaderRenderer?.description?.runs?.let { yield(it) }
-                }
-            }
-        }.firstOrNull()?.let(::mapRuns)
-
-        val description = descriptionRuns?.joinToString(separator = "") { it.text }
-
-        if (browseId.contains("FEmusic_library_privately_owned_release_detail")) {
-            val playlistId =
-                response.header?.musicDetailHeaderRenderer?.menu?.menuRenderer?.topLevelButtons?.firstOrNull()?.buttonRenderer?.navigationEndpoint?.watchPlaylistEndpoint?.playlistId!!
-            val albumItem = AlbumItem(
-                browseId = browseId,
-                playlistId = playlistId,
-                title = response.header.musicDetailHeaderRenderer.title.runs?.firstOrNull()?.text!!,
-                artists = response.header.musicDetailHeaderRenderer.subtitle.runs?.filter { it.navigationEndpoint != null }?.map {
-                    Artist(
-                        name = it.text,
-                        id = it.navigationEndpoint?.browseEndpoint?.browseId
-                    )
-                },
-                year = response.header.musicDetailHeaderRenderer.subtitle.runs?.lastOrNull()?.text?.toIntOrNull(),
-                thumbnail = response.header.musicDetailHeaderRenderer.thumbnail.croppedSquareThumbnailRenderer?.thumbnail?.thumbnails?.lastOrNull()!!.url,
-                explicit = false, // TODO: Extract explicit badge for albums from YouTube response
-                description = description
-            )
-            return@runCatching AlbumPage(
-                album = albumItem,
-                songs = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()?.musicShelfRenderer?.contents?.getItems()?.mapNotNull {
-                    AlbumPage.getSong(it, albumItem)
-                }!!.toMutableList(),
-                otherVersions = emptyList(),
-                description = description,
-                descriptionRuns = descriptionRuns
-            )
-        } else {
-            val playlistId =
-                response.microformat?.microformatDataRenderer?.urlCanonical?.substringAfterLast('=')!!
-            val albumItem = AlbumItem(
-                browseId = browseId,
-                playlistId = playlistId,
-                title = response.contents?.twoColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()?.musicResponsiveHeaderRenderer?.title?.runs?.firstOrNull()?.text!!,
-                artists = response.contents.twoColumnBrowseResultsRenderer.tabs.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()?.musicResponsiveHeaderRenderer?.straplineTextOne?.runs?.oddElements()
-                    ?.map {
-                        Artist(
-                            name = it.text,
-                            id = it.navigationEndpoint?.browseEndpoint?.browseId
-                        )
-                    }!!,
-                year = response.contents.twoColumnBrowseResultsRenderer.tabs.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()?.musicResponsiveHeaderRenderer?.subtitle?.runs?.lastOrNull()?.text?.toIntOrNull(),
-                thumbnail = response.contents.twoColumnBrowseResultsRenderer.tabs.firstOrNull()?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()?.musicResponsiveHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails?.lastOrNull()?.url!!,
-                explicit = false, // TODO: Extract explicit badge for albums from YouTube response
-                description = description
-            )
-            return@runCatching AlbumPage(
-                album = albumItem,
-                songs = if (withSongs) albumSongs(
-                    innerTube, playlistId, albumItem
-                ).getOrThrow() else emptyList(),
-                otherVersions = response.contents.twoColumnBrowseResultsRenderer.secondaryContents?.sectionListRenderer?.contents
-                    ?.find { it.musicCarouselShelfRenderer?.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.any { it.text.contains("versions", ignoreCase = true) } == true }
-                    ?.musicCarouselShelfRenderer?.contents
-                    ?.mapNotNull { it.musicTwoRowItemRenderer }
-                    ?.mapNotNull(NewReleaseAlbumPage::fromMusicTwoRowItemRenderer)
-                    .orEmpty(),
-                releasesForYou = response.contents.twoColumnBrowseResultsRenderer.secondaryContents?.sectionListRenderer?.contents
-                    ?.find { it.musicCarouselShelfRenderer?.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.any { it.text.contains("releases", ignoreCase = true) || it.text.contains("more from", ignoreCase = true) } == true }
-                    ?.musicCarouselShelfRenderer?.contents
-                    ?.mapNotNull { it.musicTwoRowItemRenderer }
-                    ?.mapNotNull(NewReleaseAlbumPage::fromMusicTwoRowItemRenderer)
-                    .orEmpty(),
-                description = description,
-                descriptionRuns = descriptionRuns
-            )
+        response.contents?.singleColumnBrowseResultsRenderer?.tabs.orEmpty().forEach {
+            addAll(it.tabRenderer.content?.sectionListRenderer?.contents.orEmpty())
         }
+        addAll(response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer?.contents.orEmpty())
+        addAll(response.contents?.sectionListRenderer?.contents.orEmpty())
+        addAll(response.continuationContents?.sectionListContinuation?.contents.orEmpty())
     }
 
-    suspend fun albumSongs(innerTube: InnerTube, playlistId: String, album: AlbumItem?): Result<List<SongItem>> = runCatching {
-        var response = innerTube.browse(WEB_REMIX, "VL$playlistId").body<BrowseResponse>()
-        val songs = response.contents?.twoColumnBrowseResultsRenderer
-            ?.secondaryContents?.sectionListRenderer
-            ?.contents?.firstOrNull()
-            ?.musicPlaylistShelfRenderer?.contents?.getItems()
-            ?.mapNotNull {
-                AlbumPage.getSong(it, album)
-            }!!
-            .toMutableList()
-        var continuation = response.contents.twoColumnBrowseResultsRenderer.secondaryContents.sectionListRenderer
-            .contents.firstOrNull()?.musicPlaylistShelfRenderer?.contents?.getContinuation()
-        val seenContinuations = mutableSetOf<String>()
-        var requestCount = 0
-        val maxRequests = 50 // Prevent excessive API calls
-        
-        while (continuation != null && requestCount < maxRequests) {
-            // Prevent infinite loops by tracking seen continuations
-            if (continuation in seenContinuations) {
-                break
+    internal fun parseAlbum(response: BrowseResponse, browseId: String): AlbumPage {
+        val sections = sections(response)
+        val responsive = sections.firstNotNullOfOrNull { it.musicResponsiveHeaderRenderer }
+            ?: response.header?.musicResponsiveHeaderRenderer
+            ?: response.header?.musicEditablePlaylistDetailHeaderRenderer?.header?.musicResponsiveHeaderRenderer
+        val detail = response.header?.musicDetailHeaderRenderer
+            ?: response.header?.musicEditablePlaylistDetailHeaderRenderer?.header?.musicDetailHeaderRenderer
+        val playlistId = sections.firstNotNullOfOrNull { it.musicPlaylistShelfRenderer?.playlistId }
+            ?: responsive?.buttons?.firstNotNullOfOrNull {
+                it.musicPlayButtonRenderer?.playNavigationEndpoint?.watchPlaylistEndpoint?.playlistId
+                    ?: it.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.playlistId
             }
-            seenContinuations.add(continuation)
-            requestCount++
-            
-            response = innerTube.browse(
-                client = WEB_REMIX,
-                continuation = continuation,
-            ).body<BrowseResponse>()
-            songs += response.onResponseReceivedActions?.firstOrNull()?.appendContinuationItemsAction?.continuationItems?.getItems()?.mapNotNull {
-                AlbumPage.getSong(it, album)
-            }.orEmpty()
-            continuation = response.continuationContents?.musicPlaylistShelfContinuation?.continuations?.getContinuation()
+            ?: detail?.menu?.menuRenderer?.topLevelButtons?.firstNotNullOfOrNull {
+                it.buttonRenderer?.navigationEndpoint?.watchPlaylistEndpoint?.playlistId
+            }
+            ?: response.microformat?.microformatDataRenderer?.urlCanonical?.let { url ->
+                java.net.URI(url).rawQuery?.split('&')?.firstOrNull { it.startsWith("list=") }
+                    ?.substringAfter('=')?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+            }
+            ?: ""
+        val descriptionRuns = sections.firstNotNullOfOrNull { it.musicDescriptionShelfRenderer?.description?.runs }
+            ?: responsive?.description?.runs ?: detail?.description?.runs
+        val artistRuns = responsive?.straplineTextOne?.runs
+            ?: detail?.subtitle?.runs?.filter { it.navigationEndpoint?.browseEndpoint != null }
+        val artists = (if (responsive?.straplineTextOne != null) artistRuns?.oddElements() else artistRuns)
+            ?.map { Artist(it.text, it.navigationEndpoint?.browseEndpoint?.browseId) }.orEmpty()
+        val album = AlbumItem(
+            browseId = browseId,
+            playlistId = playlistId,
+            title = requireNotNull((responsive?.title ?: detail?.title)?.runs?.firstOrNull()?.text) { "Album title missing: $browseId" },
+            artists = artists,
+            year = (responsive?.subtitle ?: detail?.subtitle)?.runs?.lastOrNull()?.text?.toIntOrNull(),
+            thumbnail = responsive?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+                ?: detail?.thumbnail?.croppedSquareThumbnailRenderer?.getThumbnailUrl()
+                ?: response.background?.musicThumbnailRenderer?.getThumbnailUrl().orEmpty(),
+            explicit = false,
+            description = descriptionRuns?.joinToString("") { it.text },
+        )
+        fun recommendations(keyword: String) = sections
+            .filter { section -> section.musicCarouselShelfRenderer?.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs
+                ?.any { it.text.contains(keyword, ignoreCase = true) } == true }
+            .flatMap { it.musicCarouselShelfRenderer?.contents.orEmpty() }
+            .mapNotNull { it.musicTwoRowItemRenderer }
+            .mapNotNull(NewReleaseAlbumPage::fromMusicTwoRowItemRenderer)
+        return AlbumPage(
+            album = album,
+            songs = songContents(response).getItems().mapNotNull { AlbumPage.getSong(it, album) },
+            otherVersions = recommendations("versions"),
+            releasesForYou = (recommendations("releases") + recommendations("more from")).distinctBy { it.id },
+            description = album.description,
+            descriptionRuns = descriptionRuns,
+        )
+    }
+
+    internal fun songContents(response: BrowseResponse): List<MusicShelfRenderer.Content> =
+        response.continuationContents?.musicPlaylistShelfContinuation?.contents
+            ?: response.continuationContents?.musicShelfContinuation?.contents
+            ?: response.onResponseReceivedActions?.flatMap { it.appendContinuationItemsAction?.continuationItems.orEmpty() }
+                ?.takeIf { it.isNotEmpty() }
+            ?: sections(response).flatMap { section ->
+                section.musicPlaylistShelfRenderer?.contents ?: section.musicShelfRenderer?.contents.orEmpty()
+            }
+
+    internal fun continuation(response: BrowseResponse): String? =
+        songContents(response).getContinuation()
+            ?: response.continuationContents?.musicPlaylistShelfContinuation?.continuations?.getContinuation()
+            ?: response.continuationContents?.musicShelfContinuation?.continuations?.getContinuation()
+            ?: response.continuationContents?.sectionListContinuation?.continuations?.getContinuation()
+            ?: sections(response).firstNotNullOfOrNull {
+                it.musicPlaylistShelfRenderer?.continuations?.getContinuation()
+                    ?: it.musicShelfRenderer?.continuations?.getContinuation()
+            }
+
+    suspend fun album(innerTube: InnerTube, browseId: String, withSongs: Boolean): Result<AlbumPage> = catching {
+        val response = innerTube.browse(WEB_REMIX, browseId, setLogin = true).body<BrowseResponse>()
+        val page = parseAlbum(response, browseId)
+        val songs = when {
+            !withSongs -> emptyList()
+            page.songs.isNotEmpty() -> collectSongs(innerTube, response, page.album)
+            page.album.playlistId.isNotBlank() -> albumSongs(innerTube, page.album.playlistId, page.album).getOrThrow()
+            else -> error("Album tracks missing: $browseId")
         }
-        songs
+        page.copy(songs = songs)
+    }
+
+    suspend fun albumSongs(innerTube: InnerTube, playlistId: String, album: AlbumItem?): Result<List<SongItem>> = catching {
+        val response = innerTube.browse(WEB_REMIX, "VL${playlistId.removePrefix("VL")}").body<BrowseResponse>()
+        collectSongs(innerTube, response, album)
+    }
+
+    private suspend fun collectSongs(innerTube: InnerTube, response: BrowseResponse, album: AlbumItem?): List<SongItem> {
+        val songs = songContents(response).getItems().mapNotNull { AlbumPage.getSong(it, album) }.toMutableList()
+        var next = continuation(response)
+        val seen = mutableSetOf<String>()
+        while (next != null && seen.size < 50 && seen.add(next)) {
+            val continued = innerTube.browse(client = WEB_REMIX, continuation = next).body<BrowseResponse>()
+            songs += songContents(continued).getItems().mapNotNull { AlbumPage.getSong(it, album) }
+            next = continuation(continued)
+        }
+        return songs.distinctBy { it.id }
+    }
+
+    private suspend fun <T> catching(block: suspend () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
     }
 }

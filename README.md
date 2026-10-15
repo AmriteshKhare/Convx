@@ -72,7 +72,7 @@
 
 <p><b>Convx</b> is a free, open-source music player for Android that streams from YouTube Music, built with <b>Jetpack Compose</b> on a <b>Media3</b> ExoPlayer core. The UI is a custom <b>Liquid Glass</b> design system — frosted, refractive surfaces, iOS-style bouncy scrolling, and progressive blur chrome — instead of stock Material widgets.</p>
 
-<p>Convx started as a fork of <a href="https://github.com/vivizzz007/vivi-music">vivi-music</a>; see <a href="#-credits">Credits</a> below.</p>
+<p>Convx was built on an open-source (GPL-3.0) music player base and has since diverged completely; see <a href="#-credits">Credits</a> below.</p>
 
 <hr>
 
@@ -128,7 +128,7 @@
   <li><b>Playback:</b> Media3 <code>ExoPlayer</code> service in <code>playback/MusicService.kt</code>.</li>
   <li><b>Data:</b> Room database (<code>db/</code>) for the local library, DataStore for preferences (<code>utils/DataStore.kt</code>, <code>constants/PreferenceKeys.kt</code>).</li>
   <li><b>YouTube Music access:</b> the <code>innertube</code> module — an unofficial InnerTube API client, kept separate from the app module.</li>
-  <li><b>Updater:</b> <code>vivimusic/updater/</code> checks GitHub Releases for new versions and handles in-app APK download/install (FOSS/GMS build flavors behave slightly differently — see <code>BuildConfig.CAST_AVAILABLE</code>).</li>
+  <li><b>Updater:</b> <code>convx/updater/</code> checks GitHub Releases for new versions and handles in-app APK download/install (FOSS/GMS build flavors behave slightly differently — see <code>BuildConfig.CAST_AVAILABLE</code>).</li>
 </ul>
 
 <hr>
@@ -224,8 +224,8 @@
       <td width="40%" align="left">
         <b>💡 Built On</b>
         <ul>
-          <li><strong><a href="https://github.com/vivizzz007/vivi-music">vivi-music</a></strong> by <strong>Vividh P Ashokan</strong> — the project Convx was forked from.</li>
-          <li>The <strong>Apple Music Player V17</strong> full-screen player style (Settings → Player Theme) is ported from <a href="https://github.com/vivizzz007/vivi-music">vivi-music</a>'s Apple Music player UI, GPL-3.0.</li>
+          <li>An open-source (GPL-3.0) music player — the base Convx was originally built on.</li>
+          <li>The <strong>Apple Music Player V17</strong> full-screen player style (Settings → Player Theme) is adapted from the same open-source base, GPL-3.0.</li>
         </ul>
       </td>
       <td width="60%" align="left">

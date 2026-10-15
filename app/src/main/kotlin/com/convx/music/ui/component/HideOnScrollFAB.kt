@@ -33,16 +33,7 @@ import com.convx.music.R
 import com.convx.music.ui.utils.isScrollingUp
 import dev.chrisbanes.haze.HazeState
 
-/**
- * [hazeState] should be the screen's own existing HazeState (most list screens
- * already have one for their top fade — see [com.convx.music.ui.component.TopFadeBlur])
- * whose source is the scrolling content behind this FAB. Passing one gives these
- * buttons a real frosted blur of that content for a fraction of liquidGlass's cost
- * (no lens/highlight/shadow, just Haze's blur). Null keeps the flat fallback —
- * there's nothing to blur here without a real source, and sampling the live app
- * backdrop instead would risk a RenderNode self-reference cycle on screens with no
- * hero backdrop of their own.
- */
+/** Pass the screen's scrolling [HazeState] for a frosted blur; null uses a flat fallback to avoid backdrop self-capture. */
 @Composable
 fun BoxScope.HideOnScrollFAB(
     visible: Boolean = true,
@@ -72,19 +63,11 @@ fun BoxScope.HideOnScrollFAB(
                 GlassCircleButton(
                     onClick = onRecognitionClick,
                     hazeState = hazeState,
-                    // Sacrifice: always flat. These float over scrolling content and
-                    // were among Home's eight pooled glass surfaces; AnimatedVisibility
-                    // already removes them when hidden, and flat kills the residual
-                    // haze/liquidGlass cost while visible. Never fall through to
-                    // liquidGlass's ambient path either — sampling the app backdrop
-                    // from inside its own capture is a RenderNode self-reference cycle.
+                    // Keep this frequently shown action flat to avoid backdrop sampling
+                    // from inside its own capture.
                     forceFlat = true,
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.mic),
-                        contentDescription = stringResource(R.string.recognize_music),
-                        modifier = Modifier.size(20.dp)
-                    )
+                    SymbolIcon(symbol = sf("mic.fill"), contentDescription = stringResource(R.string.recognize_music), size = 20.dp)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -135,11 +118,7 @@ fun BoxScope.HideOnScrollFAB(
                     // Sacrifice: always flat — see LazyList overload comment.
                     forceFlat = true,
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.mic),
-                        contentDescription = stringResource(R.string.recognize_music),
-                        modifier = Modifier.size(20.dp)
-                    )
+                    SymbolIcon(symbol = sf("mic.fill"), contentDescription = stringResource(R.string.recognize_music), size = 20.dp)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -190,11 +169,7 @@ fun BoxScope.HideOnScrollFAB(
                     // Sacrifice: always flat — see LazyList overload comment.
                     forceFlat = true,
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.mic),
-                        contentDescription = stringResource(R.string.recognize_music),
-                        modifier = Modifier.size(20.dp)
-                    )
+                    SymbolIcon(symbol = sf("mic.fill"), contentDescription = stringResource(R.string.recognize_music), size = 20.dp)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }

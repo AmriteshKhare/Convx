@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.search
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.ui.res.painterResource
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -109,6 +112,7 @@ import java.net.URLDecoder
 import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.utils.rememberHeroZoom
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -120,8 +124,8 @@ fun OnlineSearchResult(
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val haptic = LocalHapticFeedback.current
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
@@ -152,7 +156,7 @@ fun OnlineSearchResult(
         }
     }
 
-    val searchFilter by viewModel.filter.collectAsState()
+    val searchFilter by viewModel.filter.collectAsStateWithLifecycle()
     val searchSummary = viewModel.summaryPage
     val itemsPage by remember(searchFilter) {
         derivedStateOf {
@@ -161,9 +165,11 @@ fun OnlineSearchResult(
             }
         }
     }
-    
-    // Suggestion states
-
+    val isLoadingResults = if (searchFilter == null) {
+        searchSummary == null
+    } else {
+        itemsPage == null
+    }
 
     LaunchedEffect(lazyListState) {
         snapshotFlow {
@@ -174,9 +180,7 @@ fun OnlineSearchResult(
         }
     }
 
-    // Takes the whole row list, not just its size: tapping a song has to be able to queue the
-    // songs shown next to it (see the SongItem branch below), which is what YT Music does and
-    // what starting a one-song radio queue never did.
+    // Sibling results let a song tap queue this result set instead of starting one-song radio.
     val searchedSongsTitle = stringResource(R.string.queue_searched_songs)
     val ytItemContent: @Composable LazyItemScope.(YTItem, Int, List<YTItem>) -> Unit = { item: YTItem, index: Int, siblings: List<YTItem> ->
         val size = siblings.size
@@ -215,8 +219,7 @@ fun OnlineSearchResult(
         }
         YouTubeListItem(
             item = item,
-            isActive =
-            when (item) {
+            isActive = when (item) {
                 is SongItem -> mediaMetadata?.id == item.id
                 is AlbumItem -> mediaMetadata?.album?.id == item.id
                 else -> false
@@ -228,10 +231,7 @@ fun OnlineSearchResult(
                 IconButton(
                     onClick = longClick,
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.more_horiz),
-                        contentDescription = null,
-                    )
+                    SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                 }
             },
             modifier =
@@ -300,6 +300,10 @@ fun OnlineSearchResult(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
+                        // Bake the blur once: HWUI re-runs a RenderEffect whenever the clip
+                        // it is drawn under changes, and with glass on this backdrop is
+                        // drawn under two (screen + glass capture) every frame.
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                         .blur(120.dp)
                         .graphicsLayer { alpha = 0.55f }
                 )
@@ -318,19 +322,16 @@ fun OnlineSearchResult(
                 .fillMaxSize()
                 .windowInsetsPadding(appTopBarWindowInsets())
         ) {
-            // The search bar used to live here — now it's part of the floating nav
-            // bar itself (NavBarSearchInputBar in FloatingNavBar.kt), which stays
-            // mounted across this whole screen. See PLAN_search_navbar.md.
+            // Search input is owned by the persistent floating nav bar.
 
-            // Main content area
             Box(modifier = Modifier.weight(1f)) {
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     // No opaque wrapper, no Material chip fills — just the row over
                     // the screen's own blurred hero backdrop, tinted to match.
-                    ChipsRow(
-                        chips = listOf(
+                    AppleScopePills(
+                        pills = listOf(
                             null to stringResource(R.string.filter_all),
                             FILTER_SONG to stringResource(R.string.filter_songs),
                             FILTER_VIDEO to stringResource(R.string.filter_videos),
@@ -339,8 +340,8 @@ fun OnlineSearchResult(
                             FILTER_COMMUNITY_PLAYLIST to stringResource(R.string.filter_community_playlists),
                             FILTER_FEATURED_PLAYLIST to stringResource(R.string.filter_featured_playlists),
                         ),
-                        currentValue = searchFilter,
-                        onValueUpdate = {
+                        selected = searchFilter,
+                        onSelect = {
                             if (viewModel.filter.value != it) {
                                 viewModel.filter.value = it
                             }
@@ -348,13 +349,6 @@ fun OnlineSearchResult(
                                 lazyListState.animateScrollToItem(0)
                             }
                         },
-                        containerColor = Color.Transparent,
-                        selectedContainerColor = onTint.copy(alpha = 0.2f),
-                        labelColor = onTint.copy(alpha = 0.8f),
-                        selectedLabelColor = onTint,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 4.dp)
                     )
 
                     LazyColumn(
@@ -424,7 +418,7 @@ fun OnlineSearchResult(
                             }
                         }
 
-                        if (searchFilter == null && searchSummary == null || searchFilter != null && itemsPage == null) {
+                        if (isLoadingResults) {
                             item {
                                 ShimmerHost {
                                     repeat(8) {
@@ -440,12 +434,7 @@ fun OnlineSearchResult(
                     }
                 }
                 if (navSearch.keyboardActive) {
-                    // OnlineSearchScreen renders transparent by design (it overlays
-                    // straight onto a screen's own hero blur on SearchScreen) — but
-                    // here it overlays on top of the results list, not empty space,
-                    // so it needs its own opaque backing or the list bleeds through.
-                    // Tinted from the app's home background image (like the initial
-                    // SearchScreen), not from this results page's search-result hero.
+                    // This search overlay covers the results list, so give it an opaque background.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()

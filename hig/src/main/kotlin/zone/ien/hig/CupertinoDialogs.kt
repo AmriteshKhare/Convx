@@ -95,13 +95,11 @@ import zone.ien.hig.theme.systemBlue
 import zone.ien.hig.theme.systemGray7
 import zone.ien.hig.theme.systemRed
 
-/**
- * Style of the Cupertino alert action buttons
- * */
+/** Visual style for alert actions. */
+
 enum class AlertActionStyle {
-    /**
-     * Default action button
-     * */
+    /** Standard action button. */
+
     Default {
         override fun apply(
             style: TextStyle,
@@ -114,10 +112,8 @@ enum class AlertActionStyle {
             )
     },
 
-    /**
-     * Cancel action button. It will be displayed below the other buttons
-     * with different container color and bolder font
-     * */
+    /** Cancel action, displayed below the other buttons. */
+
     Cancel {
         override fun apply(
             style: TextStyle,
@@ -130,9 +126,8 @@ enum class AlertActionStyle {
             )
     },
 
-    /**
-     * Destructive action button. It will be red
-     * */
+    /** Destructive action, styled in red. */
+
     Destructive {
         override fun apply(
             style: TextStyle,
@@ -160,9 +155,8 @@ interface AlertDialogActionsScope {
     )
 }
 
-/**
- * Alert controller button with default style
- * */
+/** Adds an action with the default style. */
+
 fun AlertDialogActionsScope.default(
     onClick: () -> Unit,
     enabled: Boolean = true,
@@ -174,9 +168,8 @@ fun AlertDialogActionsScope.default(
     title = title,
 )
 
-/**
- * Alert controller button with destructive style
- * */
+/** Adds a destructive action. */
+
 fun AlertDialogActionsScope.destructive(
     onClick: () -> Unit,
     enabled: Boolean = true,
@@ -188,9 +181,8 @@ fun AlertDialogActionsScope.destructive(
     title = title,
 )
 
-/**
- * Alert controller button with cancel style
- * */
+/** Adds a cancel action. */
+
 fun AlertDialogActionsScope.cancel(
     onClick: () -> Unit,
     enabled: Boolean = true,
@@ -202,17 +194,8 @@ fun AlertDialogActionsScope.cancel(
     title = title,
 )
 
-/**
- * Native analog for the compose [CupertinoAlertDialog].
- *
- * @param onDismissRequest called when dialog is already dismissed. Must not be ignored
- * @param title alert dialog title
- * @param message alert dialog message
- * @param containerColor color of the dialog background
- * @param properties dialog properties
- * @param buttonsOrientation layout orientation of the dialog buttons
- * @param buttons actions builder block
- * */
+/** Cupertino alert dialog with configurable button layout. */
+
 @Composable
 @ExperimentalCupertinoApi
 fun CupertinoAlertDialog(
@@ -230,7 +213,6 @@ fun CupertinoAlertDialog(
         properties = properties,
         onDismissRequest = onDismissRequest,
         enterTransition = scaleIn(initialScale = 1.2f) + fadeIn(),
-//        exitTransition = fadeOut(animationSpec = tween(100))
     ) {
         CupertinoSurface(
             Modifier
@@ -280,18 +262,8 @@ fun CupertinoAlertDialog(
     }
 }
 
-/**
- * Compose alert dialog with iOS action sheet style.
- *
- * @param onDismissRequest called when dialog is already dismissed. Must not be ignored
- * @param title alert dialog title
- * @param message alert dialog message
- * @param containerColor not used in native dialog
- * @param secondaryContainerColor not used in native dialog
- * @param properties dialog properties
- * @param buttons actions builder block
- *
- */
+/** Cupertino action sheet with optional title, message, content, and buttons. */
+
 @Composable
 @ExperimentalCupertinoApi
 fun CupertinoActionSheet(

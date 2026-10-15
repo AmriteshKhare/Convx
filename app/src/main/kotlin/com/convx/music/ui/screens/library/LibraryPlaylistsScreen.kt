@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.library
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -121,6 +123,7 @@ import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.utils.rememberHeroZoom
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -149,7 +152,7 @@ fun LibraryPlaylistsScreen(
     
     val (libraryIconsOnly) = rememberPreference(LibraryIconsOnlyKey, defaultValue = true)
 
-    val playlists by viewModel.allPlaylists.collectAsState()
+    val playlists by viewModel.allPlaylists.collectAsStateWithLifecycle()
 
     val topSize by viewModel.topValue.collectAsState(initial = 50)
 
@@ -231,7 +234,7 @@ fun LibraryPlaylistsScreen(
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val scrollToTop =
-        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsState()
+        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
 
     val (innerTubeCookie) = rememberPreference(InnerTubeCookieKey, "")
     val isLoggedIn = remember(innerTubeCookie) {
@@ -312,13 +315,10 @@ fun LibraryPlaylistsScreen(
                         selected = viewType == type,
                         onClick = { viewType = type },
                         icon = {
-                            Icon(
-                                imageVector = when (type) {
-                                    LibraryViewType.LIST -> SfSymbols.Monochrome.SFListBullet
-                                    LibraryViewType.GRID -> SfSymbols.Monochrome.SFSquareGrid2x2
-                                },
-                                contentDescription = null,
-                            )
+                            SymbolIcon(bounceOnEnter = true, symbol = when (type) {
+                                    LibraryViewType.LIST -> sf("SFListBullet")
+                                    LibraryViewType.GRID -> sf("SFSquareGrid2x2")
+                                }, contentDescription = null)
                         },
                     )
                 }
@@ -328,11 +328,14 @@ fun LibraryPlaylistsScreen(
 
     // Hoisted: both view types de-duped the same list separately, and the scroll rail
     // needs the resulting count too.
-    val visiblePlaylists = remember(playlists) { playlists.distinctBy { it.id } }
+    // Synced (online) playlists lead; ones made on this device follow below a divider.
+    val (onlinePlaylists, devicePlaylists) = remember(playlists) {
+        playlists.distinctBy { it.id }.partition { it.playlist.browseId != null }
+    }
+    val visiblePlaylists = remember(onlinePlaylists, devicePlaylists) { onlinePlaylists + devicePlaylists }
+    val showDivider = onlinePlaylists.isNotEmpty() && devicePlaylists.isNotEmpty()
 
-    // Pinned playlists get their own row up top — a visually distinct section, not
-    // just a sort tweak within the list below, which still shows every playlist
-    // (pinned ones included) in whatever order/grouping the user picked.
+    // Keep pinned playlists in the regular list; this separate list feeds the pinned row.
     val pinnedPlaylists = remember(visiblePlaylists) {
         visiblePlaylists.filter { it.playlist.pinnedAt != null }
             .sortedByDescending { it.playlist.pinnedAt }
@@ -419,6 +422,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = likedPlaylist,
+                                sharedArtworkId = "liked",
                                 grid = false,
                                 onClick = { navController.navigate("auto_playlist/liked") },
                                 showIconOnly = libraryIconsOnly,
@@ -434,6 +438,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = downloadPlaylist,
+                                sharedArtworkId = "downloaded",
                                 grid = false,
                                 onClick = { navController.navigate("auto_playlist/downloaded") },
                                 showIconOnly = libraryIconsOnly,
@@ -449,6 +454,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = topPlaylist,
+                                sharedArtworkId = topSize.toString(),
                                 grid = false,
                                 onClick = { navController.navigate("top_playlist/$topSize") },
                                 showIconOnly = libraryIconsOnly,
@@ -464,6 +470,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = cachePlaylist,
+                                sharedArtworkId = "cached",
                                 grid = false,
                                 onClick = { navController.navigate("cache_playlist/cached") },
                                 showIconOnly = libraryIconsOnly,
@@ -479,6 +486,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = uploadedPlaylist,
+                                sharedArtworkId = "uploaded",
                                 grid = false,
                                 onClick = { navController.navigate("auto_playlist/uploaded") },
                                 showIconOnly = libraryIconsOnly,
@@ -507,8 +515,24 @@ fun LibraryPlaylistsScreen(
                         }
 
                         items(
-                            items = visiblePlaylists,
+                            items = onlinePlaylists,
                             key = { it.id },
+                            contentType = { CONTENT_TYPE_PLAYLIST },
+                        ) { playlist ->
+                            LibraryPlaylistListItem(
+                                navController = navController,
+                                menuState = menuState,
+                                coroutineScope = coroutineScope,
+                                playlist = playlist,
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                        if (showDivider) {
+                            item(key = "local_divider", contentType = CONTENT_TYPE_HEADER) { LocalSectionDivider() }
+                        }
+                        items(
+                            items = devicePlaylists,
+                            key = { "local_${it.id}" },
                             contentType = { CONTENT_TYPE_PLAYLIST },
                         ) { playlist ->
                             LibraryPlaylistListItem(
@@ -621,6 +645,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = likedPlaylist,
+                                sharedArtworkId = "liked",
                                 grid = true,
                                 onClick = { navController.navigate("auto_playlist/liked") },
                                 showIconOnly = libraryIconsOnly,
@@ -636,6 +661,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = downloadPlaylist,
+                                sharedArtworkId = "downloaded",
                                 grid = true,
                                 onClick = { navController.navigate("auto_playlist/downloaded") },
                                 showIconOnly = libraryIconsOnly,
@@ -651,6 +677,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = topPlaylist,
+                                sharedArtworkId = topSize.toString(),
                                 grid = true,
                                 onClick = { navController.navigate("top_playlist/$topSize") },
                                 showIconOnly = libraryIconsOnly,
@@ -666,6 +693,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = cachePlaylist,
+                                sharedArtworkId = "cached",
                                 grid = true,
                                 onClick = { navController.navigate("cache_playlist/cached") },
                                 showIconOnly = libraryIconsOnly,
@@ -681,6 +709,7 @@ fun LibraryPlaylistsScreen(
                         ) {
                             AutoPlaylistCard(
                                 playlist = uploadedPlaylist,
+                                sharedArtworkId = "uploaded",
                                 grid = true,
                                 onClick = { navController.navigate("auto_playlist/uploaded") },
                                 showIconOnly = libraryIconsOnly,
@@ -709,8 +738,28 @@ fun LibraryPlaylistsScreen(
                         }
 
                         items(
-                            items = visiblePlaylists,
+                            items = onlinePlaylists,
                             key = { it.id },
+                            contentType = { CONTENT_TYPE_PLAYLIST },
+                        ) { playlist ->
+                            LibraryPlaylistGridItem(
+                                navController = navController,
+                                menuState = menuState,
+                                coroutineScope = coroutineScope,
+                                playlist = playlist,
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                        if (showDivider) {
+                            item(
+                                key = "local_divider",
+                                span = { GridItemSpan(maxLineSpan) },
+                                contentType = CONTENT_TYPE_HEADER,
+                            ) { LocalSectionDivider() }
+                        }
+                        items(
+                            items = devicePlaylists,
+                            key = { "local_${it.id}" },
                             contentType = { CONTENT_TYPE_PLAYLIST },
                         ) { playlist ->
                             LibraryPlaylistGridItem(
@@ -761,6 +810,7 @@ fun LibraryPlaylistsScreen(
 @Composable
 private fun AutoPlaylistCard(
     playlist: Playlist,
+    sharedArtworkId: String? = null,
     grid: Boolean,
     onClick: () -> Unit,
     showIconOnly: Boolean,
@@ -798,6 +848,7 @@ private fun AutoPlaylistCard(
                 playlist = playlist,
                 fillMaxWidth = true,
                 autoPlaylist = true,
+                sharedArtworkId = sharedArtworkId,
                 showIconOnly = showIconOnly,
                 thumbnailOverrideUrl = override,
                 modifier = clickMod,
@@ -806,6 +857,7 @@ private fun AutoPlaylistCard(
             PlaylistListItem(
                 playlist = playlist,
                 autoPlaylist = true,
+                sharedArtworkId = sharedArtworkId,
                 showIconOnly = showIconOnly,
                 thumbnailOverrideUrl = override,
                 modifier = clickMod,

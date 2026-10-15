@@ -2,6 +2,8 @@
 
 package com.convx.music
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Context
@@ -131,7 +133,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.convx.music.constants.IsFirstRunKey
-import com.convx.music.ui.theme.vivimusicTheme
+import com.convx.music.ui.theme.ConvxTheme
 import com.convx.music.ui.utils.safeOpenUri
 import com.convx.music.utils.dataStore
 import com.convx.music.utils.get
@@ -159,7 +161,7 @@ class WelcomeActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
-            vivimusicTheme {
+            ConvxTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = AppTheme.colorScheme.background
@@ -180,8 +182,11 @@ class WelcomeActivity : ComponentActivity() {
     }
 
     private fun finishOnboarding() {
-        startActivity(Intent(this, MainActivity::class.java))
+        startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_PLAY_INTRO, true))
         finish()
+        // The intro picks up from the black splash; a window slide would break the handoff.
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
     }
 }
 
@@ -458,11 +463,7 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                                 description = stringResource(com.convx.music.R.string.perm_install_desc),
                                 shape = bottomCardShape,
                                 control = {
-                                    Icon(
-                                        imageVector = if (canInstallPackages) Icons.Rounded.Check else Icons.Rounded.ChevronRight,
-                                        contentDescription = null,
-                                        tint = if (canInstallPackages) AppTheme.colorScheme.primary else AppTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    SymbolIcon(symbol = if (canInstallPackages) sf("checkmark") else sf("chevron.right"), contentDescription = null, tint = if (canInstallPackages) AppTheme.colorScheme.primary else AppTheme.colorScheme.onSurfaceVariant)
                                 },
                                 onClick = {
                                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -528,11 +529,7 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                             description = "Help us reach more people by starring our repository.",
                             shape = topCardShape,
                             control = {
-                                Icon(
-                                    imageVector = Icons.Rounded.ChevronRight,
-                                    contentDescription = null,
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("chevron.right"), contentDescription = null, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             onClick = {
                                 uriHandler.safeOpenUri(context, "https://github.com/cosmictaserdev-creator/Convx")
@@ -549,11 +546,7 @@ fun WelcomePagerScreen(onFinished: () -> Unit) {
                             description = "Get the latest updates and chat with the community.",
                             shape = bottomCardShape,
                             control = {
-                                Icon(
-                                    imageVector = Icons.Rounded.ChevronRight,
-                                    contentDescription = null,
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("chevron.right"), contentDescription = null, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             onClick = {
                                 uriHandler.safeOpenUri(context, "https://discord.gg/Ejeb4cmzfd")

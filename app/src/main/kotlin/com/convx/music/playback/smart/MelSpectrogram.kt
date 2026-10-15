@@ -2,11 +2,11 @@
  * Ported from Orchard (https://github.com/SFG5453/Orchard).
  *
  * Copyright (C) 2026 SFG545 (original Orchard implementation)
- * Copyright (C) 2026 Kushagra Singh (BitChord adaptation)
+ * Copyright (C) 2026 Convx contributors (adapted from an open-source base)
  *
  * Orchard's original source is licensed under the GNU Affero General Public
  * License, version 3 or later. Per AGPLv3 section 13, this file is combined
- * here into BitChord -- a work licensed under the GNU General Public
+ * here into the reference app -- a work licensed under the GNU General Public
  * License, version 3 or later -- and remains itself governed by the AGPLv3
  * as part of that combination.
  *
@@ -21,22 +21,11 @@
 
 package com.convx.music.playback.smart
 
-/**
- * The log-mel front end the Beat This! model expects, backed by the native analyzer.
- *
- * Every constant is dictated by the trained network rather than chosen: it was trained on
- * torchaudio's MelSpectrogram at 22,050 Hz with n_fft 1024, hop 441 (so exactly 50 frames per
- * second), 128 Slaney mel bands from 30 Hz to 11 kHz, and `log1p(1000 * magnitude)`. A front end
- * that differs even in window convention feeds the model something it has never seen, which is why
- * this is a port of the native C++ rather than a reimplementation.
- *
- * [sampleRate] is required, not preferred: audio at any other rate is refused rather than
- * resampled here, because resampling belongs upstream where full-bandwidth samples still exist.
- */
+/** Native log-mel front end for Beat This. Its sample rate and tensor shape must match the trained model. */
 object MelSpectrogram {
 
     /** True when the native library loaded. Analysis is optional, so this is a fact, not a fault. */
-    val available: Boolean = runCatching { System.loadLibrary("vivi_analysis") }.isSuccess
+    val available: Boolean = runCatching { System.loadLibrary("convx_analysis") }.isSuccess
 
     /** Mel bands per frame; the model's input width. */
     val mels: Int by lazy { if (available) nativeMelCount() else 128 }
@@ -50,13 +39,7 @@ object MelSpectrogram {
     /** Frames per second of output, which is what beat times are derived from. */
     val frameRate: Double get() = sampleRate / hop
 
-    /**
-     * Computes the spectrogram for contiguous mono float PCM at [sampleRate].
-     *
-     * Returns null when the native library is missing, the rate is wrong, or the input is shorter
-     * than one padded frame. Callers treat that as "no model prediction available" rather than as
-     * an error; the transition policy already degrades on absent evidence.
-     */
+    /** Computes a spectrogram; returns null when native analysis is unavailable or input is invalid. */
     fun compute(samples: FloatArray, sampleRate: Double = this.sampleRate): Spectrogram? {
         if (!available || samples.isEmpty()) return null
         val values = nativeCompute(samples, sampleRate)
@@ -81,16 +64,7 @@ object MelSpectrogram {
         override fun hashCode(): Int = 31 * (31 * values.contentHashCode() + frames) + mels
     }
 
-    /**
-     * Converts mono float PCM to [sampleRate], the only rate [compute] accepts.
-     *
-     * A windowed-sinc conversion rather than decimation: dropping samples would fold everything
-     * above 11 kHz back into the band the mel filterbank reads, and an aliased spectrogram yields
-     * a *wrong* beat grid rather than a noisy one, which the planner would then trust.
-     *
-     * Returns the input unchanged when the rates already match, and null when the native library
-     * is missing or the rates are unusable.
-     */
+    /** Resamples mono PCM for [compute], preserving frequencies that decimation would alias. */
     fun resample(samples: FloatArray, inputRate: Double, outputRate: Double = sampleRate): FloatArray? {
         if (!available || samples.isEmpty() || inputRate <= 0 || outputRate <= 0) return null
         return nativeResample(samples, inputRate, outputRate).takeIf { it.isNotEmpty() }

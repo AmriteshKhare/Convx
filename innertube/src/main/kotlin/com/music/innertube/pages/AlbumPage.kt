@@ -73,7 +73,6 @@ data class AlbumPage(
         }
 
         fun getSong(renderer: MusicResponsiveListItemRenderer, album: AlbumItem? = null): SongItem? {
-            // Extract library tokens using the new method that properly handles multiple toggle items
             val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
 
             return SongItem(
@@ -86,7 +85,10 @@ data class AlbumPage(
                     ?.text?.runs?.firstOrNull()
                     ?.navigationEndpoint?.watchEndpoint?.videoId
                 ?: return null,
-                title = PageHelper.extractRuns(renderer.flexColumns, "MUSIC_VIDEO").firstOrNull()?.text ?: return null,
+                title = PageHelper.extractRuns(renderer.flexColumns, "MUSIC_VIDEO").firstOrNull()?.text
+                    ?: renderer.flexColumns.firstOrNull()?.musicResponsiveListItemFlexColumnRenderer?.text?.runs
+                        ?.joinToString("") { it.text }?.takeIf { it.isNotBlank() }
+                    ?: return null,
                 artists = PageHelper.extractRuns(renderer.flexColumns, "MUSIC_PAGE_TYPE_ARTIST").map{
                     Artist(
                         name = it.text,
@@ -105,7 +107,10 @@ data class AlbumPage(
                 },
                 duration = renderer.fixedColumns?.firstOrNull()
                     ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()
-                    ?.text?.parseTime() ?: return null,
+                    ?.text?.parseTime()
+                    ?: renderer.flexColumns.drop(1).flatMap { it.musicResponsiveListItemFlexColumnRenderer.text?.runs.orEmpty() }
+                        .firstOrNull { it.text.matches(Regex("\\d+:\\d{2}(?::\\d{2})?")) }?.text?.parseTime()
+                    ?: return null,
                 musicVideoType = renderer.musicVideoType,
                 thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: album?.thumbnail ?: return null,
                 explicit = renderer.badges?.find {

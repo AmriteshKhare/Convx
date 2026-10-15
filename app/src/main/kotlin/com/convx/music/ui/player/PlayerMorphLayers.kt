@@ -16,22 +16,10 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 
 /**
- * The two ends of the mini-to-full morph, recorded rather than drawn.
- *
- * The morph Melox does -- and the one this now does -- is NOT a sheet sliding up over a
- * mini player. Both ends are recorded into a [GraphicsLayer] and neither is drawn where
- * it lives. One overlay, sized to the interpolated container rect, draws the mini
- * player's recording at its own local offsets while it fades, and the WHOLE full player
- * recording scaled down into the same rect. That is why the player appears to shrink into
- * the pill and unfold back out of it, instead of one panel travelling past another.
- *
- * Module-level for the same reason the rects are: the pill lives in the floating nav bar,
- * the sheet lives in the player, the overlay is drawn in between, and none of the three
- * can hand a value to the other two through the tree.
- *
- * Plain fields, not snapshot state -- everything here is read in the DRAW phase, and a
- * snapshot read there would make every write re-invalidate the frame (the trap that
- * `hideWhileArtworkMorphing` was fixed for).
+ * Records the mini and full player layers, then draws them into one interpolated
+ * rectangle to create the expand/collapse morph. This state is shared because
+ * the nav bar, sheet, and overlay live in separate UI branches. Fields are read
+ * during drawing, so they stay plain fields rather than snapshot state.
  */
 object PlayerMorph {
     /**
@@ -41,11 +29,13 @@ object PlayerMorph {
     @JvmField var enabled: Boolean = true
     @JvmField var miniLayer: GraphicsLayer? = null
     /** The pill's own surface (glass, shadow, fill), recorded apart from its content: the card
-     *  starts as this surface stretched to the card rect (Melox draws its mini surface on the
+     *  starts as this surface stretched to the card rect (the reference app draws its mini surface on the
      *  growing card), so mini and player read as ONE object, not a pill swapped for a card. */
     @JvmField var miniSurfaceLayer: GraphicsLayer? = null
     @JvmField var fullBackgroundLayer: GraphicsLayer? = null
     @JvmField var fullContentLayer: GraphicsLayer? = null
+    /** Keeps the expanded player in place during a hero transition when explicitly enabled. */
+    @JvmField var stayInPlace: Boolean = false
     /** The pill's own drop-shadow elevation (px). The card casts it while it is still the
      *  pill, so the shadow is there all the way down instead of popping in on landing. */
     @JvmField var miniShadowElevationPx: Float = 0f
@@ -60,11 +50,8 @@ object PlayerMorph {
     /**
      * The close's landing, in sheet-progress units (<= 0 while it runs, 0 at rest).
      *
-     * The sheet's lower bound IS the collapsed anchor, so the close spring hits it at full
-     * speed and stops dead. The docked pill used to take over there and start its own dip
-     * spring: two motions with the speed cut between them -- the "lands, snaps, THEN
-     * overshoots". Now the card itself carries on past the slot on this spring, seeded with
-     * the exact arrival speed, and springs back; the pill only reappears once it settles.
+     * The card keeps control after reaching the collapsed anchor so its arrival speed carries
+     * into the overshoot spring. The docked pill reappears after the landing settles.
      */
     val landing = androidx.compose.animation.core.Animatable(0f)
 
@@ -90,40 +77,18 @@ object PlayerMorph {
     }
 
     /**
-     * Confirmed-fresh flags (Melox PlayerSheetTransitionState.miniFrameReady /
-     * fullBackgroundFrameReady / fullContentFrameReady).
-     *
-     * [active] used to trust a recording the instant its [GraphicsLayer] ref was
-     * non-null and the pill had a measured size -- true from the very first frame of
-     * a fast tap-open, before the full player's content had actually been composed,
-     * measured, and drawn even once. For that frame the source was already hidden
-     * (`drawInPlace = !active`) but the overlay's own zero-size guard on
-     * `fullContentLayer` also skipped drawing -- nothing painted, then the next frame
-     * caught up all at once. That read as a static mini pill with the real player
-     * just fading in, not one shape growing, because the overlay's very first visible
-     * frame showed a stale or empty recording instead of the actual content.
-     *
-     * Set true only after [Modifier.recordPlayerLayer] has actually recorded that
-     * layer at a usable size. Never reset: a resize always redraws, and so re-records, the
-     * source, whereas a reset with no redraw after it left the morph off for good.
+     * Set after each player layer has been recorded at a usable size. This keeps
+     * the morph from hiding its source before the destination has a frame to draw.
+     * Flags stay true across resizes because recording automatically updates.
      */
     @JvmField var miniFrameReady: Boolean = false
     @JvmField var fullBackgroundFrameReady: Boolean = false
     @JvmField var fullContentFrameReady: Boolean = false
 
-    /** Set by the player; the sheet's own 0..1 drag/settle progress. Snapshot-backed so
-     *  [activeState] re-subscribes when the player installs its provider -- as a plain field
-     *  the derived state first ran against the `{ 0f }` placeholder, recorded no
-     *  dependencies, and stayed false for good (the morph silently never ran). */
+    /** Snapshot-backed so [activeState] observes the provider installed by the player. */
     var progressProvider: () -> Float by androidx.compose.runtime.mutableStateOf({ 0f })
 
-    /**
-     * The sheet's drag entry points, published for the mini player.
-     *
-     * The pill lives in the nav bar and has no way to reach the sheet's state through the
-     * tree, but the mini player can be dragged open, not only tapped -- and a drag is
-     * the only way to see the morph at a progress you choose.
-     */
+    /** Drag callbacks let the mini player open and control the sheet. */
     @JvmField var onDragStart: (fromMiniPlayer: Boolean) -> Unit = {}
     @JvmField var onDragDelta: (Float) -> Unit = {}
     @JvmField var onDragEnd: (Float) -> Unit = {}
@@ -131,7 +96,7 @@ object PlayerMorph {
 
     val progress: Float get() = progressProvider().coerceIn(0f, 1f)
 
-    /** Mirrors of the sheet state for input ownership (Melox target/isDragging). */
+    /** Mirrors of the sheet state for input ownership (the reference app target/isDragging). */
     @JvmField var targetOpen: Boolean = false
     @JvmField var isDragging: Boolean = false
     @JvmField var dragFromMiniPlayer: Boolean = false
@@ -184,7 +149,7 @@ object PlayerMorph {
 
     /**
      * All three recordings present, confirmed freshly recorded, with a usable pill:
-     * the overlay may draw and the sources may hide. Melox gates this on its own
+     * the overlay may draw and the sources may hide. the reference app gates this on its own
      * per-layer frame-ready flags (see their doc above); a non-null layer with a
      * non-zero pill is necessary but not sufficient -- see [miniFrameReady].
      */
@@ -234,7 +199,7 @@ fun InstallPlayerMorphLayers() {
  * recordings inside the shared container instead, and drawing them here as well would
  * leave a second copy sitting at its own resting position.
  *
- * [markReady] fires after each successful non-zero-size recording (Melox
+ * [markReady] fires after each successful non-zero-size recording (the reference app
  * markXFrameRecorded) -- see [PlayerMorph.miniFrameReady]'s doc for why the overlay
  * must not trust a layer before this has fired at least once at the current size.
  */

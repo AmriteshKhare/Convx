@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.player.customize
 
+import androidx.compose.ui.unit.dp
 import android.content.Context
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -212,7 +213,7 @@ fun PlayerGlyph(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    val resolved = if (slot != null) rememberPlayerIcon(slot) else null
+    val resolved = if (slot != null) rememberPlayerIcon(slot).takeIf { it.isCustom } else null
     val painter = resolved?.painter ?: painterResource(fallback)
     val filter = when {
         resolved == null -> ColorFilter.tint(tint)
@@ -240,7 +241,7 @@ fun PlayerGlyph(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    val resolved = if (slot != null) rememberPlayerIcon(slot) else null
+    val resolved = if (slot != null) rememberPlayerIcon(slot).takeIf { it.isCustom } else null
     val painter = resolved?.painter ?: rememberVectorPainter(fallbackVector)
     val filter = when {
         resolved == null -> ColorFilter.tint(tint)
@@ -253,6 +254,45 @@ fun PlayerGlyph(
         colorFilter = filter,
         modifier = modifier,
     )
+}
+
+/**
+ * [PlayerGlyph] drawing the stock glyph as a bold hierarchical SF Symbol with the shared chrome.
+ * A user's custom image for [slot] still wins.
+ */
+@Composable
+fun PlayerGlyph(
+    slot: PlayerIconSlot?,
+    fallbackSymbol: com.composables.sfsymbols.SfSymbol,
+    tint: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+    size: androidx.compose.ui.unit.Dp = 22.dp,
+    bounce: Boolean = false,
+) {
+    val resolved = if (slot != null) rememberPlayerIcon(slot).takeIf { it.isCustom } else null
+    if (resolved != null) {
+        Image(
+            painter = resolved.painter,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            colorFilter = resolved.colorFilterFor(tint),
+            modifier = modifier,
+        )
+    } else {
+        // The caller's modifier sizes the slot; the symbol sits centred inside it at [size].
+        androidx.compose.foundation.layout.Box(modifier, contentAlignment = androidx.compose.ui.Alignment.Center) {
+            com.convx.music.ui.component.SymbolIcon(
+                symbol = fallbackSymbol,
+                contentDescription = contentDescription,
+                size = size,
+                tint = tint,
+                bounceOnTouch = bounce,
+                // Black is the DstOut cut-out of an active tab disc: it must stay a plain mask.
+                chrome = if (tint == androidx.compose.ui.graphics.Color.Black) 0f else com.convx.music.ui.utils.MenuIconChrome,
+            )
+        }
+    }
 }
 
 /**

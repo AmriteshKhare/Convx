@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -76,6 +77,8 @@ fun HomeHeroCard(
     onShuffle: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    meshEnabled: Boolean = false,
+    meshPaused: () -> Boolean = { false },
 ) {
     // Apple Music's cover when the song matches (strict title + artist), YouTube's otherwise.
     val artState = com.convx.music.utils.rememberAppleArtwork(
@@ -156,16 +159,8 @@ fun HomeHeroCard(
                     },
             )
 
-            // Frosted band over the lower portion: the cover again, blurred, revealed by
-            // an alpha ramp so it fades in rather than starting at a hard edge. Ramp,
-            // saturation and darken are static once the art loads, so they bake once on
-            // the CPU inside BlurredBackdropImage: one plain Image, no Offscreen layer.
+            // Bake the static frost effect once for this card-sized artwork.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                // Baked once per artwork rather than blurred live: a non-null
-                // RenderEffect is re-evaluated on every composite, so this band --
-                // static once the cover loads -- was a full-card blur pass on every
-                // frame Home drew. The radius is projected for the full screen width
-                // inside the helper, so scale it for the card's narrower width.
                 val frostAspect = maxWidth / maxHeight
                 BlurredBackdropImage(
                     model = thumbnailUrl,
@@ -186,6 +181,17 @@ fun HomeHeroCard(
                 )
             }
         }
+
+        AnimatedChromeMesh(
+            enabled = meshEnabled,
+            paused = meshPaused,
+            fadeAtBottom = false,
+            alpha = 0.25f,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .fillMaxHeight(0.48f),
+        )
 
         // Darkening pass, kept separate from the frost so the text keeps its contrast on
         // a bright cover, and so pre-API-31 (where Modifier.blur no-ops) still gets a
@@ -249,7 +255,6 @@ private fun HeroPill(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        // Figma Button: gap 4, pads H20/V14 (225:2439).
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .clip(CircleShape)
@@ -266,7 +271,6 @@ private fun HeroPill(
         Text(
             text = label,
             style = AppTheme.typography.labelLarge,
-            // Figma Button label: SemiBold 17, -0.43 tracking (225:2439).
             fontSize = 17.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = (-0.43).sp,

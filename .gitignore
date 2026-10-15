@@ -121,6 +121,7 @@ app/keystore/
 *.md
 !README.md
 !SECURITY.md
+!docs/CODEBASE_REVIEW_2026-10.md
 !.github/CONTRIBUTING.md
 !automation/**/*.md
 !.github/pull_request_template.md
@@ -148,3 +149,7 @@ merge_strings.py
 stitch_lucid_glass_music/
 app/arm64Gms
 Convx_GitHub_Analytics.xlsx
+
+# Workspace-local native toolchains and Cargo outputs.
+.tools/
+spotify/native/target/

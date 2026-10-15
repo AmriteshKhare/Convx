@@ -11,7 +11,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.dropShadow
 import com.convx.music.ui.ios.compat.LocalContentColor
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.ripple
@@ -94,11 +94,24 @@ internal fun rememberElasticStretch(): InteractiveHighlight {
 }
 
 /**
- * A floating circular liquid-glass button — the back/share/favorite buttons on
- * the Artist/Album/Playlist detail screens, replacing their Material TopAppBar
- * and flat-colored circular Surface/IconButton. Falls back to a translucent
- * flat circle when glass is disabled or unsupported, same as
- * [com.convx.music.ui.component.FloatingNavBar]'s own useGlass fallback.
+ * reference-style shadow under floating top chrome (back button, menu pills): one wide, soft
+ * blurred drop -- 24dp, nudged 4dp down -- so the glass reads as lifted off the page,
+ * rather than the tight Material elevation edge it replaces. Shared by every top-bar
+ * button/pill so they all sit at the same height.
+ */
+fun Modifier.chromeShadow(shape: androidx.compose.ui.graphics.Shape): Modifier = dropShadow(
+    shape,
+    androidx.compose.ui.graphics.shadow.Shadow(
+        radius = 24.dp,
+        color = Color.Black,
+        offset = androidx.compose.ui.unit.DpOffset(0.dp, 4.dp),
+        alpha = 0.18f,
+    ),
+)
+
+/**
+ * A floating circular glass button for Artist, Album, and Playlist screens.
+ * Falls back to a translucent circle when glass is disabled or unsupported.
  */
 @OptIn(ExperimentalFoundationApi::class, ExperimentalHazeMaterialsApi::class, ExperimentalHazeApi::class)
 @Composable
@@ -113,19 +126,9 @@ fun GlassCircleButton(
     // Photos (account avatar) must not run through additiveChrome: Plus adds
     // white over every pixel and washes the photo out. Icons keep it.
     applyAdditiveChrome: Boolean = true,
-    // True skips the blur/lens/highlight-rim backdrop sampling entirely and always
-    // uses the flat fallback fill below — for a button that shouldn't be its own
-    // offscreen glass surface (e.g. the top-bar account avatar). The press-driven
-    // elastic squish and glow sheen (elasticStretch below) are unconditional either
-    // way, so this only removes the blur/lens/rim, not the interaction feel.
+    // Draw a flat fill while keeping the button interaction effects.
     forceFlat: Boolean = false,
-    // When set (and forceFlat is false), the button samples this Haze source
-    // instead of running the full liquidGlass blur+lens+highlight+shadow+dark-rim
-    // chain — a real frosted blur of whatever content the caller marked with
-    // Modifier.hazeSource(hazeState), at a small fraction of the cost, but
-    // without lens refraction. Pass the screen's existing HazeState (most list
-    // screens already have one for their own top fade) rather than creating a
-    // new source just for this button.
+    // Sample an existing Haze source instead of applying the full glass effect.
     hazeState: HazeState? = null,
     content: @Composable () -> Unit,
 ) {
@@ -141,7 +144,7 @@ fun GlassCircleButton(
     // Single limelight: no local rim computation — pass an explicit caller tint
     // through, otherwise Unspecified so liquidGlass derives the same shared
     // ambient rim every other glass surface on this screen uses.
-    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val isDark = glassUsesDarkAppearance()
     val isHeroContext = (ambientColor.isSpecified && !ambientColor.isHueless()) || rimTintColor.isSpecified
     val highlightAlpha = com.convx.music.ui.theme.GlassTintTokens.pluckOpacity(isDark, isHeroContext)
     val effectiveRimTintColor = if (rimTintColor.isSpecified) rimTintColor else com.convx.music.ui.theme.GlassTintTokens.pluckColor(isDark, ambientColor)
@@ -187,8 +190,7 @@ fun GlassCircleButton(
         modifier = modifier
             .graphicsLayer(elasticStretchLayerBlock(elasticStretch))
             .size(size)
-            // Figma chrome shadow under top-bar buttons.
-            .shadow(12.dp, GlassCircleShape, spotColor = Color.Black.copy(alpha = 0.35f))
+            .chromeShadow(GlassCircleShape)
             .clip(GlassCircleShape)
             .then(backgroundModifier)
             .combinedClickable(
@@ -229,6 +231,7 @@ fun ContrastCircleButton(
     onLongClick: (() -> Unit)? = null,
     size: Dp = 44.dp,
     filled: Boolean = false,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -246,11 +249,11 @@ fun ContrastCircleButton(
         modifier = modifier
             .graphicsLayer(elasticStretchLayerBlock(elasticStretch))
             .size(size)
-            // Figma chrome shadow under top-bar buttons.
-            .shadow(12.dp, GlassCircleShape, spotColor = Color.Black.copy(alpha = 0.35f))
+            .chromeShadow(GlassCircleShape)
             .clip(GlassCircleShape)
             .background(bg)
             .combinedClickable(
+                enabled = enabled,
                 onClick = onClick,
                 onLongClick = onLongClick,
                 role = Role.Button,

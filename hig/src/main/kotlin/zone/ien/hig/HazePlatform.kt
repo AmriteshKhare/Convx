@@ -147,7 +147,7 @@ internal class HazeNode(
         drawContent()
 
         for (area in areas) {
-            // We need to boost the alpha as we don't have a blur effect
+            // Keep the tint opaque because this fallback does not blur the content.
             drawRect(
                 color = tint.copy(alpha = 1f),
                 topLeft = area.topLeft,

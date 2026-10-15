@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -76,15 +78,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Caps on a picked background file, so a stray 4K/multi-gigabyte video or GIF
- *  doesn't get copied into app storage and tank Home's scroll perf. Video gets
- *  a higher ceiling than image/GIF since it's expected to be the bigger file. */
+/** File size limits for picked background images and videos. */
 private const val MaxHomeBackgroundImageBytes = 20L * 1024 * 1024
 private const val MaxHomeBackgroundVideoBytes = 80L * 1024 * 1024
 
-/** Reads the picked Uri's size via the content resolver without opening the
- *  whole stream. -1 if the provider doesn't report a size (allowed through —
- *  can't enforce a cap it can't measure). */
+/** Reads the picked file size without opening its stream; returns -1 when unavailable. */
 private fun mediaSizeBytes(context: android.content.Context, uri: Uri): Long {
     return context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
         val idx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
@@ -92,23 +90,19 @@ private fun mediaSizeBytes(context: android.content.Context, uri: Uri): Long {
     } ?: -1L
 }
 
+private fun copyRawMedia(context: android.content.Context, source: Uri, destination: File): String? {
+    val input = context.contentResolver.openInputStream(source) ?: return null
+    input.use { stream ->
+        destination.outputStream().use { output -> stream.copyTo(output) }
+    }
+    return destination.absolutePath
+}
 
-/** Copies a picked image/video into app storage so the background survives
- *  without a persistable URI permission. Unique filename cache-busts Coil.
- *  Returns the absolute path, or null on failure.
- *
- *  Images are re-encoded down to [maxWidth]x[maxHeight] first. A modern phone
- *  camera or a downloaded wallpaper is routinely 20-50 MP, and keeping the raw
- *  bytes whole means every screen that shows the background pays a full-size
- *  decode and downsample, with the file sitting in app storage at its original
- *  size forever. [maxWidth]/[maxHeight] are the caller's target — see
- *  [rememberHomeBackgroundTargetSize] for how that's derived from the device's
- *  own screen resolution and the user's quality preference.
- *  Videos are copied as-is: transcoding one is not a per-pick cost worth paying.
- *
- *  Decoding through Coil rather than BitmapFactory deliberately: it already
- *  applies EXIF orientation, so a portrait photo taken sideways does not come out
- *  rotated the way a hand-rolled decode would.
+
+/**
+ * Copies picked media into app storage so it survives picker permission changes.
+ * Images are resized through Coil to preserve EXIF orientation; videos and GIFs are copied as-is.
+ * Returns the saved path, or null on failure.
  */
 private suspend fun copyBackgroundMedia(
     context: android.content.Context,
@@ -122,15 +116,8 @@ private suspend fun copyBackgroundMedia(
     val dest = File(context.filesDir, "home_background_${System.currentTimeMillis()}.$ext")
 
     if (isVideo || isGif) {
-        // Raw copy, no bake: decoding a GIF down to one frame and re-encoding it as a JPEG
-        // (the still-image path below) throws the animation away permanently. Coil already
-        // has a GIF decoder registered (App.kt), so the file plays as-is once HomeImageBackground
-        // points AsyncImage at it — animation is only lost again if blur bakes it to a static
-        // file, which is an intentional perf tradeoff there, not this copy step's problem.
-        context.contentResolver.openInputStream(source)?.use { input ->
-            dest.outputStream().use { output -> input.copyTo(output) }
-        } ?: return null
-        return@runCatching dest.absolutePath
+        // Preserve the original GIF and avoid transcoding video during the pick.
+        return@runCatching copyRawMedia(context, source, dest)
     }
 
     val request = ImageRequest.Builder(context)
@@ -141,30 +128,17 @@ private suspend fun copyBackgroundMedia(
     val bitmap = (context.imageLoader.execute(request) as? SuccessResult)?.image?.toBitmap()
 
     if (bitmap == null) {
-        // Decode failed (exotic format, corrupt file). The raw copy still renders
-        // through Coil's own decoders, so fall back rather than losing the pick.
-        context.contentResolver.openInputStream(source)?.use { input ->
-            dest.outputStream().use { output -> input.copyTo(output) }
-        } ?: return null
-        return@runCatching dest.absolutePath
+        // Keep the original when Coil cannot resize the image.
+        return@runCatching copyRawMedia(context, source, dest)
     }
 
     dest.outputStream().use { output ->
-        // Was 90 — fine at the old flat 1080x1920 cap, but now that the stored
-        // size can go up to full screen resolution, the same ratio leaves more
-        // visible blocking in smooth/gradient regions at the larger pixel
-        // count. Bump quality to match.
         bitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)
     }
     dest.absolutePath
 }.getOrNull()
 
-/**
- * Background-image controls (preview + enable/pick/blur/dim/animate/remove) —
- * embedded inside [ThemeScreen] rather than its own settings screen, since it's
- * just another facet of the app's theme. See PLAN notes: moved out of
- * AppearanceSettings' standalone "settings/appearance/homebackground" route.
- */
+/** Settings for the custom background image and video used on Home. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeBackgroundControls() {
@@ -173,7 +147,7 @@ fun HomeBackgroundControls() {
 
     val (enabled, onEnabledChange) = rememberPreference(HomeBackgroundEnabledKey, defaultValue = false)
     val (path, onPathChange) = rememberPreference(HomeBackgroundPathKey, defaultValue = "")
-    val (blur, onBlurChange) = rememberPreference(HomeBackgroundBlurKey, defaultValue = 20f)
+    val (blur, onBlurChange) = rememberPreference(HomeBackgroundBlurKey, defaultValue = 48f)
     val (dim, onDimChange) = rememberPreference(HomeBackgroundDimKey, defaultValue = 0.4f)
     val (animate, onAnimateChange) = rememberPreference(HomeBackgroundAnimateKey, defaultValue = false)
     val (isVideo, onIsVideoChange) = rememberPreference(HomeBackgroundIsVideoKey, defaultValue = false)
@@ -228,13 +202,14 @@ fun HomeBackgroundControls() {
         }
     }
 
-    if (pendingVideoUri != null) {
+    val videoUriToConfirm = pendingVideoUri
+    if (videoUriToConfirm != null) {
         DefaultDialog(
             onDismiss = { pendingVideoUri = null },
             buttons = {
                 TextButton(onClick = { pendingVideoUri = null }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = {
-                    applyPickedMedia(pendingVideoUri!!, video = true)
+                    applyPickedMedia(videoUriToConfirm, video = true)
                     pendingVideoUri = null
                 }) { Text(stringResource(R.string.home_background_video_confirm)) }
             }
@@ -262,8 +237,7 @@ fun HomeBackgroundControls() {
             if (path.isNotEmpty() && isVideo) {
                 HomeVideoBackground(path = path, blur = blur, dim = dim)
             } else if (path.isNotEmpty()) {
-                // Mirrors HomeImageBackground's own steady state: a real live
-                // RenderEffect blur, same as what the home screen actually shows.
+                // This preview uses a live blur; HomeImageBackground uses a cached blur.
                 val previewRequest = remember(path) {
                     ImageRequest.Builder(context)
                         .data(File(path))
@@ -399,7 +373,7 @@ fun HomeBackgroundControls() {
                     },
                     trailingContent = {
                         if (mode == libraryBackgroundMode) {
-                            Icon(painter = painterResource(R.drawable.check), contentDescription = null)
+                            SymbolIcon(symbol = sf("checkmark"), contentDescription = null)
                         }
                     },
                     onClick = { onLibraryBackgroundModeChange(mode) }
@@ -415,7 +389,7 @@ fun HomeBackgroundControls() {
         DefaultDialog(
             onDismiss = { tempValue = blur; showBlurDialog = false },
             buttons = {
-                TextButton(onClick = { tempValue = 20f }) { Text(stringResource(R.string.reset)) }
+                TextButton(onClick = { tempValue = 48f }) { Text(stringResource(R.string.reset)) }
                 Spacer(modifier = Modifier.weight(1f))
                 TextButton(onClick = { tempValue = blur; showBlurDialog = false }) { Text(stringResource(android.R.string.cancel)) }
                 TextButton(onClick = { onBlurChange(tempValue); showBlurDialog = false }) { Text(stringResource(android.R.string.ok)) }
@@ -424,7 +398,7 @@ fun HomeBackgroundControls() {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
                 Text(text = stringResource(R.string.home_background_blur), style = AppTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
                 Text(text = "%.0f".format(tempValue), style = AppTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
-                Slider(value = tempValue, onValueChange = { tempValue = it }, valueRange = 0f..50f, modifier = Modifier.fillMaxWidth())
+                Slider(value = tempValue, onValueChange = { tempValue = it }, valueRange = 0f..100f, modifier = Modifier.fillMaxWidth())
             }
         }
     }

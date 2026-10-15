@@ -64,18 +64,13 @@ fun AnimatedPlayPauseIcon(
             // so the swap never moves siblings mid-morph.
             val settleScale = if (playing) 0.88f else 1f
             val opticalShiftPx = if (!playing) 2.dp else 0.dp
-            Icon(
-                imageVector = if (playing) SfSymbols.Monochrome.SFPauseFill else SfSymbols.Monochrome.SFPlayFill,
-                contentDescription = description,
-                tint = tint,
-                modifier = Modifier
+            SymbolIcon(symbol = if (playing) sf("SFPauseFill") else sf("SFPlayFill"), contentDescription = description, modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
                         scaleX = settleScale
                         scaleY = settleScale
                         translationX = opticalShiftPx.toPx()
-                    },
-            )
+                    }, tint = tint)
         }
     }
 }

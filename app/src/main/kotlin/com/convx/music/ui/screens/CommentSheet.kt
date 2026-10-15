@@ -1,5 +1,7 @@
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,17 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.BottomSheetDefaults
 import com.convx.music.ui.ios.compat.CircularWavyProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import com.convx.music.ui.ios.compat.HorizontalDivider
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.IconButton
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.ios.compat.ModalBottomSheet
 import com.convx.music.ui.ios.compat.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +50,11 @@ import com.composables.sfsymbols.monochrome.SFExclamationmarkTriangle
 import com.composables.sfsymbols.monochrome.SFHandThumbsup
 import com.composables.sfsymbols.monochrome.SFXmark
 import kotlinx.coroutines.launch
+import com.convx.music.ui.component.IosGrabber
+import zone.ien.hig.CupertinoModalBottomSheet
+import zone.ien.hig.PresentationDetent
+import zone.ien.hig.PresentationStyle
+import zone.ien.hig.rememberCupertinoSheetState
 
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.AnimatedPane
@@ -61,18 +64,23 @@ import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaf
 import androidx.compose.material3.adaptive.navigation.BackNavigationBehavior
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
+import com.convx.music.utils.reportException
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3AdaptiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun CommentSheet(
     videoId: String,
     onDismiss: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberCupertinoSheetState(
+        presentationStyle = PresentationStyle.Modal(
+            detents = setOf(PresentationDetent.Large),
+        ),
+    )
 
     var comments by remember { mutableStateOf<List<CommentThreadRenderer>>(emptyList()) }
     var nextToken by remember { mutableStateOf<String?>(null) }
@@ -88,16 +96,16 @@ fun CommentSheet(
             nextToken = token
             isLoading = false
         }.onFailure {
-            it.printStackTrace()
+            reportException(it)
             isLoading = false
             isError = true
         }
     }
 
-    ModalBottomSheet(
+    CupertinoModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
+        dragHandle = { IosGrabber() },
         containerColor = AppTheme.colorScheme.surfaceContainer
     ) {
         Column(modifier = Modifier.fillMaxHeight()) {
@@ -127,10 +135,7 @@ fun CommentSheet(
                         if (!sheetState.isVisible) onDismiss()
                     }
                 }) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFXmark,
-                        contentDescription = stringResource(R.string.close)
-                    )
+                    SymbolIcon(symbol = sf("SFXmark"), contentDescription = stringResource(R.string.close))
                 }
             }
 
@@ -155,12 +160,7 @@ fun CommentSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFExclamationmarkTriangle,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = AppTheme.colorScheme.error
-                            )
+                            SymbolIcon(symbol = sf("SFExclamationmarkTriangle"), contentDescription = null, size = 48.dp, tint = AppTheme.colorScheme.error)
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(text = stringResource(R.string.no_comments))
                         }
@@ -193,10 +193,11 @@ fun CommentSheet(
                                         )
                                     }
 
-                                    if (nextToken != null) {
+                                    val continuationToken = nextToken
+                                    if (continuationToken != null) {
                                         item(key = "pagination_loader") {
-                                            LaunchedEffect(nextToken) {
-                                                YouTube.commentContinuation(nextToken!!).onSuccess { (newComments, token) ->
+                                            LaunchedEffect(continuationToken) {
+                                                YouTube.commentContinuation(continuationToken).onSuccess { (newComments, token) ->
                                                     comments = comments + newComments
                                                     nextToken = token
                                                 }
@@ -290,12 +291,7 @@ fun CommentItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val voteCount = renderer.voteCount
                 if (voteCount != null) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFHandThumbsup,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = AppTheme.colorScheme.onSurfaceVariant
-                    )
+                    SymbolIcon(symbol = sf("SFHandThumbsup"), contentDescription = null, size = 14.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = voteCount.runs?.firstOrNull()?.text ?: "0",
@@ -314,12 +310,7 @@ fun CommentItem(
                             interactionSource = remember { MutableInteractionSource() }
                         ) { onShowReplies() }
                     ) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFBubbleLeftAndBubbleRight,
-                            contentDescription = "Replies",
-                            modifier = Modifier.size(14.dp),
-                            tint = AppTheme.colorScheme.onSurfaceVariant
-                        )
+                        SymbolIcon(symbol = sf("SFBubbleLeftAndBubbleRight"), contentDescription = "Replies", size = 14.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = replyCount.toString(),
@@ -359,7 +350,7 @@ fun CommentDetailPane(
                 repliesNextToken = token
                 isLoadingReplies = false
             }.onFailure {
-                it.printStackTrace()
+                reportException(it)
                 isLoadingReplies = false
             }
         }
@@ -408,7 +399,8 @@ fun CommentDetailPane(
                 }
             }
             
-            if (repliesNextToken != null) {
+            val continuationToken = repliesNextToken
+            if (continuationToken != null) {
                 item(key = "replies_pagination") {
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -419,14 +411,14 @@ fun CommentDetailPane(
                         }
                     }
 
-                    LaunchedEffect(repliesNextToken) {
+                    LaunchedEffect(continuationToken) {
                         if (isLoadingReplies) return@LaunchedEffect
                         
                         // Debounce: let the UI settle before starting the network request
                         kotlinx.coroutines.delay(500L)
                         
                         isLoadingReplies = true
-                        YouTube.commentReplies(repliesNextToken!!).onSuccess { (newReplies, token) ->
+                        YouTube.commentReplies(continuationToken).onSuccess { (newReplies, token) ->
                             replies = (replies + newReplies).distinctBy { it.commentId ?: it.hashCode() }
                             repliesNextToken = token
                             isLoadingReplies = false

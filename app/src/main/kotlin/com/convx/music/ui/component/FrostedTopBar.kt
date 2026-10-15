@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.component
 
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -87,24 +89,9 @@ fun topBarHeight(): Dp =
 fun topBarContentPadding(): Dp = topBarHeight() + TopBarContentGap
 
 /**
- * Ported from BitChord's `FrostedTopBar` — the single top bar used across
- * every screen (top-level tabs and detail pages alike), so the logo, the
- * collapsing title and the glass all come from one place instead of each
- * screen inventing its own header.
- *
- * The bar draws no backdrop of its own — that's [TopFadeBlur], drawn
- * underneath: a blur that starts full at the status bar and ramps to nothing
- * below, so the bar has no bottom edge to draw a hard line across the page
- * with.
- *
- * [titleAlpha] (0..1) is driven by the caller's own scroll state, matching
- * Convx's existing continuous-progress convention ([rememberTitleCollapseProgress],
- * [HeroTopBlur]'s `progress`) rather than a boolean re-animated internally —
- * on a detail page it comes straight from the same progress that already
- * drives the in-list large title's handoff. Pass `title = ""`/`titleAlpha =
- * 0f` (the defaults) to suppress the centered title entirely — [leading]
- * still renders — for a bar whose identity lives on the left instead (the
- * top-level tabs' logo/title, see [com.convx.music.MainActivity]).
+ * Shared frosted header for tab and detail screens. [TopFadeBlur] draws the
+ * progressive backdrop blur underneath. Callers provide [titleAlpha] from
+ * their scroll progress so the title stays synchronized with the page.
  */
 @Composable
 fun FrostedTopBar(
@@ -123,11 +110,10 @@ fun FrostedTopBar(
     // that tint instead of snapping to the flat theme color the bar defaults
     // to everywhere else.
     titleColor: Color = Color.Unspecified,
-    // What sits at the leading edge when there's no back button — empty by
-    // default (nothing there, matching the bar this replaced) rather than a
-    // hardcoded logo, since not every caller wants one there (History/Stats
-    // just want their tinted center title with nothing on the left).
+    // Optional content shown at the leading edge when no back button is present.
     leading: @Composable () -> Unit = {},
+    leadingInset: Dp = 16.dp,
+    largeTitle: Boolean = false,
     refreshing: Boolean = false,
     // A lambda, not a value: the drag changes every frame, and reading it in
     // the caller would recompose the whole bar on each one.
@@ -151,6 +137,9 @@ fun FrostedTopBar(
         label = "topBarDivider",
     )
 
+    // In tab view the side bar floats over the left edge; the back button starts to its right.
+    val sideInset = com.convx.music.LocalPlayerAwareWindowInsets.current.asPaddingValues()
+        .calculateStartPadding(androidx.compose.ui.platform.LocalLayoutDirection.current)
     val ambientColor = com.convx.music.LocalAmbientBackgroundColor.current.value
     val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     val activeTint = if (titleColor.isSpecified) titleColor else ambientColor
@@ -173,7 +162,7 @@ fun FrostedTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .height(TopBarContentHeight),
+                .height(if (largeTitle) 44.dp else TopBarContentHeight),
         ) {
             Text(
                 text = title,
@@ -203,20 +192,18 @@ fun FrostedTopBar(
                 GlassCircleButton(
                     onClick = onBack,
                     onLongClick = onBackLongClick,
-                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp),
+                    modifier = Modifier.align(Alignment.CenterStart)
+                        .padding(start = if (sideInset > 0.dp) sideInset + 16.dp else 8.dp),
                     size = 36.dp,
                 ) {
-                    Icon(
-                        painterResource(com.convx.music.R.drawable.arrow_back_ios),
-                        contentDescription = "Back",
-                    )
+                    SymbolIcon(symbol = sf("chevron.left"), contentDescription = "Back")
                 }
             } else {
                 androidx.compose.runtime.CompositionLocalProvider(com.convx.music.ui.ios.compat.LocalContentColor provides resolvedIconColor) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 16.dp),
+                            .align(if (largeTitle) Alignment.TopStart else Alignment.CenterStart)
+                            .padding(start = leadingInset),
                     ) {
                         leading()
                     }
@@ -225,7 +212,7 @@ fun FrostedTopBar(
             androidx.compose.runtime.CompositionLocalProvider(com.convx.music.ui.ios.compat.LocalContentColor provides resolvedIconColor) {
                 Row(
                     modifier = Modifier
-                        .align(Alignment.CenterEnd)
+                        .align(if (largeTitle) Alignment.TopEnd else Alignment.CenterEnd)
                         .padding(end = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -286,12 +273,7 @@ fun TopBarAccountButton(
                     .border(0.5.dp, AppTheme.colorScheme.outline.copy(alpha = 0.3f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    Icons.Rounded.Person,
-                    contentDescription = "Settings",
-                    tint = AppTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
+                SymbolIcon(symbol = sf("person.fill"), contentDescription = "Settings", size = 18.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -340,5 +322,5 @@ private fun RefreshLine(refreshing: Boolean, pullFraction: () -> Float, modifier
 
 private val LINE_HEIGHT = 2.5.dp
 
-/** The account photo's diameter — smaller than an icon's 24dp box, since a filled circle carries more weight than a glyph does. */
+/** Account avatar size, slightly larger than a 24dp icon. */
 private val AVATAR_SIZE = 28.dp

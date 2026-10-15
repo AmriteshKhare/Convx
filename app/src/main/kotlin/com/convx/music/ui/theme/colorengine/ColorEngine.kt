@@ -13,28 +13,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Artwork colour analysis: a deterministic, perceptually-aware palette and a pair of
- * ready-to-use light/dark schemes for one image.
+ * Builds deterministic artwork palettes and light/dark color schemes.
  *
- * Kotlin port of the Swift `Color Engine` (`ColorEngine.swift`, `JoiColorAnalysis.swift`).
- * The seven stages are unchanged:
+ * The pipeline samples and weights the image, clusters its colors, then assigns
+ * semantic roles. Clustering uses a pixel-seeded random generator and stable
+ * tie-breaking, so the same image always produces the same cached result.
  *
- * 1. sample the artwork down (resolution chosen from a 16px detail probe)
- * 2. scene understanding — optional, see [VisionData]
- * 3. spatial / text / skin weight map
- * 4. tone statistics and average colours
- * 5. quantised deterministic k-means plus medoid selection
- * 6. semantic roles, WCAG text hierarchy, scheme construction
- * 7. palette packaging
- *
- * Deterministic means what it says: the same bitmap always yields the same palette,
- * because the clustering PRNG is seeded from the pixels themselves and every tie-break
- * falls back to a stable bin id. That is what makes the result safe to cache by URL.
- *
- * Stage 2 has no Android implementation here — Apple's Vision framework has no
- * equivalent that does not mean adding ML Kit. Pass [VisionData] in if you have a
- * detector; otherwise the geometric and spatial weighting of stage 3 carries the
- * pipeline, which is what [VisionMode.DISABLED] selects.
+ * Scene detection is optional. Pass [VisionData] from a detector when available;
+ * otherwise the pipeline uses geometric and spatial weighting.
  */
 object ColorEngine {
 

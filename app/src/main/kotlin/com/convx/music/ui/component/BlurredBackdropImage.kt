@@ -37,22 +37,11 @@ import kotlinx.coroutines.withContext
  * "source|decodeSize|radiusPx|finishKey". One entry per track per background style; a
  * 128-entry ceiling covers hours of listening.
  */
-private val blurredBackdropCache = android.util.LruCache<String, Bitmap>(128)
+private val blurredBackdropCache = object : android.util.LruCache<String, Bitmap>(32 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
+}
 
-/**
- * A full-bleed blurred artwork backdrop, baked ONCE per track on a tiny decoded
- * source instead of running a screen-size RenderEffect blur every frame.
- *
- * The source decodes at [decodeSize] px square and is then upscaled to fill the
- * screen; at that magnification a blur of [screenBlurRadiusDp] computed on the
- * source is visually identical to `Modifier.blur(screenBlurRadiusDp)` on the
- * full-size image, but costs a few ms of CPU on decode rather than a multi-ms
- * RenderEffect pass on every redraw. Results are cached per track in
- * [blurredBackdropCache].
- *
- * Draws nothing until the first bake completes (callers paint an opaque base
- * behind this anyway).
- */
+/** Bakes and caches a low-resolution artwork blur once per source instead of blurring the full screen every frame. */
 @Composable
 fun BlurredBackdropImage(
     model: Any?,
@@ -63,18 +52,9 @@ fun BlurredBackdropImage(
     contentScale: ContentScale = ContentScale.Crop,
     alignment: Alignment = Alignment.Center,
     colorFilter: ColorFilter? = null,
-    /**
-     * Fired once this has pixels to draw — on the bake completing, or immediately on a
-     * cache hit. The AsyncImage this replaces reported readiness through `onSuccess`, and
-     * callers use that to start their own fade; without an equivalent they would fade in
-     * against nothing.
-     */
+    /** Called when pixels are ready, including on a cache hit. */
     onReady: (() -> Unit)? = null,
-    /**
-     * Static finish pass applied once on the CPU inside the existing bake
-     * (flip, colour matrix, vertical alpha ramp) — the CPU equivalent of an
-     * Offscreen layer + DstIn gradient. Null = plain blur as before.
-     */
+    /** Optional CPU finish pass applied during the existing bitmap bake. */
     finish: ((Bitmap) -> Bitmap)? = null,
     finishKey: String = "",
 ) {
@@ -82,16 +62,11 @@ fun BlurredBackdropImage(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
 
-    // Screen-space blur radius projected onto the tiny source: the image is
-    // stretched from its decoded width to the screen width, so blur radii shrink
-    // by the same factor. The projection has to use the width the decode actually
-    // came back at, not [decodeSize] -- Coil fits within a decodeSize box, so a
-    // non-square source lands narrower than that and would come out over-blurred
-    // by the ratio it was short by. Square artwork decodes to exactly decodeSize,
-    // so nothing changes for the callers that pass one.
+    // Project the radius using the actual decoded width; Coil may return a narrower non-square image.
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val screenRadiusPx = with(density) { screenBlurRadiusDp.dp.toPx() }
-    val cacheKey = "$model|$decodeSize|$screenBlurRadiusDp|$finishKey"
+    val cacheKey = "$model|$decodeSize|$screenBlurRadiusDp|${configuration.screenWidthDp}x${configuration.screenHeightDp}|$finishKey"
     var baked by remember(cacheKey) { mutableStateOf(blurredBackdropCache.get(cacheKey)) }
 
     LaunchedEffect(cacheKey) {
@@ -103,7 +78,10 @@ fun BlurredBackdropImage(
             .allowHardware(false) // pixel readback for the bake
             .build()
         val bmp = context.imageLoader.execute(request).image?.toBitmap() ?: return@LaunchedEffect
-        val upscale = (screenWidthPx / bmp.width.coerceAtLeast(1)).coerceAtLeast(1f)
+        val upscale = maxOf(
+            screenWidthPx / bmp.width.coerceAtLeast(1),
+            screenHeightPx / bmp.height.coerceAtLeast(1),
+        ).coerceAtLeast(1f)
         val sourceRadius = (screenRadiusPx / upscale).roundToInt()
         // LaunchedEffect runs on AndroidUiDispatcher, i.e. the MAIN thread inside a frame
         // callback -- a pixel copy plus three blur passes there is a dropped frame every
@@ -143,6 +121,19 @@ fun BlurredBackdropImage(
             modifier = modifier.graphicsLayer { alpha = reveal.value },
         )
     }
+}
+
+/** Flips [src] vertically and multiplies it by a flat [tint] — the CPU equivalent of a
+ *  `scaleY = -1f` graphicsLayer under a `drawBehind { drawRect(tint, Multiply) }`. */
+internal fun flipAndMultiply(src: Bitmap, tint: Int): Bitmap {
+    val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(out)
+    canvas.save()
+    canvas.scale(1f, -1f, src.width / 2f, src.height / 2f)
+    canvas.drawBitmap(src, 0f, 0f, null)
+    canvas.restore()
+    canvas.drawColor(tint, android.graphics.PorterDuff.Mode.MULTIPLY)
+    return out
 }
 
 /** Centre-crop dimensions of a w×h source to [aspect] (w/h), pure for tests. */

@@ -153,11 +153,7 @@ fun RingtoneTrimmerDialog(
                                 }
                             }
                         ) {
-                            Icon(
-                                painter = painterResource(if (isPlaying) R.drawable.pause else R.drawable.play),
-                                contentDescription = if (isPlaying) "Pause Preview" else "Play Preview",
-                                modifier = Modifier.size(48.dp)
-                            )
+                            SymbolIcon(symbol = if (isPlaying) sf("pause.fill") else sf("play.fill"), contentDescription = if (isPlaying) "Pause Preview" else "Play Preview", size = 48.dp)
                         }
                     }
                 }

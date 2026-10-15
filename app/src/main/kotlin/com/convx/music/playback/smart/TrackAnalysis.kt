@@ -2,11 +2,11 @@
  * Ported from Orchard (https://github.com/SFG5453/Orchard).
  *
  * Copyright (C) 2026 SFG545 (original Orchard implementation)
- * Copyright (C) 2026 Kushagra Singh (BitChord adaptation)
+ * Copyright (C) 2026 Convx contributors (adapted from an open-source base)
  *
  * Orchard's original source is licensed under the GNU Affero General Public
  * License, version 3 or later. Per AGPLv3 section 13, this file is combined
- * here into BitChord -- a work licensed under the GNU General Public
+ * here into the reference app -- a work licensed under the GNU General Public
  * License, version 3 or later -- and remains itself governed by the AGPLv3
  * as part of that combination.
  *
@@ -21,21 +21,7 @@
 
 package com.convx.music.playback.smart
 
-/**
- * Stored offline analysis for one track, in that track's own timeline seconds.
- *
- * This is the contract between [TrackAnalyzer] and the transition policy.
- * Nothing here is PCM: the policy and planner read these fields and their
- * confidences, and never touch audio. Every field is optional, because the
- * ladder in [assessTransitionTier] is built to degrade on missing evidence
- * rather than to require it; an all-defaults instance is a legitimate input
- * that simply lands on the bottom rung.
- *
- * Phase 1 fills every field from DSP alone (see native/analyzer/), so
- * [beatConfidence] and [vocalActivityMask] are heuristics rather than a
- * trained model's output — the policy already treats them with the same
- * scrutiny it would a model that failed to load.
- */
+/** Offline per-track features in track-time seconds; the transition policy degrades when evidence is unavailable. */
 data class TrackAnalysis(
     /**
      * Blank means "no status was reported", which counts as ready. Any other
@@ -92,17 +78,7 @@ data class TrackAnalysis(
     /** Whole-track vocal likelihood, distinct from the per-sample [vocalActivityMask]. */
     val vocalProbability: Double = 0.0,
 ) {
-    /**
-     * Whether this analysis actually describes a track, as opposed to standing
-     * in for one that has not been analysed or could not be.
-     *
-     * Both no-analysis states have to be excluded, and they look different: a
-     * track nothing has looked at yet has a blank [status], while one whose
-     * decode failed is recorded [STATUS_READY] with every field at its default
-     * so it is not retried forever. A zero [bpm] is what separates the second
-     * from a real result — and it is also the threshold the policy uses, since
-     * a tempo outside 40–220 drops a pairing to a plain crossfade anyway.
-     */
+    /** True when analysis completed and produced a tempo. */
     val isUsable: Boolean get() = status == STATUS_READY && bpm > 0
 
     companion object {

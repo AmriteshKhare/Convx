@@ -6,87 +6,78 @@
 package com.convx.music.ui.screens.settings
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.ExperimentalMaterial3Api
+import com.convx.music.ui.ios.compat.ModalBottomSheet
+import com.convx.music.ui.ios.compat.rememberIosModalSheetState
 import com.convx.music.ui.ios.foundation.IosTheme
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.app.Activity
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.os.Build
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.Intent
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.provider.Settings
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.core.net.toUri
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.Context
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.core.content.edit
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.bounceClick
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SnackbarHostState
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.layout.layout
+import com.convx.music.ui.component.shapes.ContinuousCapsule
+import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
+import com.convx.music.ui.ios.foundation.IosMetrics
+import com.convx.music.ui.ios.compat.HorizontalDivider
 import com.convx.music.ui.ios.compat.Switch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SwitchDefaults
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableFloatStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import com.composables.sfsymbols.SfSymbols
@@ -94,40 +85,19 @@ import com.composables.sfsymbols.monochrome.SFGaugeWithNeedle
 import com.composables.sfsymbols.monochrome.SFIcloudAndArrowDownFill
 import com.composables.sfsymbols.monochrome.SFSliderHorizontal3
 import com.composables.sfsymbols.monochrome.SFStar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.CanvasSource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.CanvasSourceKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.CanvasThumbnailAnimationKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.CropAlbumArtKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DefaultOpenTabKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DynamicThemeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.EnableHighRefreshRateKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.OneTapFullscreenLyricsKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.HomeHeroCardEnabledKey
 import com.convx.music.constants.PureBlackHeroBackgroundKey
 import com.convx.music.constants.LiquidGlassGlobalEnabledKey
@@ -136,80 +106,36 @@ import com.convx.music.constants.AppLanguageKey
 import com.convx.music.constants.LanguageCodeToName
 import com.convx.music.constants.SYSTEM_DEFAULT
 import com.convx.music.ui.ios.compat.Slider
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ListenTogetherInTopBarKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LyricsAnimationStyle
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LyricsAnimationStyleKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LyricsTextPositionKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LyricsTextSizeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ShowCachedPlaylistKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ShowDownloadedPlaylistKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ShowLikedPlaylistKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ShowTopPlaylistKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ShowUploadedPlaylistKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SlimNavBarKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SwipeSensitivityKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SwipeThumbnailKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SwipeLyricsKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SwipeToRemoveSongKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SwipeToSongKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.UseNewMiniPlayerDesignKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.UseNewPlayerDesignKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.EnumDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberEnumPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlin.math.roundToInt
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LyricsClickKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LyricsLineSpacingKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LyricsScrollKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.MiniPlayerWaveformKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.AppFont
 import com.convx.music.constants.SelectedFontKey
 
@@ -230,7 +156,7 @@ fun AppearanceSettings(
     )
     val (selectedFontValue) = rememberPreference(
         SelectedFontKey,
-        defaultValue = AppFont.SYSTEM.value
+        defaultValue = AppFont.PLUS_JAKARTA_SANS.value
     )
 
     val (enableHighRefreshRate, onEnableHighRefreshRateChange) = rememberPreference(
@@ -256,7 +182,7 @@ fun AppearanceSettings(
     )
     val (lyricsAnimationStyle, onLyricsAnimationStyleChange) = rememberEnumPreference(
         LyricsAnimationStyleKey,
-        defaultValue = LyricsAnimationStyle.VIVIMUSIC_1
+        defaultValue = LyricsAnimationStyle.METRO_LYRICS
     )
     val (lyricsTextSize, onLyricsTextSizeChange) = rememberPreference(LyricsTextSizeKey, defaultValue = 30f)
     val (lyricsLineSpacing, onLyricsLineSpacingChange) = rememberPreference(LyricsLineSpacingKey, defaultValue = 1.3f)
@@ -284,15 +210,12 @@ fun AppearanceSettings(
         LiquidGlassGlobalEnabledKey,
         defaultValue = true
     )
-    // Moved from Content settings (task 011): this is an album-display option,
-    // so it belongs next to the other canvas/player-display toggles here.
+    // Keep album canvas controls with the other player display settings.
     val (albumCanvasEnabled, onAlbumCanvasEnabledChange) = rememberPreference(
         AlbumCanvasEnabledKey,
         defaultValue = false
     )
-    // Moved from Content settings (task 011): app language is a general/system
-    // setting, not content filtering -- there's no dedicated "General" screen,
-    // so it lives in this screen's existing catch-all "misc" group instead.
+    // App language is a general setting, so keep it in the miscellaneous group.
     val (appLanguage, onAppLanguageChange) = rememberPreference(key = AppLanguageKey, defaultValue = SYSTEM_DEFAULT)
     var showAppLanguageDialog by rememberSaveable { mutableStateOf(false) }
     val (homeHeroCardEnabled, onHomeHeroCardEnabledChange) = rememberPreference(HomeHeroCardEnabledKey, true)
@@ -337,7 +260,7 @@ fun AppearanceSettings(
     }
 
     var showLyricsAnimationStyleDialog by rememberSaveable {
-        mutableStateOf(false)
+        mutableStateOf(SettingsDeepLink.consumeLyricsSheet())
     }
 
     var showLyricsTextSizeDialog by rememberSaveable {
@@ -368,32 +291,11 @@ fun AppearanceSettings(
         )
     }
 
-    if (showLyricsAnimationStyleDialog) {
-        EnumDialog(
-            onDismiss = { showLyricsAnimationStyleDialog = false },
-            onSelect = {
-                onLyricsAnimationStyleChange(it)
-                showLyricsAnimationStyleDialog = false
-            },
-            title = stringResource(R.string.lyrics_animation_style),
-            current = lyricsAnimationStyle,
-            values = LyricsAnimationStyle.entries,
-            valueText = {
-                when (it) {
-                    LyricsAnimationStyle.NONE -> stringResource(R.string.none)
-                    LyricsAnimationStyle.FADE -> stringResource(R.string.fade)
-                    LyricsAnimationStyle.GLOW -> stringResource(R.string.glow)
-                    LyricsAnimationStyle.SLIDE -> stringResource(R.string.slide)
-                    LyricsAnimationStyle.KARAOKE -> stringResource(R.string.karaoke)
-                    LyricsAnimationStyle.APPLE -> stringResource(R.string.apple_music_style)
-                    LyricsAnimationStyle.APPLE_V2 -> stringResource(R.string.apple_music_style_letter)
-                    LyricsAnimationStyle.VIVIMUSIC_1 -> stringResource(R.string.vivimusic_1)
-                    LyricsAnimationStyle.LYRICS_V2 -> stringResource(R.string.lyrics_v2_fluid)
-                    LyricsAnimationStyle.METRO_LYRICS -> stringResource(R.string.lyrics_animation_metro)
-                    LyricsAnimationStyle.ARCHIVE_TUNE -> stringResource(R.string.lyrics_animation_karaoke_apple)
-                }
-            }
-        )
+    LaunchedEffect(showLyricsAnimationStyleDialog) {
+        if (showLyricsAnimationStyleDialog) {
+            showLyricsAnimationStyleDialog = false
+            SettingsSheets.open = SettingsAction.LyricsStyle
+        }
     }
 
     var showDefaultOpenTabDialog by rememberSaveable { mutableStateOf(false) }
@@ -442,13 +344,33 @@ fun AppearanceSettings(
         item(key = "all_appearance_settings") {
             Column {
         IosSettingsGroup(
-            title = stringResource(R.string.theme_colors),
-            items = listOfNotNull(
+            title = "Theme & colors",
+            items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.palette),
                     title = { Text(stringResource(R.string.theme_colors)) },
                     onClick = { navController.navigate("settings/appearance/theme") }
                 ),
+                IosSettingsItem(
+                    icon = painterResource(R.drawable.palette),
+                    title = { Text(stringResource(R.string.presets)) },
+                    description = { Text(stringResource(R.string.presets_desc)) },
+                    onClick = { navController.navigate("settings/appearance/presets") }
+                ),
+                IosSettingsItem(
+                    icon = painterResource(R.drawable.edit),
+                    title = { Text(stringResource(R.string.diy)) },
+                    description = { Text(stringResource(R.string.diy_desc)) },
+                    onClick = { navController.navigate("settings/appearance/diy") }
+                )
+            )
+        )
+
+        Spacer(modifier = Modifier.height(27.dp))
+
+        IosSettingsGroup(
+            title = "App identity",
+            items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.alphabet_cyrillic),
                     title = { Text(stringResource(R.string.app_font)) },
@@ -469,28 +391,6 @@ fun AppearanceSettings(
                     title = { Text(stringResource(R.string.app_icon)) },
                     description = { Text(stringResource(R.string.app_icon_desc)) },
                     onClick = { navController.navigate("settings/appearance/appicon") }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.palette),
-                    title = { Text(stringResource(R.string.presets)) },
-                    description = { Text(stringResource(R.string.presets_desc)) },
-                    onClick = { navController.navigate("settings/appearance/presets") }
-                ),
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.tune),
-                    title = { Text(stringResource(R.string.player_icons)) },
-                    description = { Text(stringResource(R.string.player_icons_desc)) },
-                    onClick = { navController.navigate("settings/appearance/playericons") }
-                ),
-                // Used to hide behind !useAppleMusicPlayer: DIY only drew its stickers on the
-                // classic player. Now that Player_v2 (V17) renders the same DiyStickerLayer
-                // too (with a real orientation read and the same behind/in-front z split),
-                // the editor applies to both and has no reason to be V17-only hidden.
-                IosSettingsItem(
-                    icon = painterResource(R.drawable.edit),
-                    title = { Text(stringResource(R.string.diy)) },
-                    description = { Text(stringResource(R.string.diy_desc)) },
-                    onClick = { navController.navigate("settings/appearance/diy") }
                 )
             )
         )
@@ -524,7 +424,7 @@ fun AppearanceSettings(
         Spacer(modifier = Modifier.height(27.dp))
 
         IosSettingsGroup(
-            title = stringResource(R.string.appearance),
+            title = "Display",
             items = buildList {
                 add(
                     IosSettingsItem(
@@ -546,8 +446,14 @@ fun AppearanceSettings(
         Spacer(modifier = Modifier.height(27.dp))
 
         IosSettingsGroup(
-            title = stringResource(R.string.player),
+            title = "Player & canvas",
             items = listOfNotNull(
+                IosSettingsItem(
+                    icon = painterResource(R.drawable.tune),
+                    title = { Text(stringResource(R.string.player_icons)) },
+                    description = { Text(stringResource(R.string.player_icons_desc)) },
+                    onClick = { navController.navigate("settings/appearance/playericons") }
+                ),
                 IosSettingsItem(
                     icon = painterResource(R.drawable.gradient),
                     title = { Text(stringResource(R.string.player_theme)) },
@@ -579,17 +485,17 @@ fun AppearanceSettings(
                 ),
                     IosSettingsItem(
                         icon = painterResource(R.drawable.canvas_art),
-                        title = { Text(stringResource(R.string.vivimusic_canvas)) },
+                        title = { Text(stringResource(R.string.convx_canvas)) },
                     description = {
                         val summary = if (!canvasThumbnailAnimation) {
                             stringResource(R.string.disable)
                         } else {
                             when (canvasSource) {
                                 CanvasSource.AUTO -> stringResource(R.string.canvas_source_auto)
-                                CanvasSource.ECHO_MUSIC -> stringResource(R.string.canvas_source_echo_music)
                                 CanvasSource.APPLE_MUSIC -> stringResource(R.string.canvas_source_apple_music)
-                                CanvasSource.VIVIMUSIC -> stringResource(R.string.canvas_source_vivimusic)
+                                CanvasSource.CONVX -> stringResource(R.string.canvas_source_convx)
                                 CanvasSource.TIDAL -> stringResource(R.string.canvas_source_tidal)
+                                CanvasSource.SPOTIFY -> stringResource(R.string.canvas_source_spotify)
                             }
                         }
                         Text(summary)
@@ -614,7 +520,7 @@ fun AppearanceSettings(
         Spacer(modifier = Modifier.height(27.dp))
 
         IosSettingsGroup(
-            title = stringResource(R.string.lyrics),
+            title = "Lyrics layout",
             items = listOfNotNull(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.lyrics),
@@ -641,7 +547,8 @@ fun AppearanceSettings(
                                 LyricsAnimationStyle.GLOW -> stringResource(R.string.glow)
                                 LyricsAnimationStyle.SLIDE -> stringResource(R.string.slide)
                                 LyricsAnimationStyle.KARAOKE -> stringResource(R.string.karaoke)
-                                LyricsAnimationStyle.VIVIMUSIC_1 -> stringResource(R.string.vivimusic_1)
+                                LyricsAnimationStyle.BITCHORD -> stringResource(R.string.lyrics_animation_bitchord)
+                                LyricsAnimationStyle.CONVX_1 -> stringResource(R.string.convx_1)
                                 LyricsAnimationStyle.APPLE -> stringResource(R.string.apple_music_style)
                                 LyricsAnimationStyle.APPLE_V2 -> stringResource(R.string.apple_music_style_letter)
                                 LyricsAnimationStyle.LYRICS_V2 -> stringResource(R.string.lyrics_v2_fluid)
@@ -693,7 +600,7 @@ fun AppearanceSettings(
         Spacer(modifier = Modifier.height(27.dp))
 
         IosSettingsGroup(
-            title = stringResource(R.string.misc),
+            title = "More",
             items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.nav_bar),
@@ -895,4 +802,294 @@ enum class LyricsPosition {
 enum class PlayerTextAlignment {
     SIDED,
     CENTER,
+}
+
+@Composable
+fun ColumnScope.LyricsAnimationSheetContent() {
+    val (selected, onSelect) = rememberEnumPreference(LyricsAnimationStyleKey, defaultValue = LyricsAnimationStyle.METRO_LYRICS)
+    val (position, onPositionChange) = rememberEnumPreference(LyricsTextPositionKey, defaultValue = LyricsPosition.LEFT)
+    val (autoScroll, onAutoScrollChange) = rememberPreference(LyricsScrollKey, defaultValue = true)
+    val (swipeToChange, onSwipeToChangeChange) = rememberPreference(SwipeLyricsKey, defaultValue = false)
+    val animation = androidx.compose.animation.core.rememberInfiniteTransition(label = "lyrics sample")
+    val progress by animation.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 0.82f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1900),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "sample lyric progress",
+    )
+    val selectedColor by androidx.compose.animation.animateColorAsState(
+        targetValue = IosTheme.tint,
+        animationSpec = androidx.compose.animation.core.tween(220),
+        label = "lyrics style accent",
+    )
+
+    val align = when (position) {
+        LyricsPosition.LEFT -> androidx.compose.ui.text.style.TextAlign.Start
+        LyricsPosition.CENTER -> androidx.compose.ui.text.style.TextAlign.Center
+        LyricsPosition.RIGHT -> androidx.compose.ui.text.style.TextAlign.End
+    }
+    val fill = selected == LyricsAnimationStyle.KARAOKE || selected == LyricsAnimationStyle.ARCHIVE_TUNE ||
+        selected == LyricsAnimationStyle.APPLE || selected == LyricsAnimationStyle.APPLE_V2 ||
+        selected == LyricsAnimationStyle.BITCHORD
+
+    run {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Tap a style to preview and apply it",
+                    style = IosTheme.typography.footnote,
+                    color = IosTheme.colors.secondaryLabel,
+                )
+            }
+
+            // The playing song's own lyrics, through the player's own lyrics view: what is
+            // seen here is exactly what the player shows in the chosen style.
+            val lyricsConnection = com.convx.music.LocalPlayerConnection.current
+            val lyricsTrack by remember(lyricsConnection) {
+                lyricsConnection?.mediaMetadata ?: kotlinx.coroutines.flow.MutableStateFlow(null)
+            }.collectAsStateWithLifecycle()
+            val lyricsPlaying by remember(lyricsConnection) {
+                lyricsConnection?.isPlaying ?: kotlinx.coroutines.flow.MutableStateFlow(false)
+            }.collectAsStateWithLifecycle()
+            // Paused or not, the preview keeps singing: a clock carries on from where the song
+            // stopped and loops at its end, so every style can be watched moving.
+            var pausedClock by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+            LaunchedEffect(lyricsPlaying, lyricsTrack?.id) {
+                if (lyricsPlaying || lyricsConnection == null) return@LaunchedEffect
+                val from = lyricsConnection.player.currentPosition.coerceAtLeast(0L)
+                val length = ((lyricsTrack?.duration ?: 0) * 1000L).coerceAtLeast(30_000L)
+                val startedAt = System.currentTimeMillis()
+                while (true) {
+                    androidx.compose.runtime.withFrameMillis { }
+                    pausedClock = (from + System.currentTimeMillis() - startedAt) % length
+                }
+            }
+            val previewClock: () -> Long = {
+                if (lyricsPlaying) lyricsConnection?.player?.currentPosition ?: 0L else pausedClock
+            }
+            if (lyricsConnection != null && lyricsTrack != null) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(360.dp)
+                        .clip(ContinuousRoundedRectangle(24.dp)),
+                ) {
+                    com.convx.music.ui.player.NowPlayingBackground(
+                        artworkUrl = lyricsTrack?.thumbnailUrl,
+                        hero = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    com.convx.music.ui.player.InlineLyricsView(
+                        mediaMetadata = lyricsTrack,
+                        showLyrics = true,
+                        positionProvider = previewClock,
+                    )
+                    Text(
+                        lyricsTrack?.title.orEmpty(),
+                        color = Color.White.copy(alpha = 0.6f),
+                        style = IosTheme.typography.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        modifier = Modifier.align(Alignment.TopStart).padding(14.dp),
+                    )
+                }
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(168.dp)
+                        .clip(ContinuousRoundedRectangle(24.dp))
+                        .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(selectedColor.copy(alpha = 0.38f).compositeOver(Color(0xFF111217)), Color(0xFF111217)))),
+                ) {
+                    Column(
+                        Modifier.fillMaxSize().padding(horizontal = 22.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                    ) {
+                        Text(
+                            "Where the light meets the sea",
+                            color = Color.White.copy(alpha = 0.38f),
+                            style = IosTheme.typography.subheadline,
+                            textAlign = align,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "We find our way back home",
+                            style = IosTheme.typography.title3.let {
+                                when {
+                                    fill -> it.copy(
+                                        brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                            0f to selectedColor,
+                                            progress to selectedColor,
+                                            (progress + 0.001f).coerceAtMost(1f) to Color.White.copy(alpha = 0.4f),
+                                            1f to Color.White.copy(alpha = 0.4f),
+                                        ),
+                                    )
+                                    selected == LyricsAnimationStyle.GLOW -> it.copy(
+                                        color = selectedColor,
+                                        shadow = androidx.compose.ui.graphics.Shadow(selectedColor, blurRadius = 8f + progress * 22f),
+                                    )
+                                    else -> it.copy(color = selectedColor)
+                                }
+                            },
+                            fontWeight = FontWeight.Bold,
+                            textAlign = align,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth().graphicsLayer {
+                                when (selected) {
+                                    LyricsAnimationStyle.NONE -> Unit
+                                    LyricsAnimationStyle.FADE -> alpha = 0.45f + progress * 0.55f
+                                    LyricsAnimationStyle.SLIDE -> {
+                                        translationX = (1f - progress) * 28.dp.toPx() * if (position == LyricsPosition.RIGHT) -1f else 1f
+                                        alpha = 0.5f + progress * 0.5f
+                                    }
+                                    else -> {
+                                        scaleX = 0.94f + progress * 0.06f
+                                        scaleY = scaleX
+                                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(
+                                            when (position) {
+                                                LyricsPosition.LEFT -> 0f
+                                                LyricsPosition.CENTER -> 0.5f
+                                                LyricsPosition.RIGHT -> 1f
+                                            },
+                                            0.5f,
+                                        )
+                                    }
+                                }
+                            },
+                        )
+                        Text(
+                            "Under the open sky",
+                            color = Color.White.copy(alpha = 0.38f),
+                            style = IosTheme.typography.subheadline,
+                            textAlign = align,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    Text(
+                        "SAMPLE",
+                        color = Color.White.copy(alpha = 0.45f),
+                        style = IosTheme.typography.caption,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(14.dp),
+                    )
+                }
+            }
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                // Bleed to the sheet edge while the first chip still lines up with the 20dp gutter.
+                modifier = Modifier.layout { measurable, constraints ->
+                    val bleed = 32.dp.roundToPx()
+                    val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + bleed))
+                    layout(constraints.maxWidth, placeable.height) { placeable.place(-bleed / 2, 0) }
+                },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+            ) {
+                items(LyricsAnimationStyle.entries) { style ->
+                    val active = style == selected
+                    Text(
+                        text = when (style) {
+                            LyricsAnimationStyle.NONE -> stringResource(R.string.none)
+                            LyricsAnimationStyle.FADE -> stringResource(R.string.fade)
+                            LyricsAnimationStyle.GLOW -> stringResource(R.string.glow)
+                            LyricsAnimationStyle.SLIDE -> stringResource(R.string.slide)
+                            LyricsAnimationStyle.KARAOKE -> stringResource(R.string.karaoke)
+                            LyricsAnimationStyle.APPLE -> stringResource(R.string.apple_music_style)
+                            LyricsAnimationStyle.APPLE_V2 -> stringResource(R.string.apple_music_style_letter)
+                            LyricsAnimationStyle.BITCHORD -> stringResource(R.string.lyrics_animation_bitchord)
+                            LyricsAnimationStyle.CONVX_1 -> stringResource(R.string.convx_1)
+                            LyricsAnimationStyle.LYRICS_V2 -> stringResource(R.string.lyrics_v2_fluid)
+                            LyricsAnimationStyle.METRO_LYRICS -> stringResource(R.string.lyrics_animation_metro)
+                            LyricsAnimationStyle.ARCHIVE_TUNE -> stringResource(R.string.lyrics_animation_karaoke_apple)
+                        },
+                        color = if (active) Color.White else IosTheme.colors.label,
+                        style = IosTheme.typography.subheadline,
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clip(ContinuousCapsule())
+                            .background(if (active) selectedColor else IosTheme.colors.secondarySystemFill)
+                            .clickable { onSelect(style) }
+                            .defaultMinSize(minHeight = 40.dp)
+                            .wrapContentHeight(Alignment.CenterVertically)
+                            .padding(horizontal = 16.dp),
+                    )
+                }
+            }
+
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(ContinuousRoundedRectangle(IosMetrics.GroupedCornerRadius))
+                    .background(IosTheme.colors.secondarySystemGroupedBackground),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().defaultMinSize(minHeight = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        stringResource(R.string.lyrics_text_position),
+                        style = IosTheme.typography.body,
+                        color = IosTheme.colors.label,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(
+                        Modifier
+                            .clip(ContinuousCapsule())
+                            .background(IosTheme.colors.secondarySystemFill)
+                            .padding(3.dp),
+                    ) {
+                        LyricsPosition.entries.forEach { p ->
+                            val active = p == position
+                            Text(
+                                text = when (p) {
+                                    LyricsPosition.LEFT -> stringResource(R.string.left)
+                                    LyricsPosition.CENTER -> stringResource(R.string.center)
+                                    LyricsPosition.RIGHT -> stringResource(R.string.right)
+                                },
+                                color = if (active) Color.White else IosTheme.colors.label,
+                                style = IosTheme.typography.footnote,
+                                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .clip(ContinuousCapsule())
+                                    .background(if (active) selectedColor else Color.Transparent)
+                                    .clickable { onPositionChange(p) }
+                                    .defaultMinSize(minHeight = 34.dp)
+                                    .wrapContentHeight(Alignment.CenterVertically)
+                                    .padding(horizontal = 12.dp),
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(Modifier.padding(start = 16.dp), color = IosTheme.colors.separator, thickness = IosMetrics.SeparatorThickness)
+                LyricsSheetSwitch(stringResource(R.string.lyrics_auto_scroll), autoScroll, onAutoScrollChange)
+                HorizontalDivider(Modifier.padding(start = 16.dp), color = IosTheme.colors.separator, thickness = IosMetrics.SeparatorThickness)
+                LyricsSheetSwitch(stringResource(R.string.lyrics_swipe_to_change_song), swipeToChange, onSwipeToChangeChange)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LyricsSheetSwitch(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onChange(!checked) }.defaultMinSize(minHeight = 56.dp).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = IosTheme.typography.body, color = IosTheme.colors.label, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
 }

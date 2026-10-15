@@ -134,7 +134,7 @@ per this task's explicit dependency note. Both changed the plan:
 - `app/src/main/kotlin/com/convx/music/ui/screens/settings/SearchableSettings.kt`
 - `app/src/main/kotlin/com/convx/music/ui/component/DraggableLyricsProviderList.kt`
 - `app/src/main/res/values/strings.xml` (new: `pure_black`, `pure_black_desc`)
-- `app/src/main/res/values/vivi_strings.xml` (new: `liquid_glass_simple_desc`)
+- `app/src/main/res/values/convx_strings.xml` (new: `liquid_glass_simple_desc`)
 
 ## Not touched (explicit instruction)
 - `SettingsScreen.kt` (root screen) — layout and search bar untouched, per

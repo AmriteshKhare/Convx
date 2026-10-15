@@ -11,16 +11,7 @@ import com.music.innertube.models.SongItem
 import com.music.innertube.models.WatchEndpoint
 import com.music.innertube.models.YTItem
 
-/**
- * The queue to start when a song row inside a *list* is tapped — search results, a shelf, a
- * suggestion list.
- *
- * Every one of those used to start a one-song [YouTubeQueue] radio, which threw away the list
- * the user was looking at: playing the third result meant the other results were simply gone,
- * replaced by YouTube's radio for that one track. Queue the surrounding songs instead, in the
- * order they are shown, and fall back to radio only when there is genuinely nothing to
- * surround it with.
- */
+/** Plays the tapped song in list order, falling back to YouTube radio when no surrounding list exists. */
 fun searchResultQueue(
     song: SongItem,
     siblings: List<YTItem>,

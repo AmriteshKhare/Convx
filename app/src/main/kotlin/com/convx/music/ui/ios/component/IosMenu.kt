@@ -5,36 +5,60 @@
 
 package com.convx.music.ui.ios.component
 
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import com.convx.music.ui.component.backdrop.catalog.utils.InteractiveHighlight
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
-import com.convx.music.ui.ios.foundation.IosGlassSpec
-import com.convx.music.ui.ios.foundation.IosGlassStyle
-import com.convx.music.ui.ios.foundation.IosMetrics
+import com.convx.music.ui.ios.foundation.IosMenuColors
+import com.convx.music.ui.ios.foundation.IosMenuMaterial
 import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.ui.ios.foundation.LocalIosContentColor
 import com.convx.music.ui.ios.foundation.LocalIosTextStyle
-import com.convx.music.ui.ios.foundation.iosGlass
+import com.convx.music.ui.ios.foundation.iosMenuSurface
+import com.convx.music.ui.ios.foundation.menuVibrancy
 
 /** One entry of an [IosMenu]. */
 @Immutable
@@ -44,13 +68,13 @@ data class IosMenuItem(
     val description: String? = null,
     val icon: (@Composable (Color) -> Unit)? = null,
     val role: IosButtonRole? = null,
-    /** Draws a trailing checkmark, the way a Picker inside a Menu marks its selection. */
+    /** Draws a leading checkmark, the way a Picker inside a Menu marks its selection. */
     val selected: Boolean = false,
     val enabled: Boolean = true,
     val onClick: () -> Unit = {},
 )
 
-/** A group of items with a divider above it, and an optional small header. */
+/** A group of items with a separator band above it, and an optional small header. */
 @Immutable
 data class IosMenuSection(
     val items: List<IosMenuItem>,
@@ -58,105 +82,239 @@ data class IosMenuSection(
 )
 
 /**
- * The iOS 26 menu panel: a glass card of sections, divided by hairlines.
+ * An iOS-style context menu with optional quick actions.
  *
- * [IosMenu] is the panel itself. Anchor it with [IosMenuAnchor], or place it in your
- * own Popup when you need to control the position.
+ * While a finger is down anywhere on the panel, one bright bloom follows it
+ * across the whole panel and the panel leans toward it -- no per-row highlight; lifting
+ * the finger picks the row under it. So a press can slide
+ * across rows and choose on release, exactly as on iOS — a plain tap is just the
+ * zero-length case.
  */
 @Composable
 fun IosMenu(
     sections: List<IosMenuSection>,
     modifier: Modifier = Modifier,
+    quickActions: List<IosMenuItem> = emptyList(),
     onDismissRequest: () -> Unit = {},
 ) {
-    val colors = IosTheme.colors
+    val menuColors = IosMenuMaterial.colors
+    // Window px through the current density: the V2 player rescales dp, where
+    // screenHeightDp overshot and the panel ran off the bottom in landscape.
+    val maximumHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+        (androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp() - 24.dp).coerceAtLeast(48.dp)
+    }
+    val haptic = com.convx.music.ui.theme.rememberAppHaptics()
+    val scope = rememberCoroutineScope()
+    // Bloom radius ~ 0.6 of the panel width, far brighter than a button's sheen.
+    val bloom = remember(scope) {
+        InteractiveHighlight(animationScope = scope, radiusScale = 0.6f, sheenAlpha = 0.06f, spotAlpha = 0.32f, releasePulse = true)
+    }
+
+    // Every pickable entry, in hit-test order: quick actions first, then rows.
+    val entries = remember(sections, quickActions) { quickActions + sections.flatMap { it.items } }
+    // Coordinates, not rects: resolved against the panel at hit time, so nesting
+    // (quick actions sit inside a Row) and the panel's own padding need no bookkeeping.
+    val entryCoords = remember(entries) { arrayOfNulls<LayoutCoordinates>(entries.size) }
+    val panelCoords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    var hovered by remember(entries) { mutableIntStateOf(-1) }
+
+    fun hit(position: Offset): Int {
+        val panel = panelCoords[0]?.takeIf { it.isAttached } ?: return -1
+        return entryCoords.indexOfFirst { c ->
+            c != null && c.isAttached && panel.localBoundingBoxOf(c, clipBounds = false).contains(position)
+        }.takeIf { it >= 0 && entries[it].enabled } ?: -1
+    }
+
     Column(
         modifier = modifier
-            .widthIn(min = 250.dp, max = 320.dp)
-            .iosGlass(
-                shape = ContinuousRoundedRectangle(IosMetrics.MenuCornerRadius + 12.dp),
-                style = IosGlassStyle.Regular,
-                spec = IosGlassSpec.Chrome,
-            )
-            .padding(vertical = 6.dp),
-    ) {
-        sections.forEachIndexed { index, section ->
-            if (index > 0) {
-                Box(
-                    Modifier
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .fillMaxWidth()
-                        .height(IosMetrics.SeparatorThickness)
-                        .background(colors.separator)
-                )
+            .width(IosMenuMaterial.Width)
+            .heightIn(max = maximumHeight)
+            .iosMenuSurface(IosMenuMaterial.PanelShape, bloom)
+            .menuVibrancy()
+            .onGloballyPositioned { panelCoords[0] = it }
+            .pointerInput(entries) {
+                // Observe only: the bloom/stretch watches the same stream.
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    var scrolled = false
+                    hovered = hit(down.position)
+                    while (true) {
+                        val change = awaitPointerEvent().changes.firstOrNull() ?: break
+                        if (change.isConsumed && change.position != change.previousPosition) scrolled = true
+                        if (!change.pressed) break
+                        val now = hit(change.position)
+                        if (now != hovered) {
+                            if (now >= 0) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            hovered = now
+                        }
+                    }
+                    val picked = hovered
+                    hovered = -1
+                    if (picked >= 0 && !scrolled) {
+                        entries[picked].onClick()
+                        onDismissRequest()
+                    }
+                }
             }
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 10.dp),
+    ) {
+        var index = 0
+        if (quickActions.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 10.dp),
+            ) {
+                quickActions.forEach { action ->
+                    val i = index++
+                    IosMenuQuickAction(
+                        item = action,
+                        menuColors = menuColors,
+                        modifier = Modifier
+                            .weight(1f)
+                            .onGloballyPositioned { entryCoords[i] = it },
+                    )
+                }
+            }
+        }
+        sections.forEachIndexed { sectionIndex, section ->
+            if (sectionIndex > 0 || quickActions.isNotEmpty()) IosMenuSeparator(menuColors)
 
             if (section.header != null) {
-                Box(Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 2.dp)) {
+                Box(Modifier.padding(start = 22.dp, end = 22.dp, top = 4.dp, bottom = 4.dp)) {
                     IosText(
                         text = section.header,
-                        color = colors.secondaryLabel,
+                        color = menuColors.secondaryLabel,
                         style = IosTheme.typography.footnote,
                     )
                 }
             }
 
-            // Items line their labels up in one column when any of them carries an icon.
-            val hasIcon = section.items.any { it.icon != null }
+            // A picker section (any row selectable) keeps a leading checkmark column.
+            val checkColumn = section.items.any { it.selected }
             section.items.forEach { item ->
-                IosMenuRow(item, hasIcon, onDismissRequest)
+                val i = index++
+                IosMenuRow(
+                    item = item,
+                    checkColumn = checkColumn,
+                    menuColors = menuColors,
+                    modifier = Modifier.onGloballyPositioned { entryCoords[i] = it },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun IosMenuRow(item: IosMenuItem, reserveIconColumn: Boolean, onDismissRequest: () -> Unit) {
+private fun IosMenuSeparator(menuColors: IosMenuColors) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(21.dp)
+            .padding(horizontal = IosMenuMaterial.SeparatorInset),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(menuColors.separator),
+        )
+    }
+}
+
+@Composable
+private fun IosMenuQuickAction(
+    item: IosMenuItem,
+    menuColors: IosMenuColors,
+    modifier: Modifier = Modifier,
+) {
+    val color = if (item.enabled) menuColors.label else menuColors.secondaryLabel
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = modifier
+            .fillMaxHeight()
+            .padding(horizontal = 4.dp, vertical = 6.dp),
+    ) {
+        Box(Modifier.height(22.dp), contentAlignment = Alignment.Center) {
+            item.icon?.invoke(color)
+        }
+        IosText(
+            text = item.title,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = IosTheme.typography.caption.copy(
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.sp,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun IosMenuRow(
+    item: IosMenuItem,
+    checkColumn: Boolean,
+    menuColors: IosMenuColors,
+    modifier: Modifier = Modifier,
+) {
     val colors = IosTheme.colors
     val contentColor = when {
-        !item.enabled -> colors.tertiaryLabel
+        !item.enabled -> menuColors.secondaryLabel
         item.role == IosButtonRole.Destructive -> colors.systemRed
-        else -> colors.label
+        else -> menuColors.label
     }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(enabled = item.enabled) {
-                item.onClick()
-                onDismissRequest()
-            }
+            .padding(horizontal = 10.dp)
             .defaultMinSize(minHeight = 44.dp)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(start = 12.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (reserveIconColumn) {
-            Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
-                item.icon?.invoke(contentColor)
+        if (checkColumn) {
+            Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
+                if (item.selected) IosCheckmark(color = contentColor)
             }
+            Spacer(Modifier.width(6.dp))
         }
-
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            IosText(item.title, color = contentColor)
+        if (item.icon != null) {
+            Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
+                item.icon.invoke(contentColor)
+            }
+            Spacer(Modifier.width(8.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            IosText(
+                text = item.title,
+                color = contentColor,
+                style = IosTheme.typography.body.copy(
+                    fontSize = 17.sp,
+                    lineHeight = 20.sp,
+                    letterSpacing = (-0.43).sp,
+                ),
+            )
             if (item.description != null) {
                 IosText(
                     text = item.description,
-                    color = colors.secondaryLabel,
-                    style = IosTheme.typography.subheadline,
+                    color = menuColors.secondaryLabel,
+                    style = IosTheme.typography.footnote,
                 )
             }
-        }
-
-        if (item.selected) {
-            IosCheckmark(color = IosTheme.tint)
         }
     }
 }
 
 /**
- * Anchors a menu to [content], opening it below on tap — SwiftUI's Menu, and with
- * [longPress] set, its contextMenu.
+ * Anchors a menu to [content], opening it below on tap — SwiftUI's Menu.
  */
 @Composable
 fun IosMenuAnchor(
@@ -176,7 +334,7 @@ fun IosMenuAnchor(
             ) {
                 CompositionLocalProvider(
                     LocalIosTextStyle provides IosTheme.typography.body,
-                    LocalIosContentColor provides IosTheme.colors.label,
+                    LocalIosContentColor provides IosMenuMaterial.colors.label,
                 ) {
                     IosMenu(sections, onDismissRequest = { onExpandedChange(false) })
                 }

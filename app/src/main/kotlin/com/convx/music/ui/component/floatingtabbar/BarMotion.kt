@@ -182,13 +182,16 @@ internal object BarMotion {
 
     /** Tab pill / search circle body: gentler than the mini (user: less overshoot on the
      *  bar, the mini's bounce is fine) -- ~3% expand, ~2% collapse. */
-    val BarSurfaceCollapseSpring = SpringEasing(zeta = 0.78f)
+    val BarSurfaceCollapseSpring = CriticalEasing() // inline pill never undershoots its icon
     val BarSurfaceExpandSpring = SpringEasing(zeta = 0.74f)
+
+    /** Tab pill WIDTH on expand: bouncier than its height (user: more width overshoot when the nav expands). */
+    val BarSurfaceExpandWidthSpring = SpringEasing(zeta = 0.40f)
 
     /** Mini pill WIDTH (x axis) gets its own, bouncier spring: the user asked for a
      *  bigger width overshoot than the bar's. */
     val AccessoryCollapseXSpring = SpringEasing(zeta = 0.56f, omegaT = 9f)
-    val AccessoryExpandXSpring = SpringEasing(zeta = 0.52f, omegaT = 9f)
+    val AccessoryExpandXSpring = SpringEasing(zeta = 0.34f, omegaT = 9f)
 
     /** Centre travel for everything: spring-shaped, never overshoots. */
     val Travel = CriticalEasing()
@@ -207,8 +210,8 @@ internal object BarMotion {
     )
 
     /** A surface (tab pill, search circle): centre on [Travel], size on [sizeSpring]. */
-    fun surface(durationMs: Int, sizeSpring: Easing) = AxisStaggerSpec(
-        x = AxisCurve(0, durationMs, Travel, sizeEasing = sizeSpring),
+    fun surface(durationMs: Int, sizeSpring: Easing, widthSpring: Easing = sizeSpring) = AxisStaggerSpec(
+        x = AxisCurve(0, durationMs, Travel, sizeEasing = widthSpring),
         y = AxisCurve(0, durationMs, Travel, sizeEasing = sizeSpring),
     )
 }

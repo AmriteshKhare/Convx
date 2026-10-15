@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
@@ -40,10 +42,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -68,7 +72,6 @@ import androidx.navigation.NavController
 import com.music.innertube.utils.parseCookieString
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.combinedBounceClick
-import com.convx.music.LocalDatabase
 import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.LocalPlayerConnection
 import com.convx.music.R
@@ -85,7 +88,7 @@ import com.convx.music.playback.queues.ListQueue
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.ui.component.ChipsRow
 import com.convx.music.ui.component.HideOnScrollFAB
-import com.convx.music.ui.component.IconButton
+import com.convx.music.ui.ios.compat.IconButton as CupertinoIconButton
 import com.convx.music.ui.component.FrostedTopBar
 import com.convx.music.ui.component.LargeScreenTitle
 import com.convx.music.ui.component.LocalMenuState
@@ -122,6 +125,8 @@ import com.convx.music.utils.rememberPreference
 import com.convx.music.viewmodels.DateAgo
 import com.convx.music.viewmodels.HistoryViewModel
 import java.time.format.DateTimeFormatter
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.collect
 
 @SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -131,12 +136,11 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel(LocalActivity.current as ViewModelStoreOwner),
 ) {
     val context = LocalContext.current
-    val database = LocalDatabase.current
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
     var inSelectMode by rememberSaveable { mutableStateOf(false) }
     val selection = rememberSaveable(
@@ -169,11 +173,11 @@ fun HistoryScreen(
         BackHandler(onBack = onExitSelectionMode)
     }
 
-    val historySource by viewModel.historySource.collectAsState()
+    val historySource by viewModel.historySource.collectAsStateWithLifecycle()
 
-    val filteredRemoteContent by viewModel.filteredRemoteContent.collectAsState()
-    val filteredEvents by viewModel.filteredEvents.collectAsState()
-    val allEvents by viewModel.filteredFlatEvents.collectAsState()
+    val filteredRemoteContent by viewModel.filteredRemoteContent.collectAsStateWithLifecycle()
+    val filteredEvents by viewModel.filteredEvents.collectAsStateWithLifecycle()
+    val allEvents by viewModel.filteredFlatEvents.collectAsStateWithLifecycle()
 
     LaunchedEffect(query.text) {
         viewModel.searchQuery.value = query.text
@@ -205,6 +209,17 @@ fun HistoryScreen(
 
     val lazyListState = rememberLazyListState()
     val historyTitleProgress = rememberTitleCollapseProgressState(lazyListState)
+
+    LaunchedEffect(lazyListState, historySource) {
+        snapshotFlow {
+            lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index to
+                lazyListState.layoutInfo.totalItemsCount
+        }.collect { (lastVisible, totalItems) ->
+            if (historySource == HistorySource.LOCAL && lastVisible != null && lastVisible >= totalItems - 10) {
+                viewModel.loadMoreEvents()
+            }
+        }
+    }
 
     val heroUrl = remember(filteredRemoteContent, filteredEvents) {
         if (historySource == HistorySource.REMOTE) {
@@ -242,13 +257,13 @@ fun HistoryScreen(
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeShape = ContinuousRoundedRectangle(percent = 50)
-        
+        val hazeState = remember { dev.chrisbanes.haze.HazeState() }
+
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 state = lazyListState,
-                // No bounce here: the top pull drives the hero zoom instead.
                 overscrollEffect = heroZoom.listOverscroll(),
-                modifier = Modifier.heroPullZoom(heroZoom),
+                modifier = Modifier.heroPullZoom(heroZoom).hazeSource(hazeState),
                 contentPadding = LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
                     .asPaddingValues(),
             ) {
@@ -288,20 +303,13 @@ fun HistoryScreen(
                             )
                         }
 
-                        // Keyed by identity, not position. The old key embedded the row
-                        // index, so every keystroke in the search box shifted the indices
-                        // and re-keyed the entire list — Compose threw away and rebuilt
-                        // every row's state on each character typed. The occurrence
-                        // counter only disambiguates a song that genuinely appears twice
-                        // in one section, which is what keeps the key unique without
-                        // making it move when the list is filtered.
-                        // Plain val, not remember: this runs in LazyListScope, which is not
-                        // a composable context. One pass over the section when the item
-                        // provider is built.
+                        // Use song IDs, not list positions, so filtering does not recreate rows.
+                        // Occurrence counts only distinguish duplicate songs in the same section.
                         val songKeys = buildList(section.songs.size) {
                             val seen = HashMap<String, Int>()
                             section.songs.forEach { song ->
-                                val occurrence = seen.merge(song.id, 1, Int::plus)!! - 1
+                                val occurrence = seen[song.id] ?: 0
+                                seen[song.id] = occurrence + 1
                                 add("${section.title}_${song.id}_$occurrence")
                             }
                         }
@@ -317,7 +325,7 @@ fun HistoryScreen(
                                 shape = listItemShape(index, section.songs.size),
                                 flat = true,
                                 trailingContent = {
-                                    androidx.compose.material3.IconButton(
+                                    CupertinoIconButton(
                                         onClick = {
                                             menuState.show {
                                                 YouTubeSongMenu(
@@ -331,10 +339,7 @@ fun HistoryScreen(
                                             }
                                         }
                                     ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.more_horiz),
-                                            contentDescription = null
-                                        )
+                                        SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                                     }
                                 },
                                 modifier = Modifier
@@ -406,7 +411,7 @@ fun HistoryScreen(
                                             onCheckedChange = onCheckedChange
                                         )
                                     } else {
-                                        androidx.compose.material3.IconButton(
+                                        CupertinoIconButton(
                                             onClick = {
                                                 menuState.show {
                                                     SongMenu(
@@ -418,10 +423,7 @@ fun HistoryScreen(
                                                 }
                                             }
                                         ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.more_horiz),
-                                                contentDescription = null
-                                            )
+                                            SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                                         }
                                     }
                                 },
@@ -491,6 +493,11 @@ fun HistoryScreen(
                 }
             )
 
+            com.convx.music.ui.component.TopFadeBlur(
+                hazeState = hazeState,
+                pageColor = tint,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
             // The large title's stand-in once it has scrolled away. Centred, so
             // it sits between the chrome row's edge buttons rather than under
             // them — but the search field takes the centre in those modes.
@@ -504,7 +511,6 @@ fun HistoryScreen(
                 )
             }
 
-            // Top bar logic
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -516,10 +522,7 @@ fun HistoryScreen(
             ) {
                 if (inSelectMode) {
                     GlassCircleButton(onClick = onExitSelectionMode) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFXmark,
-                            contentDescription = null,
-                        )
+                        SymbolIcon(symbol = sf("SFXmark"), contentDescription = null)
                     }
                     
                     Text(
@@ -550,7 +553,7 @@ fun HistoryScreen(
                                 }
                             }
                         )
-                        androidx.compose.material3.IconButton(
+                        CupertinoIconButton(
                             enabled = selection.isNotEmpty(),
                             onClick = {
                                 menuState.show {
@@ -565,10 +568,7 @@ fun HistoryScreen(
                                 }
                             }
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.more_horiz),
-                                contentDescription = null
-                            )
+                            SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                         }
                     }
                 } else if (isSearching) {
@@ -578,10 +578,7 @@ fun HistoryScreen(
                             query = TextFieldValue()
                         },
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.arrow_back_ios),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("chevron.left"), contentDescription = null)
                     }
 
                     Row(
@@ -635,19 +632,13 @@ fun HistoryScreen(
                             }
                         }
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.arrow_back_ios),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("chevron.left"), contentDescription = null)
                     }
 
                     Spacer(Modifier.weight(1f))
 
                     GlassCircleButton(onClick = { isSearching = true }) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("SFMagnifyingglass"), contentDescription = null)
                     }
                 }
             }

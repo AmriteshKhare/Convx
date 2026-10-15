@@ -2,7 +2,7 @@
  * Convx Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
-// Apple Music player UI ported from vivizzz007/vivi-music (https://github.com/vivizzz007/vivi-music), GPL-3.0.
+// Apple Music player UI adapted from an open-source (GPL-3.0) base.
 
 package com.convx.music.ui.player
 
@@ -63,11 +63,7 @@ fun CanvasArtworkPlayer(
     val fallback = fallbackUrl?.takeIf { it.isNotBlank() }
     val initial = primary ?: fallback ?: return
 
-    // A canvas loop is decorative, so it must never outlive the user looking at it.
-    // Gated here rather than at each call site: this composable stays composed while
-    // the app is in the background, and AlbumScreen passes isPlaying = true
-    // unconditionally, so a hardware video decoder kept running at the forced highest
-    // bitrate with the screen off — battery and heat, not just frames.
+    // Stop the decorative video when the app is backgrounded to save battery and heat.
     val lifecycleOwner = LocalLifecycleOwner.current
     var inForeground by remember(lifecycleOwner) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
@@ -181,7 +177,7 @@ fun CanvasArtworkPlayer(
 
     val alpha by animateFloatAsState(
         targetValue = if (isVideoReady) 1f else 0f,
-        // Seamless ease, not a 300ms default: the loop dissolves up out of the still.
+        // Use a longer fade to blend the loop into the still.
         animationSpec = tween(durationMillis = 650, easing = SeamlessEasing),
         label = "canvasAlpha"
     )
@@ -212,7 +208,7 @@ fun CanvasArtworkPlayer(
 @Composable
 internal fun rememberCanvasMediaSourceFactory(): DefaultMediaSourceFactory {
     val context = LocalContext.current
-    val downloadUtil = LocalDownloadUtil.current
+    val downloadUtil = LocalDownloadUtil.current.get()
     val okHttpClient =
         remember {
             OkHttpClient

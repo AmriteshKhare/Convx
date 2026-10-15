@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.settings.diy
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -248,7 +250,7 @@ fun PresetsScreen(
                 onClick = { importLauncher.launch(arrayOf("*/*")) },
                 size = 36.dp,
             ) {
-                Icon(painterResource(R.drawable.restore), contentDescription = null)
+                SymbolIcon(symbol = sf("clock.arrow.circlepath"), contentDescription = null)
             }
         },
     ) { chrome ->
@@ -256,7 +258,7 @@ fun PresetsScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showSaveSheet = true },
-                icon = { Icon(painterResource(R.drawable.palette), contentDescription = null) },
+                icon = { SymbolIcon(symbol = sf("paintpalette"), contentDescription = null) },
                 text = { Text(stringResource(R.string.preset_save_current)) },
             )
         },
@@ -324,11 +326,7 @@ private fun PresetCard(
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Icon(
-                    painterResource(R.drawable.palette),
-                    contentDescription = null,
-                    tint = AppTheme.colorScheme.onSurfaceVariant,
-                )
+                SymbolIcon(symbol = sf("paintpalette"), contentDescription = null, tint = AppTheme.colorScheme.onSurfaceVariant)
             }
         }
         Text(

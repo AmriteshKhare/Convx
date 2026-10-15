@@ -42,13 +42,8 @@ fun iosTypography(fontFamily: FontFamily = FontFamily.Default): IosTypography {
         letterSpacing = tracking.sp,
     )
 
-    // Apple Music tiers, not plain SF's: heavier weight and tracking that
-    // tightens (goes negative) as size grows, rather than SF's flat positive
-    // tracking. A title over a single record needs to carry the page on its
-    // own; SF's W400 reads as the same rank as the copy under it, so there is
-    // no hierarchy left. Line height is set at ~1.2x rather than left to the
-    // font: a two-line title at tight tracking and heavy weight sets very
-    // close by default, and the second line ends up touching the first.
+    // Use stronger weights, tighter large-title tracking, and explicit line height
+    // to keep Apple Music-style titles distinct and readable.
     fun display(size: Int, weight: FontWeight, tracking: Float) = TextStyle(
         fontFamily = fontFamily,
         fontSize = size.sp,
@@ -64,9 +59,7 @@ fun iosTypography(fontFamily: FontFamily = FontFamily.Default): IosTypography {
         title3 = display(20, FontWeight.W700, -0.3f),
         headline = display(16, FontWeight.W600, -0.2f),
         subheadline = style(15, 20, FontWeight.Normal, -0.24f),
-        // Supporting copy drops the other way from the display tiers — flat
-        // weight, zero tracking — so the gap between title and body does the
-        // hierarchy work instead of colour.
+        // Neutral body text lets weight and spacing carry the hierarchy.
         body = display(16, FontWeight.W400, 0f),
         callout = display(14, FontWeight.W400, 0f),
         footnote = style(13, 18, FontWeight.Normal, -0.08f),

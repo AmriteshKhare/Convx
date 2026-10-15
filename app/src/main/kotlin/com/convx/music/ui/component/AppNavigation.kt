@@ -90,10 +90,13 @@ internal fun rememberStickySelectedRoute(
     val matched = navigationItems.firstOrNull {
         isRouteSelected(currentRoute, it.route, navigationItems)
     }?.route
-    var last by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(matched) { if (matched != null) last = matched }
-    return matched ?: last
+    // Held outside composition state on purpose: the bar is rebuilt whenever search opens or closes, and a
+    // remembered copy was lost each time, leaving the selected slot empty on a page reached from search.
+    LaunchedEffect(matched) { if (matched != null) lastSelectedTabRoute = matched }
+    return matched ?: lastSelectedTabRoute
 }
+
+private var lastSelectedTabRoute: String? by mutableStateOf(null)
 
 @Composable
 fun AppNavigationRail(
@@ -122,11 +125,7 @@ fun AppNavigationRail(
 
             val isSearchItem = screen == Screens.Search && onSearchLongClick != null
             val interactionSource = remember { MutableInteractionSource() }
-            // LaunchedEffect(interactionSource) only launches once (interactionSource's
-            // identity never changes), so its collectLatest closure would otherwise
-            // freeze isSelected at whatever it was on that first launch — every tap
-            // afterward re-reads that stale value instead of the current route.
-            // rememberUpdatedState keeps it live.
+            // Keep selected state current inside this long-lived interaction collector.
             val currentIsSelected by rememberUpdatedState(isSelected)
 
             if (isSearchItem) {

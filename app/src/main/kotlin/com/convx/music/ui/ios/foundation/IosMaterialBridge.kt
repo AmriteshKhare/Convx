@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
  * Without this, those internals fall back to Material's stock purple. It is invisible on
  * screen; its whole job is keeping the parts we did not reimplement on the iOS palette.
  *
- * ponytail: delete only if every one of those delegations is reimplemented natively.
+ * Keep this bridge until every delegated Material component has a native implementation.
  * Removing it while they exist does not remove Material — it just makes it ugly.
  */
 @Stable
@@ -85,21 +85,9 @@ fun iosColorScheme(colors: IosColors): ColorScheme {
 }
 
 /**
- * M3 [Typography] carrying the iOS text styles, so a stray `Text()` inside an
- * unconverted screen still measures and tracks like SF Pro rather than Roboto.
- *
- * The *display* tiers are Apple Music's, not plain iOS's. SF's own large title is
- * W400 at positive tracking, which is right for a settings header and wrong for a
- * screen whose whole job is one album name over one picture: at that weight a title
- * and the credit line under it read as the same rank, and the page has no hierarchy
- * left. Apple Music sets those tiers heavy (W700/W800) and tightens the tracking as
- * the size grows, which is the look BitChord is built on and what makes its headers
- * carry. Supporting copy drops the other way — 14sp body against a 30sp title — so
- * the gap between the two ranks does the work instead of colour.
- *
- * Only the Material scale changes. `IosTheme.typography` keeps SF's real metrics, so
- * every iOS-styled row, label and menu item is untouched; this moves headers, titles
- * and subtitles, which is where the hierarchy lives.
+ * Material typography adapted to the app's iOS palette. Display titles use the
+ * heavier weights and tighter tracking used by Apple Music; other iOS typography
+ * remains unchanged.
  */
 @Stable
 fun iosMaterialTypography(fontFamily: FontFamily = FontFamily.Default): Typography {

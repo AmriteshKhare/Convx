@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
 import com.convx.music.constants.AppTextColorKey
@@ -38,36 +37,26 @@ fun Color.isHueless(): Boolean {
 fun HeroTintedContent(
     tint: Color,
     backdrop: Backdrop,
+    darkChrome: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    com.convx.music.PublishAmbientBackgroundColor(tint)
+    val onDark = AppleTokens.prefersLightContent(tint)
+    // Glass over a tint that needs light content takes the dark appearance; a light tint keeps the light one.
+    com.convx.music.PublishAmbientBackgroundColor(tint, darkChrome || onDark)
     val base = MaterialTheme.colorScheme
-    val onDark = tint.luminance() <= 0.5f
 
-    // Theme screen's explicit text color, when set, wins over the tint-derived
-    // hero text colors below — same override vivimusicTheme's own flatText
-    // already applies to plain MaterialTheme.colorScheme reads, extended to
-    // this screen-local system so hero screens (Home, Search, Library) agree
-    // with it too instead of always following their artwork tint.
+    // Hero screens replace the scheme, so restore the explicit text-color override.
     val (appTextColorInt) = rememberPreference(AppTextColorKey, defaultValue = 0)
 
-    // Was `base.accentText(tint, onDark)` alone, so any screen under this — Album,
-    // Artist, Library, Search, every playlist screen — that reads
-    // MaterialTheme.colorScheme.onSurface/onSurfaceVariant/secondary directly
-    // (rather than through LocalContentColor/LocalAccentTextColor below) fell back
-    // to the hero-tint-derived color and ignored the global text color setting.
-    // flatText is the same override vivimusicTheme applies at the root; it has to
-    // be re-applied here because this MaterialTheme rebuilds the scheme from scratch.
+    // Apply the override to MaterialTheme roles too; screens read these colors directly.
     val scheme = remember(base, tint, onDark, appTextColorInt) {
-        val tinted = base.accentText(tint, onDark)
+        val tinted = base.accentText(tint, onDark, background = tint)
         if (appTextColorInt != 0) tinted.flatText(Color(appTextColorInt)) else tinted
     }
     val contentColor = if (appTextColorInt != 0) Color(appTextColorInt) else AppleTokens.onColor(tint)
     val headingColor = if (appTextColorInt != 0) Color(appTextColorInt) else AppleTokens.onColorHeading(tint)
 
-    // The screens under this read colour through AppTheme/IosTheme, not through the
-    // nested MaterialTheme below, so the iOS palette has to be re-tinted here too or a
-    // hero screen would paint iOS labels over its own artwork-tinted background.
+    // Keep iOS labels in sync because these screens read colors through AppTheme/IosTheme.
     val baseIos = IosTheme.colors
     val heroIosColors = remember(baseIos, contentColor, headingColor, tint) {
         baseIos.copy(

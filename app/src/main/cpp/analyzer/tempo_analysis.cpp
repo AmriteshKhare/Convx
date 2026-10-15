@@ -2,11 +2,11 @@
  * Ported from Orchard (https://github.com/SFG5453/Orchard).
  *
  * Copyright (C) 2026 SFG545 (original Orchard implementation)
- * Copyright (C) 2026 Kushagra Singh (BitChord adaptation)
+ * Copyright (C) 2026 Convx contributors (adapted from an open-source base)
  *
  * Orchard's original source is licensed under the GNU Affero General Public
  * License, version 3 or later. Per AGPLv3 section 13, this file is combined
- * here into BitChord -- a work licensed under the GNU General Public
+ * here into the reference app -- a work licensed under the GNU General Public
  * License, version 3 or later -- and remains itself governed by the AGPLv3
  * as part of that combination.
  *
@@ -39,7 +39,7 @@
 #include <numeric>
 #include <vector>
 
-namespace vivimusic::smart {
+namespace convx::smart {
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
@@ -224,15 +224,8 @@ double MetricalPrior(double bpm) {
 
 }  // namespace
 
-// Searches 70-200 BPM. A candidate combines normalized correlation at its lag,
-// 0.42 times the double-lag correlation, and a small Gaussian prior around 118
-// BPM; the winner is then re-examined against its own half and double lag so a
-// pattern that repeats every two beats cannot pass itself off as the tempo.
-// Quadratic interpolation refines the winning lag by at most half a frame, and
-// phase maximizes onset strength. The grid is then tracked forward with a
-// phase-locked loop rather than extrapolated, and the four-beat downbeat offset
-// is chosen on bass-band onset strength. Confidence blends tempo strength,
-// phase strength, and separation from non-neighboring candidates.
+// Estimates tempo and beat phase from the onset envelope, then tracks the beat
+// grid forward to limit timing drift. Downbeats use bass-band onset strength.
 TempoResult AnalyzeTempo(
   const std::vector<float>& samples,
   double sample_rate,
@@ -268,17 +261,9 @@ TempoResult AnalyzeTempo(
     if (scores[lag] > scores[best_lag]) best_lag = lag;
   }
 
-  // Resolve the metrical level. The 0.42 double-lag term above stabilizes the
-  // search against picking double time, but it does so by rewarding whichever
-  // lag has a strong correlation one octave up -- and in most produced music
-  // the drum pattern repeats every two beats, so the half-tempo lag inherits
-  // that reward and wins. Measured on synthetic backbeat material, 140, 150 and
-  // 174 BPM all came back at almost exactly half.
-  //
-  // So the winner is re-examined against its own half and double lag using the
-  // *raw* correlation, with no double-lag term to bias the comparison, scaled
-  // by a perceptual tempo prior. This can only move the reading by an octave;
-  // it never overrides which lag the search actually found.
+  // Recheck the winner at half and double tempo. The double-lag search term can
+  // favor half-time when drum patterns repeat every two beats; raw correlation
+  // and a tempo prior choose between these octave-related readings.
   {
     double best_metrical = -1;
     int metrical_lag = best_lag;
@@ -310,16 +295,8 @@ TempoResult AnalyzeTempo(
     }
   }
 
-  // Which offset within the beat carries the onsets, scored by laying a comb of
-  // period `lag` over the envelope and summing what it lands on.
-  //
-  // `limit` matters more than it looks. The comb only measures phase if it stays
-  // in step with the music across the window it reads, and the lag it is given
-  // is quantized -- 0.15% off is enough to walk a comb half a beat out of phase
-  // in three minutes, which flattens the score into noise and makes the argmax
-  // arbitrary. So the first estimate reads a short window, where a 0.15% error
-  // is a few milliseconds, and it is taken again over everything once the
-  // tracking loop below has locked the interval to within 0.001%.
+  // Score each possible onset offset. Use a short window first because the
+  // quantized lag can drift out of phase over a full track; tracking refines it.
   const auto estimate_phase = [&](double lag, size_t limit) {
     const int phase_count = std::max(1, static_cast<int>(std::round(lag)));
     const double end = static_cast<double>(std::min(limit, envelope.size()));
@@ -358,33 +335,9 @@ TempoResult AnalyzeTempo(
   };
   anchor_first_beat(best_phase, refined_lag);
 
-  // Track the grid forward instead of extrapolating it.
-  //
-  // A rigid grid is only as good as the tempo estimate that generated it, and
-  // that estimate is quantized: at 11,025 Hz with a 128-sample hop, one frame of
-  // autocorrelation lag is 3.17 BPM at 128 BPM, so sub-frame interpolation is
-  // doing all the precision work and lands within roughly 0.15%. Harmless over a
-  // few bars; across the four minutes to a track's mix-out anchor it is 90 to
-  // 300 ms of accumulated phase error, measured on a *perfect* click track --
-  // up to 40% of a beat at 128 BPM, and both sides of a transition err
-  // independently. That is the single largest reason beat-matched blends do not
-  // line up.
-  //
-  // This is a phase-locked loop over the onset envelope: each beat is predicted
-  // from the running grid, the envelope is searched within a fraction of a beat
-  // for the onset that actually occurred, and the error feeds back as a fast
-  // phase correction plus a slow interval correction. The interval term is what
-  // removes the accumulating component -- a persistent error means the estimate
-  // is wrong, not that one beat moved. Both terms are bounded: phase to a
-  // quarter beat and interval to 3%, so the loop can follow a drifting
-  // performance but can never walk onto the offbeat.
-  //
-  // Run twice. The interval term needs on the order of 1/kIntervalGain beats to
-  // pull a 0.15% tempo error out of the loop, which is about two minutes of
-  // music -- so a single forward pass is still 160 ms out at the half-minute
-  // mark, and the incoming track's mix-in point lives exactly there. The first
-  // pass therefore only learns the interval; the second lays the grid down
-  // already locked to it, from the first beat.
+  // Track observed onsets instead of extrapolating the initial tempo estimate,
+  // which would accumulate timing error over a full song. The first pass learns
+  // the interval; the second builds the final grid using that refined interval.
   const double envelope_end = static_cast<double>(envelope.size()) - 1;
   const double last_frame = duration * frames_per_second;
 
@@ -482,18 +435,9 @@ TempoResult AnalyzeTempo(
   result.bpm = frames_per_second * 60.0 / refined_lag;
   result.beat_interval = 60.0 / result.bpm;
 
-  // Which of the four beats is beat one.
-  //
-  // This used to take the offset with the highest mean *full-band* onset
-  // strength, which finds the loudest recurring hit -- and in produced music
-  // that is the snare, on two and four. Measured on synthetic backbeat
-  // material it chose a backbeat in nine runs out of nine, which puts every
-  // mix a half-bar out of phase even when the beats themselves line up.
-  //
-  // Bass-band onset strength answers the question the full band cannot: kick
-  // drums are down there and snares are not. The full band still contributes,
-  // because on four-on-the-floor material every offset has the same kick and
-  // the decision falls back to whatever else marks the bar.
+  // Choose the bar phase from bass-band energy so snares on beats 2 and 4 do
+  // not dominate. Keep some full-band energy for four-on-the-floor tracks,
+  // where the kick alone cannot distinguish the four offsets.
   int downbeat_offset = 0;
   double downbeat_score = -1;
   for (int offset = 0; offset < 4; ++offset) {
@@ -516,16 +460,8 @@ TempoResult AnalyzeTempo(
     result.downbeats.push_back(result.beats[beat]);
   }
 
-  // Everything above works in envelope-frame space, where frame f is indexed by
-  // its first sample. The flux it carries belongs to the whole 46 ms window,
-  // though, so an onset detected in frame f actually happened around the
-  // window's centre -- and reporting the frame start puts every beat time
-  // half a window early. Measured against a click track of known phase the bias
-  // was a constant 27 ms, which is a flam on its own.
-  //
-  // It cancels between two tracks aligned to each other, so it was never what
-  // made blends drift, but everything that maps a beat onto real audio -- where
-  // to cue the incoming deck, where the drop lands -- is straighter without it.
+  // Flux describes each full frame, but frame timestamps use its first sample.
+  // Shift beat times to the frame center to remove that timing offset.
   const double frame_centre_seconds = frame_size / (2.0 * sample_rate);
   result.first_beat += frame_centre_seconds;
   for (double& beat : result.beats) beat += frame_centre_seconds;
@@ -545,4 +481,4 @@ TempoResult AnalyzeTempo(
   return result;
 }
 
-}  // namespace vivimusic::smart
+}  // namespace convx::smart

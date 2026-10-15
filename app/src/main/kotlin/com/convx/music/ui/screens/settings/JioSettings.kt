@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -80,7 +82,6 @@ fun JioSettings(
         pageColor = AppTheme.colorScheme.background,
         horizontalPadding = 24.dp,
     ) {
-        // Description text
         Text(
             text = stringResource(R.string.enable_saavn_streaming_desc),
             style = AppTheme.typography.bodyMedium,
@@ -131,7 +132,6 @@ fun JioSettings(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Options settings group
         IosSettingsGroup(
             title = stringResource(R.string.saavn_audio_quality),
             items = listOf(
@@ -211,12 +211,7 @@ fun JioSettings(
             modifier = Modifier.padding(top = 24.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Icon(
-                painter = painterResource(R.drawable.info),
-                contentDescription = null,
-                tint = AppTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = 8.dp)
-            )
+            SymbolIcon(symbol = sf("info.circle"), contentDescription = null, modifier = Modifier.padding(end = 8.dp), tint = AppTheme.colorScheme.onSurfaceVariant)
             Text(
                 text = stringResource(R.string.jiosaavn_beta_info),
                 style = AppTheme.typography.bodyMedium,

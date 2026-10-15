@@ -63,31 +63,23 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.pow
 
-/**
- * Progress where the collapsed and expanded layers hand over (Melox
- * PLAYER_LAYER_HANDOFF_END_PROGRESS). Mini content is fully faded out just
- * after, at [PLAYER_MINI_FADE_END]; the player's content starts appearing at
- * [PLAYER_CONTENT_APPEAR_START] and is fully in by [PLAYER_CONTENT_APPEAR_END].
- */
+/** Progress where the mini and full-player layers hand off during the morph. */
 internal const val PLAYER_LAYER_HANDOFF_PROGRESS = 0.2f
 
-/** Mini recording fully faded out here (Melox MINI_CONTENT_FADE_END 0.3). */
+/** Progress where mini-player content is fully faded out. */
 internal const val PLAYER_MINI_FADE_END = 0.3f
 
-/** Full-player content starts appearing here (Melox CONTENT_APPEAR_START 0.1). */
+/** Progress where full-player content starts appearing. */
 internal const val PLAYER_CONTENT_APPEAR_START = 0.1f
 
-/** Full-player content fully visible here (Melox CONTENT_APPEAR_END 0.6). */
+/** Progress where full-player content is fully visible. */
 internal const val PLAYER_CONTENT_APPEAR_END = 0.6f
 
 /** Q3 lock: backdrop sampling stays frozen through the morph, going live here so
  *  the first capture after the glass fades in is warm, not a stale frame. */
 internal const val PLAYER_GLASS_UNFREEZE_PROGRESS = 0.75f
 
-/**
- * Open/close settle spring: Melox PlayerSheetTransitionState.animateToTarget exactly --
- * NoBouncy, stiffness 360, velocity-seeded on release (user: morph identical to Melox).
- */
+/** Spring stiffness for opening and closing the player sheet. */
 private const val PlayerSheetStiffness = 360f
 
 private const val BackdropFreezeSafetyNs = 900_000_000L
@@ -98,12 +90,11 @@ private const val COLLAPSE_LANDING_DAMPING = 0.72f
 /** How far (of the collapse travel) a full predictive-back swipe previews. */
 private const val PREDICTIVE_BACK_TRAVEL = 0.35f
 
-/** ponytail: diagnostic slow-motion; leave at 1f except to re-diagnose transitions. */
+/** Diagnostic transition slowdown; keep at 1f for normal playback. */
 private const val DIAG_SLOWDOWN = 1f
 
 /**
- * Bottom Sheet
- * Modified from [ViMusic](https://github.com/vfsfitvnm/ViMusic)
+ * Draggable sheet adapted from [ViMusic](https://github.com/vfsfitvnm/ViMusic).
  */
 @Composable
 fun BottomSheet(
@@ -141,40 +132,31 @@ fun BottomSheet(
     val density = LocalDensity.current
     var hasBeenShown by remember { mutableStateOf(false) }
     if (!state.isCollapsed) hasBeenShown = true
-    // Resident content is composed a moment after launch instead of on the first open:
-    // composing the whole player inside the first morph frame stalled it (the card
-    // skipped to full size on the first tap after launch).
+    // Compose the player shortly after launch so its first opening morph is ready.
     if (keepContentComposed) {
         LaunchedEffect(Unit) {
-            // 600ms: late enough to stay out of the launch frames, early enough that a quick
-            // first tap no longer cold-composes the whole player inside the first morph frame.
+            // Wait until startup settles, before the user is likely to open the player.
             kotlinx.coroutines.delay(600)
             hasBeenShown = true
         }
     }
 
-    // Once the sheet has settled at full size, its corners open to square on their own
-    // short beat, so the player fills the display edge to edge with the glass rounding.
-    // Deliberately separate from the sheet's motion — the corners resolve after it arrives.
+    // Square the corners after the sheet reaches full size.
     val cornerExpansion = remember { Animatable(0f) }
     LaunchedEffect(state.isExpanded) {
         cornerExpansion.animateTo(
             targetValue = if (state.isExpanded) 1f else 0f,
-            // Critically damped: the underdamped 0.78 overshot past square into a negative
-            // radius for a few frames.
+            // Avoid overshoot, which can briefly produce an invalid corner radius.
             animationSpec = spring(dampingRatio = 1f, stiffness = 550f),
         )
     }
 
-    // The two halves record separately (Melox background/content layers); the overlay
-    // stages bg over the first fifth and content from a tenth to six tenths.
+    // Record background and content separately so the morph can fade them at different times.
     Box(
         modifier = modifier
             .graphicsLayer {
                 alpha = if (morphEnabled && PlayerMorph.active) {
-                    // Opaque for the whole flight: easing with progress left the recorded card
-                    // see-through where the backing had already faded — the "black gap" that got
-                    // the morph switched off.
+                    // Keep the recorded background opaque; the overlay controls its fade.
                     1f
                 } else {
                     (1.4f * (state.progress.coerceAtLeast(0.1f) - 0.1f).pow(0.5f)).coerceIn(0f, 1f)
@@ -202,11 +184,8 @@ fun BottomSheet(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // Use graphicsLayer for offset to ensure hardware acceleration and 120Hz support
             .graphicsLayer {
-                // Pinned at full size while the morph owns the frame: the container
-                // overlay places the recording itself, and a sheet still translated down
-                // would be recorded mid-slide and then placed a second time.
+                // The overlay places the recorded sheet, so do not apply its drag offset again.
                 translationY = if (morphEnabled && PlayerMorph.active) {
                     0f
                 } else {
@@ -240,14 +219,9 @@ fun BottomSheet(
                 )
             }
             .graphicsLayer {
-                // Was `if (!state.isExpanded) 16.dp else 0f` -- a hard switch, so the
-                // corners popped square the moment the sheet latched open and popped back
-                // on the first pixel of a drag. Both endpoints are unchanged; what is new
-                // is that the radius now travels between them.
+                // Interpolate the corner radius during dragging instead of switching abruptly.
                 val cornerRadius = if (morphEnabled && PlayerMorph.active) {
-                    // The container overlay is doing the rounding, on the rect it is
-                    // actually drawing. Rounding the recording as well would bake a
-                    // second, wrongly-scaled curve into it.
+                    // The overlay applies rounding to the drawn bounds.
                     0f
                 } else {
                     sharedContainerCornerRadius(
@@ -262,9 +236,7 @@ fun BottomSheet(
             }
     ) {
         if (handleBack && !state.isCollapsed && !state.isDismissed) {
-            // Predictive back drives the sheet itself: the swipe pulls the player part of the
-            // way toward the mini (the morph engages and the card starts shrinking into the
-            // pill under the thumb), release commits, cancel springs it back open.
+            // Predictive back previews collapse; release commits and cancellation restores the sheet.
             androidx.activity.compose.PredictiveBackHandler { events ->
                 try {
                     events.collect { event -> state.previewBack(event.progress) }
@@ -276,20 +248,13 @@ fun BottomSheet(
             }
         }
 
-        // main content
         if (!state.isCollapsed || (keepContentComposed && hasBeenShown)) {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(
                         if (state.isCollapsed) {
-                            // Placed and drawn (at alpha 0, see below, and translated a full
-                            // sheet height off screen, so no input reaches it) rather than
-                            // left unplaced: HWUI destroys the offscreen layers of nodes that
-                            // leave the render tree, so an unplaced player rebuilt every one of
-                            // them on the first morph frame -- measured 355ms, the animation
-                            // clock jumped and the card appeared at full size. Alpha-0 nodes
-                            // are still prepared, so their layers stay warm for the morph.
+                        // Keep hidden content placed so its layers stay warm for the opening morph.
                             Modifier.clearAndSetSemantics {}
                         } else {
                             Modifier
@@ -307,12 +272,8 @@ fun BottomSheet(
                         },
                     )
                     .graphicsLayer {
-                        // Starts where the mini player has finished leaving, not before
-                        // it. The two used to overlap between 0.15 and 0.25, so for that
-                        // slice of every open and close both were on screen at partial
-                        // opacity and the artwork ghosted against itself.
-                        // Same reason as the background above: the overlay owns the
-                        // fade while the morph is running.
+                        // Start full-player content after mini content has faded out.
+                        // The overlay controls the fade during the morph.
                         alpha = if (morphEnabled && PlayerMorph.active) {
                             1f
                         } else {
@@ -356,10 +317,7 @@ fun BottomSheet(
         }
     }
 
-    // Sibling of the translated sheet Box above, not a child of it -- see the
-    // parameter doc. Unaffected by the sheet's own drag translationY, so the
-    // overlay's own translations (root-relative rects it was handed) land where
-    // they mean to instead of being shifted a second time.
+    // Keep the overlay outside the translated sheet so its root-relative bounds remain valid.
     if (overlayContent != null) {
         Box(modifier = Modifier.fillMaxSize(), content = overlayContent)
     }
@@ -376,18 +334,14 @@ class BottomSheetState(
     val dismissedBound: Dp,
     private val density: Density,
 ) : DraggableState by draggableState {
-    // Same technique as BackdropFreeze.kt: a plain array, not snapshot state,
-    // read during the draw phase by a sampling glass surface's `frozen`
-    // provider. A snapshot read there would register a draw dependency and
-    // every write would re-invalidate the frame forever (the trap documented
-    // at MainActivity.kt:1253 and BackdropFreeze.kt:21-23).
+    // A plain array lets draw-phase glass reads avoid snapshot invalidations.
     internal val dragClockNs = longArrayOf(0L)
 
-    /** True between drag start and fling/cancel settle (Melox isDragging). */
+    /** True from drag start until the sheet settles. */
     var isDragging by mutableStateOf(false)
         private set
 
-    /** Which anchor the sheet is settling toward (Melox targetOpen). */
+    /** Anchor the sheet is moving toward. */
     var targetOpen by mutableStateOf(false)
         private set
 
@@ -487,15 +441,7 @@ class BottomSheetState(
         }
     }
 
-    /**
-     * [velocityPxPerSec] is the fling's actual velocity (same sign convention as
-     * [performFling]: positive travels toward expanded, negative toward collapsed).
-     * Same fixed spring as [collapseSoft]/[expandSoft] (Melox settles every path --
-     * drag-release or tap -- on one NoBouncy/360 curve; only the seed velocity
-     * differs). This used to borrow the list/hero overscroll bounce's
-     * velocity-tiered stiffness instead, which made a swipe-release settle on a
-     * visibly different curve than a tap-open right next to it.
-     */
+    /** Settles toward the nearest anchor using the release velocity. */
     private fun collapse(velocityPxPerSec: Float = 0f) {
         collapse(collapseSpring(), initialVelocity = with(density) { velocityPxPerSec.toDp() })
     }
@@ -511,14 +457,13 @@ class BottomSheetState(
     }
 
     fun collapseSoft() {
-        // Melox PlayerSheetTransition.animateToTarget: critically damped
-        // (NoBouncy), stiffness 360, velocity-seeded on fling release.
+        // Use the same spring for tap and drag transitions.
         endDragState()
         collapse(collapseSpring())
     }
 
     fun expandSoft() {
-        // See collapseSoft: Melox settles both ways on the same spring.
+        // Match the opening spring to [collapseSoft].
         endDragState()
         expand(
             spring(
@@ -597,13 +542,7 @@ class BottomSheetState(
         }
     }
 
-    // A `val`, not `get() =`: this used to allocate a fresh NestedScrollConnection (with a
-    // fresh isTopReached = false) on every access. Read inline and un-remembered at the call
-    // site, that meant any recomposition mid-drag silently reset isTopReached -- if that landed
-    // right as the finger lifted, onPreFling's isTopReached check failed, performFling never
-    // ran, and the sheet was left parked mid-drag with no anchor to settle to. Computed once
-    // here (BottomSheetState itself is only constructed once, inside `remember`), isTopReached
-    // now actually survives recomposition.
+    // Keep this connection stable across recompositions so drag state survives until onPreFling.
     val preUpPostDownNestedScrollConnection = object : NestedScrollConnection {
             var isTopReached = false
 
@@ -668,12 +607,7 @@ fun rememberBottomSheetState(
     expandedBound: Dp,
     collapsedBound: Dp = dismissedBound,
     initialAnchor: Int = dismissedAnchor,
-    // A sheet whose bounds ARE the pane it lives in (Player v2's queue pane, sized to
-    // maxHeight, not the screen) has nowhere to bounce from -- animating its mount is the
-    // one-frame-old bug where it overshoots past its own ceiling and springs back, which
-    // reads as "expand then shrink". Those callers pass false to seed the Animatable at its
-    // resting value directly. Every other sheet (mini player, real screen-edge sheets) keeps
-    // the reveal animation, so this defaults to on.
+    // Pane-sized sheets start at rest; screen-edge sheets can reveal on mount.
     animateOnMount: Boolean = true,
 ): BottomSheetState {
     val density = LocalDensity.current
@@ -704,21 +638,10 @@ fun rememberBottomSheetState(
                 // UNDISPATCHED: the snap lands in this input event, not a dispatch later --
                 // the card was trailing the finger by a frame.
                 coroutineScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
-                    // Stop AT the top, don't run past it. The animatable's upper bound is
-                    // deliberately null so the settle springs have room to overshoot, but a
-                    // raw drag using that room carried the sheet arbitrarily far above the
-                    // screen -- translationY goes negative and the content leaves the
-                    // display, and performFling then had no anchor to resolve to.
-                    //
-                    // A rubber band here does NOT work, and briefly shipped: the curve has
-                    // to be applied to the RAW accumulated pull, but each delta is measured
-                    // against `animatable.value`, which is already compressed. Every frame
-                    // then re-compresses the previous frame's compressed value, the sheet
-                    // pushes back harder than the finger moves, and dragging up reads as
-                    // jitter -- "it doesn't want to go up". Tracking raw pull separately is
-                    // what IosOverscrollEffect does, and it needs state this DraggableState
-                    // does not own. A hard stop at the top is what a fully-open sheet does
-                    // on iOS anyway: there is nothing above it to stretch toward.
+                    // Keep direct drags within the expanded bound. The upper animation
+                    // bound stays open so settle springs can overshoot. Rubber-banding here
+                    // would need separate raw-drag state; using the clamped value makes the
+                    // sheet jitter under the finger.
                     val next = animatable.value - with(density) { delta.toDp() }
                     animatable.snapTo(next.coerceAtMost(expandedBound))
                 }

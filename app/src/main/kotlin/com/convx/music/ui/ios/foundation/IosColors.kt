@@ -135,7 +135,8 @@ fun darkIosColors(accent: Color = Color(0xFF0A84FF)): IosColors = IosColors(
     systemGray5 = Color(0xFF2C2C2E),
     systemGray6 = Color(0xFF1C1C1E),
     label = Color(0xFFFFFFFF),
-    secondaryLabel = Color(0x99EBEBF5),
+    // Keep dark secondary labels at 70% opacity for readability.
+    secondaryLabel = Color(0xB3EBEBF5),
     tertiaryLabel = Color(0x4DEBEBF5),
     quaternaryLabel = Color(0x2EEBEBF5),
     placeholderText = Color(0x4DEBEBF5),
@@ -145,7 +146,8 @@ fun darkIosColors(accent: Color = Color(0xFF0A84FF)): IosColors = IosColors(
     quaternarySystemFill = Color(0x2E767680),
     separator = Color(0x99545458),
     opaqueSeparator = Color(0xFF38383A),
-    systemBackground = Color(0xFF121212),
+    // Dark system backgrounds use true black.
+    systemBackground = Color(0xFF000000),
     secondarySystemBackground = Color(0xFF1C1C1E),
     tertiarySystemBackground = Color(0xFF2C2C2E),
     systemGroupedBackground = Color(0xFF000000),

@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.library
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -65,10 +67,11 @@ import com.convx.music.R
 import com.convx.music.constants.CONTENT_TYPE_HEADER
 import com.convx.music.constants.CONTENT_TYPE_SONG
 import com.convx.music.constants.HideExplicitKey
+import com.convx.music.constants.HideVideoSongsKey
+import com.convx.music.constants.DataSaverEnabledKey
 import com.convx.music.constants.LibraryIconsOnlyKey
 import com.convx.music.constants.SongFilter
 import com.convx.music.constants.SongFilterKey
-import com.convx.music.constants.LocalOnlyModeKey
 import com.convx.music.constants.SongSortDescendingKey
 import com.convx.music.constants.SongSortType
 import com.convx.music.constants.SongSortTypeKey
@@ -96,6 +99,7 @@ import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.utils.heroPullZoom
 import com.convx.music.ui.utils.listOverscroll
 import com.convx.music.ui.utils.rememberHeroZoom
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -107,8 +111,8 @@ fun LibrarySongsScreen(
     val context = LocalContext.current
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
     val (sortType, onSortTypeChange) = rememberEnumPreference(
         SongSortTypeKey,
@@ -118,14 +122,16 @@ fun LibrarySongsScreen(
 
     val (ytmSync) = rememberPreference(YtmSyncKey, true)
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
+    val hideVideoSongs by rememberPreference(key = HideVideoSongsKey, defaultValue = false)
+    val dataSaverEnabled by rememberPreference(key = DataSaverEnabledKey, defaultValue = false)
     val (libraryIconsOnly) = rememberPreference(LibraryIconsOnlyKey, defaultValue = true)
 
-    val songs by viewModel.allSongs.collectAsState()
-    val isScanning by viewModel.isScanning.collectAsState()
-    val scanResult by viewModel.scanResult.collectAsState()
+    val songsSnapshot by viewModel.allSongs.collectAsStateWithLifecycle()
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
+    val scanResult by viewModel.scanResult.collectAsStateWithLifecycle()
 
     var storedFilter by rememberEnumPreference(SongFilterKey, SongFilter.LIKED)
-    val (localOnly) = rememberPreference(LocalOnlyModeKey, false)
+    val localOnly = com.convx.music.LocalLocalOnlyMode.current
     // Mirrors what the view model actually queries while local-only mode is on.
     val filter = if (localOnly) SongFilter.LOCAL else storedFilter
     // Pull-to-refresh only: no hero artwork on this screen, so heroZoom.scale
@@ -171,7 +177,7 @@ fun LibrarySongsScreen(
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val scrollToTop =
-        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsState()
+        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTop?.value) {
         if (scrollToTop?.value == true) {
@@ -180,8 +186,21 @@ fun LibrarySongsScreen(
         }
     }
 
-    val filteredSongs = remember(songs, hideExplicit) {
-        if (hideExplicit) songs.filter { !it.song.explicit } else songs
+    val filteredSongs = remember(
+        songsSnapshot,
+        filter,
+        sortType,
+        sortDescending,
+        hideExplicit,
+        hideVideoSongs,
+        dataSaverEnabled,
+    ) {
+        val snapshotMatchesScreen = songsSnapshot.filter == filter &&
+            songsSnapshot.sortType == sortType &&
+            songsSnapshot.descending == sortDescending &&
+            songsSnapshot.hideExplicit == hideExplicit &&
+            songsSnapshot.hideVideoSongs == (hideVideoSongs || dataSaverEnabled)
+        if (snapshotMatchesScreen) songsSnapshot.songs else emptyList()
     }
 
     Box(
@@ -213,10 +232,7 @@ fun LibrarySongsScreen(
                         onClick = onDeselect,
                         shape = RoundedCornerShape(16.dp),
                         leadingIcon = {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFXmark,
-                                contentDescription = ""
-                            )
+                            SymbolIcon(bounceOnEnter = true, symbol = sf("SFXmark"), contentDescription = "")
                         },
                     )
                     // Local-only mode pins the filter to LOCAL in the view model, so
@@ -314,10 +330,7 @@ fun LibrarySongsScreen(
                 }
             }
 
-            // Rescan is available whenever local files are already present —
-            // previously the only scan trigger was the empty-state button, so
-            // once anything was found there was no way to pick up newly added
-            // songs.
+            // Keep rescan available after the first local scan.
             if (filter == SongFilter.LOCAL && hasStoragePermission &&
                 filteredSongs.isNotEmpty() && !isScanning
             ) {
@@ -343,11 +356,7 @@ fun LibrarySongsScreen(
                         }
                         Spacer(Modifier.weight(1f))
                         Button(onClick = { viewModel.scanLocalFiles() }) {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFArrowClockwise,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
+                            SymbolIcon(bounceOnEnter = true, symbol = sf("SFArrowClockwise"), contentDescription = null, size = 18.dp)
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.scan_local_files))
                         }
@@ -429,10 +438,7 @@ fun LibrarySongsScreen(
                                 }
                             },
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.more_horiz),
-                                contentDescription = null,
-                            )
+                            SymbolIcon(bounceOnEnter = true, symbol = sf("ellipsis"), contentDescription = null)
                         }
                     },
                     modifier =

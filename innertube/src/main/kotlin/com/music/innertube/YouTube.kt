@@ -49,10 +49,7 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
 import java.net.Proxy
 
-/**
- * Parse useful data with [InnerTube] sending requests.
- * Modified from [ViMusic](https://github.com/vfsfitvnm/ViMusic)
- */
+/** Modified from [ViMusic](https://github.com/vfsfitvnm/ViMusic). */
 object YouTube : InnertubeRepository {
     private val innerTube = InnerTube()
 
@@ -280,7 +277,6 @@ LibraryMapper.libraryRecentActivity(innerTube)
      * This is more reliable than using cached tokens which might be stale
      */
     override suspend fun addSongToLibrary(videoId: String): Result<Boolean> = runCatching {
-        // Get fresh song data with menu tokens using next endpoint
         val nextResult = PlayerMapper.next(innerTube, WatchEndpoint(videoId = videoId), null).getOrThrow()
         val song = nextResult.items.find { it.id == videoId }
             ?: throw Exception("Song not found in next response")
@@ -295,7 +291,6 @@ LibraryMapper.libraryRecentActivity(innerTube)
      * Remove a song from library by fetching fresh feedback tokens from the next endpoint
      */
     override suspend fun removeSongFromLibrary(videoId: String): Result<Boolean> = runCatching {
-        // Get fresh song data with menu tokens using next endpoint
         val nextResult = PlayerMapper.next(innerTube, WatchEndpoint(videoId = videoId), null).getOrThrow()
         val song = nextResult.items.find { it.id == videoId }
             ?: throw Exception("Song not found in next response")
@@ -366,39 +361,34 @@ LibraryMapper.libraryRecentActivity(innerTube)
 
     override suspend fun comments(videoId: String): Result<Pair<List<CommentThreadRenderer>, String?>> = runCatching {
         val response = innerTube.next(YouTubeClient.WEB, videoId, null, null, null, null, null).body<NextResponse>()
-        
-        // Find comment continuation token from engagementPanels (Primary location for YouTube Music/some WEB videos)
-        val commentsPanel = response.engagementPanels?.firstOrNull { 
+        val token = commentContinuationToken(response, videoId)
+        commentContinuation(token).getOrThrow()
+    }
+
+    private fun commentContinuationToken(response: NextResponse, videoId: String): String {
+        val commentsPanel = response.engagementPanels?.firstOrNull {
             it.engagementPanelSectionListRenderer?.panelIdentifier == "engagement-panel-comments-section"
         }
-        val tokenFromEngagementPanels = commentsPanel?.engagementPanelSectionListRenderer?.content?.sectionListRenderer?.contents
+        val engagementPanelToken = commentsPanel
+            ?.engagementPanelSectionListRenderer?.content?.sectionListRenderer?.contents
             ?.mapNotNull { it.itemSectionRenderer }
             ?.flatMap { it.contents.orEmpty() }
             ?.mapNotNull { it?.continuationItemRenderer }
             ?.firstOrNull()?.continuationEndpoint?.continuationCommand?.token
 
-
         val contentList = response.contents.twoColumnWatchNextResults?.results?.results?.content
+        val webToken = contentList
+            ?.mapNotNull { it?.continuationItemRenderer }
+            ?.firstOrNull()?.continuationEndpoint?.continuationCommand?.token
+            ?: contentList
+                ?.mapNotNull { it?.itemSectionRenderer }
+                ?.flatMap { it.contents.orEmpty() }
+                ?.mapNotNull { it?.continuationItemRenderer }
+                ?.firstOrNull()?.continuationEndpoint?.continuationCommand?.token
 
-        // We MUST prioritize the standard WEB comment section tokenizer to unlock nested replies!
-        // Engagement panels are tailored for YouTube Music which natively disables nested replies.
-        val token =
-            // Path 1: direct continuationItemRenderer in the content list
-            contentList?.mapNotNull { it?.continuationItemRenderer }
-                ?.firstOrNull()
-                ?.continuationEndpoint?.continuationCommand?.token
-            // Path 2: fallback — inside an itemSectionRenderer's contents
-                ?: contentList?.mapNotNull { it?.itemSectionRenderer }
-                    ?.flatMap { it.contents.orEmpty() }
-                    ?.mapNotNull { it?.continuationItemRenderer }
-                    ?.firstOrNull()
-                    ?.continuationEndpoint?.continuationCommand?.token
-            // Path 3: Fallback strictly to engagement panels only if WEB fails
-                ?: tokenFromEngagementPanels
-                ?: throw Exception("No comment continuation token found for videoId=$videoId")
-
-
-        commentContinuation(token).getOrThrow()
+        // The WEB token supports nested replies; use the engagement-panel token as a fallback.
+        return webToken ?: engagementPanelToken
+            ?: throw Exception("No comment continuation token found for videoId=$videoId")
     }
 
     override suspend fun commentContinuation(continuationToken: String): Result<Pair<List<CommentThreadRenderer>, String?>> = runCatching {
@@ -413,7 +403,7 @@ LibraryMapper.libraryRecentActivity(innerTube)
         val legacyComments = continuationItems.mapNotNull { it.commentThreadRenderer }
             .filter { it.comment?.commentRenderer != null || it.commentViewModel?.commentViewModel != null }
 
-        // Use a safe key extraction that prioritizes the renderer's ID, then the viewport ID, then fallback to index
+        // Use comment IDs when available; fall back to a renderer hash when they are missing.
         val legacyCommentsMap = legacyComments.associateBy { thread ->
             thread.comment?.commentRenderer?.commentId 
                 ?: thread.commentViewModel?.commentViewModel?.commentId
@@ -475,31 +465,20 @@ LibraryMapper.libraryRecentActivity(innerTube)
 
         // 3. Extract Next Token (Exhaustive Search)
         val nextToken = continuationItems.mapNotNull { item ->
-            item.continuationItemRenderer?.let { renderer ->
-                renderer.continuationEndpoint?.continuationCommand?.token
-                    ?: renderer.button?.buttonRenderer?.command?.let { null }
-                    ?: renderer.button?.buttonRenderer?.navigationEndpoint?.let { null }
-            }
+            item.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token
         }.firstOrNull()
-            ?: endpoints.mapNotNull { endpoint ->
-                endpoint.appendContinuationItemsAction?.continuationItems?.mapNotNull { it.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token }
-            }.flatten().firstOrNull()
+            ?: endpoints.flatMap { endpoint ->
+                endpoint.appendContinuationItemsAction?.continuationItems.orEmpty()
+                    .mapNotNull { it.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token }
+            }.firstOrNull()
         
         // Merge Legacy and Framework comments
         val frameworkCommentsMap = commentsFromFramework.associateBy { it.comment?.commentRenderer?.commentId }
         val allIds = (legacyCommentsMap.keys + frameworkCommentsMap.keys).filterNotNull().distinct()
 
+        // Framework entries have current fields and may include legacy replies.
         val comments = allIds.mapNotNull { id ->
-            val legacy = legacyCommentsMap[id]
-            val modern = frameworkCommentsMap[id]
-
-            // Always prioritize the modern framework model because YouTube migrated text content exclusively to it.
-            // We've already injected `legacy.replies` into `modern` above.
-            if (modern != null) {
-                modern
-            } else {
-                legacy
-            }
+            frameworkCommentsMap[id] ?: legacyCommentsMap[id]
         }.distinctBy { it.comment?.commentRenderer?.commentId ?: it.hashCode() }
         
 

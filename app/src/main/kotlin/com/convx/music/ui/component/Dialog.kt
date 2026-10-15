@@ -237,12 +237,7 @@ fun InfoLabel(
     verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier.padding(horizontal = 8.dp)
 ) {
-    Icon(
-        painter = painterResource(id = R.drawable.info),
-        contentDescription = null,
-        tint = IosTheme.colors.secondaryLabel,
-        modifier = Modifier.padding(4.dp)
-    )
+    SymbolIcon(symbol = sf("info.circle"), contentDescription = null, modifier = Modifier.padding(4.dp), tint = IosTheme.colors.secondaryLabel)
     Text(
         text = text,
         style = IosTheme.typography.footnote,

@@ -5,11 +5,25 @@
 
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,17 +34,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -46,12 +64,15 @@ import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.ios.compat.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberModalBottomSheetState
+import com.convx.music.ui.ios.compat.rememberIosModalSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,16 +84,19 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.convx.music.LocalPlayerAwareWindowInsets
@@ -112,11 +136,17 @@ import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import kotlin.math.abs
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private val PresetCardWidth = 148.dp
+
+private enum class PlayerDesignPreset { CARD, VINYL, APPLE_MUSIC, APPLE_MUSIC_V2 }
+
 
 /**
  * Player theme picker: preset cards that render a live miniature of the real
@@ -133,7 +163,7 @@ fun PlayerThemeScreen(
         PlayerArtworkStyleKey, defaultValue = PlayerArtworkStyle.CARD
     )
     val (background, onBackgroundChange) = rememberEnumPreference(
-        PlayerBackgroundStyleKey, defaultValue = PlayerBackgroundStyle.APPLE_MUSIC
+        PlayerBackgroundStyleKey, defaultValue = PlayerBackgroundStyle.GRADIENT
     )
     val (sliderStyle, onSliderStyleChange) = rememberEnumPreference(
         SliderStyleKey, defaultValue = SliderStyle.DEFAULT
@@ -148,7 +178,7 @@ fun PlayerThemeScreen(
         PlayerGradientAngleKey, defaultValue = 90f
     )
     val (useAppleMusicPlayer, onUseAppleMusicPlayerChange) = rememberPreference(
-        UseAppleMusicPlayerKey, defaultValue = false
+        UseAppleMusicPlayerKey, defaultValue = true
     )
     val (playerLook, onPlayerLookChange) = rememberEnumPreference(
         PlayerLookKey, defaultValue = PlayerLook.SQUARED
@@ -164,173 +194,185 @@ fun PlayerThemeScreen(
 
     var showStaticPicker by rememberSaveable { mutableStateOf(false) }
     var showGradientSheet by rememberSaveable { mutableStateOf(false) }
-
-    // Layout builder disabled for now — see the commented-out section below.
-    // val (layoutOrderRaw, onLayoutOrderChange) = rememberPreference(PlayerLayoutOrderKey, defaultValue = "")
-    // val (hiddenSlotsRaw, onHiddenSlotsChange) = rememberPreference(PlayerLayoutHiddenSlotsKey, defaultValue = "")
-    // val layoutSlots = remember(layoutOrderRaw) {
-    //     PlayerLayoutRegistry.deserializeOrder(layoutOrderRaw).toMutableStateList()
-    // }
-    // val hiddenSlots = remember(hiddenSlotsRaw) {
-    //     PlayerLayoutRegistry.deserializeHiddenSlots(hiddenSlotsRaw)
-    // }
+    // Opening Player design goes straight to the visual chooser. The page underneath
+    // remains available for advanced color and gradient tuning when it is dismissed.
 
     // Apple Music draws its own square artwork treatment, so the shape presets
     // have nothing to act on while it is selected.
     val artworkLocked = background == PlayerBackgroundStyle.APPLE_MUSIC
     // V17 uses its own thumbnail layout — VINYL and CLOVER don't apply.
     val v17Active = useAppleMusicPlayer
+    val selectedDesign = when {
+        v17Active -> PlayerDesignPreset.APPLE_MUSIC_V2
+        background == PlayerBackgroundStyle.APPLE_MUSIC -> PlayerDesignPreset.APPLE_MUSIC
+        artworkStyle == PlayerArtworkStyle.VINYL -> PlayerDesignPreset.VINYL
+        else -> PlayerDesignPreset.CARD
+    }
 
     // Preview the song that is actually playing; fall back to the app icon.
     val playerConnection = LocalPlayerConnection.current
     val mediaMetadata by remember(playerConnection) {
         playerConnection?.mediaMetadata ?: MutableStateFlow<MediaMetadata?>(null)
-    }.collectAsState()
+    }.collectAsStateWithLifecycle()
     val artworkUrl = mediaMetadata?.thumbnailUrl
+    val isPlaying by remember(playerConnection) {
+        playerConnection?.isPlaying ?: MutableStateFlow(false)
+    }.collectAsStateWithLifecycle()
+    var previewPositionMillis by remember(playerConnection) {
+        mutableLongStateOf(playerConnection?.player?.currentPosition?.coerceAtLeast(0L) ?: 0L)
+    }
+    LaunchedEffect(playerConnection, isPlaying) {
+        if (playerConnection == null) return@LaunchedEffect
+        previewPositionMillis = playerConnection.player.currentPosition.coerceAtLeast(0L)
+        while (isPlaying) {
+            delay(500L)
+            previewPositionMillis = playerConnection.player.currentPosition.coerceAtLeast(0L)
+        }
+    }
 
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     Column(
+        // Scroll first, then pad: the padding belongs to the content, so rows travel under the
+        // top bar and the side bar instead of being cut off at their edges.
         Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
-            .verticalScroll(rememberScrollState()),
+            .widthIn(max = 720.dp)
+            .verticalScroll(rememberScrollState())
+            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current),
     ) {
-        SectionTitle(stringResource(R.string.player_theme_artwork))
-        if (artworkLocked || v17Active) {
-            LockedNote(stringResource(if (v17Active) R.string.player_theme_artwork_locked_v17 else R.string.player_theme_artwork_locked))
-        }
-        PresetRow {
-            PlayerArtworkStyle.entries.forEach { style ->
-                val disabledByV17 = v17Active && style != PlayerArtworkStyle.CARD
-                PresetCard(
-                    label = when (style) {
-                        PlayerArtworkStyle.CARD -> stringResource(R.string.player_theme_card)
-                        PlayerArtworkStyle.VINYL -> stringResource(R.string.player_theme_vinyl)
-                        PlayerArtworkStyle.CLOVER -> stringResource(R.string.player_theme_clover)
-                    },
-                    selected = artworkStyle == style,
-                    enabled = !artworkLocked && !disabledByV17,
-                    onClick = { onArtworkStyleChange(style) },
-                ) {
-                    PlayerPreview(
-                        artworkStyle = style,
-                        background = background,
-                        sliderStyle = sliderStyle,
-                        artworkUrl = artworkUrl,
-                        staticColor = Color(staticColorInt),
-                        gradientStops = gradientStops,
-                        gradientAngle = gradientAngle,
-                    )
-                }
+        SectionTitle("Player design")
+        SettingRow(
+            title = when (selectedDesign) {
+                PlayerDesignPreset.CARD -> stringResource(R.string.player_theme_card)
+                PlayerDesignPreset.VINYL -> stringResource(R.string.player_theme_vinyl)
+                PlayerDesignPreset.APPLE_MUSIC -> "Apple Music"
+                PlayerDesignPreset.APPLE_MUSIC_V2 -> stringResource(R.string.apple_music_player_v17)
+            },
+            onClick = { SettingsSheets.open = SettingsAction.PlayerDesign },
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Change", color = AppTheme.colorScheme.primary, style = AppTheme.typography.labelLarge)
+                Spacer(Modifier.width(6.dp))
+                SymbolIcon(symbol = sf("chevron.right"), contentDescription = null, size = 13.dp, tint = AppTheme.colorScheme.primary)
             }
         }
-
-        SectionTitle(stringResource(R.string.player_background_style))
-        PresetRow {
-            PlayerBackgroundStyle.entries.filter {
-                (it != PlayerBackgroundStyle.BLUR && it != PlayerBackgroundStyle.GLASS) || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-            }.forEach { style ->
-                val disabledByV17 = v17Active && style == PlayerBackgroundStyle.APPLE_MUSIC
-                PresetCard(
-                    label = backgroundLabel(style),
-                    selected = background == style,
-                    enabled = !disabledByV17,
-                    onClick = { onBackgroundChange(style) },
-                ) {
-                    PlayerPreview(
-                        artworkStyle = artworkStyle,
-                        background = style,
-                        sliderStyle = sliderStyle,
-                        artworkUrl = artworkUrl,
-                        staticColor = Color(staticColorInt),
-                        gradientStops = gradientStops,
-                        gradientAngle = gradientAngle,
-                    )
-                }
-            }
-        }
-
-        SectionTitle(stringResource(R.string.apple_music_player_v17))
-        PresetRow {
-            PresetCard(
-                label = stringResource(R.string.apple_music_player_v17),
-                selected = useAppleMusicPlayer,
-                onClick = {
-                    val enabling = !useAppleMusicPlayer
-                    onUseAppleMusicPlayerChange(enabling)
-                    // V17 IS the Apple look; leaving the normal player's background style
-                    // on APPLE_MUSIC too is redundant and leaves that style stranded should
-                    // the user turn V17 back off. Move it to the closest look instead.
-                    if (enabling && background == PlayerBackgroundStyle.APPLE_MUSIC) {
-                        onBackgroundChange(PlayerBackgroundStyle.LIVE_MESH)
-                    }
-                },
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    androidx.compose.foundation.Image(
-                        painter = painterResource(R.drawable.convx_logo),
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                    )
-                }
-            }
-        }
-        if (useAppleMusicPlayer) {
+        if (v17Active) {
             LockedNote(stringResource(R.string.apple_music_player_v17_description))
-            SectionTitle(stringResource(R.string.player_look))
-            PresetRow {
-                PlayerLook.entries.forEach { look ->
-                    PresetCard(
-                        label = stringResource(
-                            if (look == PlayerLook.HERO) R.string.player_look_hero else R.string.player_look_squared
-                        ),
-                        selected = playerLook == look,
-                        onClick = { onPlayerLookChange(look) },
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black),
+        }
+
+        PlayerSettingReveal(visible = !v17Active && !artworkLocked) {
+            Column {
+                SectionTitle("Artwork shape")
+                PresetRow {
+                    PlayerArtworkStyle.entries.forEach { style ->
+                        PresetCard(
+                            label = when (style) {
+                                PlayerArtworkStyle.CARD -> stringResource(R.string.player_theme_card)
+                                PlayerArtworkStyle.VINYL -> stringResource(R.string.player_theme_vinyl)
+                                PlayerArtworkStyle.CLOVER -> stringResource(R.string.player_theme_clover)
+                            },
+                            selected = artworkStyle == style,
+                            onClick = { onArtworkStyleChange(style) },
                         ) {
-                            if (look == PlayerLook.HERO) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .fillMaxHeight(0.65f)
-                                        .background(
-                                            Brush.verticalGradient(
-                                                listOf(AppTheme.colorScheme.primary, Color.Transparent)
-                                            )
-                                        )
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .fillMaxWidth(0.6f)
-                                        .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(AppTheme.colorScheme.primary)
-                                )
-                            }
+                            PlayerPreview(
+                                artworkStyle = style,
+                                background = background,
+                                sliderStyle = sliderStyle,
+                                artworkUrl = artworkUrl,
+                                staticColor = Color(staticColorInt),
+                                gradientStops = gradientStops,
+                                gradientAngle = gradientAngle,
+                            )
                         }
                     }
                 }
             }
-            SwitchPreference(
-                title = { Text(stringResource(R.string.player_thumbnail_shadow)) },
-                checked = showPlayerThumbnailShadow,
-                onCheckedChange = onShowPlayerThumbnailShadowChange,
-            )
-            if (showPlayerThumbnailShadow) {
-                SliderPreference(
-                    title = { Text(stringResource(R.string.player_thumbnail_shadow_elevation)) },
-                    value = playerThumbnailShadowElevation,
-                    onValueChange = onPlayerThumbnailShadowElevationChange,
-                )
+        }
+
+        PlayerSettingReveal(visible = (!v17Active || playerLook == PlayerLook.SQUARED) && !artworkLocked) {
+            Column {
+                SectionTitle(stringResource(R.string.player_background_style))
+                PresetRow {
+                    PlayerBackgroundStyle.entries.filter {
+                        (it != PlayerBackgroundStyle.BLUR && it != PlayerBackgroundStyle.GLASS) || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    }.forEach { style ->
+                        val disabledByV17 = v17Active && style == PlayerBackgroundStyle.APPLE_MUSIC
+                        PresetCard(
+                            label = backgroundLabel(style),
+                            selected = background == style,
+                            enabled = !disabledByV17,
+                            onClick = { onBackgroundChange(style) },
+                        ) {
+                            PlayerPreview(
+                                artworkStyle = artworkStyle,
+                                background = style,
+                                sliderStyle = sliderStyle,
+                                artworkUrl = artworkUrl,
+                                staticColor = Color(staticColorInt),
+                                gradientStops = gradientStops,
+                                gradientAngle = gradientAngle,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        PlayerSettingReveal(visible = useAppleMusicPlayer) {
+            Column {
+                SectionTitle(stringResource(R.string.player_look))
+                PresetRow {
+                    PlayerLook.entries.forEach { look ->
+                        PresetCard(
+                            label = stringResource(
+                                if (look == PlayerLook.HERO) R.string.player_look_hero else R.string.player_look_squared
+                            ),
+                            selected = playerLook == look,
+                            onClick = { onPlayerLookChange(look) },
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black),
+                            ) {
+                                if (look == PlayerLook.HERO) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .fillMaxHeight(0.65f)
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(AppTheme.colorScheme.primary, Color.Transparent)
+                                                )
+                                            )
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .fillMaxWidth(0.6f)
+                                            .aspectRatio(1f)
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(AppTheme.colorScheme.primary)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                PlayerSettingReveal(visible = playerLook == PlayerLook.SQUARED) {
+                    SwitchPreference(
+                        title = { Text(stringResource(R.string.player_thumbnail_shadow)) },
+                        checked = showPlayerThumbnailShadow,
+                        onCheckedChange = onShowPlayerThumbnailShadowChange,
+                    )
+                }
+                PlayerSettingReveal(visible = playerLook == PlayerLook.SQUARED && showPlayerThumbnailShadow) {
+                    SliderPreference(
+                        title = { Text(stringResource(R.string.player_thumbnail_shadow_elevation)) },
+                        value = playerThumbnailShadowElevation,
+                        onValueChange = onPlayerThumbnailShadowElevationChange,
+                    )
+                }
             }
         }
         SwitchPreference(
@@ -340,7 +382,7 @@ fun PlayerThemeScreen(
             onCheckedChange = onShowUpNextChange,
         )
 
-        if (background == PlayerBackgroundStyle.STATIC) {
+        PlayerSettingReveal(visible = background == PlayerBackgroundStyle.STATIC) {
             SettingRow(
                 title = stringResource(R.string.player_theme_static_color),
                 onClick = { showStaticPicker = true },
@@ -355,7 +397,7 @@ fun PlayerThemeScreen(
             }
         }
 
-        if (background == PlayerBackgroundStyle.CUSTOM_GRADIENT) {
+        PlayerSettingReveal(visible = background == PlayerBackgroundStyle.CUSTOM_GRADIENT) {
             SettingRow(
                 title = stringResource(R.string.player_theme_edit_gradient),
                 onClick = { showGradientSheet = true },
@@ -392,30 +434,8 @@ fun PlayerThemeScreen(
             }
         }
 
-        // Layout builder disabled for now.
-        // SectionTitle(stringResource(R.string.player_theme_layout))
-        // Text(
-        //     text = stringResource(R.string.player_theme_layout_desc),
-        //     style = AppTheme.typography.bodySmall,
-        //     color = AppTheme.colorScheme.onSurfaceVariant,
-        //     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-        // )
-        // PlayerLayoutList(
-        //     slots = layoutSlots,
-        //     hiddenSlots = hiddenSlots,
-        //     artworkUrl = artworkUrl,
-        //     onReordered = { onLayoutOrderChange(PlayerLayoutRegistry.serializeOrder(it)) },
-        //     onVisibilityChange = { slot, hidden ->
-        //         val updated = if (hidden) hiddenSlots + slot else hiddenSlots - slot
-        //         onHiddenSlotsChange(PlayerLayoutRegistry.serializeHiddenSlots(updated))
-        //     },
-        //     modifier = Modifier
-        //         .fillMaxWidth()
-        //         .padding(horizontal = 16.dp)
-        //         .height(480.dp),
-        // )
-
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(32.dp))
+    }
     }
 
     if (showStaticPicker) {
@@ -446,11 +466,19 @@ fun PlayerThemeScreen(
                 onClick = navController::navigateUp,
                 onLongClick = navController::backToMain,
             ) {
-                Icon(painterResource(R.drawable.arrow_back), contentDescription = null)
+                SymbolIcon(symbol = sf("arrow.left"), contentDescription = null)
             }
         },
         scrollBehavior = scrollBehavior,
     )
+}
+
+@Composable
+private fun PlayerDesignPreset.displayName(): String = when (this) {
+    PlayerDesignPreset.CARD -> stringResource(R.string.player_theme_card)
+    PlayerDesignPreset.VINYL -> stringResource(R.string.player_theme_vinyl)
+    PlayerDesignPreset.APPLE_MUSIC -> "Apple Music"
+    PlayerDesignPreset.APPLE_MUSIC_V2 -> stringResource(R.string.apple_music_player_v17)
 }
 
 /**
@@ -467,7 +495,7 @@ private fun GradientSheet(
     onStopsChange: (List<Color>) -> Unit,
     onAngleChange: (Float) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberIosModalSheetState(skipPartiallyExpanded = true)
     val working = remember(stops) { stops.toMutableStateList() }
     var editingIndex by remember { mutableIntStateOf(-1) }
 
@@ -519,11 +547,7 @@ private fun GradientSheet(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            painterResource(R.drawable.add),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
+                        SymbolIcon(symbol = sf("plus"), contentDescription = null, size = 18.dp)
                     }
                 }
             }
@@ -605,7 +629,7 @@ private fun backgroundLabel(style: PlayerBackgroundStyle) = when (style) {
     PlayerBackgroundStyle.GLOW_ANIMATED -> stringResource(R.string.glow_animated)
     PlayerBackgroundStyle.APPLE_MUSIC -> stringResource(R.string.apple_music)
     PlayerBackgroundStyle.LIVE_MESH -> stringResource(R.string.live_mesh)
-    PlayerBackgroundStyle.BITCHORD_MESH -> stringResource(R.string.player_theme_colour_mesh)
+    PlayerBackgroundStyle.FLUID_MESH -> stringResource(R.string.player_theme_colour_mesh)
     PlayerBackgroundStyle.STATIC -> stringResource(R.string.player_theme_static)
     PlayerBackgroundStyle.CUSTOM_GRADIENT -> stringResource(R.string.player_theme_custom_gradient)
     PlayerBackgroundStyle.GLASS -> stringResource(R.string.player_background_liquid_glass)
@@ -623,10 +647,22 @@ private fun sliderLabel(style: SliderStyle) = when (style) {
 private fun SectionTitle(text: String) {
     Text(
         text = text,
-        style = AppTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
+        style = AppTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = AppTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 8.dp),
     )
+}
+
+@Composable
+private fun PlayerSettingReveal(visible: Boolean, content: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = expandVertically(animationSpec = tween(220)) + fadeIn(animationSpec = tween(180)),
+        exit = shrinkVertically(animationSpec = tween(180)) + fadeOut(animationSpec = tween(140)),
+    ) {
+        content()
+    }
 }
 
 @Composable
@@ -778,7 +814,7 @@ private fun PresetRow(content: @Composable () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 20.dp),
     ) { content() }
 }
 
@@ -791,12 +827,22 @@ private fun PresetCard(
     preview: @Composable () -> Unit,
 ) {
     val shape = RoundedCornerShape(18.dp)
+    val borderWidth by animateDpAsState(if (selected) 2.dp else 1.dp, label = "presetBorderWidth")
+    val borderColor by animateColorAsState(
+        if (selected) AppTheme.colorScheme.primary else AppTheme.colorScheme.outlineVariant,
+        label = "presetBorderColor",
+    )
+    val checkColor by animateColorAsState(
+        if (selected) AppTheme.colorScheme.primary else Color.Transparent,
+        label = "presetCheckColor",
+    )
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(PresetCardWidth)
             .clip(RoundedCornerShape(20.dp))
             .clickable(enabled = enabled, onClick = onClick)
+                .animateContentSize()
             // Disabled presets stay readable but visibly out of play.
             .alpha(if (enabled) 1f else 0.38f)
             .padding(bottom = 4.dp),
@@ -808,9 +854,8 @@ private fun PresetCard(
                 .shadow(if (selected) 10.dp else 5.dp, shape)
                 .clip(shape)
                 .border(
-                    width = if (selected) 2.dp else 1.dp,
-                    color = if (selected) AppTheme.colorScheme.primary
-                    else AppTheme.colorScheme.outlineVariant,
+                    width = borderWidth,
+                    color = borderColor,
                     shape = shape,
                 )
         ) { preview() }
@@ -826,19 +871,12 @@ private fun PresetCard(
             modifier = Modifier
                 .size(20.dp)
                 .clip(CircleShape)
-                .background(
-                    if (selected) AppTheme.colorScheme.primary else Color.Transparent
-                )
+                .background(checkColor)
                 .border(1.5.dp, AppTheme.colorScheme.outline, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (selected) {
-                Icon(
-                    painterResource(R.drawable.check),
-                    contentDescription = null,
-                    tint = AppTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(13.dp),
-                )
+                SymbolIcon(symbol = sf("checkmark"), contentDescription = null, size = 13.dp, tint = AppTheme.colorScheme.onPrimary)
             }
         }
     }
@@ -865,7 +903,7 @@ private fun PlayerPreview(
         PlayerBackgroundStyle.LIVE_MESH ->
             Brush.linearGradient(listOf(accent, Color.Black, accent.copy(alpha = 0.4f)))
         // Blobs of colour over a near-black base, which is what the real thing is.
-        PlayerBackgroundStyle.BITCHORD_MESH ->
+        PlayerBackgroundStyle.FLUID_MESH ->
             Brush.radialGradient(listOf(accent.copy(alpha = 0.85f), Color.Black))
         PlayerBackgroundStyle.GLOW_ANIMATED -> Brush.radialGradient(listOf(accent, Color.Black))
         else -> Brush.verticalGradient(listOf(accent.copy(alpha = 0.55f), Color.Black))
@@ -944,13 +982,14 @@ private fun PlayerPreview(
     }
 }
 
-/** Tiny stand-in for each seek bar style, drawn at roughly a third of playback. */
+/** Small live seek-bar preview shared by the preset cards and the device mockup. */
 @Composable
-private fun SeekBarPreview(style: SliderStyle, color: Color) {
+private fun SeekBarPreview(style: SliderStyle, color: Color, progress: Float = 0.35f) {
+    val boundedProgress = progress.coerceIn(0f, 1f)
     when (style) {
         SliderStyle.DEFAULT -> Canvas(Modifier.fillMaxWidth().height(10.dp)) {
             val y = size.height / 2f
-            val split = size.width * 0.35f
+            val split = size.width * boundedProgress
             drawLine(color.copy(alpha = 0.3f), androidx.compose.ui.geometry.Offset(0f, y),
                 androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 3f)
             drawLine(color, androidx.compose.ui.geometry.Offset(0f, y),
@@ -961,7 +1000,7 @@ private fun SeekBarPreview(style: SliderStyle, color: Color) {
 
         SliderStyle.WAVY -> Canvas(Modifier.fillMaxWidth().height(10.dp)) {
             val y = size.height / 2f
-            val split = size.width * 0.35f
+            val split = size.width * boundedProgress
             val path = androidx.compose.ui.graphics.Path().apply {
                 moveTo(0f, y)
                 var x = 0f
@@ -978,21 +1017,15 @@ private fun SeekBarPreview(style: SliderStyle, color: Color) {
                 androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 3f)
         }
 
-        SliderStyle.SLIM -> Row(Modifier.fillMaxWidth()) {
-            Box(
-                Modifier
-                    .weight(0.35f)
-                    .height(8.dp)
-                    .clip(CircleShape)
-                    .background(color)
+        SliderStyle.SLIM -> Canvas(Modifier.fillMaxWidth().height(8.dp)) {
+            drawRoundRect(
+                color.copy(alpha = 0.3f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
             )
-            Spacer(Modifier.width(2.dp))
-            Box(
-                Modifier
-                    .weight(0.65f)
-                    .height(8.dp)
-                    .clip(CircleShape)
-                    .background(color.copy(alpha = 0.3f))
+            drawRoundRect(
+                color,
+                size = androidx.compose.ui.geometry.Size(size.width * boundedProgress, size.height),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f),
             )
         }
 
@@ -1006,7 +1039,7 @@ private fun SeekBarPreview(style: SliderStyle, color: Color) {
                 val h = (heights[i] * size.height).coerceAtLeast(size.height * 0.2f)
                 val x = i * slot + slot / 2f
                 drawRoundRect(
-                    color = if (i < bars / 2) color else color.copy(alpha = 0.3f),
+                    color = if (i < bars * boundedProgress) color else color.copy(alpha = 0.3f),
                     topLeft = androidx.compose.ui.geometry.Offset(x - barW / 2f, mid - h / 2f),
                     size = androidx.compose.ui.geometry.Size(barW, h),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(barW / 2f),
@@ -1039,6 +1072,7 @@ private fun SettingRow(title: String, onClick: () -> Unit, trailing: @Composable
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .animateContentSize()
             .padding(horizontal = 20.dp, vertical = 16.dp),
     ) {
         Text(title, style = AppTheme.typography.bodyLarge, modifier = Modifier.weight(1f))

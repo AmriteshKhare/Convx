@@ -81,25 +81,8 @@ import zone.ien.hig.theme.Gray
 import zone.ien.hig.theme.systemGreen
 import zone.ien.hig.utils.DampedDragAnimation
 
-/**
- * Cupertino Design Switch.
- *
- * Switches toggle the state of a single item on or off.
- *
- * @param updatedChecked whether or not this switch is checked
- * @param onCheckedChange called when this switch is clicked. If `null`, then this switch will not
- * be interactable, unless something else handles its input events and updates its state.
- * @param modifier the [Modifier] to be applied to this switch
- * @param thumbContent content that will be drawn inside the thumb
- * @param enabled controls the enabled state of this switch. When `false`, this component will not
- * respond to user input, and it will appear visually disabled and disabled to accessibility
- * services.
- * @param colors [CupertinoSwitchColors] that will be used to resolve the colors used for this switch in
- * different states. See [CupertinoSwitchDefaults.colors].
- * @param interactionSource the [MutableInteractionSource] representing the stream of [Interaction]s
- * for this switch. You can create and pass in your own `remember`ed instance to observe
- * [Interaction]s and customize the appearance / behavior of this switch in different states.
- */
+/** Cupertino-style switch with optional thumb content. */
+
 @OptIn(InternalCupertinoApi::class)
 @Composable
 fun CupertinoSwitch(
@@ -226,12 +209,20 @@ fun CupertinoSwitch(
                     shape = { ContinuousCapsule() },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
-                        blur(8.dp.toPx() * (1f - progress))
-                        lens(
-                            5.dp.toPx() * progress,
-                            10.dp.toPx() * progress,
-                            chromaticAberration = true
-                        )
+                        // The idle thumb's opaque surface fully covers the backdrop.
+                        if (progress != 0f) {
+                            blur(8.dp.toPx() * (1f - progress))
+                            lens(
+                                5.dp.toPx() * progress,
+                                10.dp.toPx() * progress,
+                                chromaticAberration = true
+                            )
+                        }
+                    },
+                    onDrawBackdrop = { drawBackdrop ->
+                        if (dampedDragAnimation.pressProgress != 0f) {
+                            drawBackdrop()
+                        }
                     },
                     highlight = {
                         val progress = dampedDragAnimation.pressProgress
@@ -277,12 +268,8 @@ fun CupertinoSwitch(
     }
 }
 
-/**
- * Represents the colors used by a [Switch] in different states
- *
- * See [SwitchDefaults.colors] for the default implementation that follows Material
- * specifications.
- */
+/** Colors for enabled and disabled switch states. */
+
 @Immutable
 class CupertinoSwitchColors internal constructor(
     private val thumbColor: Color,
@@ -296,11 +283,7 @@ class CupertinoSwitchColors internal constructor(
     private val disabledUncheckedTrackColor: Color,
     private val disabledUncheckedIconColor: Color,
 ) {
-    /**
-     * Represents the color used for the switch's thumb, depending on [enabled] and [checked].
-     *
-     * @param enabled whether the Switch is enabled or not
-     */
+
     @Composable
     internal fun thumbColor(enabled: Boolean): State<Color> =
         rememberUpdatedState(
@@ -311,12 +294,7 @@ class CupertinoSwitchColors internal constructor(
             },
         )
 
-    /**
-     * Represents the color used for the switch's track, depending on [enabled] and [checked].
-     *
-     * @param enabled whether the Switch is enabled or not
-     * @param checked whether the Switch is checked or not
-     */
+
     @Composable
     internal fun trackColor(
         enabled: Boolean,
@@ -330,12 +308,7 @@ class CupertinoSwitchColors internal constructor(
             },
         )
 
-    /**
-     * Represents the content color passed to the icon if used
-     *
-     * @param enabled whether the Switch is enabled or not
-     * @param checked whether the Switch is checked or not
-     */
+
     @Composable
     internal fun iconColor(
         enabled: Boolean,

@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.search.suggestions
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -21,6 +23,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import com.convx.music.ui.ios.compat.AppTheme
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.IconButton
+import com.convx.music.ui.ios.compat.OutlinedButton
+import com.convx.music.ui.ios.compat.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +54,7 @@ import com.convx.music.R
 import com.convx.music.constants.SuggestionRegionKey
 import com.convx.music.constants.SuggestionRegionSlugToName
 import com.convx.music.ui.component.NavigationTitle
+import com.convx.music.ui.utils.sharedArtworkSource
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.utils.rememberPreference
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -65,6 +73,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInRoot
 import kotlin.math.abs
 import java.net.URLEncoder
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -73,12 +82,12 @@ fun SuggestionsTabContent(
     viewModel: SuggestionsViewModel = hiltViewModel(),
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
-    val suggestionTracks by viewModel.suggestionTracks.collectAsState()
-    val suggestionArtists by viewModel.suggestionArtists.collectAsState()
-    val suggestionAlbums by viewModel.suggestionAlbums.collectAsState()
-    val suggestionVideos by viewModel.suggestionVideos.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val isManualLoading by viewModel.isManualLoading.collectAsState()
+    val suggestionTracks by viewModel.suggestionTracks.collectAsStateWithLifecycle()
+    val suggestionArtists by viewModel.suggestionArtists.collectAsStateWithLifecycle()
+    val suggestionAlbums by viewModel.suggestionAlbums.collectAsStateWithLifecycle()
+    val suggestionVideos by viewModel.suggestionVideos.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isManualLoading by viewModel.isManualLoading.collectAsStateWithLifecycle()
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val playerConnection = com.convx.music.LocalPlayerConnection.current
     val context = LocalContext.current
@@ -134,7 +143,7 @@ fun SuggestionsTabContent(
         suggestionTracks?.let { tracks ->
                 item {
                     TrendingAppleMusicSection(
-                        tracks = suggestionTracks!!,
+                        tracks = tracks,
                         countryCode = regionCode,
                         onTrackClick = { track ->
                             android.widget.Toast.makeText(context, "Loading ${track.title}...", android.widget.Toast.LENGTH_SHORT).show()
@@ -213,7 +222,6 @@ fun SuggestionsTabContent(
                 }
             }
 
-            // Footer at the very bottom
             if (suggestionTracks != null || suggestionArtists != null || suggestionAlbums != null || suggestionVideos != null) {
                 item {
                     Column(
@@ -226,7 +234,7 @@ fun SuggestionsTabContent(
                             color = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
                         Text(
-                            text = "vivi-music",
+                            text = "convx",
                             style = AppTheme.typography.labelSmall,
                             color = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             fontWeight = FontWeight.Bold
@@ -284,7 +292,7 @@ fun TrendingAppleMusicSection(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(SfSymbols.Monochrome.SFAntennaRadiowavesLeftAndRight, null, tint = AppTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                            SymbolIcon(symbol = sf("SFAntennaRadiowavesLeftAndRight"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.primary)
                             Spacer(Modifier.width(12.dp))
                             Text("View more on Apple Music", style = AppTheme.typography.titleMedium, color = AppTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
@@ -371,11 +379,7 @@ fun TrendingAppleMusicSection(
                     enabled = pagerState.currentPage > 0,
                     modifier = Modifier.size(32.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.chevron_leftpx),
-                        contentDescription = "Previous",
-                        tint = if (pagerState.currentPage > 0) com.convx.music.ui.ios.foundation.IosTheme.colors.label else com.convx.music.ui.ios.foundation.IosTheme.colors.tertiaryLabel
-                    )
+                    SymbolIcon(symbol = sf("chevron.left"), contentDescription = "Previous", tint = if (pagerState.currentPage > 0) com.convx.music.ui.ios.foundation.IosTheme.colors.label else com.convx.music.ui.ios.foundation.IosTheme.colors.tertiaryLabel)
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -389,11 +393,7 @@ fun TrendingAppleMusicSection(
                     enabled = pagerState.currentPage < pagerState.pageCount - 1,
                     modifier = Modifier.size(32.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.chevron_right_px),
-                        contentDescription = "Next",
-                        tint = if (pagerState.currentPage < pagerState.pageCount - 1) com.convx.music.ui.ios.foundation.IosTheme.colors.label else com.convx.music.ui.ios.foundation.IosTheme.colors.tertiaryLabel
-                    )
+                    SymbolIcon(symbol = sf("chevron.right"), contentDescription = "Next", tint = if (pagerState.currentPage < pagerState.pageCount - 1) com.convx.music.ui.ios.foundation.IosTheme.colors.label else com.convx.music.ui.ios.foundation.IosTheme.colors.tertiaryLabel)
                 }
             }
         }
@@ -414,7 +414,7 @@ fun TopArtistsSection(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
         ) {
-            items(artists) { artist ->
+            items(artists, key = { it.rank }) { artist ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(100.dp).bounceClick { onArtistClick(artist) }) {
                     Box(contentAlignment = Alignment.BottomEnd) {
                         SubcomposeAsyncImage(
@@ -463,17 +463,23 @@ fun TrendingAlbumsSection(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 16.dp)
         ) {
-            items(albums) { album ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(120.dp).bounceClick { onAlbumClick(album) }) {
+            items(albums, key = { it.rank }) { album ->
+                com.convx.music.ui.utils.ArtworkSourceHost(
+                    Modifier.width(120.dp).bounceClick { onAlbumClick(album) },
+                ) { sourceModifier ->
+                val artworkOwner = com.convx.music.ui.utils.rememberArtworkSourceOwner()
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = sourceModifier) {
                     Box(contentAlignment = Alignment.BottomEnd) {
                         SubcomposeAsyncImage(
                             model = album.thumbnailUrl,
+                            onSuccess = com.convx.music.ui.utils.sharedArtworkImageListener(artworkOwner, album.thumbnailUrl),
                             contentDescription = album.title,
                             contentScale = ContentScale.Crop,
                             loading = {
                                 com.convx.music.ui.component.ShimmerBox(Modifier.fillMaxSize(), shape = RoundedCornerShape(12.dp))
                             },
-                            modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)).background(AppTheme.colorScheme.surfaceVariant)
+                            modifier = Modifier.sharedArtworkSource(album.sharedArtworkId, album.thumbnailUrl, artworkOwner)
+                                .size(120.dp).clip(RoundedCornerShape(12.dp)).background(AppTheme.colorScheme.surfaceVariant)
                         )
                         Surface(modifier = Modifier.size(28.dp).offset((-4).dp, (-4).dp), shape = CircleShape, color = AppTheme.colorScheme.primary, tonalElevation = 4.dp) {
                             Box(contentAlignment = Alignment.Center) {
@@ -484,6 +490,7 @@ fun TrendingAlbumsSection(
                     Spacer(Modifier.height(8.dp))
                     Text(album.title, style = AppTheme.typography.titleSmall, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
                     Text(album.artist, style = AppTheme.typography.bodySmall, color = AppTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
+                }
                 }
             }
 
@@ -502,12 +509,7 @@ fun TrendingAlbumsSection(
                             .clip(RoundedCornerShape(12.dp))
                             .background(AppTheme.colorScheme.primaryContainer)
                     ) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFAntennaRadiowavesLeftAndRight,
-                            contentDescription = null,
-                            tint = AppTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        SymbolIcon(symbol = sf("SFAntennaRadiowavesLeftAndRight"), contentDescription = null, size = 32.dp, tint = AppTheme.colorScheme.primary)
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -574,7 +576,6 @@ fun TrendingVideosSection(
                 )
 
 
-                // Gradient Overlay
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -589,7 +590,6 @@ fun TrendingVideosSection(
                         )
                 )
 
-                // Content
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomStart)

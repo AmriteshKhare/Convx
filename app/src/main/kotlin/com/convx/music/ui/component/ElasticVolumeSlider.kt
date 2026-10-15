@@ -22,12 +22,14 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -75,7 +78,9 @@ fun ElasticVolumeSlider(
     activeColor: Color,
     inactiveColor: Color,
     restingTrackHeight: Dp = 6.dp,
-    activeTrackHeight: Dp = 12.dp,
+    /** Inset of the speaker glyphs from the row edges. */
+    horizontalPadding: Dp = 16.dp,
+    activeTrackHeight: Dp = 18.dp,
     leftIcon: @Composable () -> Unit,
     rightIcon: @Composable () -> Unit,
 ) {
@@ -145,36 +150,39 @@ fun ElasticVolumeSlider(
     }
 
     Row(
-        modifier = modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+        modifier = modifier.heightIn(min = 48.dp).padding(horizontal = horizontalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ElasticIcon(pulse = leftPulse, pullPx = if (region == ElasticRegion.LEFT) -overflowPx else 0f) {
+        ElasticIcon(pulse = leftPulse, pullPx = if (region == ElasticRegion.LEFT)
+            -overflowPx.coerceAtMost(with(density) { 8.dp.toPx() }) else 0f) {
             leftIcon()
         }
 
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(activeTrackHeight)
+                .height(48.dp)
                 .onSizeChanged { trackWidthPx = it.width.toFloat() }
                 .pointerInput(enabled) {
                     if (!enabled) return@pointerInput
-                    detectTapGestures(
-                        onPress = {
-                            dragging = true
-                            onMove(it.x)
-                            tryAwaitRelease()
+                    // One gesture owns both press and drag: the former tap
+                    // detector cancelled and shrank the track when dragging began.
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        dragging = true
+                        onMove(down.position.x)
+                        down.consume()
+                        try {
+                            do {
+                                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
+                                    ?: break
+                                if (change.pressed) onMove(change.position.x)
+                                change.consume()
+                            } while (change.pressed)
+                        } finally {
                             onRelease()
                         }
-                    )
-                }
-                .pointerInput(enabled) {
-                    if (!enabled) return@pointerInput
-                    detectHorizontalDragGestures(
-                        onDragStart = { dragging = true },
-                        onDragEnd = { onRelease() },
-                        onDragCancel = { onRelease() },
-                    ) { change, _ -> onMove(change.position.x) }
+                    }
                 },
             contentAlignment = Alignment.Center,
         ) {
@@ -184,15 +192,15 @@ fun ElasticVolumeSlider(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(trackHeight)
-                    .clip(ContinuousCapsule())
-                    .background(inactiveColor)
                     .graphicsLayer {
                         if (size.width > 0f) {
-                            scaleX = 1f + overflowPx / size.width
+                            scaleX = scale * (1f + overflowPx / size.width)
                         }
-                        scaleY = 1f - (overflowPx / maxOverflowPx) * 0.2f
+                        scaleY = scale * (1f - (overflowPx / maxOverflowPx) * 0.2f)
                         transformOrigin = TransformOrigin(stretchOrigin, 0.5f)
                     }
+                    .clip(ContinuousCapsule())
+                    .background(inactiveColor)
             ) {
                 val filled = trackWidthPx * value.coerceIn(0f, 1f)
                 if (filled > 0f) {
@@ -201,14 +209,16 @@ fun ElasticVolumeSlider(
                             .fillMaxWidth()
                             .height(trackHeight)
                             .drawBehind {
-                                drawRect(activeColor, size = Size(filled, size.height))
+                                drawRoundRect(activeColor, size = Size(filled, size.height),
+                                    cornerRadius = CornerRadius(size.height / 2f))
                             }
                     )
                 }
             }
         }
 
-        ElasticIcon(pulse = rightPulse, pullPx = if (region == ElasticRegion.RIGHT) overflowPx else 0f) {
+        ElasticIcon(pulse = rightPulse, pullPx = if (region == ElasticRegion.RIGHT)
+            overflowPx.coerceAtMost(with(density) { 8.dp.toPx() }) else 0f) {
             rightIcon()
         }
     }

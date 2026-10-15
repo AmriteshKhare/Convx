@@ -2,10 +2,12 @@
  * Convx Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
-// Apple Music player UI ported from vivizzz007/vivi-music (https://github.com/vivizzz007/vivi-music), GPL-3.0.
+// Apple Music player UI adapted from an open-source (GPL-3.0) base.
 
 package com.convx.music.ui.player
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -71,6 +73,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import com.convx.music.ui.component.Icon as MIcon
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -91,10 +94,10 @@ fun AppleMiniPlayer(
     val miniPlayerBackground by rememberEnumPreference(MiniPlayerBackgroundStyleKey, defaultValue = PlayerBackgroundStyle.DEFAULT)
     
     // Player states
-    val playbackState by playerConnection.playbackState.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-    val canSkipNext by playerConnection.canSkipNext.collectAsState()
-    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
+    val playbackState by playerConnection.playbackState.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+    val canSkipNext by playerConnection.canSkipNext.collectAsStateWithLifecycle()
+    val canSkipPrevious by playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
     
     // Cast state
     val castHandler = remember(playerConnection) {
@@ -104,7 +107,7 @@ fun AppleMiniPlayer(
             null
         }
     }
-    val isCasting by castHandler?.isCasting?.collectAsState() ?: remember { mutableStateOf(false) }
+    val isCasting by castHandler?.isCasting?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
 
     // Swipe settings
     val swipeSensitivity by rememberPreference(SwipeSensitivityKey, 0.73f)
@@ -225,22 +228,19 @@ fun AppleMiniPlayer(
         Box(
             modifier = Modifier
                 .then(if (isTabletLandscape) Modifier.width(500.dp).align(Alignment.Center) else Modifier.fillMaxWidth())
-                // Figma Now Playing mini row: 48 tall, full pill (348:2524).
-                // The outer 64 slot stays (layout reserves MiniPlayerHeight).
+                // Reserve MiniPlayerHeight even though the visible bar is 48 dp tall.
                 .height(48.dp)
                 .align(Alignment.Center)
                 .offset { IntOffset(offsetXAnimatable.value.roundToInt(), 0) }
                 .clip(RoundedCornerShape(24.dp))
                 .background(color = backgroundColor)
         ) {
-            // Background Layers
             MiniPlayerBackgroundLayer(
                 style = miniPlayerBackground,
                 mediaMetadata = mediaMetadata,
                 gradientColors = gradientColors
             )
 
-            // Bottom Progress Bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -256,10 +256,8 @@ fun AppleMiniPlayer(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                // Figma mini row contents pads: V8/H16 (348:2524).
                 modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                // Figma mini row art: 32, radius 8 (348:2524).
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -277,21 +275,18 @@ fun AppleMiniPlayer(
                     }
                 }
 
-                // Figma mini-player art-to-text gap: 8 (348:2524).
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Song info - title and artist
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.Center
                 ) {
-                    val error by LocalPlayerConnection.current?.error?.collectAsState() ?: remember { mutableStateOf(null) }
+                    val error by LocalPlayerConnection.current?.error?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(null) }
                     
                     mediaMetadata?.let { metadata ->
                         Text(
                             text = metadata.title,
                             color = onSurfaceColor,
-                            // Figma mini-player title: Semibold 15, -0.23, lh 20 (348:2524).
                             fontSize = 15.sp,
                             lineHeight = 20.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -309,7 +304,6 @@ fun AppleMiniPlayer(
                                 Text(
                                     text = metadata.artists.joinToString { it.name },
                                     color = onSurfaceColor.copy(alpha = 0.7f),
-                                    // Figma mini-player artist: Regular 11, +0.06, lh 13 (348:2524).
                                     fontSize = 11.sp,
                                     lineHeight = 13.sp,
                                     letterSpacing = 0.06.sp,
@@ -334,18 +328,11 @@ fun AppleMiniPlayer(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Cast indicator
                 if (isCasting) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFAirplayAudio,
-                        contentDescription = "Casting",
-                        tint = primaryColor,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    SymbolIcon(symbol = sf("SFAirplayAudio"), contentDescription = "Casting", size = 20.dp, tint = primaryColor)
                     Spacer(modifier = Modifier.width(8.dp))
                 }
 
-                // Play/Pause Button
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -367,29 +354,21 @@ fun AppleMiniPlayer(
                             }
                         }
                 ) {
-                    val isPlaying by playerConnection.isPlaying.collectAsState()
-                    val castIsPlaying by castHandler?.castIsPlaying?.collectAsState() ?: remember { mutableStateOf(false) }
+                    val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
+                    val castIsPlaying by castHandler?.castIsPlaying?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(false) }
                     val effectiveIsPlaying = if (isCasting) castIsPlaying else isPlaying
-                    val isMuted by playerConnection.isMuted.collectAsState()
+                    val isMuted by playerConnection.isMuted.collectAsStateWithLifecycle()
 
-                    Icon(
-                        imageVector = when {
-                            isListenTogetherGuest -> if (isMuted) SfSymbols.Monochrome.SFSpeakerSlashFill else SfSymbols.Monochrome.SFSpeakerWave2Fill
-                            playbackState == Player.STATE_ENDED -> SfSymbols.Monochrome.SFArrowCounterclockwise
-                            effectiveIsPlaying -> SfSymbols.Monochrome.SFPauseFill
-                            else -> SfSymbols.Monochrome.SFPlayFill
-                        },
-                        contentDescription = null,
-                        tint = onSurfaceColor,
-                        // Figma mini-player glyphs: 17pt (348:2524).
-                        modifier = Modifier.size(17.dp)
-                    )
+                    SymbolIcon(symbol = when {
+                            isListenTogetherGuest -> if (isMuted) sf("SFSpeakerSlashFill") else sf("SFSpeakerWave2Fill")
+                            playbackState == Player.STATE_ENDED -> sf("SFArrowCounterclockwise")
+                            effectiveIsPlaying -> sf("SFPauseFill")
+                            else -> sf("SFPlayFill")
+                        }, contentDescription = null, size = 17.dp, tint = onSurfaceColor)
                 }
 
-                // Figma mini-player controls gap: 4 (348:2524).
                 Spacer(modifier = Modifier.width(4.dp))
 
-                // Next Button
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
@@ -399,12 +378,7 @@ fun AppleMiniPlayer(
                             playerConnection.seekToNext()
                         }
                 ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFForwardFill,
-                        contentDescription = "Next",
-                        tint = if (canSkipNext && !isListenTogetherGuest) onSurfaceColor else onSurfaceColor.copy(alpha = 0.3f),
-                        modifier = Modifier.size(17.dp)
-                    )
+                    SymbolIcon(symbol = sf("SFForwardFill"), contentDescription = "Next", size = 17.dp, tint = if (canSkipNext && !isListenTogetherGuest) onSurfaceColor else onSurfaceColor.copy(alpha = 0.3f))
                 }
             }
         }

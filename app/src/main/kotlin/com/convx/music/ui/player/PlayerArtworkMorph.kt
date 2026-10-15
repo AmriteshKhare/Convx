@@ -50,31 +50,29 @@ import kotlin.math.roundToInt
 /**
  * One end of the artwork flight, as the element that owns it describes itself.
  *
- * The TARGET decides how it is reached: [travels] false (classic vinyl/clover) means the
- * cover shrink-fades in place instead of flying. The old code derived that from two
- * preferences on the overlay side and a different one on the target side, and the two
- * disagreed -- V2 Squared + a vinyl style hid the real cover while nothing flew, so the
- * art vanished for 70% of every open.
+ * The target controls whether the cover travels or fades at the mini-player bounds.
  */
 internal data class MorphArtTarget(
     val rect: Rect,
     val radiusPx: Float,
     val travels: Boolean = true,
-    /** Target fades its foot out (V2 Hero): the flyer grows the same mask as it lands. */
+    /** Optional lower-edge fade on the travelling artwork. */
     val heroMask: Boolean = false,
     val shadowPx: Float = 0f,
     /** V2 Squared's pause-shrink applies to this target's painted size. */
     val pauseShrinks: Boolean = false,
+    /** A separate album-cover thumbnail must not dissolve into the hero's motion-video poster. */
+    val videoPoster: Boolean = true,
+    val fadeEndpoints: Boolean = false,
+    val fadeOnly: Boolean = false,
 )
 
 /**
  * A registration slot several live elements can report into (bar inline + expanded
  * accessories mid-transition, V2 cover + lyrics header mid-transition, pager pages).
  *
- * Latest report wins; an element leaving composition hands the slot back to the most
- * recent survivor, or to null when none is left. Values used to be set and never
- * cleared, so a pill that no longer existed (keyboard up, rail layout, settings screen)
- * kept "ready" morphs growing out of an empty spot with a stale recording.
+ * The latest report wins. When an element leaves composition, the slot restores the most
+ * recent remaining report or clears itself when no elements remain.
  */
 internal class MorphSlot<T : Any> {
     private val owners = LinkedHashMap<Any, T>()
@@ -114,13 +112,18 @@ fun Modifier.miniArtworkMorphSource(cornerRadiusPx: Float): Modifier {
         .onGloballyPositioned {
             if (it.isAttached) miniArtworkSlot.report(owner, MorphArtTarget(it.boundsInRoot(), cornerRadiusPx))
         }
-        .hideWhileMorphing()
+        .graphicsLayer {
+            alpha = if (!PlayerMorph.active) 1f
+            else if (fullArtworkSlot.value?.fadeEndpoints == true && fullArtworkSlot.value?.travels == true) {
+                miniArtworkEndpointAlpha(PlayerMorph.progress)
+            }
+            else 0f
+        }
 }
 
 /**
- * Target end: a full player's cover (classic card/vinyl, V2 cover, V2 lyrics/queue
- * header). Registers itself AND hides itself while the flyer carries it, from the same
- * [travels] flag, so the two can never disagree again.
+ * Target end: a full player's cover or lyrics/queue header. Travelling targets hide while
+ * the overlay carries the cover; stationary targets keep their own fade behavior.
  */
 @Composable
 fun Modifier.fullArtworkMorphTarget(
@@ -129,6 +132,9 @@ fun Modifier.fullArtworkMorphTarget(
     heroMask: Boolean = false,
     shadowPx: Float = 0f,
     pauseShrinks: Boolean = false,
+    videoPoster: Boolean = true,
+    fadeEndpoints: Boolean = false,
+    fadeOnly: Boolean = false,
 ): Modifier {
     val owner = remember { Any() }
     DisposableEffect(owner) { onDispose { fullArtworkSlot.release(owner) } }
@@ -140,12 +146,16 @@ fun Modifier.fullArtworkMorphTarget(
             if (!it.isAttached || it.boundsInWindow().isEmpty) return@onGloballyPositioned
             fullArtworkSlot.report(
                 owner,
-                MorphArtTarget(it.boundsInRoot(), cornerRadiusPx, travels, heroMask, shadowPx, pauseShrinks),
+                MorphArtTarget(it.boundsInRoot(), cornerRadiusPx, travels, heroMask, shadowPx, pauseShrinks, videoPoster, fadeEndpoints, fadeOnly),
             )
         }
         .graphicsLayer {
             alpha = if (!PlayerMorph.active) {
                 1f
+            } else if (fadeOnly) {
+                1f
+            } else if (fadeEndpoints) {
+                fullArtworkEndpointAlpha(PlayerMorph.progress)
             } else if (travels) {
                 0f
             } else {
@@ -163,7 +173,7 @@ fun Modifier.fullArtworkMorphTarget(
  * up, so it stays sharp. A rounded clip window then interpolates per axis from the mini
  * rect to the target rect ([sharedArtworkWindow]), which is what lets a square pill cover
  * open into V2's tall Hero and land on its true shape, and a square card land exactly on
- * itself. Both ends are frozen for the flight (Melox freezeArtworkBounds).
+ * itself. Both ends are frozen for the flight (the reference app freezeArtworkBounds).
  */
 @Composable
 fun PlayerArtworkMorphOverlay(
@@ -187,17 +197,24 @@ fun PlayerArtworkMorphOverlay(
     // Canvas video on the target: one still of the frame on screen, grabbed in the first
     // flight frame's composition (before its draw). Collapsed, the loop is paused, so this
     // is also the exact frame an open lands on.
-    val poster = remember(flying, mediaId) { if (flying) CanvasPosterSource.capture(mediaId) else null }
     // Same rule as the container: frozen source while opening, live pill cover while closing.
     val mini = if (PlayerMorph.targetOpen) frozen?.first ?: liveMini else liveMini ?: frozen?.first
     val full = frozen?.second ?: liveFull
     if (mini == null || full == null || thumbnailUrl == null) return
+    val poster = remember(flying, mediaId, full.videoPoster) {
+        if (flying && full.videoPoster) CanvasPosterSource.capture(mediaId) else null
+    }
     // onGloballyPositioned can fire once with a degenerate size before layout settles, and
     // coil3.size.Dimension throws on any px <= 0 (measured crash, Samsung).
     if (mini.rect.width <= 0f || mini.rect.height <= 0f || full.rect.width <= 0f || full.rect.height <= 0f) return
 
     if (!full.travels) {
-        FancyArtworkFadeOverlay(thumbnailUrl = thumbnailUrl, mini = mini, progress = progress)
+        FancyArtworkFadeOverlay(
+            thumbnailUrl = thumbnailUrl,
+            mini = mini,
+            progress = progress,
+            shrink = !full.fadeOnly,
+        )
         return
     }
 
@@ -224,7 +241,7 @@ fun PlayerArtworkMorphOverlay(
                     shadowElevation = 0f
                     return@graphicsLayer
                 }
-                alpha = 1f
+                alpha = if (full.fadeEndpoints) flyingArtworkEndpointAlpha(fraction) else 1f
                 val window = sharedArtworkWindow(mini.rect, target, fraction)
                 // Image square side at this instant: covers the window at every fraction
                 // (lerp of the max >= max of the lerps), full image at 0, Crop at 1.
@@ -306,6 +323,20 @@ internal fun posterAlpha(progress: Float): Float {
     return t * t * (3f - 2f * t)
 }
 
+private fun artworkEndpointEase(value: Float): Float {
+    val t = value.coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
+}
+
+internal fun miniArtworkEndpointAlpha(progress: Float): Float =
+    1f - artworkEndpointEase(sanitizedProgress(progress) / 0.18f)
+
+internal fun fullArtworkEndpointAlpha(progress: Float): Float =
+    artworkEndpointEase((sanitizedProgress(progress) - 0.82f) / 0.18f)
+
+internal fun flyingArtworkEndpointAlpha(progress: Float): Float =
+    (1f - miniArtworkEndpointAlpha(progress) - fullArtworkEndpointAlpha(progress)).coerceIn(0f, 1f)
+
 private fun Rect.scaledAboutCenter(factor: Float): Rect =
     if (factor >= 1f) this else Rect(
         left = center.x - width * factor / 2f,
@@ -348,15 +379,15 @@ private fun heroFadeInverseStops(start: Float = 0.78f, steps: Int = 24): Array<P
 }
 
 /**
- * Q5 fancy path (classic vinyl/clover only): those shapes never travel. The mini-anchored
- * copy shrinks (1 -> 0.85) and fades across the first 0.3; the real artwork resolves late
- * via [fullArtworkMorphTarget].
+ * Stationary fade path for layouts that should not move artwork between bounds. The mini
+ * copy can shrink while fading; Hero Bleed keeps its size and lets the player content fade in.
  */
 @Composable
 private fun FancyArtworkFadeOverlay(
     thumbnailUrl: String,
     mini: MorphArtTarget,
     progress: () -> Float,
+    shrink: Boolean,
 ) {
     val density = LocalDensity.current
     val boxWidthDp = with(density) { mini.rect.width.toDp() }
@@ -374,7 +405,7 @@ private fun FancyArtworkFadeOverlay(
                 }
                 val fade = easeOutCubic((fraction / PLAYER_MINI_FADE_END).coerceIn(0f, 1f))
                 alpha = 1f - fade
-                val shrinkScale = 1f - 0.15f * fade
+                val shrinkScale = if (shrink) 1f - 0.15f * fade else 1f
                 scaleX = shrinkScale
                 scaleY = shrinkScale
                 transformOrigin = TransformOrigin.Center

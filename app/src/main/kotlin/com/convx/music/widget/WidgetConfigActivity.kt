@@ -41,7 +41,7 @@ import com.convx.music.R
 import com.convx.music.ui.component.PreferenceEntry
 import com.convx.music.ui.component.PreferenceGroupTitle
 import com.convx.music.ui.component.SwitchPreference
-import com.convx.music.ui.theme.vivimusicTheme
+import com.convx.music.ui.theme.ConvxTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -74,7 +74,7 @@ class WidgetConfigActivity : ComponentActivity() {
         }
 
         setContent {
-            vivimusicTheme {
+            ConvxTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = AppTheme.colorScheme.background,

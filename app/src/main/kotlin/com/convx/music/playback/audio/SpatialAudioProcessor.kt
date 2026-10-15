@@ -12,16 +12,13 @@ import androidx.media3.common.util.UnstableApi
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.roundToInt
+import kotlin.math.exp
+import kotlin.math.PI
 
 /**
- * Cheap stand-in for "spatial audio": widens the mid/side image and mixes in
- * a short, low-passed cross-feed between channels — the same trick most
- * consumer virtual-surround plugins use. O(1) per sample, no FFT or
- * convolution, so it costs nothing worth measuring on a phone CPU.
- *
- * Runs inside ExoPlayer's own audio processor pipeline rather than through the
- * platform [android.media.audiofx.Virtualizer], which OEM audio effect chains
- * routinely swallow whole.
+ * Stereo widening with a short, low-passed crossfeed between channels.
+ * Applies attenuation based on the combined coefficients to retain headroom.
+ * Runs inside ExoPlayer's PCM processor pipeline.
  *
  * Deliberately alters the signal, so [enabled] must be forced false while Bit
  * Perfect is on — same reasoning as the EQ bypass in
@@ -34,74 +31,86 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
     var enabled: Boolean = false
 
     /** How much wider the stereo image gets. 1.0 = untouched. */
-    private val widthGain = 2.5f
+    private val widthGain = 1.25f
 
     /** Makeup attenuation after widening, so the wider side energy doesn't clip. */
-    private val outputGain = 0.82f
+    // Bound the sum of the widening and crossfeed coefficients to unity.
+    // Even full-scale anti-phase stereo must not hit the hard PCM clamp.
+    private val outputGain get() = 1f / (widthGain + crossfeedGain)
 
     /** How much of the delayed, low-passed opposite channel gets mixed back in. */
     private val crossfeedGain = 0.2f
 
     /** One-pole lowpass factor applied to the cross-fed signal — dulls it, like a far ear would. */
-    private val lowpassCoeff = 0.3f
+    private var lowpassCoeff = 0f
 
     private var delayLeft = ShortArray(0)
     private var delayRight = ShortArray(0)
     private var delayIndex = 0
     private var lowpassLeft = 0f
     private var lowpassRight = 0f
+    private var processingActive = false
+    private var borrowedOutput = AudioProcessor.EMPTY_BUFFER
 
-    /**
-     * Stereo 16-bit only: the widening is written in terms of a left and a
-     * right sample, and there is no mid/side of a mono voice note or of a 5.1
-     * mix to widen.
-     *
-     * Bowing out with [AudioProcessor.AudioFormat.NOT_SET] rather than an
-     * [AudioProcessor.UnhandledAudioFormatException] is what keeps those
-     * tracks playable at all.
-     * [DefaultAudioSink][androidx.media3.exoplayer.audio.DefaultAudioSink]
-     * configures every processor in its chain whether or not the effect is
-     * switched on, and a throw from any of them fails the whole sink — the
-     * renderer dies with "MediaCodecAudioRenderer error" before a sample is
-     * written. NOT_SET means "inactive for this format" and the chain routes
-     * around this processor instead.
-     */
+    /** Unsupported formats bypass the effect without failing playback. */
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
-        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT || inputAudioFormat.channelCount != 2) {
+        if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT ||
+            inputAudioFormat.channelCount != 2 || inputAudioFormat.sampleRate <= 0
+        ) {
             return AudioProcessor.AudioFormat.NOT_SET
         }
-        val delaySamples = (inputAudioFormat.sampleRate * DELAY_MS / 1000f)
-            .roundToInt()
-            .coerceAtLeast(1)
-        delayLeft = ShortArray(delaySamples)
-        delayRight = ShortArray(delaySamples)
-        delayIndex = 0
-        lowpassLeft = 0f
-        lowpassRight = 0f
         return inputAudioFormat
     }
 
     override fun onFlush() {
+        if (inputAudioFormat.sampleRate > 0 && inputAudioFormat.channelCount == 2 &&
+            inputAudioFormat.encoding == C.ENCODING_PCM_16BIT
+        ) {
+            val delaySamples = (inputAudioFormat.sampleRate * DELAY_MS / 1000f)
+                .roundToInt().coerceAtLeast(1)
+            if (delayLeft.size != delaySamples) {
+                delayLeft = ShortArray(delaySamples)
+                delayRight = ShortArray(delaySamples)
+            }
+            lowpassCoeff = (1.0 - exp(-2.0 * PI * 700.0 / inputAudioFormat.sampleRate)).toFloat()
+        } else {
+            delayLeft = ShortArray(0)
+            delayRight = ShortArray(0)
+        }
         delayLeft.fill(0)
         delayRight.fill(0)
         delayIndex = 0
         lowpassLeft = 0f
         lowpassRight = 0f
+        processingActive = false
+        borrowedOutput = AudioProcessor.EMPTY_BUFFER
+    }
+
+    override fun onReset() {
+        onFlush()
+        delayLeft = ShortArray(0)
+        delayRight = ShortArray(0)
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {
-        val frameCount = inputBuffer.remaining() / BYTES_PER_FRAME
-        if (frameCount == 0) return
-        val outputBuffer = replaceOutputBuffer(frameCount * BYTES_PER_FRAME)
+        val byteCount = inputBuffer.remaining()
+        if (byteCount == 0) return
+        val frameCount = byteCount / BYTES_PER_FRAME
+        borrowedOutput = AudioProcessor.EMPTY_BUFFER
 
-        if (!enabled) {
-            outputBuffer.put(inputBuffer)
-            outputBuffer.flip()
+        if (!enabled || delayLeft.isEmpty()) {
+            // Do not replay crossfeed from a previous enabled interval.
+            if (processingActive) onFlush()
+            borrowedOutput = inputBuffer.slice().order(ByteOrder.nativeOrder())
+            inputBuffer.position(inputBuffer.limit())
             return
         }
 
+        val outputBuffer = replaceOutputBuffer(byteCount)
         inputBuffer.order(ByteOrder.nativeOrder())
         outputBuffer.order(ByteOrder.nativeOrder())
+        processingActive = true
+        val gain = outputGain
 
         val delaySize = delayLeft.size
         repeat(frameCount) {
@@ -122,19 +131,29 @@ class SpatialAudioProcessor : BaseAudioProcessor() {
 
             delayLeft[delayIndex] = left.toShort()
             delayRight[delayIndex] = right.toShort()
-            delayIndex = (delayIndex + 1) % delaySize
+            if (++delayIndex == delaySize) delayIndex = 0
 
-            outputBuffer.putShort(clampToShort(widenedLeft * outputGain))
-            outputBuffer.putShort(clampToShort(widenedRight * outputGain))
+            outputBuffer.putShort(clampToShort(widenedLeft * gain))
+            outputBuffer.putShort(clampToShort(widenedRight * gain))
         }
+        outputBuffer.put(inputBuffer)
         outputBuffer.flip()
     }
+
+    override fun getOutput(): ByteBuffer {
+        val processed = super.getOutput()
+        val borrowed = borrowedOutput
+        borrowedOutput = AudioProcessor.EMPTY_BUFFER
+        return if (borrowed.hasRemaining()) borrowed else processed
+    }
+
+    override fun isEnded(): Boolean = super.isEnded() && !borrowedOutput.hasRemaining()
 
     private fun clampToShort(value: Float): Short =
         value.coerceIn(Short.MIN_VALUE.toFloat(), Short.MAX_VALUE.toFloat()).toInt().toShort()
 
     private companion object {
         const val BYTES_PER_FRAME = 4 // stereo, 16-bit
-        const val DELAY_MS = 15
+        const val DELAY_MS = 0.35f
     }
 }

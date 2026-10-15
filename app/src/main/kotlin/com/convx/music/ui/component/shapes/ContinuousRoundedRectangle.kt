@@ -62,13 +62,7 @@ open class ContinuousRoundedRectangle(
         val bottomRight = (if (layoutDirection == Ltr) bottomEnd else bottomStart).fastCoerceIn(0f, maxRadius)
         val bottomLeft = (if (layoutDirection == Ltr) bottomStart else bottomEnd).fastCoerceIn(0f, maxRadius)
 
-        // Plain circular-arc rrect (what RoundedCornerShape emits), not the G2 path.
-        // A path outline is Outline.Generic, which Skia can't clip analytically: every
-        // clipped/glass surface re-rasterized its squircle mask on the CPU and uploaded
-        // it each frame it moved (15 uploads + ~20 extra render passes per Home scroll
-        // frame, measured). Melox uses RoundedCornerShape everywhere and pays none of it.
-        // ponytail: G2 corner smoothing dropped app-wide; to restore it for one static
-        // surface, draw that surface's path into a cached layer instead of clipping.
+        // Use a native rounded-rectangle outline; generic paths require costly mask rasterization.
         return roundedOutline(size, topLeft, topRight, bottomRight, bottomLeft)
     }
 

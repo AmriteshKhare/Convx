@@ -13,7 +13,7 @@ depends_on: []
 ## Goal
 
 Replace the app-wide loading animation/page (currently shows red or black)
-with BitChord's loading treatment, everywhere a loading state appears —
+with the reference app's loading treatment, everywhere a loading state appears —
 not just the artist page.
 
 ## Acceptance criteria
@@ -21,8 +21,8 @@ not just the artist page.
 - Find every loading/skeleton state in the app (search for the current
   red/black loading composable — likely a shared loading indicator or
   splash-style placeholder) and identify all call sites.
-- Replace with BitChord's loading animation/page look
-  (`BitChord/app/src/main/java/com/music/bitchord/ui/` — find its loading
+- Replace with the reference app's loading animation/page look
+  (`the reference app/app/src/main/java/com/music/reference/ui/` — find its loading
   component), applied consistently across every screen that currently shows
   the red/black version.
 - No screen regresses to a blank/crashing state during the swap.
@@ -30,5 +30,5 @@ not just the artist page.
 
 ## Context
 
-Reference clone at `BitChord/`. This was called out explicitly separate
+Reference clone at `the reference app/`. This was called out explicitly separate
 from the artist-page chroma-tint task — scope is the whole app.

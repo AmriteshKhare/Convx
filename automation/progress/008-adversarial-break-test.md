@@ -141,7 +141,7 @@ correctly scoped and should stay as-is.
 
 ### H2 — Update APK is downloaded without scheme or signature verification, and extracted without bounds
 
-**`app/src/main/kotlin/com/convx/music/vivimusic/updater/downloadmanager/UpdateDownloadWorker.kt:28`**
+**`app/src/main/kotlin/com/convx/music/convx/updater/downloadmanager/UpdateDownloadWorker.kt:28`**
 
 ```kotlin
 val url = URL(apkUrl)
@@ -194,7 +194,7 @@ rule files, or set `allowBackup="false"`, or move the credentials to
 
 ## MEDIUM
 
-### M1 — `vivimusic://listen` deep link joins a Listen Together room with no confirmation
+### M1 — `convx://listen` deep link joins a Listen Together room with no confirmation
 
 **`app/src/main/kotlin/com/convx/music/MainActivity.kt:2346-2354`**, filter at
 **`app/src/main/AndroidManifest.xml:117-125`**
@@ -212,10 +212,10 @@ if (!listenCode.isNullOrBlank() && isListenLink) {
 }
 ```
 
-The `vivimusic://` scheme is `BROWSABLE` with no App Links verification (the
+The `convx://` scheme is `BROWSABLE` with no App Links verification (the
 `https` filter above it has `autoVerify="true"`; this one cannot). Any web
 page, QR code, or installed app can fire
-`vivimusic://listen/<attacker-code>` and the user is silently joined to an
+`convx://listen/<attacker-code>` and the user is silently joined to an
 attacker-controlled room — no prompt, no confirmation — after which their
 username and every track they play are broadcast to that room's host.
 
@@ -598,7 +598,7 @@ looped worker/verifier independently. None of these were fixed here.
 | `automation/tasks/010-fix-cleartext-traffic-config.md` | Scope `cleartextTrafficPermitted` to localhost/private ranges instead of `base-config`, and reject `ws://` Listen Together URLs (or warn) at `ListenTogetherClient.getServerUrl`. |
 | `automation/tasks/011-fix-updater-apk-verification.md` | Require `https`, pin the release host, verify the downloaded APK's signing certificate before the install prompt, cap zip extraction, and close the output stream in `use {}`. |
 | `automation/tasks/012-fix-credential-backup-exposure.md` | Exclude `filesDir/datastore` and the Room DB from `backup_rules.xml` / `data_extraction_rules.xml`, or move the Discord token and innertube cookie into Keystore-backed storage. |
-| `automation/tasks/013-fix-deep-link-hardening.md` | Confirm before `joinRoom` on a `vivimusic://listen` link, URL-encode the `browse`/`channel` route segments, wrap `handleDeepLinkIntent` navigation in `runCatching`, and host-validate URIs that arrive via `EXTRA_TEXT`. |
+| `automation/tasks/013-fix-deep-link-hardening.md` | Confirm before `joinRoom` on a `convx://listen` link, URL-encode the `browse`/`channel` route segments, wrap `handleDeepLinkIntent` navigation in `runCatching`, and host-validate URIs that arrive via `EXTRA_TEXT`. |
 | `automation/tasks/014-fix-preset-icon-filename-validation.md` | Apply `isSafeFileName` to `PlayerIconSet.fromJson`'s `"file"` field, matching the guard `DiySticker.fromJson` already has. Tighten only — relax no existing preset limit. |
 | `automation/tasks/015-fix-restore-no-valid-entries.md` | Branch on `foundAny` before stopping the service, deleting the persistent queue, and calling `exitProcess(0)`. |
 | `automation/tasks/016-fix-addtoplaylist-online-race.md` | Await the per-song coroutines (`async`/`awaitAll`) before dismissing, move `onDismiss()` to after completion, and replace the shared `songsIdx` counter — both blocks in `AddToPlaylistDialogOnline.kt`. |

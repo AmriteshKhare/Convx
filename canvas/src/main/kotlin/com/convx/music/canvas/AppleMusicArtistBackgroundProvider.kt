@@ -23,14 +23,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Fetches Apple Music artist motion artwork (HLS canvas) for the artist screen.
- *
- * 1. Searches for the artist by name.
- * 2. Fetches the artist profile with `extend=editorialVideo,editorialArtwork`.
- *
- * Results are cached for 24 hours.
- */
+/** Fetches an artist's Apple Music motion artwork and caches it for 24 hours. */
 object AppleMusicArtistBackgroundProvider {
 
     private const val AMP_BASE_URL = "https://amp-api.music.apple.com"
@@ -145,36 +138,26 @@ object AppleMusicArtistBackgroundProvider {
             if (response.status != HttpStatusCode.OK) return@runCatching null
 
             val root = response.body<JsonObject>()
-            val data = root["data"]?.jsonArray
-            if (data.isNullOrEmpty()) return@runCatching null
-            
-            val artistObj = data.firstOrNull()?.jsonObject ?: return@runCatching null
-            val attributes = artistObj["attributes"]?.jsonObject
-            
-            // Look for editorialVideo first
-            val ev = attributes?.get("editorialVideo")?.jsonObject
-            if (ev != null) {
-                val videoUrl = extractEditorialVideoUrl(ev)
-                if (!videoUrl.isNullOrBlank()) {
-                    return@runCatching videoUrl
-                }
-            }
+            val artist = root["data"]?.jsonArray?.firstOrNull()?.jsonObject
+                ?: return@runCatching null
+            val attributes = artist["attributes"]?.jsonObject
 
-            // Fallback to editorialArtwork
-            val ea = attributes?.get("editorialArtwork")?.jsonObject
-            if (ea != null) {
-                val videoUrl = extractEditorialVideoUrl(ea)
-                if (!videoUrl.isNullOrBlank()) {
-                    return@runCatching videoUrl
-                }
-            }
+            val editorialVideo = attributes?.get("editorialVideo")?.jsonObject
+            editorialVideo?.let(::extractEditorialVideoUrl)?.let { return@runCatching it }
 
-            null
+            val editorialArtwork = attributes?.get("editorialArtwork")?.jsonObject
+            editorialArtwork?.let(::extractEditorialVideoUrl)
         }.getOrNull()
     }
 
     private fun extractEditorialVideoUrl(editorialData: JsonObject): String? {
-        val preferredKeys = listOf("motionDetailRaw", "motionDetailTall", "motionDetailSquare", "motionSquareVideo1x1", "motionTallVideo3x4")
+        val preferredKeys = listOf(
+            "motionDetailRaw",
+            "motionDetailTall",
+            "motionDetailSquare",
+            "motionSquareVideo1x1",
+            "motionTallVideo3x4",
+        )
         for (key in preferredKeys) {
             val videoUrl = editorialData[key]?.jsonObject?.get("video")?.jsonPrimitive?.contentOrNull
             if (!videoUrl.isNullOrBlank()) return videoUrl

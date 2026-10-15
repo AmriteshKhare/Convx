@@ -74,22 +74,8 @@ private val RailWidth = 28.dp
 private const val ScrollTopSection = "↑"
 
 /**
- * Fast-scrub rail pinned to the trailing edge of a long list: drag a finger down it and
- * the list jumps section by section, with a bubble showing the section under the finger.
- *
- * Two details make it feel like a native fast-scroller rather than a row of small
- * buttons:
- *
- * - The rail divides whatever height it is given by the number of sections, so the first
- *   and last targets stay pinned to the ends and only the spacing between them changes.
- *   Letters shrink to 4sp on a short window rather than the rail scrolling or clipping.
- * - Selection updates on drag position, not on per-letter hit testing, so a fast scrub
- *   never drops a section between two sampled pointer events.
- *
- * [sectionIndexMap] maps a section key to the list index where it starts. Sections with
- * no items are not skipped in the rail — they resolve to the next populated section
- * downward (see [findAlphabetTargetIndex]), which keeps the letters at fixed positions
- * so muscle memory survives a re-sort.
+ * Fast-scrub rail that maps drag position to a list section and shows its label.
+ * Empty sections remain in place and resolve to the next populated section.
  */
 @Composable
 fun AlphabetScrollBar(

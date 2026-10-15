@@ -50,7 +50,7 @@ fun PrivacySettings(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val (pauseListenHistory, onPauseListenHistoryChange) = rememberPreference(
         key = PauseListenHistoryKey,
         defaultValue = false
@@ -190,7 +190,7 @@ fun PrivacySettings(
         Spacer(modifier = Modifier.height(27.dp))
 
         IosSettingsGroup(
-            title = stringResource(R.string.misc),
+            title = "Screen security",
             items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.screenshot),

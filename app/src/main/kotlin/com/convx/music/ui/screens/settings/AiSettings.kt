@@ -5,103 +5,56 @@
 
 package com.convx.music.ui.screens.settings
 
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Box
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.only
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AlertDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.CompositionLocalProvider
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.input.TextFieldValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.AiProviderKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DeeplApiKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.DeeplFormalityKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LanguageCodeToName
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.OpenRouterApiKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.OpenRouterBaseUrlKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.OpenRouterModelKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.TranslateLanguageKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.TranslateModeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.EnumDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.TextFieldDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,7 +125,6 @@ fun AiSettings(
             "claude-3-5-sonnet-latest",
             "claude-3-opus-latest"
         ),
-        //fixed issue with gemni
         "Gemini" to listOf(
             "gemini-2.5-flash-lite",
             "gemini-2.5-flash",
@@ -225,7 +177,7 @@ fun AiSettings(
                     Text(stringResource(android.R.string.ok))
                 }
             },
-            icon = { Icon(painterResource(R.drawable.info), null) },
+            icon = { SymbolIcon(symbol = sf("info.circle"), contentDescription = null) },
             title = { Text(stringResource(R.string.ai_provider_help)) },
             text = { 
                 Column {
@@ -251,7 +203,7 @@ fun AiSettings(
                     Text(stringResource(android.R.string.ok))
                 }
             },
-            icon = { Icon(painterResource(R.drawable.info), null) },
+            icon = { SymbolIcon(symbol = sf("info.circle"), contentDescription = null) },
             title = { Text(stringResource(R.string.ai_translation_mode)) },
             text = { 
                 Column {
@@ -289,7 +241,6 @@ fun AiSettings(
                 } else {
                     openRouterBaseUrl = ""
                 }
-                // Set model to first available model for the selected provider
                 val modelsForProvider = modelsByProvider[it] ?: listOf()
                 openRouterModel = if (modelsForProvider.isNotEmpty()) {
                     modelsForProvider[0]
@@ -342,7 +293,7 @@ fun AiSettings(
     if (showApiKeyDialog) {
         TextFieldDialog(
             title = { Text(stringResource(R.string.ai_api_key)) },
-            icon = { Icon(painterResource(R.drawable.key), null) },
+            icon = { SymbolIcon(symbol = sf("key.fill"), contentDescription = null) },
             initialTextFieldValue = TextFieldValue(text = openRouterApiKey),
             onDone = {
                 openRouterApiKey = it
@@ -355,7 +306,7 @@ fun AiSettings(
     if (showDeeplApiKeyDialog) {
         TextFieldDialog(
             title = { Text("DeepL ${stringResource(R.string.ai_api_key)}") },
-            icon = { Icon(painterResource(R.drawable.key), null) },
+            icon = { SymbolIcon(symbol = sf("key.fill"), contentDescription = null) },
             initialTextFieldValue = TextFieldValue(text = deeplApiKey),
             onDone = {
                 deeplApiKey = it
@@ -389,7 +340,7 @@ fun AiSettings(
     if (showBaseUrlDialog && aiProvider == "Custom") {
         TextFieldDialog(
             title = { Text(stringResource(R.string.ai_base_url)) },
-            icon = { Icon(painterResource(R.drawable.link), null) },
+            icon = { SymbolIcon(symbol = sf("link"), contentDescription = null) },
             initialTextFieldValue = TextFieldValue(text = openRouterBaseUrl),
             onDone = {
                 openRouterBaseUrl = it
@@ -423,7 +374,7 @@ fun AiSettings(
     if (showCustomModelInput) {
         TextFieldDialog(
             title = { Text(stringResource(R.string.ai_model)) },
-            icon = { Icon(painterResource(R.drawable.discover_tune), null) },
+            icon = { SymbolIcon(symbol = sf("slider.horizontal.3"), contentDescription = null) },
             initialTextFieldValue = TextFieldValue(text = openRouterModel),
             onDone = {
                 openRouterModel = it
@@ -449,11 +400,7 @@ fun AiSettings(
                     onClick = { showProviderDialog = true },
                     trailingContent = {
                         IconButton(onClick = { showProviderHelpDialog = true }) {
-                            Icon(
-                                painterResource(R.drawable.info),
-                                contentDescription = stringResource(R.string.ai_provider_help),
-                                modifier = Modifier.size(20.dp)
-                            )
+                            SymbolIcon(symbol = sf("info.circle"), contentDescription = stringResource(R.string.ai_provider_help), size = 20.dp)
                         }
                     }
                 ),
@@ -560,11 +507,7 @@ fun AiSettings(
                             onClick = { showTranslateModeDialog = true },
                             trailingContent = {
                                 IconButton(onClick = { showTranslateModeHelpDialog = true }) {
-                                    Icon(
-                                        painterResource(R.drawable.info),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("info.circle"), contentDescription = null, size = 20.dp)
                                 }
                             }
                         )

@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.player
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateIntAsState
@@ -104,6 +106,7 @@ import com.convx.music.extensions.toggleRepeatMode
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.ui.component.ScrollingWaveformSeekBar
 import com.convx.music.ui.component.floatingtabbar.SearchBarRowHeight
+import com.convx.music.ui.component.floatingtabbar.clipWhilePressed
 import com.convx.music.ui.component.rememberPlaybackFraction
 import androidx.compose.ui.graphics.isSpecified
 import com.convx.music.LocalAmbientBackgroundColor
@@ -118,36 +121,15 @@ import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-/**
- * Optical size correction for the lyrics glyph beside the queue one.
- *
- * `lyrics` is drawn in a 28dp viewport with real padding around the artwork;
- * `queue_music` is drawn in a 24dp viewport with its strokes running nearly edge
- * to edge. Rendered at the same box size the lyrics mark therefore reads visibly
- * smaller, so it gets a slightly larger box to match by eye rather than by number.
- */
+/** Slightly enlarges the lyrics glyph to match the queue icon visually. */
 private const val LyricsIconScale = 1.18f
 
-/**
- * Compact now playing controls docked inside the floating tab bar, mirroring the
- * iOS 26 Apple Music accessory: a wide pill above the tabs when the bar is
- * expanded, and a slim strip between the tab pill and the search tab when inline.
- *
- * Swiping the artwork/title area horizontally changes the song, honoring the same
- * swipe preferences and thresholds as [MiniPlayer]. Tapping the row invokes
- * [onClick] (which opens the full player).
- */
-// Pill widths (dp) between which the waveform and skip button fade out. Measured off the
-// phone: expanded strip 344dp, inline slot 232dp. Full at 320 keeps the expanded look; gone at
-// 262 means they have left before the inline slot's text starts to need the room.
+/** Mini-player controls shown in the floating bar or side panel. */
+// Width range where the waveform and skip button fade out.
 private const val MiniExtrasFullWidth = 320f
 private const val MiniExtrasGoneWidth = 262f
 
-/**
- * [width] scaled by [fraction], and faded by it when [fade]. Read in the layout phase, so a
- * change re-lays-out but never recomposes; the alpha rides the same placement, so width and
- * fade can never be a frame apart.
- */
+/** Scales [width] by [fraction], and optionally applies the same fraction to alpha. */
 private fun Modifier.scaledWidth(width: Dp, fade: Boolean = false, fraction: () -> Float): Modifier = layout { measurable, constraints ->
     val f = fraction()
     val w = (width.roundToPx() * f).roundToInt()
@@ -157,14 +139,10 @@ private fun Modifier.scaledWidth(width: Dp, fade: Boolean = false, fraction: () 
     }
 }
 
-/** Soft edge of the title marquee (AQPov: the text dissolves ~10pt before the clip). */
+/** Soft edge used by the title marquee. */
 private val MarqueeFade = 10.dp
 
-/**
- * Widens the box [fade] to the left (the title inside is padded back by the same amount, so
- * at rest it sits exactly where it did) and fades both edges, so text scrolling out of the
- * marquee dissolves instead of being cut.
- */
+/** Adds a soft fade to both edges of the scrolling title. */
 private fun Modifier.marqueeEdgeFade(fade: Dp): Modifier = this
     .layout { measurable, constraints ->
         val f = fade.roundToPx()
@@ -211,7 +189,7 @@ fun FloatingMiniPlayer(
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val ambientColor = LocalAmbientBackgroundColor.current.value
-    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val isDark = com.convx.music.ui.component.glassUsesDarkAppearance()
     val playTint = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
         isDark = isDark,
         activeTint = ambientColor,
@@ -241,10 +219,7 @@ fun FloatingMiniPlayer(
     val layoutDirection = LocalLayoutDirection.current
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
-    // Swipe thresholds below were tuned as raw pixel counts, which is only
-    // ~14dp on a dense (~3.5x) screen — well within a tap's incidental finger
-    // drift, so plain taps were misread as deliberate swipes and skipped the
-    // track. Scaling by density.density makes them density-independent.
+    // Scale pixel thresholds by density so the swipe feels consistent across screens.
     val densityScale = density.density
 
     val offsetXAnimatable = remember { Animatable(0f) }
@@ -260,40 +235,20 @@ fun FloatingMiniPlayer(
     val animationSpec = remember {
         spring<Float>(dampingRatio = 0.73f, stiffness = 620f)
     }
-    // Commit distance for the swipe. The logistic curve this replaces produced
-    // ~400dp — about 1200px at 3x, on a screen 1080px wide — so releasing the pill
-    // never changed track no matter how far it was dragged. Expressed as a fraction
-    // of screen width instead: sensitivity 0 needs 45%, sensitivity 1 needs 12%.
+    // Express the commit distance as a screen-width fraction so sensitivity scales predictably.
     val configuration = LocalConfiguration.current
     val autoSwipeThreshold = remember(swipeSensitivity, configuration.screenWidthDp, densityScale) {
         val screenWidthPx = configuration.screenWidthDp * densityScale
         (screenWidthPx * (0.45f - 0.33f * swipeSensitivity.coerceIn(0f, 1f))).roundToInt()
     }
 
-    // Same structure as MiniPlayer: the drag detector sits on the outermost
-    // container so the whole accessory is swipeable, and the entire content row
-    // slides with the drag. A plain Box (not BoxWithConstraints) — this sits
-    // inside FloatingTabBar's Row, which sizes itself via
-    // .height(IntrinsicSize.Max); BoxWithConstraints is a SubcomposeLayout,
-    // and SubcomposeLayout can't answer intrinsic-measurement queries, which
-    // crashes the whole bar. onSizeChanged gets the same measured height for
-    // the !isInline tablet pill's icon/thumbnail scaling without that problem.
-    //
-    // Seeded at the pill's real resting height (64dp, matching
-    // FloatingSideBar's FloatingMiniPlayerMinHeight/MaxHeight) rather than 0:
-    // every scroll-triggered mount of this branch used to render its very
-    // first frame with measuredHeightPx still at 0, which the size formulas
-    // below floor-clamp to 36dp regardless of the pill's real height — then
-    // the true measurement lands a frame later and every icon visibly pops
-    // to its real size. Starting from the known resting height means the
-    // first frame is already correct (or within a pixel of it) instead of
-    // popping from the clamp floor on every single expand.
+    // Use Box because the parent relies on intrinsic sizing; BoxWithConstraints uses
+    // subcomposition and cannot provide that measurement. onSizeChanged gives tablet sizing.
+    // Seed with the 64dp resting height to avoid a one-frame size pop before measurement.
     var measuredHeightPx by remember { mutableIntStateOf(with(density) { 64.dp.roundToPx() }) }
-    // Input owner (Melox): taps open only while the mini owns input -- mid-flight
-    // taps would otherwise fight the settling spring. Event-time read, always current.
+    // Ignore taps while the morph animation owns input.
     val tryOpenPlayer = { if (PlayerMorph.miniAcceptsInput) onClick() }
-    // Mirrors FloatingTabBarDefaults.elevations() (inline 6dp, expanded 12dp): the morph card
-    // casts this shadow while it is still the pill.
+    // Match the tab bar shadow while the morph card is still the pill.
     val miniShadowPx = with(density) { (if (isInline) 6.dp else 12.dp).toPx() }
     androidx.compose.runtime.SideEffect { PlayerMorph.miniShadowElevationPx = miniShadowPx }
     LaunchedEffect(Unit) {
@@ -308,8 +263,7 @@ fun FloatingMiniPlayer(
             }
         }
     }
-    // Tracked-split morph bounds go stale when the mini switches layout branch
-    // (tab style, inline): clear so the new branch re-reports the same frame.
+    // Clear stale morph bounds when switching layout branches.
     LaunchedEffect(tabStyle, isInline) {
         clearMiniContentControlsRects()
     }
@@ -321,38 +275,25 @@ fun FloatingMiniPlayer(
             // travel reads at pill size -- same as bar pills elsewhere.
             // Toned down from 1x/2x (user: touch stretch "way too much").
             .graphicsLayer(elasticStretchLayerBlock(glow, magnitude = if (isInline) 0.6f else 1.2f))
-            // The WHOLE pill leaves the bar while the shared card owns it -- glass, shadow and
-            // background come in through [modifier], outside the recording below, so hiding
-            // only the recording left an empty glass pill sitting in the bar while its content
-            // flew (no shared morph). The card draws the pill's plate itself (Melox
-            // PlayerSheetContentOverlay glass chrome), fading over the first fifth.
+            // Hide the whole pill while the shared card draws its plate during the morph.
             .graphicsLayer {
                 // Hidden through the close landing too: the morph card carries the landing
                 // (dip + squash) and hands back only once it has settled on the slot.
                 alpha = if (PlayerMorph.active || PlayerMorph.landingActive) 0f else 1f
             }
-            // Surface recording: everything [modifier] paints (glass, shadow, fill). During the
-            // morph the content recording below draws nothing in place, so this captures the
-            // bare surface, which the card then draws stretched as its starting skin.
+            // Capture the pill surface separately; the morph card stretches it as its starting skin.
             .recordPlayerLayer(
                 layer = { if (PlayerMorph.enabled) PlayerMorph.miniSurfaceLayer else null },
                 drawInPlace = { true },
             )
             .then(modifier)
-            // Source end of the mini-to-full container morph. Outside .then(modifier)
-            // so it measures the pill as the nav bar actually places it.
+            // Record the pill bounds where the navigation bar places it.
             .miniContainerMorphSource()
-            // The pill's body may swell past its target in the bar's overshoot; its CONTENT
-            // may not. Without this the row re-laid out every frame of the bounce (text and
-            // buttons micro-adjusting). Glass/shadow above keep the full animated size.
+            // Keep content at its target size during overshoot to prevent layout jitter.
             .noOvershootContent()
-            // Source end of the shared container morph. Recorded here and drawn by the
-            // overlay instead of in place, so the pill does not sit in the nav bar while
-            // a copy of it is expanding across the screen.
+            // Record content for the overlay so it can draw the morph outside the bar.
             .recordPlayerLayer(
-                // Only records while the morph is enabled -- see PlayerMorph.enabled --
-                // so this doesn't pay for a GraphicsLayer capture every frame for a morph
-                // that's currently off.
+                // Avoid layer capture when morphing is disabled.
                 layer = { if (PlayerMorph.enabled) PlayerMorph.miniLayer else null },
                 drawInPlace = { !PlayerMorph.active && !PlayerMorph.landingActive },
                 markReady = { PlayerMorph.miniFrameReady = true },
@@ -360,6 +301,8 @@ fun FloatingMiniPlayer(
             .onSizeChanged { measuredHeightPx = it.height }
             // Finger-following glow, same as the search pill.
             .then(glow.gestureModifier)
+            // Clip the sheen to the pill while pressed.
+            .clipWhilePressed(glow, com.convx.music.ui.component.shapes.NavContinuousCapsule)
             .then(glow.modifier)
             // Edge-flick skip only: center drag stretches (via glow above)
             // but never slides or commits. Snaps hop to the card scope.
@@ -376,12 +319,9 @@ fun FloatingMiniPlayer(
                     totalDragDistance = 0f
                     var lastAdjustedX = 0f
                     var maxAbsY = 0f
-                    // Local slide accumulator: the async snap below can't be
-                    // read back for the commit gate without racing it.
+                    // Track drag distance locally; the animation updates asynchronously.
                     var slideX = offsetXAnimatable.value
-                    // Melox MiniPlayer drag-to-open: an upward drag that wins over the
-                    // horizontal paths hands the finger to the player sheet, so the card
-                    // follows it 1:1 and settles on release with the fling velocity.
+                    // An upward drag hands control to the player sheet until release.
                     var verticalDrag = false
                     var lastY = start.y
                     val velocityTracker = VelocityTracker()
@@ -429,14 +369,12 @@ fun FloatingMiniPlayer(
                                 coroutineScope.launch { offsetXAnimatable.snapTo(slideX) }
                             }
                         } else if (totalDragDistance > viewConfig.touchSlop) {
-                            // Center drag (stretch only): swallow the move so the
-                            // tap-to-open below can't fire on release after a drag.
+                            // Consume center drags so they cannot trigger the tap handler.
                             change.consume()
                         }
                     }
                     } catch (e: kotlinx.coroutines.CancellationException) {
-                        // Gesture torn down mid drag-open (bar re-layout, pill remount):
-                        // settle the sheet instead of leaving it parked mid-morph.
+                        // Settle the sheet if the pill is removed during a drag.
                         if (verticalDrag) PlayerMorph.onDragCancel()
                         throw e
                     }
@@ -446,7 +384,7 @@ fun FloatingMiniPlayer(
                         return@awaitEachGesture
                     }
                     val duration = System.currentTimeMillis() - dragStartTime
-                    // Mean velocity over the gesture, px/ms.
+                    // Average gesture velocity in pixels per millisecond.
                     val velocity = if (duration > 0) totalDragDistance / duration else 0f
                     val currentOffset = slideX
                     val dragged = abs(currentOffset)
@@ -454,15 +392,13 @@ fun FloatingMiniPlayer(
                         playerConnection.player.previousMediaItemIndex != -1
                     val canSkipNext =
                         playerConnection.player.nextMediaItemIndex != -1
-                    // Quick edge flick or dragged past threshold
+                    // A quick edge flick or a drag past the threshold skips a track.
                     val shouldChangeSong = allowSwipe &&
                         maxAbsY < verticalCapPx &&
                         (dragged > autoSwipeThreshold ||
                             (velocity > 0.55f && dragged > autoSwipeThreshold * 0.25f))
                     if (shouldChangeSong) {
-                        // Through the connection, not the raw player: the wrapper
-                        // routes to Cast while casting, re-prepares an ENDED
-                        // player, and fires the skip callbacks.
+                        // Use the connection to preserve cast routing and skip callbacks.
                         if (currentOffset > 0 && canSkipPrevious) {
                             playerConnection.seekToPrevious()
                         } else if (currentOffset < 0 && canSkipNext) {
@@ -475,10 +411,7 @@ fun FloatingMiniPlayer(
                     }
                 }
             }
-            // Single tap anywhere on the pill (except the transport controls and
-            // the seek waveform, which consume the tap themselves) opens the
-            // full player; a long-press opens the song menu instead. Sits after
-            // pointerInput so a drag that consumes the move above cancels both.
+            // Taps open the player and long presses open the song menu. Drag handlers run first.
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -486,11 +419,7 @@ fun FloatingMiniPlayer(
                 onLongClick = onLongClick,
             )
     ) {
-        // Fixed sizes for both phone accessory strips (isInline and the default
-        // !tabStyle wave bar) — neither's resting height ever changes, so there is
-        // nothing to scale against. Only the tablet pill's height actually varies
-        // (FloatingMiniPlayerMinHeight..MaxHeight in FloatingSideBar), so only it
-        // scales its icons/thumbnail off the measured height.
+        // Only the tablet pill changes height, so only it scales content to its measured height.
         val animatedHeightPx by animateIntAsState(
             targetValue = if (tabStyle) measuredHeightPx else with(density) { 64.dp.roundToPx() },
             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -501,16 +430,8 @@ fun FloatingMiniPlayer(
         val artCornerRadius = artSize * 0.22f
         val controlSize = if (tabStyle) (measuredHeight * 0.55f).coerceIn(36.dp, 52.dp) else 36.dp
 
-        // The phone strip is ONE layout for both bar states. Its trailing waveform and skip
-        // button follow the pill's current animated width instead of an isInline flag, so
-        // whichever tree the shared element draws at any instant renders the same thing: no
-        // flip between two layouts mid-move, no text re-wrap. `extras` is only read in the
-        // layout and draw phases below, so the per-frame change never recomposes this.
-        // Plain field written by the Row's own layout pass, just before it measures the
-        // children that read it -- the same frame's width. It used to be snapshot state
-        // set from onSizeChanged: every frame of the expand morph laid the extras out
-        // against the PREVIOUS frame's width (the title column absorbing the difference,
-        // so text and buttons jittered) and paid a second layout pass for the write.
+        // Keep one layout during the morph; read animated width in layout/draw to avoid recomposition.
+        // The row writes this field before measuring children, so they use the same frame's width.
         val pillWidthPx = remember { IntArray(1) }
         val extras = {
             val dp = pillWidthPx[0] / density.density
@@ -535,14 +456,9 @@ fun FloatingMiniPlayer(
                 ),
         ) {
             if (!tabStyle) {
-                // iOS-style mini bar (default): thumbnail, title/artist, a wave
-                // seek bar, play/pause, and forward (skip next).
                 val iconSize = controlSize * 0.5f
                 val playIconSize = controlSize * 0.6f
-                // Keep the State, don't unwrap it: rememberPlaybackFraction samples
-                // withFrameMillis, so a `by` delegate read here recomposes the whole
-                // mini player every frame while playing. Only the seek bar's progress
-                // lambda below needs the value, and that reads it in the draw phase.
+                // Keep playback progress as State so the seek bar reads it during drawing.
                 val playbackFraction = rememberPlaybackFraction(playerConnection.player, isPlaying)
                 val waveformSeed = remember(mediaMetadata?.id) { mediaMetadata?.id?.hashCode() ?: 0 }
 
@@ -583,21 +499,16 @@ fun FloatingMiniPlayer(
                     Spacer(Modifier.width(10.dp))
 
                     Column(
-                        // One Plus layer for both lines rather than one each: the glyphs never
-                        // overlap, so adding them together is the same pixels at half the layers.
+                        // Combine both lines into one layer; their glyphs do not overlap.
                         modifier = Modifier
                             .weight(1f)
                             .additiveChrome(useGlass && isDark),
                     ) {
-                        // iOS 26/27 accessory (AQPov reference): a long title scrolls as a
-                        // marquee with soft edges instead of ellipsizing -- holds at the start,
-                        // slides left, wraps round after a gap. Only while playing, so a paused
-                        // bar stays idle (no per-frame redraws).
+                        // Scroll long titles only during playback; paused titles stay still.
                         Box(Modifier.marqueeEdgeFade(MarqueeFade)) {
                             Text(
                                 text = mediaMetadata?.title.orEmpty(),
                                 style = AppTheme.typography.bodyMedium,
-                                // Figma mini-player title: Semibold 15, -0.23, lh 20 (348:2524).
                                 fontSize = 15.sp,
                                 lineHeight = 20.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -618,7 +529,6 @@ fun FloatingMiniPlayer(
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
                             style = AppTheme.typography.bodySmall,
-                            // Figma mini-player artist: Regular 11, +0.06, lh 13 (348:2524).
                             fontSize = 11.sp,
                             lineHeight = 13.sp,
                             letterSpacing = 0.06.sp,
@@ -680,24 +590,14 @@ fun FloatingMiniPlayer(
                     )
                 }
             } else {
-                // Tablet floating pill: matches the Apple Music iPad now-playing
-                // bar exactly — shuffle, prev, play/pause, next, repeat, then
-                // artwork+title/artist, then lyrics and queue on the far end.
-                // Icons scale with controlSize — IconButton's own size modifier
-                // only resizes the tap target, the Icon inside stays at a fixed
-                // default unless given an explicit size too.
+                // Scale the icon itself as well as the tablet pill's tap targets.
                 val iconSize = controlSize * 0.5f
                 val playIconSize = controlSize * 0.6f
                 IconButton(
                     onClick = { playerConnection.player.shuffleModeEnabled = !shuffleModeEnabled },
                     modifier = Modifier.size(controlSize),
                 ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFShuffle,
-                        contentDescription = stringResource(R.string.shuffle_label),
-                        tint = transportTint,
-                        modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark),
-                    )
+                    SymbolIcon(symbol = sf("SFShuffle"), contentDescription = stringResource(R.string.shuffle_label), modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark), tint = transportTint)
                 }
                 IconButton(
                     onClick = { playerConnection.requestSkip(forward = false) },
@@ -737,12 +637,7 @@ fun FloatingMiniPlayer(
                     onClick = { playerConnection.player.toggleRepeatMode() },
                     modifier = Modifier.size(controlSize),
                 ) {
-                    Icon(
-                        imageVector = if (repeatMode == Player.REPEAT_MODE_ONE) SfSymbols.Monochrome.SFRepeat1 else SfSymbols.Monochrome.SFRepeat,
-                        contentDescription = stringResource(R.string.repeat_mode_all),
-                        tint = if (repeatMode != Player.REPEAT_MODE_OFF) transportTint else transportTint.copy(alpha = 0.4f),
-                        modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark),
-                    )
+                    SymbolIcon(symbol = if (repeatMode == Player.REPEAT_MODE_ONE) sf("SFRepeat1") else sf("SFRepeat"), contentDescription = stringResource(R.string.repeat_mode_all), modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark), tint = if (repeatMode != Player.REPEAT_MODE_OFF) transportTint else transportTint.copy(alpha = 0.4f))
                 }
 
                 Spacer(Modifier.width(8.dp))
@@ -784,14 +679,12 @@ fun FloatingMiniPlayer(
                     Spacer(Modifier.width(12.dp))
 
                     Column(
-                        // One Plus layer for both lines rather than one each: the glyphs never
-                        // overlap, so adding them together is the same pixels at half the layers.
+                        // Combine both lines into one layer; their glyphs do not overlap.
                         modifier = Modifier.weight(1f).additiveChrome(useGlass && isDark),
                     ) {
                         Text(
                             text = mediaMetadata?.title.orEmpty(),
                             style = AppTheme.typography.bodyMedium,
-                            // Figma mini-player title: Semibold 15, -0.23, lh 20 (348:2524).
                             fontSize = 15.sp,
                             lineHeight = 20.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -803,7 +696,6 @@ fun FloatingMiniPlayer(
                         Text(
                             text = mediaMetadata?.artists?.joinToString { it.name }.orEmpty(),
                             style = AppTheme.typography.bodySmall,
-                            // Figma mini-player artist: Regular 11, +0.06, lh 13 (348:2524).
                             fontSize = 11.sp,
                             lineHeight = 13.sp,
                             letterSpacing = 0.06.sp,
@@ -820,43 +712,23 @@ fun FloatingMiniPlayer(
                     onClick = onLyricsClick ?: onClick,
                     modifier = Modifier.size(controlSize),
                 ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFQuoteBubble,
-                        contentDescription = stringResource(R.string.lyrics),
-                        tint = transportTint,
-                        modifier = Modifier.size(iconSize * LyricsIconScale).additiveChrome(useGlass && isDark),
-                    )
+                    SymbolIcon(symbol = sf("SFQuoteBubble"), contentDescription = stringResource(R.string.lyrics), modifier = Modifier.size(iconSize * LyricsIconScale).additiveChrome(useGlass && isDark), tint = transportTint)
                 }
                 IconButton(
                     onClick = onQueueClick ?: onClick,
                     modifier = Modifier.size(controlSize),
                 ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFListBullet,
-                        contentDescription = stringResource(R.string.queue),
-                        tint = transportTint,
-                        modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark),
-                    )
+                    SymbolIcon(symbol = sf("SFListBullet"), contentDescription = stringResource(R.string.queue), modifier = Modifier.size(iconSize).additiveChrome(useGlass && isDark), tint = transportTint)
                 }
             }
         }
     }
 }
 
-/**
- * Measures content at no more than this node's settled (lookahead) size and centres it in
- * whatever the animating bounds are. The lookahead pass records the target; the main pass
- * clamps to it. A plain layout modifier: it re-measures only when layout is invalidated
- * anyway (the version built on approachLayout reported "approach in progress" forever,
- * which re-laid the pill out every frame -- scroll lag and heat).
- */
+/** Measures content at its settled size and centres it in the animated bounds. */
 @androidx.compose.runtime.Composable
 internal fun Modifier.noOvershootContent(): Modifier {
-    // Inside the tab bar's persistent accessory host: the content follows the surface's
-    // animating width, clamped to the inline..expanded span, so it reflows smoothly through
-    // a switch (the waveform and skip fading with the width) -- laying it out once at the
-    // TARGET width made it jump to the new layout on frame one, then slide. The clamp keeps
-    // it off the surface's springy overshoot; natural height, centred both ways.
+    // Follow animated width within the target range to avoid reflow during overshoot.
     val hostSpec = com.convx.music.ui.component.floatingtabbar.LocalAccessoryContentSpec.current
     if (hostSpec != null) return layout { measurable, constraints ->
         val w = if (hostSpec.maxWidth > 0) {

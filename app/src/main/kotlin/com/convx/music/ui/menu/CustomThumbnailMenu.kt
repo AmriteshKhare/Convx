@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.menuBottomInset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -34,7 +37,7 @@ fun CustomThumbnailMenu(
             start = 8.dp,
             top = 8.dp,
             end = 8.dp,
-            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+            bottom = 8.dp + menuBottomInset(),
         ),
     ) {
         item {
@@ -43,10 +46,7 @@ fun CustomThumbnailMenu(
                     Text(text = stringResource(R.string.choose_from_library)) 
                 },
                 leadingContent = {
-                    Icon(
-                        painter = painterResource(R.drawable.insert_photo),
-                        contentDescription = null,
-                    )
+                    SymbolIcon(symbol = sf("photo"), contentDescription = null)
                 },
                 modifier = Modifier.clickable {
                     onEdit()
@@ -60,10 +60,7 @@ fun CustomThumbnailMenu(
                     Text(text = stringResource(R.string.remove_custom_image)) 
                 },
                 leadingContent = {
-                    Icon(
-                        painter = painterResource(R.drawable.delete),
-                        contentDescription = null,
-                    )
+                    SymbolIcon(symbol = sf("trash"), contentDescription = null)
                 },
                 modifier = Modifier.clickable {
                     onRemove()

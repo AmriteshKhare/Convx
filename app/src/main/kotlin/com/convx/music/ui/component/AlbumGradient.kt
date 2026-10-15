@@ -22,9 +22,7 @@ fun AlbumGradient(
     modifier: Modifier = Modifier,
 ) {
     val surfaceColor = AppTheme.colorScheme.surface
-    // Same extraction + cache as the Artist/Album/Playlist detail screens — this used
-    // to be its own separate fetch, cache and Material Palette fallback, so the same
-    // artwork could be decoded and analysed twice for no reason.
+    // Reuse the shared artwork tint cache to avoid decoding the same image twice.
     val extractedColors = rememberArtworkTint(thumbnailUrl)
 
     val color1 by animateColorAsState(

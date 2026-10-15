@@ -6,11 +6,13 @@ package com.convx.music.ui.component.shapes
 
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.LayoutDirection
 import kotlin.math.abs
 
@@ -23,7 +25,7 @@ import kotlin.math.abs
  * transitions. A square (the search / inline tab circle) stays a TRUE circle, as on iOS --
  * a G2 capsule of a square would read as a squircle -- and stays on the cheap rrect path.
  *
- * ponytail: path clip on the bar pill + mini pill; re-measure Home scroll RenderThread if
+ * Keep the number of clipped surfaces small; measure additional clips during scroll.
  * the bar ever grows more clipped surfaces.
  */
 @Immutable
@@ -55,3 +57,14 @@ object NavContinuousCapsule : CornerBasedShape(
         bottomStart: CornerSize,
     ): CornerBasedShape = this
 }
+
+private val CircularCapsule = RoundedCornerShape(50)
+
+/**
+ * Outline for a pill's elevation shadow. HWUI draws an rrect shadow analytically, but a path
+ * outline goes through Skia's shadow utils, which rasterized the blurred G2 capsule on the CPU
+ * and uploaded it on every frame the pill resized (measured: 785x163 / 969x142 uploads per
+ * frame through bar collapse, tab switch and menu open). Under a 6-12dp blur the G2 and
+ * circular ends are indistinguishable.
+ */
+val Shape.shadowShape: Shape get() = if (this === NavContinuousCapsule) CircularCapsule else this

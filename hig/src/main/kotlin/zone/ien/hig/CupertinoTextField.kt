@@ -75,32 +75,8 @@ import zone.ien.hig.theme.systemRed
 
 internal fun KeyboardOptions.enableNativeInput(): KeyboardOptions = this
 
-/**
- * A Cupertino-style text field that allows users to enter and edit text.
- *
- * @param value the text field's input value
- * @param onValueChange called when the text field's input value changes
- * @param modifier the [Modifier] to be applied to this text field
- * @param enabled controls the enabled state of this text field. When `false`, this component will not
- *     respond to user input and will be displayed as disabled
- * @param readOnly controls the read-only state of this text field. When `true`, this component will not
- *     respond to user input and will be displayed as read-only
- * @param textStyle the [TextStyle] to be applied to the text content
- * @param placeholder the placeholder content to be displayed when the text field is empty
- * @param leadingIcon the icon displayed at the start of the text field
- * @param trailingIcon the icon displayed at the end of the text field
- * @param isError controls the error state of this text field. When `true`, this component will be displayed
- *     with error styling
- * @param visualTransformation the [VisualTransformation] to be applied to the text content
- * @param keyboardOptions the keyboard options configuration for this text field
- * @param keyboardActions the keyboard actions configuration for this text field
- * @param singleLine when `true`, this text field will be constrained to a single line
- * @param maxLines the maximum number of lines this text field can grow to
- * @param minLines the minimum number of lines this text field will show
- * @param interactionSource the [MutableInteractionSource] representing the stream of [Interaction]s
- * @param contentAlignment the vertical alignment of the text field content
- * @param colors the [CupertinoTextFieldColors] to be used to configure the text field's appearance
- */
+/** Cupertino-style text field for entering and editing text. */
+
 @Composable
 fun CupertinoTextField(
     value: String,
@@ -123,7 +99,6 @@ fun CupertinoTextField(
     contentAlignment: Alignment.Vertical = Alignment.CenterVertically,
     colors: CupertinoTextFieldColors = CupertinoTextFieldDefaults.colors(),
 ) {
-    // If color is not provided via the text style, use content color as a default
     val textColor = textStyle.color.takeOrElse { colors.textColor(enabled, isError, interactionSource).value }
     val mergedTextStyle = textStyle.merge(TextStyle(color = textColor))
 
@@ -198,7 +173,6 @@ fun CupertinoTextField(
     contentAlignment: Alignment.Vertical = Alignment.CenterVertically,
     colors: CupertinoTextFieldColors = CupertinoTextFieldDefaults.colors(),
 ) {
-    // If color is not provided via the text style, use content color as a default
     val textColor = textStyle.color.takeOrElse { colors.textColor(enabled, isError, interactionSource).value }
     val mergedTextStyle = textStyle.merge(TextStyle(color = textColor))
 
@@ -270,7 +244,6 @@ fun CupertinoTextField(
     contentAlignment: Alignment.Vertical = Alignment.CenterVertically,
     colors: CupertinoTextFieldColors = CupertinoTextFieldDefaults.colors(),
 ) {
-    // If color is not provided via the text style, use content color as a default
     val textColor = textStyle.color.takeOrElse { colors.textColor(enabled, isError, interactionSource).value }
     val mergedTextStyle = textStyle.merge(TextStyle(color = textColor))
 
@@ -343,7 +316,6 @@ fun CupertinoSecureTextField(
     textObfuscationMode: TextObfuscationMode = TextObfuscationMode.RevealLastTyped,
     textObfuscationCharacter: Char = '\u2022',
 ) {
-    // If color is not provided via the text style, use content color as a default
     val textColor = textStyle.color.takeOrElse { colors.textColor(enabled, isError, interactionSource).value }
     val mergedTextStyle = textStyle.merge(TextStyle(color = textColor))
 
@@ -650,14 +622,7 @@ class CupertinoTextFieldColors internal constructor(
     private val disabledPlaceholderColor: Color,
     private val errorPlaceholderColor: Color,
 ) {
-    /**
-     * Represents the color used for the leading icon of this text field.
-     *
-     * @param enabled whether the text field is enabled
-     * @param isError whether the text field's current value is in error
-     * @param interactionSource the [InteractionSource] of this text field. Helps to determine if
-     * the text field is in focus or not
-     */
+
     @Composable
     internal fun leadingIconColor(
         enabled: Boolean,
@@ -676,14 +641,7 @@ class CupertinoTextFieldColors internal constructor(
         )
     }
 
-    /**
-     * Represents the color used for the trailing icon of this text field.
-     *
-     * @param enabled whether the text field is enabled
-     * @param isError whether the text field's current value is in error
-     * @param interactionSource the [InteractionSource] of this text field. Helps to determine if
-     * the text field is in focus or not
-     */
+
     @Composable
     internal fun trailingIconColor(
         enabled: Boolean,
@@ -702,14 +660,7 @@ class CupertinoTextFieldColors internal constructor(
         )
     }
 
-    /**
-     * Represents the color used for the border indicator of this text field.
-     *
-     * @param enabled whether the text field is enabled
-     * @param isError whether the text field's current value is in error
-     * @param interactionSource the [InteractionSource] of this text field. Helps to determine if
-     * the text field is in focus or not
-     */
+
     @Composable
     internal fun indicatorColor(
         enabled: Boolean,
@@ -728,14 +679,7 @@ class CupertinoTextFieldColors internal constructor(
         return rememberUpdatedState(targetValue)
     }
 
-    /**
-     * Represents the container color for this text field.
-     *
-     * @param enabled whether the text field is enabled
-     * @param isError whether the text field's current value is in error
-     * @param interactionSource the [InteractionSource] of this text field. Helps to determine if
-     * the text field is in focus or not
-     */
+
     @Composable
     internal fun containerColor(
         enabled: Boolean,
@@ -754,14 +698,7 @@ class CupertinoTextFieldColors internal constructor(
         return rememberUpdatedState(targetValue)
     }
 
-    /**
-     * Represents the color used for the placeholder of this text field.
-     *
-     * @param enabled whether the text field is enabled
-     * @param isError whether the text field's current value is in error
-     * @param interactionSource the [InteractionSource] of this text field. Helps to determine if
-     * the text field is in focus or not
-     */
+
     @Composable
     internal fun placeholderColor(
         enabled: Boolean,
@@ -780,14 +717,7 @@ class CupertinoTextFieldColors internal constructor(
         return rememberUpdatedState(targetValue)
     }
 
-    /**
-     * Represents the color used for the input field of this text field.
-     *
-     * @param enabled whether the text field is enabled
-     * @param isError whether the text field's current value is in error
-     * @param interactionSource the [InteractionSource] of this text field. Helps to determine if
-     * the text field is in focus or not
-     */
+
     @Composable
     internal fun textColor(
         enabled: Boolean,
@@ -806,11 +736,7 @@ class CupertinoTextFieldColors internal constructor(
         return rememberUpdatedState(targetValue)
     }
 
-    /**
-     * Represents the color used for the cursor of this text field.
-     *
-     * @param isError whether the text field's current value is in error
-     */
+
     @Composable
     internal fun cursorColor(isError: Boolean): State<Color> = rememberUpdatedState(if (isError) errorCursorColor else cursorColor)
 
@@ -998,16 +924,10 @@ object CupertinoBorderedTextFieldDefaults {
 
 @Immutable
 object CupertinoTextFieldDefaults {
-    /**
-     * The default min width applied to an [CupertinoTextField].
-     * Note that you can override it by applying Modifier.heightIn directly on a text field.
-     */
+    /** Minimum height of a [CupertinoTextField]. Override it with [Modifier.heightIn]. */
     val MinHeight = 26.dp
 
-    /**
-     * The default min width applied to an [CupertinoTextField].
-     * Note that you can override it by applying Modifier.widthIn directly on a text field.
-     */
+    /** Minimum width of a [CupertinoTextField]. Override it with [Modifier.widthIn]. */
     val MinWidth = 280.dp
 
     /**

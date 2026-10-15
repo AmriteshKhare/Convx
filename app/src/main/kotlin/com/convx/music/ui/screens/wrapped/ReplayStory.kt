@@ -4,6 +4,8 @@
  */
 package com.convx.music.ui.screens.wrapped
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -240,7 +242,7 @@ private fun BoxScope.PageContent(kind: ReplayPage.Kind, s: WrappedState) {
     }
 }
 
-// Chrome ------------------------------------------------------------------------------------
+// Chrome
 
 @Composable
 private fun ReplayChrome(
@@ -282,7 +284,7 @@ private fun ReplayChrome(
                 }
                 Spacer(Modifier.width(10.dp))
                 ChromeCircle(onClose) {
-                    Icon(painterResource(R.drawable.close), "Close", tint = Color.White, modifier = Modifier.size(16.dp))
+                    SymbolIcon(symbol = sf("xmark"), contentDescription = "Close", size = 16.dp, tint = Color.White)
                 }
             }
             if (showBars) {
@@ -296,14 +298,11 @@ private fun ReplayChrome(
         if (showBars) {
             Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 10.dp)) {
                 ChromeCircle(onToggleMute) {
-                    Icon(
-                        painterResource(if (isMuted) R.drawable.volume_off else R.drawable.volume_up),
-                        "Mute", tint = Color.White, modifier = Modifier.size(16.dp),
-                    )
+                    SymbolIcon(symbol = if (isMuted) sf("speaker.slash.fill") else sf("speaker.wave.3.fill"), contentDescription = "Mute", size = 16.dp, tint = Color.White)
                 }
                 Spacer(Modifier.weight(1f))
                 ChromeCircle(onShare) {
-                    Icon(painterResource(R.drawable.ios_share), "Share", tint = Color.White, modifier = Modifier.size(16.dp))
+                    SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = "Share", size = 16.dp, tint = Color.White)
                 }
             }
         }
@@ -318,7 +317,7 @@ private fun ChromeCircle(onClick: () -> Unit, content: @Composable () -> Unit) {
     ) { content() }
 }
 
-// Background ---------------------------------------------------------------------------------
+// Background
 
 /**
  * Two soft colour fields drifting past each other, Replay's summary-background look. Plain radial
@@ -339,7 +338,7 @@ private fun Modifier.flowingGradient(a: Color, b: Color): Modifier {
     }
 }
 
-// Type ----------------------------------------------------------------------------------------
+// Type
 
 private val HeadlineStyle = TextStyle(color = Color.White, fontSize = 34.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold)
 
@@ -366,7 +365,7 @@ private fun BoxScope.LoadingPulse() {
     Text("This is your Replay.", style = HeadlineStyle.copy(fontSize = 24.sp), modifier = Modifier.align(Alignment.Center).graphicsLayer { alpha = a })
 }
 
-// Pages ---------------------------------------------------------------------------------------
+// Pages
 
 @Composable
 private fun BoxScope.IntroPage(arts: List<String>) {
@@ -563,10 +562,9 @@ private fun BoxScope.SummaryPage(s: WrappedState, nf: NumberFormat) {
             }
         }
     }
-    // Save-as-playlist, carried over from the old Wrapped playlist page.
     val manager = LocalWrappedManager.current
     val creation = s.playlistCreationState
-    val imageName = remember { if (kotlin.random.Random.nextBoolean()) "viviwrapped_v1" else "viviwrapped_v2" }
+    val imageName = remember { if (kotlin.random.Random.nextBoolean()) "convx_wrapped_v1" else "convx_wrapped_v2" }
     Box(
         Modifier
             .align(Alignment.BottomCenter)

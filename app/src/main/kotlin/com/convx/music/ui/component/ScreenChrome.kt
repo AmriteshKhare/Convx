@@ -5,6 +5,10 @@
 
 package com.convx.music.ui.component
 
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -45,35 +49,9 @@ import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Text
 
 /**
- * The chrome a pushed screen wears: the page's own colour, a Haze source over
- * its scrolling content, the progressive [TopFadeBlur] ramp, and a
- * [FrostedTopBar] whose glass back button is always there while its compact
- * title fades in only once the large one has scrolled away.
- *
- * This is the app's one answer to "a screen with a back button and a title".
- * It replaced both a single global bar in [com.convx.music.MainActivity] (which
- * could not see any individual page's scroll or background colour, so it pinned
- * every title open and tinted the strip wrong) and Material's `TopAppBar`
- * (opaque, hard-edged — a rectangle sitting on the page with a line drawn
- * across whatever scrolls under it).
- *
- * The layering is not free-form. It is the one arrangement Haze tolerates:
- *
- * ```
- * Box                                  <- page colour, nothing else
- *  ├─ Box(hazeSource)                  <- the scrolling content, and ONLY that
- *  ├─ TopFadeBlur(hazeEffect)          <- sibling of the source, never inside it
- *  └─ FrostedTopBar                    <- sibling too
- * ```
- *
- * A `hazeEffect` placed *inside* the node it samples captures its own draw
- * output and silently blurs nothing — no crash, no warning, just a flat strip.
- *
- * The same rule, for a different reason, governs the glass on the bar's own
- * buttons: they sample [GlassScreenChrome.backdrop], so they must not sit
- * inside the node that backdrop records, or the capture re-enters its own draw
- * and the renderer hard-crashes (see `glass-chrome-rendernode-cycle`). Being a
- * sibling of the content satisfies both constraints at once.
+ * Shared layout for pushed screens. The scrolling content is the Haze source;
+ * the fade blur and top bar stay as siblings so neither samples itself. The bar
+ * keeps its back button visible and reveals the compact title after scrolling.
  */
 @Composable
 fun ScreenChromeBox(
@@ -285,14 +263,15 @@ fun ScreenLazyPage(
             onBackLongClick = onBackLongClick,
             actions = actions,
         ) {
+            val sideInsets = LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal).asPaddingValues()
+            val direction = androidx.compose.ui.platform.LocalLayoutDirection.current
             LazyColumn(
                 state = listState,
-                modifier = modifier
-                    .then(chrome.contentModifier())
-                    .windowInsetsPadding(
-                        LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal),
-                    )
-                    .padding(horizontal = horizontalPadding),
+                modifier = modifier.then(chrome.contentModifier()),
+                contentPadding = PaddingValues(
+                    start = sideInsets.calculateStartPadding(direction) + horizontalPadding,
+                    end = sideInsets.calculateEndPadding(direction) + horizontalPadding,
+                ),
             ) {
                 item(key = "title") {
                     Column {

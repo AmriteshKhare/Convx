@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.library
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,9 +74,10 @@ fun AiDjSetScreen(
     startInConcertMode: Boolean = false,
     viewModel: AiDjSetViewModel = hiltViewModel(),
 ) {
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val playerConnection = LocalPlayerConnection.current ?: return
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val result = state.result
 
     var prompt by rememberSaveable { mutableStateOf("") }
     var songCount by rememberSaveable { mutableIntStateOf(DEFAULT_SONG_COUNT) }
@@ -95,23 +98,18 @@ fun AiDjSetScreen(
         horizontalPadding = 16.dp,
     ) {
         when {
-            state.result != null -> {
-                val result = state.result!!
+            result != null -> {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        text = result.playlistName,
-                        style = AppTheme.typography.headlineSmall,
-                        color = AppTheme.colorScheme.onSurface,
+                    com.convx.music.ui.component.PlaylistIdentity(
+                        title = result.playlistName,
+                        artwork = seedSong?.thumbnailUrl,
+                        subtitle = stringResource(R.string.ai_dj_mix_song_count, result.orderedTitles.size),
                     )
-                    Text(
-                        text = stringResource(R.string.ai_dj_mix_song_count, result.orderedTitles.size),
-                        style = AppTheme.typography.bodyMedium,
-                        color = AppTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = stringResource(R.string.ai_dj_mix_method, result.method),
-                        style = AppTheme.typography.bodySmall,
-                        color = AppTheme.colorScheme.onSurfaceVariant,
+                    com.convx.music.ui.component.PlaylistPlaybackActions(
+                        enabled = result.orderedTitles.isNotEmpty(),
+                        playing = false,
+                        onPlay = { playerConnection.playQueue(ListQueue(title = result.playlistName, items = result.toMediaItems())) },
+                        onShuffle = { playerConnection.playQueue(ListQueue(title = result.playlistName, items = result.toMediaItems().shuffled())) },
                     )
 
                     if (result.unmatchedTitles.isNotEmpty()) {
@@ -309,7 +307,7 @@ fun AiDjSetScreen(
                                         .coerceAtLeast(MIN_DURATION_MINUTES)
                                 },
                             ) {
-                                Icon(painterResource(R.drawable.remove), contentDescription = null)
+                                SymbolIcon(symbol = sf("minus"), contentDescription = null)
                             }
                             Text(
                                 text = stringResource(R.string.ai_dj_mix_duration_minutes, durationMinutes),
@@ -321,7 +319,7 @@ fun AiDjSetScreen(
                                         .coerceAtMost(MAX_DURATION_MINUTES)
                                 },
                             ) {
-                                Icon(painterResource(R.drawable.add), contentDescription = null)
+                                SymbolIcon(symbol = sf("plus"), contentDescription = null)
                             }
                         }
                     } else {
@@ -338,13 +336,13 @@ fun AiDjSetScreen(
                             IconButton(
                                 onClick = { songCount = (songCount - 1).coerceAtLeast(MIN_SONG_COUNT) },
                             ) {
-                                Icon(painterResource(R.drawable.remove), contentDescription = null)
+                                SymbolIcon(symbol = sf("minus"), contentDescription = null)
                             }
                             Text(text = "$songCount", style = AppTheme.typography.bodyLarge)
                             IconButton(
                                 onClick = { songCount = (songCount + 1).coerceAtMost(MAX_SONG_COUNT) },
                             ) {
-                                Icon(painterResource(R.drawable.add), contentDescription = null)
+                                SymbolIcon(symbol = sf("plus"), contentDescription = null)
                             }
                         }
                     }

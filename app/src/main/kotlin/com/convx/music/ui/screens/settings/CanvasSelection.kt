@@ -6,106 +6,56 @@
 package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.animateColorAsState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.bounceClick
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.combinedBounceClick
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Box
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.only
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Card
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.CardDefaults
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.RadioButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Switch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarDefaults
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.graphics.Color
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.CanvasSource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.CanvasSourceKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.CanvasThumbnailAnimationKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.ExpressiveIconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.ModernSwitch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberEnumPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -125,13 +75,12 @@ fun CanvasSelection(
 
     SettingsPage(
         navController = navController,
-        title = stringResource(R.string.vivimusic_canvas),
+        title = stringResource(R.string.convx_canvas),
         pageColor = AppTheme.colorScheme.background,
         horizontalPadding = 24.dp,
     ) {
-        // Description text
         Text(
-            text = stringResource(R.string.vivimusic_canvas_desc),
+            text = stringResource(R.string.convx_canvas_desc),
             style = AppTheme.typography.bodyMedium,
             color = AppTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 24.dp, top = 16.dp)
@@ -180,7 +129,6 @@ fun CanvasSelection(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Options settings group
         IosSettingsGroup(
             title = stringResource(R.string.canvas_source),
             items = listOf(
@@ -200,19 +148,6 @@ fun CanvasSelection(
                 IosSettingsItem(
                     leadingContent = {
                         RadioButton(
-                            selected = canvasSource == CanvasSource.ECHO_MUSIC,
-                            onClick = null,
-                            enabled = canvasThumbnailAnimation
-                        )
-                    },
-                    title = { Text(stringResource(R.string.canvas_source_echo_music)) },
-                    description = { Text(stringResource(R.string.canvas_source_echo_music_desc)) },
-                    enabled = canvasThumbnailAnimation,
-                    onClick = { onCanvasSourceChange(CanvasSource.ECHO_MUSIC) }
-                ),
-                IosSettingsItem(
-                    leadingContent = {
-                        RadioButton(
                             selected = canvasSource == CanvasSource.APPLE_MUSIC,
                             onClick = null,
                             enabled = canvasThumbnailAnimation
@@ -226,15 +161,15 @@ fun CanvasSelection(
                 IosSettingsItem(
                     leadingContent = {
                         RadioButton(
-                            selected = canvasSource == CanvasSource.VIVIMUSIC,
+                            selected = canvasSource == CanvasSource.CONVX,
                             onClick = null,
                             enabled = canvasThumbnailAnimation
                         )
                     },
-                    title = { Text(stringResource(R.string.canvas_source_vivimusic)) },
-                    description = { Text(stringResource(R.string.canvas_source_vivimusic_desc)) },
+                    title = { Text(stringResource(R.string.canvas_source_convx)) },
+                    description = { Text(stringResource(R.string.canvas_source_convx_desc)) },
                     enabled = canvasThumbnailAnimation,
-                    onClick = { onCanvasSourceChange(CanvasSource.VIVIMUSIC) }
+                    onClick = { onCanvasSourceChange(CanvasSource.CONVX) }
                 ),
                 IosSettingsItem(
                     leadingContent = {
@@ -248,6 +183,19 @@ fun CanvasSelection(
                     description = { Text(stringResource(R.string.canvas_source_tidal_desc)) },
                     enabled = canvasThumbnailAnimation,
                     onClick = { onCanvasSourceChange(CanvasSource.TIDAL) }
+                ),
+                IosSettingsItem(
+                    leadingContent = {
+                        RadioButton(
+                            selected = canvasSource == CanvasSource.SPOTIFY,
+                            onClick = null,
+                            enabled = canvasThumbnailAnimation
+                        )
+                    },
+                    title = { Text(stringResource(R.string.canvas_source_spotify)) },
+                    description = { Text(stringResource(R.string.canvas_source_spotify_desc)) },
+                    enabled = canvasThumbnailAnimation,
+                    onClick = { onCanvasSourceChange(CanvasSource.SPOTIFY) }
                 )
             )
         )

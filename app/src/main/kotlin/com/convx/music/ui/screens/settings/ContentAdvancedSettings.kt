@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.content.ClipData
 import android.content.ClipboardManager
 import androidx.compose.animation.AnimatedVisibility
@@ -26,9 +28,9 @@ import com.convx.music.ui.ios.compat.BasicAlertDialog
 import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.DropdownMenuItem
+import com.convx.music.ui.ios.compat.ExposedDropdownMenuBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.OutlinedTextField
@@ -98,6 +100,7 @@ import com.music.innertube.YouTube
 import com.music.innertube.models.IpVersion
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 import java.net.Proxy
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * The power-user half of [ContentSettings]: artist-page display density, proxy/network
@@ -110,6 +113,7 @@ import java.net.Proxy
 fun ContentAdvancedSettings(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
+    networkOnly: Boolean = false,
 ) {
     val context = LocalContext.current
 
@@ -138,7 +142,7 @@ fun ContentAdvancedSettings(
     var showPlaybackLogsDialog by rememberSaveable { mutableStateOf(false) }
     var showClientProbeDialog by rememberSaveable { mutableStateOf(false) }
     var clientProbeOutput by rememberSaveable { mutableStateOf<String?>(null) }
-    val playbackLogs by PlaybackLogManager.logs.collectAsState()
+    val playbackLogs by PlaybackLogManager.logs.collectAsStateWithLifecycle()
 
     var showProxyConfigurationDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -288,8 +292,7 @@ fun ContentAdvancedSettings(
 
     if (showProviderPriorityDialog) {
         val defaultOrder = LyricsProviderRegistry.getDefaultProviderOrder()
-        // Task 011: presence/order in this single list is now the only control --
-        // the 7 separate enable switches were removed from the settings list above.
+        // The selected order is also the enabled provider list; missing providers are disabled.
         val enabledSetters = mapOf(
             "LrcLib" to onEnableLrclibChange,
             "Kugou" to onEnableKugouChange,
@@ -371,12 +374,7 @@ fun ContentAdvancedSettings(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.lyrics),
-                                            contentDescription = null,
-                                            tint = AppTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.size(16.dp),
-                                        )
+                                        SymbolIcon(symbol = sf("quote.bubble"), contentDescription = null, size = 16.dp, tint = AppTheme.colorScheme.onSecondaryContainer)
                                         Text(
                                             text = stringResource(R.string.lyrics_provider_priority),
                                             style = AppTheme.typography.labelMedium,
@@ -491,7 +489,7 @@ fun ContentAdvancedSettings(
     }
 
     if (showClientProbeDialog) {
-        val probeVideoId = LocalPlayerConnection.current?.mediaMetadata?.collectAsState()?.value?.id
+        val probeVideoId = LocalPlayerConnection.current?.mediaMetadata?.collectAsStateWithLifecycle()?.value?.id
             ?: FALLBACK_PROBE_VIDEO_ID
         LaunchedEffect(showClientProbeDialog, probeVideoId) {
             val results = YouTubeClientProbe.run(
@@ -548,11 +546,11 @@ fun ContentAdvancedSettings(
 
     SettingsPage(
         navController = navController,
-        title = stringResource(R.string.advanced),
+        title = if (networkOnly) "Network & proxy" else stringResource(R.string.advanced),
         pageColor = AppTheme.colorScheme.background,
         horizontalPadding = 16.dp,
     ) {
-        IosSettingsGroup(
+        if (!networkOnly) IosSettingsGroup(
             title = stringResource(R.string.artist_page_settings),
             items = listOf(
                 IosSettingsItem(
@@ -570,9 +568,9 @@ fun ContentAdvancedSettings(
             )
         )
 
-        Spacer(modifier = Modifier.height(27.dp))
+        if (!networkOnly) Spacer(modifier = Modifier.height(27.dp))
 
-        IosSettingsGroup(
+        if (networkOnly) IosSettingsGroup(
             title = stringResource(R.string.proxy),
             items = buildList {
                 add(IosSettingsItem(
@@ -611,10 +609,10 @@ fun ContentAdvancedSettings(
             }
         )
 
-        Spacer(modifier = Modifier.height(27.dp))
+        if (networkOnly) Spacer(modifier = Modifier.height(27.dp))
 
-        IosSettingsGroup(
-            title = stringResource(R.string.lyrics),
+        if (!networkOnly) IosSettingsGroup(
+            title = "Lyrics sources",
             items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.lyrics),
@@ -630,10 +628,10 @@ fun ContentAdvancedSettings(
             )
         )
 
-        Spacer(modifier = Modifier.height(27.dp))
+        if (!networkOnly) Spacer(modifier = Modifier.height(27.dp))
 
-        IosSettingsGroup(
-            title = stringResource(R.string.misc),
+        if (!networkOnly) IosSettingsGroup(
+            title = "Home & discovery",
             items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.trending_up),
@@ -657,9 +655,9 @@ fun ContentAdvancedSettings(
             )
         )
 
-        Spacer(modifier = Modifier.height(27.dp))
+        if (!networkOnly) Spacer(modifier = Modifier.height(27.dp))
 
-        IosSettingsGroup(
+        if (!networkOnly) IosSettingsGroup(
             title = stringResource(R.string.logs_heading),
             items = listOf(
                 IosSettingsItem(

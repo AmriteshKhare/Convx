@@ -5,6 +5,7 @@
 
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.constants.ShowVideoSwitchKey
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -41,7 +42,6 @@ import com.convx.music.constants.CrossfadeEnabledKey
 import com.convx.music.constants.CrossfadeGaplessKey
 import com.convx.music.constants.DisableLoadMoreWhenRepeatAllKey
 import com.convx.music.constants.EnableSaavnStreamingKey
-import com.convx.music.constants.HideVolumeBarKey
 import com.convx.music.constants.HistoryDuration
 import com.convx.music.constants.PersistentShuffleAcrossQueuesKey
 import com.convx.music.constants.PreventDuplicateTracksInQueueKey
@@ -51,7 +51,6 @@ import com.convx.music.constants.SeekExtraSeconds
 import com.convx.music.constants.ShufflePlaylistFirstKey
 import com.convx.music.constants.SkipSilenceInstantKey
 import com.convx.music.constants.SkipSilenceKey
-import com.convx.music.constants.SpatialAudioKey
 import com.convx.music.constants.StopMusicOnTaskClearKey
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.IosSettingsGroup
@@ -80,13 +79,13 @@ fun PlayerAdvancedSettings(
         CrossfadeGaplessKey,
         defaultValue = true
     )
-    val (hideVolumeBar, onHideVolumeBarChange) = rememberPreference(
-        HideVolumeBarKey,
-        defaultValue = false
-    )
     val (compactPlayerInTabView, onCompactPlayerInTabViewChange) = rememberPreference(
         CompactPlayerInTabViewKey,
         defaultValue = false
+    )
+    val (showVideoSwitch, onShowVideoSwitchChange) = rememberPreference(
+        ShowVideoSwitchKey,
+        defaultValue = true
     )
     val (historyDuration, onHistoryDurationChange) = rememberPreference(
         HistoryDuration,
@@ -103,10 +102,6 @@ fun PlayerAdvancedSettings(
     )
     val (bitPerfect, onBitPerfectChange) = rememberPreference(
         key = BitPerfectKey,
-        defaultValue = false
-    )
-    val (spatialAudio, onSpatialAudioChange) = rememberPreference(
-        key = SpatialAudioKey,
         defaultValue = false
     )
     val context = LocalContext.current
@@ -156,7 +151,7 @@ fun PlayerAdvancedSettings(
         item(key = "player_advanced_settings_content") {
             Column {
                 IosSettingsGroup(
-                    title = stringResource(R.string.player),
+                    title = "Audio engine",
                     items = buildList {
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.graphic_eq),
@@ -184,13 +179,13 @@ fun PlayerAdvancedSettings(
                             ))
                         }
                         add(IosSettingsItem(
-                            icon = painterResource(R.drawable.tune),
-                            title = { Text(stringResource(R.string.hide_volume_bar)) },
-                            description = { Text(stringResource(R.string.hide_volume_bar_desc)) },
+                            icon = painterResource(R.drawable.library_music),
+                            title = { Text(stringResource(R.string.show_video_switch)) },
+                            description = { Text(stringResource(R.string.show_video_switch_desc)) },
                             trailingContent = {
-                                Switch(checked = hideVolumeBar, onCheckedChange = onHideVolumeBarChange)
+                                Switch(checked = showVideoSwitch, onCheckedChange = onShowVideoSwitchChange)
                             },
-                            onClick = { onHideVolumeBarChange(!hideVolumeBar) }
+                            onClick = { onShowVideoSwitchChange(!showVideoSwitch) }
                         ))
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.crop),
@@ -209,6 +204,12 @@ fun PlayerAdvancedSettings(
                             title = { Text(stringResource(R.string.excluded_folders)) },
                             description = { Text(stringResource(R.string.excluded_folders_desc)) },
                             onClick = { navController.navigate("settings/player/local_folders") }
+                        ))
+                        add(IosSettingsItem(
+                            icon = painterResource(R.drawable.library_music),
+                            title = { Text(stringResource(R.string.network_storage)) },
+                            description = { Text(stringResource(R.string.network_storage_desc)) },
+                            onClick = { navController.navigate("settings/network_storage") }
                         ))
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.history),
@@ -277,26 +278,6 @@ fun PlayerAdvancedSettings(
                             onClick = { if (!crossfadeEnabled) onBitPerfectChange(!bitPerfect) }
                         ))
                         add(IosSettingsItem(
-                            icon = painterResource(R.drawable.equalizer),
-                            title = { Text(stringResource(R.string.spatial_audio)) },
-                            description = {
-                                Text(
-                                    // Gate on the raw preference, matching what MusicService's
-                                    // BitPerfectKey collector actually acts on.
-                                    if (bitPerfect) stringResource(R.string.spatial_audio_disabled_by_bit_perfect)
-                                    else stringResource(R.string.spatial_audio_description)
-                                )
-                            },
-                            trailingContent = {
-                                Switch(
-                                    checked = if (bitPerfect) false else spatialAudio,
-                                    onCheckedChange = onSpatialAudioChange,
-                                    enabled = !bitPerfect
-                                )
-                            },
-                            onClick = { if (!bitPerfect) onSpatialAudioChange(!spatialAudio) }
-                        ))
-                        add(IosSettingsItem(
                             icon = painterResource(R.drawable.arrow_forward),
                             title = { Text(stringResource(R.string.seek_seconds_addup)) },
                             description = { Text(stringResource(R.string.seek_seconds_addup_description)) },
@@ -311,7 +292,7 @@ fun PlayerAdvancedSettings(
                 Spacer(modifier = Modifier.height(27.dp))
 
                 IosSettingsGroup(
-                    title = stringResource(R.string.queue),
+                    title = "Queue rules",
                     items = listOf(
                         IosSettingsItem(
                             icon = painterResource(R.drawable.playlist_add),
@@ -376,7 +357,7 @@ fun PlayerAdvancedSettings(
                 Spacer(modifier = Modifier.height(27.dp))
 
                 IosSettingsGroup(
-                    title = stringResource(R.string.misc),
+                    title = "Other",
                     items = listOf(
                         IosSettingsItem(
                             icon = painterResource(R.drawable.clear_all),

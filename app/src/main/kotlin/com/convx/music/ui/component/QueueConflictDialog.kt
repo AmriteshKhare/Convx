@@ -19,6 +19,7 @@ import com.convx.music.constants.AskBeforeReplacingQueueKey
 import com.convx.music.playback.PlayerConnection
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.foundation.IosTheme
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * Asks whether starting something new should keep the queue that is already playing or clear
@@ -32,7 +33,7 @@ import com.convx.music.ui.ios.foundation.IosTheme
 @Composable
 fun QueueConflictDialog(playerConnection: PlayerConnection?) {
     val connection = playerConnection ?: return
-    val pending by connection.pendingQueue.collectAsState()
+    val pending by connection.pendingQueue.collectAsStateWithLifecycle()
     val queue = pending ?: return
 
     DefaultDialog(
@@ -80,7 +81,7 @@ fun QueueReplacedUndoSnackbar(
     snackbarHostState: SnackbarHostState,
 ) {
     val connection = playerConnection ?: return
-    val replaced by connection.queueReplacedForUndo.collectAsState()
+    val replaced by connection.queueReplacedForUndo.collectAsStateWithLifecycle()
     val message = stringResource(R.string.queue_replaced_message)
     val undoLabel = stringResource(R.string.undo)
 

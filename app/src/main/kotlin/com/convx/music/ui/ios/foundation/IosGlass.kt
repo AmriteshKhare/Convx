@@ -90,6 +90,7 @@ fun Modifier.iosGlass(
     tint: Color = Color.Unspecified,
     interactive: Boolean = false,
     backdrop: Backdrop = IosTheme.backdrop,
+    wash: Color = Color.Transparent,
 ): Modifier {
     val colors = IosTheme.colors
     val isDark = colors.isDark
@@ -109,11 +110,12 @@ fun Modifier.iosGlass(
     if (!isRenderEffectSupported()) {
         if (style == IosGlassStyle.Prominent) {
             val prominent = if (tint.isSpecified) tint else colors.accent
-            return clip(shape).background(prominent.copy(alpha = 0.82f))
+            return clip(shape).background(prominent.copy(alpha = 0.82f)).background(wash)
         }
         return clip(shape)
             .background((baseSurfaceColor.copy(alpha = baseOpacity)))
             .background(activeTint.copy(alpha = effectiveTintAlpha))
+            .background(wash)
     }
 
     val scope = rememberCoroutineScope()
@@ -162,6 +164,7 @@ fun Modifier.iosGlass(
                         drawRect(activeTint.copy(alpha = effectiveTintAlpha))
                     }
                 }
+                if (wash.alpha > 0f) drawRect(wash)
             },
         )
         .then(if (interactive) highlight.modifier.then(highlight.gestureModifier) else Modifier)

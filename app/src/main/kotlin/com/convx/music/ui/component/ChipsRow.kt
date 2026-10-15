@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.component
 
+import androidx.compose.ui.unit.Dp
+import com.convx.music.ui.utils.bleedStart
 import android.annotation.SuppressLint
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
@@ -13,6 +15,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,6 +80,9 @@ fun <T> ChipsRow(
     selectedContainerColor: Color = AppTheme.colorScheme.secondaryContainer,
     labelColor: Color = Color.Unspecified,
     selectedLabelColor: Color = Color.Unspecified,
+    scrollState: ScrollState = rememberScrollState(),
+    /** Width of the floating side bar the chips may scroll under; the first chip still starts clear of it. */
+    sideInset: Dp = 0.dp,
 ) {
     val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     val ambientColor = LocalAmbientBackgroundColor.current.value
@@ -107,17 +113,18 @@ fun <T> ChipsRow(
         modifier =
         modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
+            .bleedStart(sideInset)
+            .horizontalScroll(scrollState)
             .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
             .padding(vertical = 8.dp),
     ) {
-        Spacer(Modifier.width(LocalPageMetrics.current.gutter))
+        Spacer(Modifier.width(LocalPageMetrics.current.gutter + sideInset))
 
         chips.forEachIndexed { index, (value, label) ->
             val isSelected = currentValue == value
 
             val cornerRadius by animateDpAsState(
-                // Figma Queue Chip On state is a full pill (458:10096).
+                // Selected chips expand into a full pill.
                 targetValue = if (isSelected) 100.dp else 8.dp,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -136,18 +143,6 @@ fun <T> ChipsRow(
                     selectedLabelColor = effectiveSelectedLabelColor,
                 ),
                 onClick = { onValueUpdate(value) },
-                leadingIcon = if (isSelected) {
-                    {
-                        Icon(
-                            imageVector = Icons.Filled.Done,
-                            contentDescription = null,
-                            tint = effectiveSelectedLabelColor,
-                            modifier = Modifier.size(FilterChipDefaults.IconSize),
-                        )
-                    }
-                } else {
-                    null
-                },
                 shape = RoundedCornerShape(cornerRadius),
                 border = pillBorder,
                 modifier = Modifier.animateContentSize(
@@ -212,19 +207,11 @@ fun <Int> ChoiceChipsRow(
                         )
                     },
                     leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Tune,
-                            contentDescription = null,
-                            modifier = Modifier.size(FilterChipDefaults.IconSize),
-                        )
+                        SymbolIcon(symbol = sf("slider.horizontal.3"), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize))
                     },
                     trailingIcon = {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFChevronDown,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .graphicsLayer(rotationZ = rotationAnimation)
-                        )
+                        SymbolIcon(symbol = sf("SFChevronDown"), contentDescription = null, size = 14.dp, modifier = Modifier
+                                .graphicsLayer(rotationZ = rotationAnimation))
                     },
                     shape = RoundedCornerShape(16.dp),
                     border = null,
@@ -284,17 +271,6 @@ fun <Int> ChoiceChipsRow(
                         containerColor = containerColor,
                     ),
                     onClick = { onValueUpdate(value) },
-                    leadingIcon = if (isSelected) {
-                        {
-                            Icon(
-                                imageVector = Icons.Filled.Done,
-                                contentDescription = null,
-                                modifier = Modifier.size(FilterChipDefaults.IconSize),
-                            )
-                        }
-                    } else {
-                        null
-                    },
                     shape = RoundedCornerShape(cornerRadius),
                     border = null,
                     modifier = Modifier

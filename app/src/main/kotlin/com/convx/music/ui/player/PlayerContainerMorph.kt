@@ -60,7 +60,7 @@ fun Modifier.miniContainerMorphSource(): Modifier {
 }
 
 /**
- * Mini transport cluster, in root coordinates (Melox miniPlayerControlsBounds).
+ * Mini transport cluster, in root coordinates (the reference app miniPlayerControlsBounds).
  *
  * The overlay draws the mini recording twice -- title side riding the
  * travelling corner, controls shifted to keep their right inset -- so both
@@ -116,22 +116,10 @@ fun playerSheetBackgroundAlpha(progress: Float): Float =
     easeInCubic((progress / PLAYER_LAYER_HANDOFF_PROGRESS).coerceIn(0f, 1f))
 
 /**
- * The one surface the whole morph happens inside (Melox PlayerSheetContentOverlay).
- *
- * Positioned at the interpolated container rect -- the pill's bounds at progress 0, the
- * whole screen at 1 -- it draws BOTH recordings:
- *
- * - the mini player's, drawn TWICE with a clip split: the title side pinned to
- *   the source offsets, the controls translated to keep their right inset as
- *   the card grows. Title/artist/buttons visibly TRAVEL instead of fading;
- * - the full player's, scaled by `container width / full width`, appearing
- *   from a tenth to six tenths while the mini hands over.
- *
- * ENTIRELY draw-phase. An earlier version sized a real Box from progress read in
- * composition; it composed once, at progress 0.0004, and never again -- so the container
- * sat at pill size for the whole gesture while the sheet it had replaced was no longer
- * drawing itself either. Reading progress here means the frame that changes it is the
- * frame that redraws this, with no recomposition at all.
+ * Draws the mini and full player layers in one container during the sheet morph.
+ * The mini title stays anchored while its controls travel; the full player scales in as
+ * the mini hands off. Progress is read during drawing so every frame updates without
+ * recomposing the player.
  */
 @Composable
 fun PlayerContainerMorphOverlay(
@@ -150,11 +138,7 @@ fun PlayerContainerMorphOverlay(
                 // mid-gesture, which walked the card's source edge away from the flying cover.
                 var flightMini: Rect? = null
                 var flightControls: Rect? = null
-                // No invalidateFullFrames() here any more: this cache builds on the overlay's
-                // first draw, which comes AFTER the sheet has recorded and marked ready in the
-                // same frame. A static background then never redrew, its flag stayed false and
-                // the morph never engaged (the sheet just slid and faded). A resize re-records
-                // on its own, since a size change always redraws the sheet.
+                // The sheet's first draw marks it ready; avoid forcing repeated full-frame redraws.
                 onDrawBehind {
                     val fraction = progress().coerceIn(0f, 1f)
                     // Close landing: the sheet has stopped on its bound, the card has not.
@@ -196,12 +180,7 @@ fun PlayerContainerMorphOverlay(
                         progress = fraction,
                     ).topStart
 
-                    // The pill's drop shadow, cast by the card for as long as the card is still
-                    // the pill (same fade as its plate). Clipped away before, so the real pill's
-                    // shadow popped in on the landing frame.
-                    // Opening only: closing lands shadowless and the real pill's shadow then
-                    // fades in (PlayerMorph.pillShadow) -- a card shadow handing over to the
-                    // pill's own on the landing frame still read as a pop.
+                    // Keep the card shadow during opening; the pill supplies its own shadow on close.
                     val shadowAlpha = if (PlayerMorph.targetOpen) 1f - playerSheetBackgroundAlpha(fraction) else 0f
                     if (shadowAlpha > 0f && PlayerMorph.miniShadowElevationPx > 0f) {
                         shadowLayer.topLeft = androidx.compose.ui.unit.IntOffset(
@@ -215,27 +194,36 @@ fun PlayerContainerMorphOverlay(
                         ) { }
                         drawLayer(shadowLayer)
                     }
+                    val stay = PlayerMorph.stayInPlace
+                    if (stay) {
+                        // Hero Blend: the bleed does not travel. The recorded player is drawn
+                        // at its own place and simply fades; the pill alone morphs below.
+                        if (fraction > 0f) {
+                            fullBackgroundLayer.alpha = playerSheetBackgroundAlpha(fraction)
+                            fullBackgroundLayer.renderEffect = null
+                            drawLayer(fullBackgroundLayer)
+                        }
+                        if (fraction > PLAYER_CONTENT_APPEAR_START) {
+                            fullContentLayer.alpha = playerSheetPageAlpha(fraction)
+                            fullContentLayer.renderEffect = null
+                            drawLayer(fullContentLayer)
+                        }
+                    }
                     clipPath.reset()
                     clipPath.addRoundRect(RoundRect(rect, CornerRadius(radius, radius)))
                     clipPath(clipPath) {
-                        // No flat plate (Melox draws no plate either): the mini
+                        // No flat plate (the reference app draws no plate either): the mini
                         // recording carries its own live glass for the first
                         // fifth, and the full recording is opaque from a tenth.
                         // A plate would sit behind translucent glass and read dead.
                         translate(left = rect.left, top = rect.top) {
-                            // The pill's own plate, carried by the card (the real pill hides
-                            // while the morph runs -- see FloatingMiniPlayer): the card starts
-                            // as the pill, not as bare content, and hands to the player
-                            // background over the first fifth (Melox playerSheetBarAlpha).
-                            // Exact complement of the background's rise (drawn over it), so
-                            // the card is never see-through mid-handoff: the pill's surface
-                            // becomes the player's background, one object throughout.
+                            // Fade the pill surface out as the player background fades in.
                             val plateAlpha = 1f - playerSheetBackgroundAlpha(fraction)
                             if (plateAlpha > 0f) {
                                 val surface = PlayerMorph.miniSurfaceLayer
                                 if (surface != null && surface.size.width > 0 && surface.size.height > 0) {
                                     // The pill's real glass, stretched to the card: it distorts
-                                    // as it grows, the way Melox's mini surface does.
+                                    // as it grows, the way the reference app's mini surface does.
                                     surface.alpha = plateAlpha
                                     scale(
                                         scaleX = rect.width / surface.size.width,
@@ -266,16 +254,16 @@ fun PlayerContainerMorphOverlay(
                                 }
                             }
                             // Background leads (first fifth), content follows (tenth
-                            // to six tenths): two recordings, staged like Melox.
+                            // to six tenths): two recordings, staged like the reference app.
                             val scale = rect.width / size.width
-                            if (fraction > 0f) {
+                            if (fraction > 0f && !stay) {
                                 fullBackgroundLayer.alpha = playerSheetBackgroundAlpha(fraction)
                                 fullBackgroundLayer.renderEffect = null
                                 scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero) {
                                     drawLayer(fullBackgroundLayer)
                                 }
                             }
-                            if (fraction > PLAYER_CONTENT_APPEAR_START) {
+                            if (fraction > PLAYER_CONTENT_APPEAR_START && !stay) {
                                 fullContentLayer.alpha = playerSheetPageAlpha(fraction)
                                 fullContentLayer.renderEffect = null
                                 scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero) {
@@ -310,7 +298,7 @@ private fun landingCardRect(mini: Rect): Rect {
 }
 
 /**
- * Mini recording drawn as two tracked halves (Melox clip split, pill-origin
+ * Mini recording drawn as two tracked halves (the reference app clip split, pill-origin
  * layer, inside the caller's translate to the container origin).
  *
  * Title side compensates the corner travel so it stays absolute while the

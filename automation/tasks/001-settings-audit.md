@@ -22,7 +22,7 @@ crashes when changed.
   Content Advanced, Theme, Glass Effect, EQ, DIY, etc.) reachable from the
   Settings root.
 - For each toggle/slider/picker: read its label + description string
-  (`vivi_strings.xml`), flip it, and confirm the described behavior actually
+  (`convx_strings.xml`), flip it, and confirm the described behavior actually
   changes on-device (not just that the preference value changed in
   DataStore — the *visible/audible effect* it promises must occur).
   Reference the [[user memory]] on this preference if one names known-stale

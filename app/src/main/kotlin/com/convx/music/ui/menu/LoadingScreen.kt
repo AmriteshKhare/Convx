@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.convx.music.R
 
-/** Ported to BitChord's shimmer look: a themed card, not the old black-scrim dialog. */
+/** Progress dialog with a shimmer indicator and percentage. */
 @Composable
 fun LoadingScreen(
     isVisible: Boolean,

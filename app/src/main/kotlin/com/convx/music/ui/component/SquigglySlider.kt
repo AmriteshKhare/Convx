@@ -183,7 +183,6 @@ fun SquigglySlider(
             val totalProgressPx = totalWidth * progress
             val centerY = size.height / 2f
 
-            // Calculate wave progress
             val waveProgressPx = if (!transitionEnabled || progress > matchedWaveEndpoint) {
                 totalWidth * progress
             } else {

@@ -2,8 +2,8 @@
  * Copyright 2026, compose-miuix-ui contributors
  * SPDX-License-Identifier: Apache-2.0
  *
- * Melox InteractiveHighlight behavior, shared by Convx glass controls. The optional
- * radiusScale retains existing component-specific sizing; the default is Melox's 1.2x.
+ * the reference app InteractiveHighlight behavior, shared by Convx glass controls. The optional
+ * radiusScale retains existing component-specific sizing; the default is the reference app's 1.2x.
  */
 package com.convx.music.ui.component.backdrop.catalog.utils
 
@@ -30,7 +30,17 @@ class InteractiveHighlight(
     private val animationScope: CoroutineScope,
     private val position: (size: Size, offset: Offset) -> Offset = { _, offset -> offset },
     private val radiusScale: Float = 1.5f,
+    // Overall lift and finger-spot strength. Menus (iOS 27) use a much brighter bloom.
+    private val sheenAlpha: Float = 0.08f,
+    private val spotAlpha: Float = 0.15f,
+    /**
+     * iOS 27 menus: letting go sends a soft glow ring out from the finger that fades as
+     * it spreads (the "let go" pulse in the reference clip). Off for buttons.
+     */
+    private val releasePulse: Boolean = false,
 ) {
+    private val pulse = Animatable(1f)
+    private var pulseCenter = Offset.Zero
     private val pressProgressAnimationSpec = spring(0.5f, 300f, 0.001f)
     private val positionAnimationSpec = spring(0.5f, 300f, Offset.VisibilityThreshold)
     private val pressProgressAnimation = Animatable(0f, 0.001f)
@@ -41,11 +51,29 @@ class InteractiveHighlight(
     val offset: Offset get() = positionAnimation.value - startPosition
 
     val modifier: Modifier = Modifier.drawWithContent {
+        val r = pulse.value
+        if (releasePulse && r < 1f) {
+            val base = (size.minDimension * radiusScale).coerceAtLeast(1f)
+            val ring = base * (0.5f + 1.3f * r)
+            val a = spotAlpha * 1.1f * (1f - r)
+            drawRect(
+                brush = Brush.radialGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color.White.copy(alpha = a * 0.35f),
+                        0.6f to Color.White.copy(alpha = a),
+                        1.0f to Color.White.copy(alpha = 0f),
+                    ),
+                    center = Offset(pulseCenter.x.coerceIn(0f, size.width), pulseCenter.y.coerceIn(0f, size.height)),
+                    radius = ring,
+                ),
+                blendMode = BlendMode.Plus,
+            )
+        }
         val progress = pressProgressAnimation.value
         if (progress > 0f) {
             // Plus blending lifts sampled luminance without replacing backdrop detail.
             drawRect(
-                color = Color.White.copy(alpha = 0.08f * progress),
+                color = Color.White.copy(alpha = sheenAlpha * progress),
                 blendMode = BlendMode.Plus,
             )
             val pos = position(size, positionAnimation.value)
@@ -54,7 +82,7 @@ class InteractiveHighlight(
                 x = pos.x.coerceIn(0f, size.width),
                 y = pos.y.coerceIn(0f, size.height),
             )
-            val spotColor = Color.White.copy(alpha = 0.15f * progress)
+            val spotColor = Color.White.copy(alpha = spotAlpha * progress)
             drawRect(
                 brush = Brush.radialGradient(
                     colorStops = arrayOf(
@@ -88,6 +116,13 @@ class InteractiveHighlight(
     }
 
     private fun release() {
+        if (releasePulse) {
+            pulseCenter = positionAnimation.value
+            animationScope.launch {
+                pulse.snapTo(0f)
+                pulse.animateTo(1f, androidx.compose.animation.core.tween(460, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            }
+        }
         animationScope.launch {
             launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
             launch { positionAnimation.animateTo(startPosition, positionAnimationSpec) }

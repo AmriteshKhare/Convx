@@ -2,11 +2,11 @@
  * Ported from Orchard (https://github.com/SFG5453/Orchard).
  *
  * Copyright (C) 2026 SFG545 (original Orchard implementation)
- * Copyright (C) 2026 Kushagra Singh (BitChord adaptation)
+ * Copyright (C) 2026 Convx contributors (adapted from an open-source base)
  *
  * Orchard's original source is licensed under the GNU Affero General Public
  * License, version 3 or later. Per AGPLv3 section 13, this file is combined
- * here into BitChord -- a work licensed under the GNU General Public
+ * here into the reference app -- a work licensed under the GNU General Public
  * License, version 3 or later -- and remains itself governed by the AGPLv3
  * as part of that combination.
  *
@@ -27,20 +27,15 @@ import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.util.Log
 import java.io.File
-import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
-import java.nio.channels.FileChannel
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.math.sqrt
-import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.gpu.CompatibilityList
-import org.tensorflow.lite.gpu.GpuDelegate
 
 /** The linear-frequency STFT front end open-unmix was trained on. */
 object VocalSpectrogram {
@@ -86,22 +81,11 @@ object VocalSpectrogram {
     @JvmStatic private external fun nativeFftSize(): Int
 }
 
-/**
- * Vocal-presence tracking with KUIELab's MDX-Net "vocals" target (UVR-MDX-NET-9482, MIT weights),
- * ISMIR 2021 MDX 2nd place at 9.00 vocals SDR on MUSDB18 — far above the open-unmix checkpoint
- * this replaces.
- *
- * The transition policy uses this to avoid mixing two vocals over each other: a blend where both
- * tracks are singing is the one case that reliably sounds wrong however well the beats line up.
- * Karaoke uses the same per-band mask to attenuate the vocal stem live.
- *
- * Only the vocals target is used: what matters is how much vocal content is present at an
- * instant, not reconstructing four stems. The model estimates the vocals complex spectrogram
- * directly (not a mask), so the ratio used downstream is `|vocals| / (|mix| + eps)`.
- */
+/** Estimates vocal presence with UVR-MDX-NET-9482 (MIT) for transition planning and karaoke attenuation. */
 class VocalTracker(private val context: Context) {
 
     @Volatile private var session: OrtSession? = null
+    private var sessionOptions: OrtSession.SessionOptions? = null
     private val lock = Any()
 
     private fun session(): OrtSession? {
@@ -119,14 +103,24 @@ class VocalTracker(private val context: Context) {
                 File(context.filesDir, STALE_MODEL_ASSET).delete()
                 val options = OrtSession.SessionOptions().apply {
                     setIntraOpNumThreads(INFERENCE_THREADS)
+                    setInterOpNumThreads(1)
+                    addConfigEntry("session.intra_op.allow_spinning", "0")
+                    addConfigEntry("session.inter_op.allow_spinning", "0")
                     setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
                     // Same reasoning as BeatTracker: the arena retains every block it allocates for
                     // the life of the session, which a backgrounded music player cannot justify.
                     setCPUArenaAllocator(false)
                     setMemoryPatternOptimization(false)
                 }
-                OrtEnvironment.getEnvironment().createSession(file.absolutePath, options)
-                    .also { session = it }
+                try {
+                    OrtEnvironment.getEnvironment().createSession(file.absolutePath, options).also {
+                        sessionOptions = options
+                        session = it
+                    }
+                } catch (error: Throwable) {
+                    options.close()
+                    throw error
+                }
             }.onFailure { Log.w(TAG, "Vocal model unavailable; no mask will be produced", it) }
                 .getOrNull()
         }
@@ -141,6 +135,7 @@ class VocalTracker(private val context: Context) {
      */
     fun track(left: FloatArray, right: FloatArray, rate: Double): FloatArray? {
         if (!VocalSpectrogram.available) return null
+        val active = session() ?: return null
         val resampledLeft = MelSpectrogram.resample(left, rate, VocalSpectrogram.sampleRate) ?: return null
         val resampledRight = MelSpectrogram.resample(right, rate, VocalSpectrogram.sampleRate) ?: return null
 
@@ -150,7 +145,6 @@ class VocalTracker(private val context: Context) {
             Log.d(TAG, "Window of $frames frames exceeds the model's $FIXED_FRAMES")
             return null
         }
-        val active = session() ?: return null
 
         val ratios = MdxFront.ratios(resampledLeft, resampledRight, frames, active)
         if (ratios == null) {
@@ -176,21 +170,13 @@ class VocalTracker(private val context: Context) {
     }
 
     /**
-     * The MDX-Net front end: complex STFT plus chunking that mirrors the reference
-     * implementation bit-for-bit (periodic Hann, n_fft 6144/4096 with hop 1024,
-     * center=True reflect padding, zero trim caps, GEN-sized steps), so the ONNX
-     * export sees exactly the frames it was trained on.
-     *
-     * GEN and HOP share the model's frame grid on purpose: chunk k's frame f lands
-     * on continuous frame `k * STRIDE + f - LEAD`, so ratios drop straight into the
-     * caller's mask frames with no resampling. No inverse STFT anywhere — only the
-     * magnitudes are needed for the ratio.
-     *
-     * Denoise mode (averaging the runs of x and -x) is deliberately off: it doubles
-     * inference cost for a small quality gain the phone budget cannot afford.
+     * Runs the model's MDX-Net STFT and chunking. Window, hop, padding, and
+     * chunk alignment must match training so each output frame maps directly
+     * to the vocal mask. Reused scratch buffers are guarded because callers can
+     * run on separate threads. Denoise mode stays off to avoid doubling inference.
      */
     private object MdxFront {
-        const val N_FFT = 4096
+        const val N_FFT = 6144
         const val HOP = 1024
         const val DIM_F = 2048
         const val DIM_T = 256
@@ -205,21 +191,46 @@ class VocalTracker(private val context: Context) {
         }
         private val workRe = FloatArray(N_FFT)
         private val workIm = FloatArray(N_FFT)
+        private const val M = N_FFT / 3
+        private val decRe = FloatArray(M)
+        private val decIm = FloatArray(M)
+        private val accRe = Array(3) { FloatArray(M) }
+        private val accIm = Array(3) { FloatArray(M) }
+
+        /** Twiddles W_N^(s*k) for the radix-3 combine, real/imag interleaved per s. */
+        private val TWIDDLE: FloatArray by lazy {
+            val tw = FloatArray(3 * N_FFT * 2)
+            for (s in 0..2) {
+                for (k in 0 until N_FFT) {
+                    val angle = -2.0 * PI * s * k / N_FFT
+                    tw[(s * N_FFT + k) * 2] = cos(angle).toFloat()
+                    tw[(s * N_FFT + k) * 2 + 1] = sin(angle).toFloat()
+                }
+            }
+            tw
+        }
+
+        // Allocated once: karaoke calls this every ~5.6 s window, and a fresh ~12MB direct
+        // buffer per call is native memory the GC never feels pressure to free. Direct, so
+        // the input never lands on the Java heap and ORT reads it where it lies.
+        private val backing: ByteBuffer by lazy {
+            ByteBuffer.allocateDirect(4 * DIM_F * DIM_T * Float.SIZE_BYTES).order(ByteOrder.nativeOrder())
+        }
+        private val mixRe by lazy { Array(2) { Array(DIM_T) { FloatArray(DIM_F) } } }
+        private val mixIm by lazy { Array(2) { Array(DIM_T) { FloatArray(DIM_F) } } }
 
         /**
          * Per-frame vocal ratios `[frame][bin]` in [0, 1], silence baked as 0, or
-         * null when inference fails. Single-threaded by construction — both
-         * callers run it on their own worker — so the scratch buffers are shared
-         * rather than reallocated per chunk.
+         * null when inference fails.
          */
         fun ratios(
             left: FloatArray,
             right: FloatArray,
             frames: Int,
             session: OrtSession,
-        ): Array<FloatArray>? {
+        ): Array<FloatArray>? = synchronized(this) {
             val samples = left.size
-            if (samples == 0 || frames <= 0) return null
+            if (samples == 0 || frames <= 0) return@synchronized null
             val out = Array(frames) { FloatArray(DIM_F) }
             val pad = GEN - samples % GEN
             val len = TRIM + samples + pad + TRIM
@@ -230,14 +241,6 @@ class VocalTracker(private val context: Context) {
 
             val environment = OrtEnvironment.getEnvironment()
             val shape = longArrayOf(1, 4, DIM_F.toLong(), DIM_T.toLong())
-            // Direct, so the ~12MB of input never lands on the Java heap and ORT
-            // reads it where it lies — same reasoning as the old magnitude path,
-            // which died on 256MB-heap devices from two copies of less than this.
-            val backing = ByteBuffer
-                .allocateDirect(4 * DIM_F * DIM_T * Float.SIZE_BYTES)
-                .order(ByteOrder.nativeOrder())
-            val mixRe = Array(2) { Array(DIM_T) { FloatArray(DIM_F) } }
-            val mixIm = Array(2) { Array(DIM_T) { FloatArray(DIM_F) } }
 
             var k = 0
             while (k * GEN < TRIM + samples) {
@@ -262,11 +265,78 @@ class VocalTracker(private val context: Context) {
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "MDX inference failed", e)
-                    return null
+                    return@synchronized null
                 }
                 k++
             }
-            return out
+            out
+        }
+
+        /**
+         * Streams the vocal stem: for each model chunk, hands [sink] the vocals for `GEN` input
+         * samples (left, right, start index, count). The model predicts the vocal spectrogram
+         * directly, so its output is inverted back to a waveform; the accompaniment is the mix
+         * minus this. False when inference fails.
+         */
+        fun vocals(
+            left: FloatArray,
+            right: FloatArray,
+            session: OrtSession,
+            isCurrent: () -> Boolean,
+            sink: (FloatArray, FloatArray, Int, Int) -> Unit,
+        ): Boolean = synchronized(this) {
+            val samples = left.size
+            if (samples == 0) return@synchronized false
+            val pad = GEN - samples % GEN
+            val len = TRIM + samples + pad + TRIM
+            val padL = FloatArray(len)
+            val padR = FloatArray(len)
+            left.copyInto(padL, TRIM, 0, samples)
+            right.copyInto(padR, TRIM, 0, samples)
+
+            val environment = OrtEnvironment.getEnvironment()
+            val shape = longArrayOf(1, 4, DIM_F.toLong(), DIM_T.toLong())
+            val outRe = Array(2) { Array(DIM_T) { FloatArray(DIM_F) } }
+            val outIm = Array(2) { Array(DIM_T) { FloatArray(DIM_F) } }
+            val wave = FloatArray((DIM_T - 1) * HOP)
+            val outLeft = FloatArray(GEN)
+            val outRight = FloatArray(GEN)
+
+            var k = 0
+            while (k * GEN < TRIM + samples) {
+                if (!isCurrent()) return@synchronized false
+                val start = k * GEN
+                stftChunk(padL, padR, start, len, mixRe, mixIm)
+                pack(backing.asFloatBuffer(), mixRe, mixIm)
+                try {
+                    OnnxTensor.createTensor(environment, backing.asFloatBuffer(), shape).use { tensor ->
+                        session.run(mapOf(session.inputNames.first() to tensor)).use { outputs ->
+                            val target = (outputs.get(0) as OnnxTensor).floatBuffer
+                            for (channel in 0..1) {
+                                for (frame in 0 until DIM_T) {
+                                    for (bin in 0 until DIM_F) {
+                                        val base = bin * DIM_T + frame
+                                        outRe[channel][frame][bin] = target.get(base + channel * DIM_F * DIM_T)
+                                        outIm[channel][frame][bin] = target.get(base + (2 + channel) * DIM_F * DIM_T)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "MDX inference failed", e)
+                    return@synchronized false
+                }
+                for (channel in 0..1) {
+                    SpectralMath.istft(outRe[channel], outIm[channel], DIM_T, DIM_F, HOP, wave)
+                    // Chunk sample TRIM is input sample k * GEN; the half windows either side are dropped.
+                    wave.copyInto(if (channel == 0) outLeft else outRight, 0, TRIM, TRIM + GEN)
+                }
+                val count = minOf(GEN, samples - start)
+                sink(outLeft, outRight, start, count)
+                k++
+            }
+            true
         }
 
         /** One chunk's complex STFT per channel, torch center=True semantics. */
@@ -291,7 +361,7 @@ class VocalTracker(private val context: Context) {
                         workRe[n] = (if (idx < 0 || idx >= len) 0f else src[idx]) * HANN[n]
                         workIm[n] = 0f
                     }
-                    fft(workRe, workIm)
+                    fft6144(workRe, workIm)
                     val frameRe = dstRe[frame]
                     val frameIm = dstIm[frame]
                     for (bin in 0 until DIM_F) {
@@ -302,8 +372,39 @@ class VocalTracker(private val context: Context) {
             }
         }
 
-        /** Iterative radix-2 FFT, in place. N_FFT is a power of two by construction. */
-        internal fun fft(re: FloatArray, im: FloatArray) {
+        /**
+         * 6144-point FFT: three radix-2 [fft]s over the decimated sequences plus one radix-3
+         * combine with precomputed twiddles (verified bit-close against numpy, max err 2.4e-13).
+         */
+        private fun fft6144(re: FloatArray, im: FloatArray) {
+            for (s in 0..2) {
+                for (r in 0 until M) {
+                    decRe[r] = re[3 * r + s]
+                    decIm[r] = im[3 * r + s]
+                }
+                fft(decRe, decIm)
+                decRe.copyInto(accRe[s])
+                decIm.copyInto(accIm[s])
+            }
+            for (k in 0 until N_FFT) {
+                val m = k % M
+                var sr = 0f
+                var si = 0f
+                for (s in 0..2) {
+                    val wr = TWIDDLE[(s * N_FFT + k) * 2]
+                    val wi = TWIDDLE[(s * N_FFT + k) * 2 + 1]
+                    val ar = accRe[s][m]
+                    val ai = accIm[s][m]
+                    sr += wr * ar - wi * ai
+                    si += wr * ai + wi * ar
+                }
+                re[k] = sr
+                im[k] = si
+            }
+        }
+
+        /** Iterative radix-2 FFT, in place, over the array's (power-of-two) length. */
+        private fun fft(re: FloatArray, im: FloatArray) {
             val n = re.size
             var j = 0
             for (i in 1 until n) {
@@ -405,347 +506,34 @@ class VocalTracker(private val context: Context) {
     }
 
     /**
-     * Per-frame, per-band vocal mask for karaoke: `target / mix` clamped to [0, 1], averaged over
-     * both channels and over the model bins falling in each of [KaraokeBands] log bands, quantized
-     * to a byte. Index `frame * KaraokeBands.COUNT + band`. Frames run at
-     * [VocalSpectrogram.frameRate] from the window's first sample.
-     *
-     * Band-reduced rather than per-bin so a whole song's mask is a few MB, and so the real-time
-     * processor (which runs its own, smaller STFT at the stream rate) can look it up by Hz.
+     * Separates the vocals of a whole track at [VocalSpectrogram.sampleRate], streaming them to
+     * [sink] as (left, right, startSample, count) pieces. False when the model is unavailable,
+     * inference fails, or [isCurrent] turns false.
      */
-    fun separationMask(left: FloatArray, right: FloatArray, rate: Double): Pair<ByteArray, Int>? {
-        if (!VocalSpectrogram.available) return null
-        val resampledLeft = MelSpectrogram.resample(left, rate, VocalSpectrogram.sampleRate) ?: return null
-        val resampledRight = MelSpectrogram.resample(right, rate, VocalSpectrogram.sampleRate) ?: return null
-        if (resampledLeft.size != resampledRight.size) return null
-        // Caller windows to FIXED_FRAMES; a hair over (resampler rounding) is truncated.
-        val frames = ((resampledLeft.size + MdxGpu.HOP - 1) / MdxGpu.HOP).coerceAtMost(FIXED_FRAMES)
-        val active = gpuSession() ?: return null
-        val started = System.currentTimeMillis()
-        val ratios = MdxGpu.ratios(resampledLeft, resampledRight, frames) { input, output ->
-            active.interpreter.run(input, output)
-        }
-        if (ratios == null) {
-            Log.w(TAG, "Karaoke mask failed")
-            return null
-        }
-        Log.d(
-            TAG,
-            "karaoke mask $frames frames on ${active.backend} in " +
-                "${System.currentTimeMillis() - started}ms",
-        )
-        val bandOfBin = KaraokeBands.bandOfBin(MdxGpu.DIM_F, VocalSpectrogram.sampleRate, MdxGpu.N_FFT)
-        val out = ByteArray(frames * KaraokeBands.COUNT)
-        val sum = FloatArray(KaraokeBands.COUNT)
-        val count = IntArray(KaraokeBands.COUNT)
-        for (frame in 0 until frames) {
-            sum.fill(0f); count.fill(0)
-            val row = ratios[frame]
-            for (bin in 0 until MdxGpu.DIM_F) {
-                val band = bandOfBin[bin]
-                if (band < 0) continue
-                sum[band] += row[bin]
-                count[band]++
-            }
-            for (band in 0 until KaraokeBands.COUNT) {
-                val v = if (count[band] > 0) sum[band] / count[band] else 0f
-                out[frame * KaraokeBands.COUNT + band] = (v * 255f + 0.5f).toInt().toByte()
-            }
-        }
-        return out to frames
-    }
-
-    /**
-     * LiteRT session for the streaming-quality mask path (Sing): GPU delegate
-     * when the device supports it, 4-thread XNNPACK CPU otherwise. The DJ
-     * transition curve keeps the proven ORT session above; this one only feeds
-     * [separationMask].
-     */
-    private data class GpuSession(
-        val interpreter: Interpreter,
-        val delegate: GpuDelegate?,
-        val backend: String,
-    )
-
-    @Volatile private var gpuSession: GpuSession? = null
-    private val gpuLock = Any()
-
-    private fun gpuSession(): GpuSession? {
-        gpuSession?.let { return it }
-        synchronized(gpuLock) {
-            gpuSession?.let { return it }
-            return runCatching {
-                val fd = context.assets.openFd(MODEL_TFLITE)
-                val model = FileInputStream(fd.fileDescriptor).use { stream ->
-                    stream.channel.use { channel ->
-                        channel.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
-                    }
-                }
-                val options = Interpreter.Options()
-                var delegate: GpuDelegate? = null
-                val backend = try {
-                    if (CompatibilityList().isDelegateSupportedOnThisDevice) {
-                        delegate = GpuDelegate(CompatibilityList().bestOptionsForThisDevice)
-                        options.addDelegate(delegate)
-                        "gpu"
-                    } else {
-                        options.setNumThreads(INFERENCE_THREADS)
-                        "cpu"
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "GPU delegate unavailable, CPU fallback", e)
-                    runCatching { delegate?.close() }
-                    delegate = null
-                    options.setNumThreads(INFERENCE_THREADS)
-                    "cpu"
-                }
-                GpuSession(Interpreter(model, options), delegate, backend).also {
-                    gpuSession = it
-                    Log.d(TAG, "MDX LiteRT session on $backend")
-                }
-            }.onFailure { Log.w(TAG, "LiteRT session unavailable", it) }.getOrNull()
-        }
-    }
-
-    /**
-     * The Voc_FT front end (n_fft 6144) for the LiteRT mask path: same
-     * reference-mirroring chunking as [MdxFront] (periodic Hann, center=True
-     * reflect, zero trim caps, GEN steps), so the .tflite export sees exactly
-     * the frames it was converted from.
-     *
-     * 6144 is 3 × 2048, so the FFT is mixed-radix: three radix-2 passes
-     * ([MdxFront.fft], device-proven on the 9482 path) plus one radix-3
-     * combine with precomputed twiddles — verified bit-close against numpy
-     * (max err 2.4e-13) before shipping.
-     */
-    private object MdxGpu {
-        const val N_FFT = 6144
-        const val HOP = 1024
-        const val DIM_F = 3072
-        const val DIM_T = 256
-        const val CHUNK = HOP * (DIM_T - 1)
-        const val TRIM = N_FFT / 2
-        const val GEN = CHUNK - 2 * TRIM
-        const val STRIDE = GEN / HOP
-        const val LEAD = TRIM / HOP
-        private const val M = 2048
-
-        private val HANN = FloatArray(N_FFT) {
-            (0.5 - 0.5 * cos(2.0 * PI * it / N_FFT)).toFloat()
-        }
-
-        /** Twiddles W_N^{s·k} for the radix-3 combine, real/imag interleaved per s. */
-        private val TWIDDLE: FloatArray by lazy {
-            val tw = FloatArray(3 * N_FFT * 2)
-            for (s in 0..2) {
-                for (k in 0 until N_FFT) {
-                    val angle = -2.0 * PI * s * k / N_FFT
-                    tw[(s * N_FFT + k) * 2] = cos(angle).toFloat()
-                    tw[(s * N_FFT + k) * 2 + 1] = sin(angle).toFloat()
-                }
-            }
-            tw
-        }
-
-        // Allocated once and reused: ratios() runs once per ~6s analysis window on the
-        // single karaoke thread (as the shared work arrays below already assume). Fresh
-        // per call, the two direct buffers were 25MB of native memory each window that
-        // the GC never felt pressure to free -- lmkd killed the app in the foreground.
-        private val backingIn: ByteBuffer by lazy {
-            ByteBuffer.allocateDirect(4 * DIM_F * DIM_T * Float.SIZE_BYTES).order(ByteOrder.nativeOrder())
-        }
-        private val backingOut: ByteBuffer by lazy {
-            ByteBuffer.allocateDirect(4 * DIM_F * DIM_T * Float.SIZE_BYTES).order(ByteOrder.nativeOrder())
-        }
-        private val mixRe by lazy { Array(2) { Array(DIM_T) { FloatArray(DIM_F) } } }
-        private val mixIm by lazy { Array(2) { Array(DIM_T) { FloatArray(DIM_F) } } }
-
-        private val workRe = FloatArray(N_FFT)
-        private val workIm = FloatArray(N_FFT)
-        private val decRe = FloatArray(M)
-        private val decIm = FloatArray(M)
-        private val accRe = Array(3) { FloatArray(M) }
-        private val accIm = Array(3) { FloatArray(M) }
-
-        /**
-         * Per-frame vocal ratios `[frame][bin]`, silence baked as 0, or null on
-         * failure. [run] executes one `[1, 4, DIM_F, DIM_T]` chunk through the
-         * interpreter (GPU or CPU — the caller's session decides).
-         */
-        fun ratios(
-            left: FloatArray,
-            right: FloatArray,
-            frames: Int,
-            run: (ByteBuffer, ByteBuffer) -> Unit,
-        ): Array<FloatArray>? {
-            val samples = left.size
-            if (samples == 0 || frames <= 0) return null
-            val out = Array(frames) { FloatArray(DIM_F) }
-            val pad = GEN - samples % GEN
-            val len = TRIM + samples + pad + TRIM
-            val padL = FloatArray(len)
-            val padR = FloatArray(len)
-            left.copyInto(padL, TRIM, 0, samples)
-            right.copyInto(padR, TRIM, 0, samples)
-
-            var k = 0
-            while (k * GEN < TRIM + samples) {
-                val start = k * GEN
-                stftChunk(padL, padR, start, len, mixRe, mixIm)
-                pack(backingIn.asFloatBuffer(), mixRe, mixIm)
-                try {
-                    // LiteRT copies the result into backingOut with a relative put,
-                    // leaving its position at the end; a view taken from there has
-                    // zero elements and every get() threw (IndexOutOfBounds, limit=0),
-                    // so no Sing mask was ever produced. Rewind through
-                    // java.nio.Buffer -- the base-class method exists on every API
-                    // level, unlike the Java 9 covariant overrides (see the ORT path).
-                    (backingIn as java.nio.Buffer).rewind()
-                    (backingOut as java.nio.Buffer).clear()
-                    run(backingIn, backingOut)
-                    (backingOut as java.nio.Buffer).rewind()
-                    reduce(backingOut.asFloatBuffer(), mixRe, mixIm, k, frames, out)
-                } catch (e: Exception) {
-                    Log.w(TAG, "MDX LiteRT inference failed", e)
-                    return null
-                }
-                k++
-            }
-            return out
-        }
-
-        private fun stftChunk(
-            padL: FloatArray,
-            padR: FloatArray,
-            start: Int,
-            len: Int,
-            mixRe: Array<Array<FloatArray>>,
-            mixIm: Array<Array<FloatArray>>,
-        ) {
-            for (channel in 0..1) {
-                val src = if (channel == 0) padL else padR
-                val dstRe = mixRe[channel]
-                val dstIm = mixIm[channel]
-                for (frame in 0 until DIM_T) {
-                    val base = start + frame * HOP - TRIM
-                    for (n in 0 until N_FFT) {
-                        var idx = base + n
-                        if (idx < 0) idx = -idx
-                        else if (idx >= len) idx = 2 * (len - 1) - idx
-                        workRe[n] = (if (idx < 0 || idx >= len) 0f else src[idx]) * HANN[n]
-                        workIm[n] = 0f
-                    }
-                    fft6144(workRe, workIm)
-                    val frameRe = dstRe[frame]
-                    val frameIm = dstIm[frame]
-                    for (bin in 0 until DIM_F) {
-                        frameRe[bin] = workRe[bin]
-                        frameIm[bin] = workIm[bin]
-                    }
-                }
-            }
-        }
-
-        private fun fft6144(re: FloatArray, im: FloatArray) {
-            for (s in 0..2) {
-                for (r in 0 until M) {
-                    decRe[r] = re[3 * r + s]
-                    decIm[r] = im[3 * r + s]
-                }
-                MdxFront.fft(decRe, decIm)
-                for (r in 0 until M) {
-                    accRe[s][r] = decRe[r]
-                    accIm[s][r] = decIm[r]
-                }
-            }
-            for (k in 0 until N_FFT) {
-                val m = k % M
-                var sr = 0f
-                var si = 0f
-                for (s in 0..2) {
-                    val wr = TWIDDLE[(s * N_FFT + k) * 2]
-                    val wi = TWIDDLE[(s * N_FFT + k) * 2 + 1]
-                    val ar = accRe[s][m]
-                    val ai = accIm[s][m]
-                    sr += wr * ar - wi * ai
-                    si += wr * ai + wi * ar
-                }
-                re[k] = sr
-                im[k] = si
-            }
-        }
-
-        private fun pack(
-            into: FloatBuffer,
-            mixRe: Array<Array<FloatArray>>,
-            mixIm: Array<Array<FloatArray>>,
-        ) {
-            for (c in 0..3) {
-                val channel = c and 1
-                val src = if (c < 2) mixRe[channel] else mixIm[channel]
-                for (bin in 0 until DIM_F) {
-                    for (frame in 0 until DIM_T) {
-                        into.put(src[frame][bin])
-                    }
-                }
-            }
-        }
-
-        private fun reduce(
-            target: FloatBuffer,
-            mixRe: Array<Array<FloatArray>>,
-            mixIm: Array<Array<FloatArray>>,
-            chunk: Int,
-            frames: Int,
-            out: Array<FloatArray>,
-        ) {
-            for (frame in 0 until DIM_T) {
-                val t = chunk * STRIDE + frame - LEAD
-                if (t < 0 || t >= frames) continue
-                val row = out[t]
-                for (bin in 0 until DIM_F) {
-                    val lr = mixRe[0][frame][bin]
-                    val li = mixIm[0][frame][bin]
-                    val rr = mixRe[1][frame][bin]
-                    val ri = mixIm[1][frame][bin]
-                    val ml = sqrt(lr * lr + li * li)
-                    val mr = sqrt(rr * rr + ri * ri)
-                    if (ml <= 1e-6f || mr <= 1e-6f) continue
-                    val base = bin * DIM_T + frame
-                    val vl = sqrt(
-                        target.get(base) * target.get(base) +
-                            target.get(base + 2 * DIM_F * DIM_T) *
-                                target.get(base + 2 * DIM_F * DIM_T),
-                    )
-                    val vr = sqrt(
-                        target.get(base + DIM_F * DIM_T) * target.get(base + DIM_F * DIM_T) +
-                            target.get(base + 3 * DIM_F * DIM_T) *
-                                target.get(base + 3 * DIM_F * DIM_T),
-                    )
-                    row[bin] = ((vl / ml + vr / mr) * 0.5f).coerceIn(0f, 1f)
-                }
-            }
-        }
+    fun separateVocals(
+        left: FloatArray,
+        right: FloatArray,
+        isCurrent: () -> Boolean,
+        sink: (FloatArray, FloatArray, Int, Int) -> Unit,
+    ): Boolean {
+        val active = session() ?: return false
+        return MdxFront.vocals(left, right, active, isCurrent, sink)
     }
 
     fun release() {
         synchronized(lock) {
             runCatching { session?.close() }
             session = null
-        }
-        synchronized(gpuLock) {
-            runCatching { gpuSession?.interpreter?.close() }
-            runCatching { gpuSession?.delegate?.close() }
-            gpuSession = null
+            runCatching { sessionOptions?.close() }
+            sessionOptions = null
         }
     }
 
     companion object {
-        private const val TAG = "ViviVocalTracker"
+        private const val TAG = "ConvxVocalTracker"
         private const val MODEL_ASSET = "uvr_mdxnet_9482.onnx"
-        private const val MODEL_TFLITE = "uvr_mdx_voc_ft_fp32.tflite"
         private const val STALE_MODEL_ASSET = "vocals_umxhq_int8.onnx"
-        private const val INFERENCE_THREADS = 4
+        private const val INFERENCE_THREADS = 1
 
         /** The model's fixed input width, ~22.8 s, chosen upstream to cover a transition overlap. */
         const val FIXED_FRAMES = 960
@@ -754,32 +542,4 @@ class VocalTracker(private val context: Context) {
         private const val LOW_HZ = 200.0
         private const val HIGH_HZ = 4000.0
     }
-}
-
-/**
- * Bands the karaoke mask is stored in, shared by the offline mask ([VocalTracker]) and the
- * real-time processor so both agree on what band a frequency is in.
- *
- * Fine enough that the mask stays a *vocal* mask: 21.5 Hz linear bands (two model bins) up to
- * 2 kHz, where voice harmonics sit a few tens of Hz from kick, bass and snare body, then 100 log
- * bands (~2% wide) to 16 kHz. Coarser bands would average a hi-hat or snare in with the voice
- * sharing its band and dim it too. Below 60 Hz nothing is touched.
- */
-object KaraokeBands {
-    private const val LINEAR_HZ = 44_100.0 / 4096.0 * 2.0
-    private const val SPLIT_HZ = 2_000.0
-    private const val TOP_HZ = 16_000.0
-    private val LINEAR = (SPLIT_HZ / LINEAR_HZ).toInt()
-    private const val LOG = 100
-    val COUNT = LINEAR + LOG
-
-    fun bandOf(hz: Double): Int = when {
-        hz < 60.0 -> -1
-        hz < SPLIT_HZ -> (hz / LINEAR_HZ).toInt().coerceAtMost(LINEAR - 1)
-        else -> LINEAR + (kotlin.math.ln(hz / SPLIT_HZ) / kotlin.math.ln(TOP_HZ / SPLIT_HZ) * LOG)
-            .toInt().coerceIn(0, LOG - 1)
-    }
-
-    fun bandOfBin(bins: Int, sampleRate: Double, fftSize: Int): IntArray =
-        IntArray(bins) { bandOf(it * sampleRate / fftSize) }
 }

@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.convx.music.ui.component.shapes.ContinuousCapsule
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 
-/**
+/*
  * iOS shapes.
  *
  * The squircle itself comes from the app's own [ContinuousRoundedRectangle] — a real

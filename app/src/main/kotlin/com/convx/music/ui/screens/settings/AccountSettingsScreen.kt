@@ -7,61 +7,29 @@ package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.ios.compat.AppTheme
 
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.layout.Box
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ButtonGroupDefaults
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.only
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.width
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.shape.CircleShape
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.*
 // Explicit import wins over the star import above, so the two toggles below
 // pick up the glass switch without touching their call sites.
 import com.convx.music.ui.ios.compat.Switch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.*
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.draw.clip
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.layout.ContentScale
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalContext
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalUriHandler
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import com.composables.sfsymbols.SfSymbols
@@ -71,40 +39,22 @@ import com.composables.sfsymbols.monochrome.SFPencil
 import com.composables.sfsymbols.monochrome.SFPlusCircle
 import com.composables.sfsymbols.monochrome.SFRectanglePortraitAndArrowRight
 import com.composables.sfsymbols.monochrome.SFWrenchAdjustable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.font.FontWeight
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.input.TextFieldValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import coil3.compose.AsyncImage
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.music.innertube.YouTube
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.music.innertube.utils.parseCookieString
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.*
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.*
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.AccountSettingsViewModel
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.HomeViewModel
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AccountSettingsScreen(
@@ -135,8 +85,8 @@ fun AccountSettingsScreen(
 
     val homeViewModel: HomeViewModel = hiltViewModel()
     val accountSettingsViewModel: AccountSettingsViewModel = hiltViewModel()
-    val accountName by homeViewModel.accountName.collectAsState()
-    val accountImageUrl by homeViewModel.accountImageUrl.collectAsState()
+    val accountName by homeViewModel.accountName.collectAsStateWithLifecycle()
+    val accountImageUrl by homeViewModel.accountImageUrl.collectAsStateWithLifecycle()
 
     // Keeps the tap-to-switch list alive for sessions that predate the channel
     // picker, or whose lookup failed at login — without this it is only ever
@@ -157,7 +107,7 @@ fun AccountSettingsScreen(
     ) {
             // Account Profile Section
             IosSettingsGroup(
-                title = stringResource(R.string.settings),
+                title = "YouTube Music",
                 items = listOf(
                     IosSettingsItem(
                         icon = if (isLoggedIn && !accountImageUrl.isNullOrBlank()) null else rememberVectorPainter(SfSymbols.Monochrome.SFRectanglePortraitAndArrowRight),
@@ -176,27 +126,23 @@ fun AccountSettingsScreen(
                                 }
                                 Text(
                                     text = if (isLoggedIn) accountName else stringResource(R.string.login),
-                                    color = AppTheme.colorScheme.primary,
-                                    style = AppTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                                    color = if (isLoggedIn) com.convx.music.ui.ios.foundation.IosTheme.colors.label else com.convx.music.ui.ios.foundation.IosTheme.tint,
+                                    style = com.convx.music.ui.ios.foundation.IosTheme.typography.body.copy(fontWeight = FontWeight.SemiBold)
                                 )
                             }
                         },
                         trailingContent = if (isLoggedIn) ({
-                            OutlinedButton(
-//                                onClick = {
-//                                    accountSettingsViewModel.logoutKeepData(context, onInnerTubeCookieChange)
-//                                    navController.navigateUp()
-//                                },
-                                onClick = {
-                                    showLogoutDialog = true
-                                },
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = AppTheme.colorScheme.surfaceContainer,
-                                    contentColor = AppTheme.colorScheme.onSurface
-                                )
-                            ) {
-                                Text(stringResource(R.string.action_logout))
-                            }
+                            // iOS-style destructive pill: readable on light and dark cards alike.
+                            Text(
+                                stringResource(R.string.action_logout),
+                                color = com.convx.music.ui.ios.foundation.IosTheme.colors.systemRed,
+                                style = com.convx.music.ui.ios.foundation.IosTheme.typography.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(com.convx.music.ui.ios.foundation.IosTheme.colors.systemRed.copy(alpha = 0.14f))
+                                    .clickable { showLogoutDialog = true }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                            )
                         }) else null,
                         onClick = {
                             if (isLoggedIn) navController.navigate("account")
@@ -450,7 +396,6 @@ fun AccountSettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                        // Cancel button
                         ToggleButton(
                             checked = false,
                             onCheckedChange = { showLogoutDialog = false },
@@ -460,7 +405,6 @@ fun AccountSettingsScreen(
                             Text(stringResource(android.R.string.cancel))
                         }
 
-                        // Clear Data button
                         ToggleButton(
                             checked = false,
                             onCheckedChange = {

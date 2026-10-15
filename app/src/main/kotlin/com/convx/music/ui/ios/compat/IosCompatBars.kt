@@ -68,9 +68,7 @@ fun TopAppBar(
     expandedHeight: Dp = 44.dp,
     subtitle: (@Composable () -> Unit)? = null,
 ) {
-    // compose-hig's bar drives its own scroll-adaptive background (isBackgroundAdaptive)
-    // through the backdrop it's handed, rather than taking a caller-computed alpha —
-    // the manual overlap-fraction fade the old cupertino call shape needed is now internal.
+    // The library derives the bar fill and hairline from its backdrop and scroll state.
     CupertinoTopAppBar(
         title = { ProvideTextStyle(IosTheme.typography.headline, title) },
         subtitle = subtitle?.let { { ProvideTextStyle(IosTheme.typography.caption, it) } },

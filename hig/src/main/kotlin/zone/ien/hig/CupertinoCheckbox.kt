@@ -49,18 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import zone.ien.hig.theme.CupertinoTheme
 
-/**
- * Cupertino-style checkbox composable.
- *
- * This composable creates a checkbox that follows Cupertino design guidelines.
- * 
- * @param checked Whether the checkbox is currently checked
- * @param onCheckedChange Called when the user clicks the checkbox to change its state
- * @param modifier The modifier to be applied to the checkbox
- * @param enabled Whether the checkbox is enabled or not
- * @param colors The colors to be used for the checkbox in different states
- * @param interactionSource The interaction source for the checkbox
- */
+/** Cupertino-style checkbox. */
 @Composable
 fun CupertinoCheckBox(
     checked: Boolean,
@@ -85,6 +74,7 @@ fun CupertinoCheckBox(
     )
 }
 
+/** Checkbox that supports On, Off, and Indeterminate states. */
 @Composable
 fun CupertinoTriStateCheckBox(
     state: ToggleableState,
@@ -192,10 +182,7 @@ class CupertinoCheckboxColors(
     val disabledUncheckedBorderColor: Color,
     val disabledIndeterminateBorderColor: Color,
 ) {
-    /**
-     * Returns a copy of this CheckboxColors, optionally overriding some of the values.
-     * This uses the Color.Unspecified to mean “use the value from the source”
-     */
+    /** Copies these colors, using [Color.Unspecified] to keep the current value. */
     fun copy(
         checkedCheckmarkColor: Color = this.checkedCheckmarkColor,
         uncheckedCheckmarkColor: Color = this.uncheckedCheckmarkColor,
@@ -224,11 +211,7 @@ class CupertinoCheckboxColors(
         disabledIndeterminateBorderColor.takeOrElse { this.disabledIndeterminateBorderColor },
     )
 
-    /**
-     * Represents the color used for the checkmark inside the checkbox, depending on [state].
-     *
-     * @param state the [ToggleableState] of the checkbox
-     */
+
     @Composable
     internal fun checkmarkColor(state: ToggleableState): State<Color> {
         val target =
@@ -241,13 +224,7 @@ class CupertinoCheckboxColors(
         return rememberUpdatedState(target)
     }
 
-    /**
-     * Represents the color used for the box (background) of the checkbox, depending on [enabled]
-     * and [state].
-     *
-     * @param enabled whether the checkbox is enabled or not
-     * @param state the [ToggleableState] of the checkbox
-     */
+
     @Composable
     internal fun boxColor(
         enabled: Boolean,
@@ -270,12 +247,7 @@ class CupertinoCheckboxColors(
         return rememberUpdatedState(target)
     }
 
-    /**
-     * Represents the color used for the border of the checkbox, depending on [enabled] and [state].
-     *
-     * @param enabled whether the checkbox is enabled or not
-     * @param state the [ToggleableState] of the checkbox
-     */
+
     @Composable
     internal fun borderColor(
         enabled: Boolean,

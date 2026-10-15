@@ -5,6 +5,10 @@
 
 package com.convx.music.ui.screens.recognition
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.utils.openSearchResults
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -64,7 +68,7 @@ import java.time.format.DateTimeFormatter
 fun RecognitionHistoryScreen(
     navController: NavController
 ) {
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val coroutineScope = rememberCoroutineScope()
 
     val historyItems by database.recognitionHistory().collectAsState(initial = emptyList())
@@ -103,10 +107,7 @@ fun RecognitionHistoryScreen(
         DefaultDialog(
             onDismiss = { showClearDialog = false },
             icon = {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFTrash,
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("SFTrash"), contentDescription = null)
             },
             title = { Text(stringResource(R.string.clear_recognition_history)) },
             buttons = {
@@ -138,10 +139,7 @@ fun RecognitionHistoryScreen(
         DefaultDialog(
             onDismiss = { itemToDelete = null },
             icon = {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFTrash,
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("SFTrash"), contentDescription = null)
             },
             title = { Text(stringResource(R.string.delete)) },
             buttons = {
@@ -177,10 +175,7 @@ fun RecognitionHistoryScreen(
         actions = {
             if (historyItems.isNotEmpty()) {
                 IconButton(onClick = { showClearDialog = true }) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFTrash,
-                        contentDescription = stringResource(R.string.delete),
-                    )
+                    SymbolIcon(symbol = sf("SFTrash"), contentDescription = stringResource(R.string.delete))
                 }
             }
         },
@@ -190,7 +185,7 @@ fun RecognitionHistoryScreen(
                 .fillMaxSize()
                 .padding(top = topBarContentPadding())
         ) {
-            // ── Static search bar ──────────────────────────────────
+            // Static search bar
             TextField(
                 value = query,
                 onValueChange = { query = it },
@@ -202,20 +197,12 @@ fun RecognitionHistoryScreen(
                     )
                 },
                 leadingIcon = {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.onSurfaceVariant
-                    )
+                    SymbolIcon(symbol = sf("SFMagnifyingglass"), contentDescription = null, tint = AppTheme.colorScheme.onSurfaceVariant)
                 },
                 trailingIcon = {
                     if (query.text.isNotEmpty()) {
                         IconButton(onClick = { query = TextFieldValue() }) {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFXmark,
-                                contentDescription = null,
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("SFXmark"), contentDescription = null, tint = AppTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 },
@@ -234,7 +221,7 @@ fun RecognitionHistoryScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            // ── List / empty state ─────────────────────────────────
+            // List and empty state
             when {
                 historyItems.isEmpty() -> {
                     // No history at all
@@ -245,12 +232,7 @@ fun RecognitionHistoryScreen(
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFClock,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
+                            SymbolIcon(symbol = sf("SFClock"), contentDescription = null, size = 64.dp, tint = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "No recognition history",
@@ -269,12 +251,7 @@ fun RecognitionHistoryScreen(
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
+                            SymbolIcon(symbol = sf("SFMagnifyingglass"), contentDescription = null, size = 64.dp, tint = AppTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "No results for \"${query.text}\"",
@@ -310,7 +287,7 @@ fun RecognitionHistoryScreen(
                                         item = item,
                                         onClick = {
                                             val searchQuery = "${item.title} ${item.artist}"
-                                            navController.navigate("search/${java.net.URLEncoder.encode(searchQuery, "UTF-8")}")
+                                            navController.openSearchResults(searchQuery)
                                         },
                                         onDelete = {
                                             itemToDelete = item
@@ -328,7 +305,7 @@ fun RecognitionHistoryScreen(
                                     item = item,
                                     onClick = {
                                         val searchQuery = "${item.title} ${item.artist}"
-                                        navController.navigate("search/${java.net.URLEncoder.encode(searchQuery, "UTF-8")}")
+                                        navController.openSearchResults(searchQuery)
                                     },
                                     onDelete = {
                                         itemToDelete = item
@@ -367,7 +344,6 @@ private fun RecognitionHistoryItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Album art
             AsyncImage(
                 model = item.coverArtUrl,
                 contentDescription = null,
@@ -379,7 +355,6 @@ private fun RecognitionHistoryItem(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Track info
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -404,13 +379,8 @@ private fun RecognitionHistoryItem(
                 )
             }
 
-            // Delete action
             IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFTrash,
-                    contentDescription = stringResource(R.string.delete_from_history),
-                    tint = AppTheme.colorScheme.onSurfaceVariant
-                )
+                SymbolIcon(symbol = sf("SFTrash"), contentDescription = stringResource(R.string.delete_from_history), tint = AppTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

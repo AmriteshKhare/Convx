@@ -6,128 +6,67 @@
 package com.convx.music.ui.screens.settings
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.animateFloatAsState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.only
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AlertDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.LinearProgressIndicator
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Slider
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.LaunchedEffect
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableLongStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.rememberCoroutineScope
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.graphics.StrokeCap
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalContext
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.playback.ExoDownloadService
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import coil3.SingletonImageLoader
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import coil3.annotation.DelicateCoilApi
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import coil3.annotation.ExperimentalCoilApi
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import coil3.imageLoader
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalDatabase
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerConnection
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.MaxImageCacheSizeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.MaxSongCacheSizeKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.extensions.tryOrNull
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.ActionPromptDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.formatFileSize
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.Dispatchers
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.delay
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.flow.first
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.isActive
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.launch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import okio.ByteString.Companion.encodeUtf8
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Alignment
@@ -142,7 +81,7 @@ fun StorageSettings(
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     val context = LocalContext.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val imageDiskCache = context.imageLoader.diskCache ?: return
     val playerCache = LocalPlayerConnection.current?.service?.playerCache ?: return
     val downloadCache = LocalPlayerConnection.current?.service?.downloadCache ?: return
@@ -277,27 +216,10 @@ fun StorageSettings(
             onDismiss = { clearImageCacheDialog = false },
             onConfirm = {
                 coroutineScope.launch(Dispatchers.IO) {
-                    val urlsToPreserve = mutableSetOf<String>()
-                    val downloadedSongs = try {
-                        database.downloadedSongsByNameAsc().first()
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-                    downloadedSongs.forEach { song ->
-                        song.song.thumbnailUrl?.let { urlsToPreserve.add(it.encodeUtf8().sha256().hex()) }
-                        song.album?.thumbnailUrl?.let { urlsToPreserve.add(it.encodeUtf8().sha256().hex()) }
-                    }
-                    val directory = imageDiskCache.directory.toFile()
-                    if (directory.exists() && directory.isDirectory) {
-                        directory.listFiles()?.forEach { file ->
-                            if (file.isFile && !file.name.startsWith("journal")) {
-                                val isPreserved = urlsToPreserve.any { hash -> file.name.startsWith(hash) }
-                                if (!isPreserved) {
-                                    file.delete()
-                                }
-                            }
-                        }
-                    }
+                    // Let Coil update its journal and cache size atomically.
+                    // Deleting backing files bypasses the live DiskCache index.
+                    imageDiskCache.clear()
+                    context.imageLoader.memoryCache?.clear()
                 }
                 clearImageCacheDialog = false
             },
@@ -350,7 +272,7 @@ fun StorageSettings(
         horizontalPadding = 16.dp,
     ) {
         IosSettingsGroup(
-            title = stringResource(R.string.storage),
+            title = "Usage",
             items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.storage),

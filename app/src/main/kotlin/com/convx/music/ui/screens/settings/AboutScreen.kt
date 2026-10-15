@@ -108,7 +108,6 @@ fun AboutScreen(
         pageColor = AppTheme.colorScheme.background,
         horizontalPadding = 16.dp,
     ) {
-        // Header
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -116,7 +115,7 @@ fun AboutScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = stringResource(R.string.vivi_music_title),
+                text = stringResource(R.string.convx_title),
                 style = AppTheme.typography.displaySmall.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 48.sp,

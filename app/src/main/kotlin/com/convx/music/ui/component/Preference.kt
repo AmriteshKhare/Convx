@@ -144,7 +144,7 @@ fun <T> ListPreference(
         ListDialog(
             onDismiss = { showDialog = false },
         ) {
-            items(values) { value ->
+            items(values, key = { it.toString() }) { value ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier =

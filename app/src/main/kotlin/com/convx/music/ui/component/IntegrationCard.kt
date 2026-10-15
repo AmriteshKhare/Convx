@@ -48,7 +48,6 @@ fun IntegrationCard(
         modifier = Modifier
             .fillMaxWidth()
     ) {
-        // Section title
         title?.let {
             Text(
                 text = it,
@@ -58,7 +57,6 @@ fun IntegrationCard(
             )
         }
 
-        // Settings items
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -88,9 +86,6 @@ fun IntegrationCard(
     }
 }
 
-/**
- * Individual settings item row with Material 3 styling
- */
 @Composable
 private fun IntegrationCardItemRow(
     item: IntegrationCardItem
@@ -105,7 +100,6 @@ private fun IntegrationCardItemRow(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Icon with background
         item.icon?.let { icon ->
             Box(
                 modifier = Modifier
@@ -152,16 +146,13 @@ private fun IntegrationCardItemRow(
             Spacer(modifier = Modifier.width(16.dp))
         }
 
-        // Title and description
         Column(
             modifier = Modifier.weight(1f)
         ) {
-            // Title content
             ProvideTextStyle(AppTheme.typography.titleMedium) {
                 item.title()
             }
 
-            // Description if provided
             item.description?.let { desc ->
                 Spacer(modifier = Modifier.height(2.dp))
                 ProvideTextStyle(
@@ -174,7 +165,6 @@ private fun IntegrationCardItemRow(
             }
         }
 
-        // Trailing content
         item.trailingContent?.let { trailing ->
             Spacer(modifier = Modifier.width(8.dp))
             trailing()

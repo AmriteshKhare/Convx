@@ -13,58 +13,32 @@ import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 
-/**
- * The app's motion language, in one place.
- *
- * Every animation in the app is supposed to be one of these. Before this existed
- * there were 44 hand-written `spring(`s, 169 `tween(`s and 153 `animate*` call
- * sites across 120 files, each picking its own timing — which is why two things
- * that move together (a nav bar and the page behind it, a puck and the tab it
- * marks) so often moved on visibly different clocks.
- *
- * The numbers are not taste. [MorphStiffness] is regressed off the iOS 27 reference
- * capture in `designRefrence/shared transition animation.mp4`; the rest derive from it
- * so that everything in the app reads as the same physical material.
- *
- * Springs, not tweens, wherever a value can be interrupted mid-flight — a spring
- * carries its velocity across the interruption and a tween restarts. Tweens are
- * kept only for pure cross-fades, where there is no velocity to preserve.
- */
+/** Shared animation specs and motion tokens. Springs preserve velocity when interrupted; tweens are for fades. */
 object Motion {
+    private val ArtworkEasing = Easing(com.convx.artwork.ArtworkMotion::progress)
 
-    /**
-     * Container morph: a tile opening into a detail screen, and back.
-     *
-     * Measured off the reference capture by recovering the morphing card's scale per
-     * frame (multi-scale template match against the settled detail screen), over two
-     * independent takes of each direction. Push reaches 99% in ~265ms, pop in ~230ms,
-     * neither overshoots.
-     *
-     * Fitted to the SETTLE TIME, not to the per-frame shape. At 30fps a card crossing
-     * the screen in a quarter of a second is heavily motion-blurred in exactly the
-     * mid-transition frames, and blur biases a template match's scale estimate — the
-     * measured mid-frames are not trustworthy enough to regress a curve shape from,
-     * and pretending otherwise would be fitting the capture's blur, not Apple's
-     * animation. Duration and the absence of overshoot are solid; both directions
-     * average to a critically damped spring with a ~0.24s natural period.
-     *
-     * stiffness = (2*pi / 0.24)^2 ~= 700.
-     *
-     * The previous value was 195 (a 0.45s period) — ~3.6x slower to settle than the
-     * reference. That one number was most of why the morph did not read as iOS: the
-     * curve shape was already close, the clock was wrong.
-     */
-    /**
-     * Flamingo's lyric easing — a symmetric ease-in-out that leaves the line almost
-     * stationary at both ends and does nearly all its travel in the middle third.
-     *
-     * Standard easings are asymmetric: they leave quickly and arrive slowly, which is right
-     * for something entering the screen and wrong for text that has to look *sung*. A lyric
-     * line is not going anywhere — it swells and settles — so the curve has to hold still at
-     * both ends, and this is the one Flamingo uses for every line transition in its view.
-     */
+    fun <T> artwork(): FiniteAnimationSpec<T> = tween(
+        com.convx.artwork.ArtworkMotion.DurationMillis,
+        easing = ArtworkEasing,
+    )
+
+    /** List artwork expanding into a detail hero and returning to its source tile. */
+    const val SharedArtworkMillis = 500
+    fun <T> sharedArtwork(): FiniteAnimationSpec<T> = tween(
+        SharedArtworkMillis,
+        easing = ArtworkEasing,
+    )
+
+    fun collectionPush(): FiniteAnimationSpec<androidx.compose.ui.unit.IntOffset> = spring(
+        dampingRatio = 1f,
+        stiffness = 380f,
+        visibilityThreshold = androidx.compose.ui.unit.IntOffset(1, 1),
+    )
+
+    /** Symmetric easing that keeps lyrics near rest at the start and end of a line transition. */
     val LyricEasing = CubicBezierEasing(0.75f, 0f, 0.25f, 1f)
 
+    /** Stiffness for the shared-element container morph. */
     const val MorphStiffness = 950f
 
     fun <T> morph(): FiniteAnimationSpec<T> = spring(
@@ -131,7 +105,7 @@ object Motion {
      * [appear], but for the leaving half of a transition that predictive back can
      * gesture-scrub.
      */
-    const val AppearExitMillis = 240
+    const val AppearExitMillis = 400
 
     fun <T> appearExit(): FiniteAnimationSpec<T> = tween(AppearExitMillis, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
 
@@ -180,7 +154,7 @@ object Motion {
      * the original 200ms tween, short enough that the stale-backdrop window reads
      * as a blur settling rather than a broken transition.
      */
-    const val PushMillis = 260
+    const val PushMillis = 400
 
     /**
      * UIKit's navigation curve. Not `FastOutSlowIn`: Material's curve pulls harder

@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.component
 
+import com.convx.music.ui.utils.MenuItemChrome
+import com.convx.music.ui.utils.MenuIconChrome
+import com.convx.music.ui.utils.additiveChrome
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -58,16 +61,20 @@ fun NewActionGrid(
 ) {
     if (actions.isEmpty()) return
     val colors = IosTheme.colors
+    // Inside the menu panel the quick actions sit bare on the panel (iOS 27 clip).
+    val inPanel = LocalInMenuPanel.current
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(ContinuousCapsule())
-            .background(colors.secondarySystemGroupedBackground),
+            .then(
+                if (inPanel) Modifier
+                else Modifier.clip(ContinuousCapsule()).background(colors.secondarySystemGroupedBackground),
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         actions.forEachIndexed { index, action ->
-            if (index > 0) {
+            if (index > 0 && !inPanel) {
                 Box(
                     Modifier
                         .width(IosMetrics.SeparatorThickness)
@@ -83,7 +90,11 @@ fun NewActionGrid(
 @Composable
 private fun ActionSegment(action: NewAction, modifier: Modifier) {
     val colors = IosTheme.colors
-    val contentColor = if (action.contentColor.isSpecified) action.contentColor else IosTheme.tint
+    val contentColor = when {
+        action.contentColor.isSpecified -> action.contentColor
+        LocalInMenuPanel.current -> com.convx.music.ui.ios.foundation.IosMenuMaterial.colors.label
+        else -> IosTheme.tint
+    }
 
     // NewAction.onClick is a @Composable lambda (several call sites open dialogs from
     // it), so it has to be invoked from composition rather than the click callback.
@@ -95,23 +106,23 @@ private fun ActionSegment(action: NewAction, modifier: Modifier) {
 
     Column(
         modifier = modifier
-            .clickable(enabled = action.enabled) { performAction = true }
+            .clickable(enabled = action.enabled, interactionSource = null, indication = null) { performAction = true }
             .alpha(if (action.enabled) 1f else 0.4f)
-            .padding(vertical = 10.dp, horizontal = 4.dp)
+            .padding(vertical = 12.dp, horizontal = 4.dp)
             .semantics { role = Role.Button },
         horizontalAlignment = Alignment.CenterHorizontally,
-        // Figma Quick Action: symbol-to-label gap 5 (393:7946).
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         CompositionLocalProvider(
             LocalIosContentColor provides contentColor,
             com.convx.music.ui.ios.compat.LocalContentColor provides contentColor,
         ) {
-            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { action.icon() }
+            CompositionLocalProvider(LocalSymbolChrome provides MenuItemChrome, LocalSymbolIconSize provides 24.dp) {
+                Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) { action.icon() }
+            }
         }
         IosText(
             text = action.text,
-            // Figma Quick Action label: Medium 12 (393:7946).
             style = IosTheme.typography.caption.copy(fontWeight = FontWeight.Medium),
             color = contentColor,
             textAlign = TextAlign.Center,

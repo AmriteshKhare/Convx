@@ -3,19 +3,13 @@ package com.convx.music.ui.utils
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Guards the artwork quality ladder. `i.ytimg.com` thumbnails are addressed by filename, so
- * the only lever is which rung is asked for; it used to be binary (maxres above 1200px,
- * hqdefault for everything else), which fed a 544px grid tile a 480x360 image whose square
- * crop leaves 360px of real detail.
- */
+/** Checks that artwork URLs request a size appropriate for their display bounds. */
 class ThumbnailResizeTest {
 
     private val ytimg = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
 
     @Test
     fun `list and grid art asks above the old hqdefault floor`() {
-        // The regression this fixes: 544 used to land on hqdefault.
         assertEquals(
             "https://i.ytimg.com/vi/dQw4w9WgXcQ/sddefault.jpg",
             ytimg.resize(544, 544),
@@ -38,8 +32,6 @@ class ThumbnailResizeTest {
 
     @Test
     fun `height alone still picks a rung`() {
-        // maxOf(width ?: 0, height ?: 0): a height-only request used to fall through to
-        // hqdefault no matter how large it was, because only width was consulted.
         assertEquals(
             "https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg",
             ytimg.resize(height = 1200),
@@ -49,5 +41,35 @@ class ThumbnailResizeTest {
     @Test
     fun `no dimensions leaves the url alone`() {
         assertEquals(ytimg, ytimg.resize())
+    }
+
+    @Test
+    fun `google artwork updates dimensions without changing its format`() {
+        val url = "https://lh3.googleusercontent.com/a-/image=w100-h100-p-l90-rj"
+
+        assertEquals(
+            "https://lh3.googleusercontent.com/a-/image=w200-h300-p-l90-rj",
+            url.resize(200, 300),
+        )
+    }
+
+    @Test
+    fun `google avatar replaces its existing size`() {
+        val url = "https://yt3.ggpht.com/a-/image=s120-c-k-c0x00ffffff-no-rj"
+
+        assertEquals(
+            "https://yt3.ggpht.com/a-/image=s200",
+            url.resize(200, 200),
+        )
+    }
+
+    @Test
+    fun `apple artwork uses the larger requested dimension`() {
+        val url = "https://is1-ssl.mzstatic.com/image/thumb/Music116/100x100bb.webp"
+
+        assertEquals(
+            "https://is1-ssl.mzstatic.com/image/thumb/Music116/300x300bb.jpg",
+            url.resize(200, 300),
+        )
     }
 }

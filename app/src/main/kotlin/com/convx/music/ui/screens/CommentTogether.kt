@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.ios.compat.AppTheme
 
 import androidx.compose.animation.*
@@ -54,14 +56,15 @@ import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommentTogetherScreen(navController: NavController) {
     val manager = LocalListenTogetherManager.current ?: return
-    val messages by manager.chatMessages.collectAsState()
-    val userId by manager.userId.collectAsState()
-    val roomState by manager.roomState.collectAsState()
+    val messages by manager.chatMessages.collectAsStateWithLifecycle()
+    val userId by manager.userId.collectAsStateWithLifecycle()
+    val roomState by manager.roomState.collectAsStateWithLifecycle()
     val windowInsets = LocalPlayerAwareWindowInsets.current
     
     var textInput by remember { mutableStateOf("") }
@@ -98,7 +101,7 @@ fun CommentTogetherScreen(navController: NavController) {
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(imageVector = SfSymbols.Monochrome.SFChevronLeft, contentDescription = null)
+                        SymbolIcon(symbol = sf("SFChevronLeft"), contentDescription = null)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -114,8 +117,6 @@ fun CommentTogetherScreen(navController: NavController) {
                     .imePadding()
                     .padding(16.dp)
             ) {
-                // Reply Preview
-                // Reply Preview
                 AnimatedVisibility(
                     visible = replyingTo != null,
                     enter = expandVertically() + fadeIn(),
@@ -161,11 +162,7 @@ fun CommentTogetherScreen(navController: NavController) {
                                     )
                                 }
                                 IconButton(onClick = { replyingTo = null }) {
-                                    Icon(
-                                        imageVector = SfSymbols.Monochrome.SFXmark,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("SFXmark"), contentDescription = null, size = 16.dp)
                                 }
                             }
                         }
@@ -264,13 +261,12 @@ private fun MessageItem(
                 )
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                // Render Quoted Reply
                 message.replyTo?.let { reply ->
                     Surface(
                         color = replyBgColor,
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
-                            .padding(bottom = 6.dp) // Space between quote and message
+                            .padding(bottom = 6.dp)
                             .fillMaxWidth()
                     ) {
                         Row(
@@ -370,11 +366,7 @@ private fun ChatInputArea(
                 modifier = Modifier.size(48.dp),
                 elevation = FloatingActionButtonDefaults.elevation(0.dp, 0.dp)
             ) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFPaperplane,
-                    contentDescription = stringResource(R.string.send),
-                    modifier = Modifier.size(24.dp)
-                )
+                SymbolIcon(symbol = sf("SFPaperplane"), contentDescription = stringResource(R.string.send), size = 24.dp)
             }
         }
     }
@@ -401,12 +393,7 @@ private fun EmptyChatPlaceholder() {
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFBubbleLeftAndBubbleRight,
-                contentDescription = null,
-                tint = AppTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(56.dp)
-            )
+            SymbolIcon(symbol = sf("SFBubbleLeftAndBubbleRight"), contentDescription = null, size = 56.dp, tint = AppTheme.colorScheme.onPrimaryContainer)
         }
         Spacer(modifier = Modifier.height(24.dp))
         Text(

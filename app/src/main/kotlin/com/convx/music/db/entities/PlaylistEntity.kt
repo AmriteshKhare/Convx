@@ -37,9 +37,7 @@ data class PlaylistEntity(
     val isLocal: Boolean = false,
     @ColumnInfo(name = "isAutoSync", defaultValue = false.toString())
     val isAutoSync: Boolean = false,
-    /** Non-null when the user pinned this playlist to the top of Library. A timestamp
-     *  rather than a boolean so multiple pins have a natural, stable order (most
-     *  recently pinned first) without a separate position column to keep in sync. */
+    /** Pin timestamp; newer pins sort first without a separate position column. */
     val pinnedAt: LocalDateTime? = null,
 ) {
     companion object {

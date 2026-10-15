@@ -7,30 +7,9 @@ package com.convx.music.ui.player
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.util.lerp
 
-/*
- * Geometry for a mini-player <-> full-player transition treated as a shared element:
- * one container and one artwork travelling between two measured rects, rather than a
- * sheet sliding up over the top of a separate mini player.
- *
- * The reason this reads better than a straight interpolation is that nothing here moves
- * on a single curve — each axis of each element gets its own, and the
- * asymmetry is the whole effect:
- *
- * - The container's **height** tracks progress linearly while its **width** runs on
- *   [easeInCubic]. The sheet therefore grows tall first and only flares out to full width
- *   near the end, which is what makes it look like it is rising out of the bar instead of
- *   inflating in place.
- * - The artwork's **x** runs on [easeOutCubic] — it commits to its horizontal position
- *   early, so the cover appears to lead the motion — while its **y** is a blend of
- *   [easeInCubic] and linear ([ARTWORK_VERTICAL_LINEAR_WEIGHT]), keeping vertical travel
- *   closer to the finger during a drag.
- *
- * All of this is pure geometry: no Compose state, no animation. Feed it a progress value
- * from whatever already drives the sheet (a drag, a spring) and it returns where things
- * belong at that instant. Kept separate from the sheet itself so the curves can be
- * checked directly, which is the only practical way to verify motion this fiddly.
+/* Pure geometry for the mini-player/full-player shared transition. Each element
+ * uses its own easing so the artwork leads the container during expansion.
  */
-
 /** Weight of the linear term in the artwork's vertical travel; the rest is [easeInCubic]. */
 const val ARTWORK_VERTICAL_LINEAR_WEIGHT = 0.4f
 
@@ -65,7 +44,7 @@ fun easeOutCubic(value: Float): Float {
  * The sheet container's bounds at [progress], 0 being [source] (the mini player) and 1
  * being [target] (the full player).
  *
- * Plain linear edge interpolation (Melox PlayerSheetGeometry): the spring driving
+ * Plain linear edge interpolation (the reference app PlayerSheetGeometry): the spring driving
  * progress already shapes the motion, so the rect itself adds no second curve.
  */
 fun sharedContainerRect(source: Rect, target: Rect, progress: Float): Rect {
@@ -79,7 +58,7 @@ fun sharedContainerRect(source: Rect, target: Rect, progress: Float): Rect {
 }
 
 /**
- * Who owns finger input during the flight (Melox PlayerInputOwner).
+ * Who owns finger input during the flight (the reference app PlayerInputOwner).
  *
  * While dragging, the end the drag started from owns input so a close gesture
  * can reverse from the current frame. At rest the mini owns input only before
@@ -108,7 +87,7 @@ internal fun playerSheetInputOwner(
 }
 
 /**
- * Where the mini player's halves sit inside the animating container (Melox
+ * Where the mini player's halves sit inside the animating container (the reference app
  * clip split, pill-origin recording, fullscreen coords).
  *
  * Title side: x compensates the corner travel so the title stays absolute
@@ -209,7 +188,7 @@ const val AMBIENT_TRANSITION_DEFAULT_MS = 1_100
 const val CORNER_EXPANSION_PROGRESS_BAND = 0.02f
 
 /**
- * Per-corner radii of the travelling card (Melox SharedContainerCornerRadii).
+ * Per-corner radii of the travelling card (the reference app SharedContainerCornerRadii).
  * Uniform in practice; the struct keeps the door open for squircle-style
  * per-corner treatment without reshaping the call chain.
  */

@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.size
@@ -49,10 +51,7 @@ fun LocalPlaylistMenu(
             title = { Text(stringResource(R.string.remove_download)) },
             description = { Text(stringResource(R.string.remove_download_playlist_desc)) },
             icon = {
-                Icon(
-                    painter = painterResource(R.drawable.offline),
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
             },
             onClick = {
                 onDownload()
@@ -77,10 +76,7 @@ fun LocalPlaylistMenu(
             title = { Text(stringResource(R.string.action_download)) },
             description = { Text(stringResource(R.string.download_playlist_desc)) },
             icon = {
-                Icon(
-                    painter = painterResource(R.drawable.download),
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
             },
             onClick = {
                 onDownload()
@@ -97,10 +93,7 @@ fun LocalPlaylistMenu(
                 title = { Text(stringResource(R.string.edit)) },
                 description = { Text(stringResource(R.string.edit_playlist)) },
                 icon = {
-                    Icon(
-                        painter = painterResource(R.drawable.edit),
-                        contentDescription = null
-                    )
+                    SymbolIcon(symbol = sf("pencil"), contentDescription = null)
                 },
                 onClick = {
                     onEdit()
@@ -116,10 +109,7 @@ fun LocalPlaylistMenu(
                     title = { Text(stringResource(R.string.action_sync)) },
                     description = { Text(stringResource(R.string.sync_playlist_desc)) },
                     icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.sync),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("arrow.triangle.2.circlepath"), contentDescription = null)
                     },
                     onClick = {
                         onSync()
@@ -135,10 +125,7 @@ fun LocalPlaylistMenu(
                     title = { Text(stringResource(R.string.add_to_queue)) },
                     description = { Text(stringResource(R.string.add_to_queue_desc)) },
                     icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.queue_music),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                     },
                     onClick = {
                         onQueue()
@@ -174,10 +161,7 @@ fun LocalPlaylistMenu(
                 title = { Text(stringResource(R.string.share)) },
                 description = { Text(stringResource(R.string.share_playlist_desc)) },
                 icon = {
-                    Icon(
-                        painter = painterResource(R.drawable.ios_share),
-                        contentDescription = null
-                    )
+                    SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null)
                 },
                 onClick = {
                     val shareText = if (isYouTubePlaylist) {
@@ -202,10 +186,7 @@ fun LocalPlaylistMenu(
                 title = { Text(stringResource(R.string.delete)) },
                 description = { Text(stringResource(R.string.delete_playlist_desc)) },
                 icon = {
-                    Icon(
-                        painter = painterResource(R.drawable.delete),
-                        contentDescription = null
-                    )
+                    SymbolIcon(symbol = sf("trash"), contentDescription = null)
                 },
                 onClick = {
                     onDelete()
@@ -236,10 +217,7 @@ fun AutoPlaylistMenu(
             title = { Text(stringResource(R.string.remove_download)) },
             description = { Text(stringResource(R.string.remove_download_playlist_desc)) },
             icon = {
-                Icon(
-                    painter = painterResource(R.drawable.offline),
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
             },
             onClick = {
                 onDownload()
@@ -264,10 +242,7 @@ fun AutoPlaylistMenu(
             title = { Text(stringResource(R.string.action_download)) },
             description = { Text(stringResource(R.string.download_playlist_desc)) },
             icon = {
-                Icon(
-                    painter = painterResource(R.drawable.download),
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
             },
             onClick = {
                 onDownload()
@@ -283,10 +258,7 @@ fun AutoPlaylistMenu(
                     title = { Text(stringResource(R.string.add_to_queue)) },
                     description = { Text(stringResource(R.string.add_to_queue_desc)) },
                     icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.queue_music),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                     },
                     onClick = {
                         onQueue()
@@ -317,10 +289,7 @@ fun TopPlaylistMenu(
             title = { Text(stringResource(R.string.remove_download)) },
             description = { Text(stringResource(R.string.remove_download_playlist_desc)) },
             icon = {
-                Icon(
-                    painter = painterResource(R.drawable.offline),
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
             },
             onClick = {
                 onDownload()
@@ -345,10 +314,7 @@ fun TopPlaylistMenu(
             title = { Text(stringResource(R.string.action_download)) },
             description = { Text(stringResource(R.string.download_playlist_desc)) },
             icon = {
-                Icon(
-                    painter = painterResource(R.drawable.download),
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
             },
             onClick = {
                 onDownload()
@@ -364,10 +330,7 @@ fun TopPlaylistMenu(
                     title = { Text(stringResource(R.string.add_to_queue)) },
                     description = { Text(stringResource(R.string.add_to_queue_desc)) },
                     icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.queue_music),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                     },
                     onClick = {
                         onQueue()
@@ -398,10 +361,7 @@ fun CachePlaylistMenu(
             title = { Text(stringResource(R.string.remove_download)) },
             description = { Text(stringResource(R.string.remove_download_playlist_desc)) },
             icon = {
-                Icon(
-                    painter = painterResource(R.drawable.offline),
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
             },
             onClick = {
                 onDownload()
@@ -426,10 +386,7 @@ fun CachePlaylistMenu(
             title = { Text(stringResource(R.string.action_download)) },
             description = { Text(stringResource(R.string.download_playlist_desc)) },
             icon = {
-                Icon(
-                    painter = painterResource(R.drawable.download),
-                    contentDescription = null
-                )
+                SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
             },
             onClick = {
                 onDownload()
@@ -445,10 +402,7 @@ fun CachePlaylistMenu(
                     title = { Text(stringResource(R.string.add_to_queue)) },
                     description = { Text(stringResource(R.string.add_to_queue_desc)) },
                     icon = {
-                        Icon(
-                            painter = painterResource(R.drawable.queue_music),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                     },
                     onClick = {
                         onQueue()

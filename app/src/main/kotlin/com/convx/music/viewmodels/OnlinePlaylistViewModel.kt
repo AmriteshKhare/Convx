@@ -86,6 +86,7 @@ class OnlinePlaylistViewModel @Inject constructor(
 ) : ViewModel() {
     private val playlistId = requireNotNull(savedStateHandle.get<String>("playlistId")) { "Missing playlistId" }
     val routeThumb = savedStateHandle.get<String>("thumbnail")?.takeIf { it.isNotEmpty() }
+    val routeTitle = savedStateHandle.get<String>("title")?.takeIf { it.isNotEmpty() }
 
     val playlist = MutableStateFlow<PlaylistItem?>(null)
     val playlistSongs = MutableStateFlow<List<SongItem>>(emptyList())
@@ -109,11 +110,11 @@ class OnlinePlaylistViewModel @Inject constructor(
     private var proactiveLoadJob: Job? = null
 
     init {
-        // Fast sync restore from memory cache
         val cached = PlaylistMemoryCache.get(playlistId)
         if (cached != null) {
             playlist.value = cached.playlist
             playlistSongs.value = applySongFilters(cached.songs)
+            com.convx.music.utils.AppleArt.prefetchArtistIds(playlistSongs.value)
             relatedItems.value = cached.related
             continuation = cached.continuation
             _isLoading.value = false
@@ -152,6 +153,7 @@ class OnlinePlaylistViewModel @Inject constructor(
                     playlist.value = playlistPage.playlist
                     val filteredSongs = applySongFilters(playlistPage.songs)
                     playlistSongs.value = filteredSongs
+                    com.convx.music.utils.AppleArt.prefetchArtistIds(filteredSongs)
                     val related = playlistPage.related ?: emptyList()
                     relatedItems.value = related
                     continuation = playlistPage.songsContinuation

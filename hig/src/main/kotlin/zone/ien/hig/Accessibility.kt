@@ -27,39 +27,21 @@ import zone.ien.hig.theme.CupertinoColors
 import zone.ien.hig.theme.White
 import zone.ien.hig.theme.isDark
 
-/**
- * This object provides access to native accessibility preferences
- *
- * It allows for checking system accessibility settings such as high contrast mode and
- * reduced transparency.
- */
+/** Accessibility preferences used by Cupertino components. */
 object Accessibility
 
-/**
- * Checks if high contrast mode is enabled in the system.
- */
+/** Whether high contrast is enabled. */
 val Accessibility.isHighContrastEnabled: Boolean get() = false
 
-/**
- * Checks if reduced transparency is enabled in the system.
- */
+/** Whether reduced transparency is enabled. */
 val Accessibility.isReduceTransparencyEnabled: Boolean get() = false
 
-/**
- * Adjust color contrast if corresponding OS accessibility system preference is enabled
- *
- * @return the accessible color version based on system settings
- */
+/** Applies the current contrast preference to this color. */
 val Color.accessible: Color
     @Composable
     get() = accessible(isDark())
 
-/**
- * Adjust color contrast if corresponding accessibility system preference is enabled
- *
- * @param isDark whether the theme is dark or light
- * @return the accessible color version based on system settings
- */
+/** Applies high contrast when it is enabled. */
 fun Color.accessible(isDark: Boolean): Color =
     if (Accessibility.isHighContrastEnabled) {
         lerp(this, if (isDark) CupertinoColors.White else Color.Black, .2f)

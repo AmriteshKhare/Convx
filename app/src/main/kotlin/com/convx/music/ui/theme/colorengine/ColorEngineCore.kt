@@ -17,7 +17,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/**
+/*
  * Colour models and the perceptual maths behind them.
  *
  * Kotlin port of the Swift `Color Engine` sources (`ColorEngineColorModels.swift`,

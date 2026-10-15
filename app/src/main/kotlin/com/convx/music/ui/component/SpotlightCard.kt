@@ -66,22 +66,9 @@ private val ReflectionBlurRadius = 24.dp
 private const val WideArtRatio = 1.15f
 
 /**
- * A tall artwork card whose lower portion is the same artwork mirrored, blurred and
- * darkened, with the title reading over it. The artwork appears to pour off its own
- * bottom edge and the text sits in the pour rather than on a separate label strip.
- *
- * Reflection geometry: the mirror is drawn from halfway down the artwork and revealed by
- * an alpha ramp running from two thirds of the artwork height to its bottom edge, so the
- * top two thirds stay completely clear.
- *
- * Drawn on the GPU from the image already decoded for the artwork — a second AsyncImage
- * flipped in a graphics layer — rather than built on the CPU as a blurred, mesh-warped,
- * disk-cached derivative per track. Coil hands back the same cache entry, so there is no
- * second decode, no cache of our own to maintain, and no bitmap held alive per card.
- *
- * Below API 31 Modifier.blur is a no-op, which would leave a sharp upside-down copy of
- * the artwork. The reflection is dropped there and the tinted card colour carries the
- * text instead.
+ * Artwork card with a mirrored, blurred reflection behind its title. The image
+ * is reused from Coil; below API 31 the reflection is omitted because blur is
+ * unavailable and would leave a sharp inverted image.
  */
 @Composable
 fun SpotlightCard(
@@ -223,11 +210,7 @@ private fun BoxScope.SpotlightReflection(
     // radius up by however much narrower that is or the reflection comes out sharp.
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val projectedBlur = ReflectionBlurRadius.value * (screenWidthDp / artworkSize.value)
-    // The ramp, flip, saturation and darken are static once the art loads, so they
-    // are baked once on the CPU inside BlurredBackdropImage instead of an Offscreen
-    // layer + DstIn gradient per frame. Box height = artworkSize = H; the old
-    // gradient spanned [H/3, 2H/3].
-    // The old black overlay at alpha d over the image is exactly rgb * (1-d).
+    // Build the static reflection color treatment once instead of drawing extra layers each frame.
     val reflectionMatrix = remember {
         android.graphics.ColorMatrix().apply {
             setSaturation(ReflectionSaturation)

@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.component.sf
+import dev.chrisbanes.haze.hazeSource
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,6 +94,7 @@ import com.convx.music.ui.utils.albumRoute
 import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.viewmodels.NewReleaseViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -102,10 +106,10 @@ fun NewReleaseScreen(
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val newReleaseAlbums by viewModel.newReleaseAlbums.collectAsState()
+    val newReleaseAlbums by viewModel.newReleaseAlbums.collectAsStateWithLifecycle()
 
     val coroutineScope = rememberCoroutineScope()
     val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
@@ -135,13 +139,13 @@ fun NewReleaseScreen(
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeShape = ContinuousRoundedRectangle(percent = 50)
+        val hazeState = androidx.compose.runtime.remember { dev.chrisbanes.haze.HazeState() }
 
         Box(modifier = Modifier.fillMaxSize()) {
             LazyVerticalGrid(
                 state = lazyGridState,
-                // No bounce here: the top pull drives the hero zoom instead.
                 overscrollEffect = heroZoom.listOverscroll(),
-                modifier = Modifier.heroPullZoom(heroZoom).fillMaxSize(),
+                modifier = Modifier.heroPullZoom(heroZoom).fillMaxSize().hazeSource(hazeState),
                 columns = rememberGridColumns(),
                 contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
             ) {
@@ -198,6 +202,11 @@ fun NewReleaseScreen(
             }
 
             val newReleaseProgress = com.convx.music.ui.component.rememberTitleCollapseProgressState(lazyGridState)
+            com.convx.music.ui.component.TopFadeBlur(
+                hazeState = hazeState,
+                pageColor = tint,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -211,10 +220,7 @@ fun NewReleaseScreen(
                     onClick = { navController.navigateUp() },
                     onLongClick = { navController.backToMain() },
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.arrow_back_ios),
-                        contentDescription = null,
-                    )
+                    SymbolIcon(symbol = sf("chevron.left"), contentDescription = null)
                 }
 
                 Text(

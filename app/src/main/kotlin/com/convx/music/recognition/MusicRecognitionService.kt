@@ -36,13 +36,10 @@ import java.nio.ByteOrder
  */
 object MusicRecognitionService {
     
-    // Recording parameters
     private const val RECORDING_SAMPLE_RATE = 44100
     private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
     private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
-    // Recording duration: 10 seconds for better recognition accuracy
-    // Original MusicRecognizer uses: 3s -> 6s -> 9s -> 10s fallback
-    // We use 10s directly to match the fallback duration for maximum compatibility
+    // Use the original recognizer's final 10-second fallback duration.
     private const val RECORDING_DURATION_MS = 10000L
     
     private val _recognitionStatus = MutableStateFlow<RecognitionStatus>(RecognitionStatus.Ready)
@@ -88,7 +85,6 @@ object MusicRecognitionService {
                 return@withContext _recognitionStatus.value
             }
             
-            // Verify format
             require(
                 resampledAudio.channelCount == 1 &&
                 resampledAudio.sampleRate == VibraSignature.REQUIRED_SAMPLE_RATE &&

@@ -25,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.Layout
@@ -109,19 +108,7 @@ internal fun SharedTransitionScope.accessorySlot(
     }
 }
 
-/**
- * The accessory, composed ONCE for the bar's whole life and flown between the slots.
- *
- * It used to live inside each bar shape, so every inline/expanded switch built a brand-new
- * mini player on the transition's first frame (preferences, flows, image request, layers:
- * the measured over-budget frame) and re-laid its content out on every frame after. Here
- * the switch only retargets [rect]; each frame re-measures the surface at the animated size
- * while the content inside stays laid out at its target width (skipped by layout), so the
- * per-frame work is the surface and its draw.
- *
- * Rendered in the shared-transition overlay at the accessory's old z (2): above the tab
- * glyph travelling underneath it, as before.
- */
+/** Composes the accessory once and moves it between slots without rebuilding its content each frame. */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun SharedTransitionScope.AccessoryHost(
@@ -175,8 +162,10 @@ internal fun SharedTransitionScope.AccessoryHost(
                             shapes.accessoryShape,
                             if (isInline) elevations.inlineElevation else elevations.expandedElevation,
                         )
-                        .background(color = colors.accessoryBackgroundColor, shapes.accessoryShape)
-                        .clip(shapes.accessoryShape),
+                        // No .clip: the G2 capsule is a path, and a path clip is a CPU mask
+                        // uploaded every frame the glass re-renders. The fill and the glass
+                        // (masked by the shared pool) follow the outline on their own.
+                        .background(color = colors.accessoryBackgroundColor, shapes.accessoryShape),
                     isInline,
                 )
             }

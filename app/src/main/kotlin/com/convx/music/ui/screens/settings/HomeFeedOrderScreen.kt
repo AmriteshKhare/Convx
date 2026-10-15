@@ -69,7 +69,7 @@ private data class HomeFeedRow(val id: String, val labelRes: Int)
  */
 private val ArrangeableRows = listOf(
     HomeFeedRow("hero", R.string.home_section_hero),
-    HomeFeedRow("keep_listening", R.string.recently_played),
+    HomeFeedRow("keep_listening", R.string.keep_listening),
     HomeFeedRow("quick_picks", R.string.quick_picks),
     HomeFeedRow("speed_dial", R.string.speed_dial),
     HomeFeedRow("from_the_community", R.string.home_section_community),

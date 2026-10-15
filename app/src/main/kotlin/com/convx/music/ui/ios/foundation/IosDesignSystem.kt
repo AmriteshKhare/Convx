@@ -15,28 +15,11 @@ import com.convx.music.constants.AppTextColorKey
 import com.convx.music.utils.rememberPreference
 
 /**
- * App design system — one semantic mapping for every element, light + dark.
+ * Semantic iOS-style colors for content and Liquid Glass surfaces.
  *
- * Follows ios-color-and-materials: never hard-code hex in views, use the
- * semantic roles below so light/dark, base/elevated and Liquid Glass all
- * come free. Custom user colors ([AppBackgroundColorKey]/[AppTextColorKey],
- * 0 = unset) are opt-in overrides applied ON TOP of these defaults — clearing
- * them (one click) returns the whole UI to this system.
- *
- * Element map (content layer — grouped set, canvas → card → nested):
- * - Screen canvas: [canvas] (systemGroupedBackground)
- * - Card/group on canvas: [card] (secondarySystemGroupedBackground)
- * - Nested group in card: [nested] (tertiarySystemGroupedBackground)
- * - Plain (non-grouped) screens: [plainBackground]/[plainCard] (system set)
- * - Text tiers: [primaryText] → [secondaryText] → [tertiaryText]; never
- *   quaternary on thin materials — see [vibrantLabel].
- * - Hairlines: [separator]; safety/allergy text always [primaryText] on a
- *   solid surface, never low-vibrancy on thin material.
- *
- * Chrome layer (Liquid Glass — nav bar, glass items):
- * - Symbols default monochromatic via [chromeContent]; color sparingly, for
- *   emphasis only. Primary action colors the BACKGROUND ([chromeProminent],
- *   white label) — never the symbol/text, never multiple controls.
+ * Use these roles instead of hard-coded colors so light/dark themes stay
+ * consistent. User-selected background and text colors override the defaults
+ * when set; clearing them restores the system palette.
  */
 object IosDesignSystem {
     /** Screen canvas. */

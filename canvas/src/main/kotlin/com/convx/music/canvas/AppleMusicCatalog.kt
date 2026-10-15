@@ -77,25 +77,24 @@ data class AppleArtist(
     val motionVideoUrl: String?,
 )
 
-/**
- * Apple Music catalog lookups for artwork, logos and Apple's precomputed artwork colours,
- * matched to YouTube Music items by normalised title + artist.
- *
- * Every lookup is cached (memory, and on disk when [cacheDir] is set) including misses, and
- * concurrent lookups for the same key share one request, so list rows re-asking for the same
- * song cost nothing. Network is capped at [MAX_PARALLEL] requests.
- */
+/** Looks up Apple artwork and colors by title and artist, with cached results and bounded concurrency. */
 object AppleMusicCatalog {
     private const val AMP = "https://amp-api.music.apple.com"
+    private const val OFFICIAL_API = "https://api.music.apple.com"
     private const val MAX_PARALLEL = 4
     private const val HIT_TTL_MS = 7L * 24 * 60 * 60 * 1000
     private const val MISS_TTL_MS = 24L * 60 * 60 * 1000
+    private const val STALE_GRACE_MS = 30L * 24 * 60 * 60 * 1000
 
     /** Set once at app start; null keeps the cache in memory only. */
     @Volatile
     var cacheDir: File? = null
 
     var storefront: String = "us"
+
+    /** Optional backend token provider; true forces refresh. Keep the signing key off-device. */
+    @Volatile
+    var developerTokenProvider: (suspend (forceRefresh: Boolean) -> String)? = null
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true; explicitNulls = false }
 
@@ -114,11 +113,7 @@ object AppleMusicCatalog {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val gate = Semaphore(MAX_PARALLEL)
 
-    /**
-     * Separate lane for what a page is waiting on (artist profile, album page): measured on
-     * device, the artist lookup queued ~14s behind Home's list-thumbnail lookups on the shared
-     * gate, so a visible hero sat on its shimmer waiting for off-screen rows.
-     */
+    /** Keeps page-critical artwork lookups ahead of Home's lower-priority thumbnail requests. */
     private val pageGate = Semaphore(2)
     private val inFlight = ConcurrentHashMap<String, Deferred<String?>>()
 
@@ -129,7 +124,7 @@ object AppleMusicCatalog {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>) = size > 2000
     }
 
-    // ---- public lookups ----
+    // Public lookups
 
     /** [priority]: an album page waiting on this, not a list row; uses the page lane. */
     suspend fun album(title: String, artist: String?, priority: Boolean = false): AppleArtwork? =
@@ -142,9 +137,9 @@ object AppleMusicCatalog {
             findSong(title, artist)?.let { json.encodeToString(it) }
         }?.let { json.decodeFromString<AppleArtwork>(it) }
 
-    suspend fun artist(name: String): AppleArtist? =
+    suspend fun artist(name: String, priority: Boolean = true): AppleArtist? =
         cached("artist|$storefront|${normalize(name)}") {
-            findArtist(name)?.let { json.encodeToString(it) }
+            findArtist(name, priority)?.let { json.encodeToString(it) }
         }?.let { json.decodeFromString<AppleArtist>(it) }
 
     /** A memory-cache answer: [value] null means Apple was asked and has no match. */
@@ -163,7 +158,7 @@ object AppleMusicCatalog {
         peek("artist|$storefront|${normalize(name)}")
             ?.let { Cached(it.value?.let { v -> json.decodeFromString<AppleArtist>(v) }) }
 
-    // ---- matching ----
+    // Matching
 
     private val bracketed = Regex("""\s*[(\[][^)\]]*(feat|ft\.|with |remaster|version|edit|deluxe|explicit|clean)[^)\]]*[)\]]""")
     private val trailingKind = Regex("""\s+-\s+(single|ep)$""")
@@ -202,18 +197,24 @@ object AppleMusicCatalog {
         }?.get("artwork")?.let(::artwork)
     }
 
-    private suspend fun findArtist(name: String): AppleArtist? {
-        val root = request(
-            "/v1/catalog/$storefront/search", "term" to name, "types" to "artists", "limit" to "5",
-            priority = true,
-        ) ?: return null
-        val data = root.path("results", "artists", "data") as? JsonArray ?: return null
-        val id = data.firstOrNull { normalize(it.jsonObject.path("attributes", "name").string()) == normalize(name) }
-            ?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull ?: return null
+    /** Lightweight lookup for background prefetch; page lookups share this persisted cache. */
+    suspend fun artistId(name: String, priority: Boolean = false): String? =
+        cached("artist-id|$storefront|${normalize(name)}", hitTtlMs = 30L * 24 * 60 * 60 * 1000) {
+            val root = request(
+                "/v1/catalog/$storefront/search", "term" to name, "types" to "artists", "limit" to "5",
+                priority = priority,
+            ) ?: return@cached null
+            val data = root.path("results", "artists", "data") as? JsonArray ?: return@cached null
+            data.singleOrNull { normalize(it.jsonObject.path("attributes", "name").string()) == normalize(name) }
+                ?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull
+        }
+
+    private suspend fun findArtist(name: String, priority: Boolean): AppleArtist? {
+        val id = artistId(name, priority) ?: return null
         val detail = request(
             "/v1/catalog/$storefront/artists/$id",
             "extend" to "artwork,editorialArtwork,editorialVideo",
-            priority = true,
+            priority = priority,
         ) ?: return null
         val attrs = (detail["data"] as? JsonArray)?.firstOrNull()?.jsonObject?.get("attributes") as? JsonObject
             ?: return null
@@ -236,12 +237,7 @@ object AppleMusicCatalog {
         )
     }
 
-    /**
-     * The artist's button colour, if Apple ever includes it under a `keyColor` key (searched at any
-     * depth). Verified 2026-09-14: the web catalog's artist response (extend=artwork,
-     * editorialArtwork, editorialVideo) carries no such field, so this is null in practice and the
-     * play button stays white.
-     */
+    /** Returns Apple's artist button color when a `keyColor` field is present. */
     internal fun findKeyColor(element: JsonElement?): Int? = when (element) {
         is JsonObject -> element["keyColor"]?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
             ?.let(::hexColor)
@@ -277,23 +273,25 @@ object AppleMusicCatalog {
         return data.mapNotNull { it.jsonObject["attributes"] as? JsonObject }
     }
 
-    // ---- transport ----
+    // Transport
 
-    private suspend fun request(
+    internal suspend fun request(
         path: String,
         vararg params: Pair<String, String>,
         priority: Boolean = false,
     ): JsonObject? = (if (priority) pageGate else gate).withPermit {
         try {
-            var token = AppleMusicToken.get()
+            val provider = developerTokenProvider
+            val api = if (provider != null) OFFICIAL_API else AMP
+            var token = provider?.invoke(false) ?: AppleMusicToken.get()
             if (token.isEmpty()) throw LookupFailed("no token")
-            var response = get(path, token, params)
+            var response = get(api, path, token, params)
             if (response.status == HttpStatusCode.Unauthorized || response.status == HttpStatusCode.Forbidden) {
                 log("$path -> ${response.status.value}, refreshing token")
-                AppleMusicToken.invalidate(token)
-                token = AppleMusicToken.get()
+                if (provider == null) AppleMusicToken.invalidate(token)
+                token = provider?.invoke(true) ?: AppleMusicToken.get()
                 if (token.isEmpty()) throw LookupFailed("no token")
-                response = get(path, token, params)
+                response = get(api, path, token, params)
             }
             if (response.status == HttpStatusCode.NotFound) return@withPermit null
             if (response.status != HttpStatusCode.OK) throw LookupFailed("$path -> ${response.status.value}")
@@ -313,8 +311,8 @@ object AppleMusicCatalog {
     /** Status only (paths, HTTP codes, match results) — never the token. Shows as System.out in logcat. */
     internal fun log(message: String) = println("AppleCatalog: $message")
 
-    private suspend fun get(path: String, token: String, params: Array<out Pair<String, String>>): HttpResponse =
-        client.get(AMP + path) {
+    private suspend fun get(api: String, path: String, token: String, params: Array<out Pair<String, String>>): HttpResponse =
+        client.get(api + path) {
             header("Authorization", "Bearer $token")
             header("Origin", "https://music.apple.com")
             header("Referer", "https://music.apple.com/")
@@ -322,20 +320,22 @@ object AppleMusicCatalog {
             params.forEach { (k, v) -> parameter(k, v) }
         }
 
-    // ---- cache ----
+    // Cache
 
     private fun peek(key: String): Entry? = synchronized(memory) {
         memory[key]?.takeIf { it.expiresAt > System.currentTimeMillis() }
     }
 
-    private suspend fun cached(key: String, load: suspend () -> String?): String? {
+    internal suspend fun cached(key: String, hitTtlMs: Long = HIT_TTL_MS, load: suspend () -> String?): String? {
         val now = System.currentTimeMillis()
-        synchronized(memory) { memory[key] }?.takeIf { it.expiresAt > now }?.let { return it.value }
+        val previous = synchronized(memory) { memory[key] }
+        previous?.takeIf { it.expiresAt > now }?.let { return it.value }
         // LAZY: the body (and its finally-remove) must not run before the map holds it.
         val deferred = inFlight.computeIfAbsent(key) {
             scope.async(start = CoroutineStart.LAZY) {
                 try {
-                    readDisk(key)?.takeIf { it.expiresAt > System.currentTimeMillis() }?.let { entry ->
+                    val saved = readDisk(key)
+                    saved?.takeIf { it.expiresAt > System.currentTimeMillis() }?.let { entry ->
                         synchronized(memory) { memory[key] = entry }
                         return@async entry.value
                     }
@@ -343,9 +343,13 @@ object AppleMusicCatalog {
                         load()
                     } catch (e: LookupFailed) {
                         log("not cached: ${e.message}")
-                        return@async null
+                        // Serve a recent successful lookup during outages, without extending its TTL
+                        // or treating auth/network failure as a confirmed missing artist.
+                        return@async listOfNotNull(previous, saved)
+                            .filter { it.value != null && System.currentTimeMillis() - it.expiresAt <= STALE_GRACE_MS }
+                            .maxByOrNull { it.expiresAt }?.value
                     }
-                    val entry = Entry(value, System.currentTimeMillis() + if (value != null) HIT_TTL_MS else MISS_TTL_MS)
+                    val entry = Entry(value, System.currentTimeMillis() + if (value != null) hitTtlMs else MISS_TTL_MS)
                     synchronized(memory) { memory[key] = entry }
                     writeDisk(key, entry)
                     value
@@ -385,19 +389,7 @@ object AppleMusicCatalog {
         runCatching { this?.jsonPrimitive?.contentOrNull }.getOrNull().orEmpty()
 }
 
-/**
- * The anonymous developer token the Apple Music web player itself uses, kept alive on its own:
- *
- * - **renew**: a token within a day of its `exp` counts as expired and is replaced early;
- * - **revive**: a 401/403 from the API drops the token and triggers a fresh read;
- * - **persist**: every token read is saved under [AppleMusicCatalog.cacheDir], so a restart
- *   reuses it instead of downloading the web player again;
- * - **back off**: a failed read waits [SCRAPE_BACKOFF_MS] before the next attempt.
- *
- * The token is read from music.apple.com: the environment meta tag if present, otherwise the
- * `developerToken` literal in the web player's index bundle. The bundle carries other JWTs too,
- * so only one issued by `AMPWebPlay` is accepted. The baked-in [SEED] is just the last resort.
- */
+/** Retrieves and caches Apple Music's web player token. Only `AMPWebPlay` tokens are accepted. */
 object AppleMusicToken {
     const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -410,6 +402,8 @@ object AppleMusicToken {
 
     // Any JWT shape: the header's key order changes between web player builds ("typ" or "alg" first).
     private val jwt = Regex("""eyJ[\w-]+\.eyJ[\w-]+\.[\w-]+""")
+    private val issuerClaim = Regex(""""iss"\s*:\s*"([^"]+)"""")
+    private val expirationClaim = Regex(""""exp"\s*:\s*(\d+)""")
     private const val WEB_PLAY_ISSUER = "AMPWebPlay"
     private val envMeta = Regex("""name="desktop-music-app/config/environment"\s+content="([^"]+)"""")
     private val indexJs = Regex("""/assets/index[\w~.-]*\.js""")
@@ -417,6 +411,8 @@ object AppleMusicToken {
 
     @Volatile
     private var token: String = SEED
+    @Volatile
+    private var rejectedToken: String? = null
 
     /** After a failed scrape every lookup would otherwise re-download the web player; wait instead. */
     private const val SCRAPE_BACKOFF_MS = 10L * 60 * 1000
@@ -466,19 +462,26 @@ object AppleMusicToken {
     }.getOrNull()
 
     internal fun isWebPlayToken(jwtToken: String): Boolean =
-        payload(jwtToken)?.let { Regex(""""iss"\s*:\s*"([^"]+)"""").find(it)?.groupValues?.get(1) } == WEB_PLAY_ISSUER
+        payload(jwtToken)?.let { issuerClaim.find(it)?.groupValues?.get(1) } == WEB_PLAY_ISSUER
 
     /** First unexpired web-player token in [text] (a page or script body), if any. */
     internal fun pickWebPlayToken(text: String, nowSeconds: Long = System.currentTimeMillis() / 1000): String? =
-        jwt.findAll(text).map { it.value }.firstOrNull { isWebPlayToken(it) && !isExpired(it, nowSeconds) }
+        jwt.findAll(text).map { it.value }.firstOrNull {
+            it != rejectedToken && isWebPlayToken(it) && !isExpired(it, nowSeconds)
+        }
 
     fun invalidate(rejected: String) {
-        if (token == rejected) token = ""
+        rejectedToken = rejected
+        if (token == rejected) {
+            token = ""
+            // Do not restore the same rejected token from disk during renewal.
+            diskChecked = true
+        }
     }
 
     /** JWT `exp` check with a day of margin. Unparseable counts as expired. */
     internal fun isExpired(jwtToken: String, nowSeconds: Long = System.currentTimeMillis() / 1000): Boolean {
-        val exp = payload(jwtToken)?.let { Regex(""""exp"\s*:\s*(\d+)""").find(it)?.groupValues?.get(1)?.toLongOrNull() }
+        val exp = payload(jwtToken)?.let { expirationClaim.find(it)?.groupValues?.get(1)?.toLongOrNull() }
             ?: return true
         return exp - 86_400 <= nowSeconds
     }
@@ -501,7 +504,10 @@ object AppleMusicToken {
             }.bodyAsText()
             pickWebPlayToken(js)
         }
-    }.onFailure { AppleMusicCatalog.log("token scrape failed: ${it::class.simpleName}: ${it.message}") }
+    }.onFailure {
+        if (it is kotlinx.coroutines.CancellationException) throw it
+        AppleMusicCatalog.log("token scrape failed: ${it::class.simpleName}: ${it.message}")
+    }
         .getOrNull()
         .also { AppleMusicCatalog.log("token scrape ${if (it != null) "found a token" else "found nothing"}") }
 }

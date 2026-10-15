@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.screens.search
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.chromeShadow
 import androidx.compose.ui.res.painterResource
 import android.content.res.Configuration
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -92,6 +95,7 @@ import com.convx.music.utils.listItemShape
 import com.convx.music.viewmodels.LocalFilter
 import com.convx.music.viewmodels.LocalSearchViewModel
 import kotlinx.coroutines.flow.drop
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -108,14 +112,28 @@ fun LocalSearchScreen(
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current ?: return
 
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val searchFilter by viewModel.filter.collectAsState()
-    val result by viewModel.result.collectAsState()
+    val searchFilter by viewModel.filter.collectAsStateWithLifecycle()
+    val result by viewModel.result.collectAsStateWithLifecycle()
 
     LaunchedEffect(query) {
         viewModel.query.value = query
+    }
+    val localOnly = com.convx.music.LocalLocalOnlyMode.current
+    val audioPermission = com.convx.music.ui.component.rememberLocalAudioPermission { }
+    LaunchedEffect(localOnly, audioPermission.granted) {
+        if (localOnly && audioPermission.granted) viewModel.scanLocalFiles()
+    }
+    if (localOnly && !audioPermission.granted) {
+        Box(Modifier.fillMaxSize()) {
+            com.convx.music.ui.screens.library.apple.LocalAccessCard(
+                blocked = audioPermission.blocked,
+                onAllow = audioPermission.request,
+            )
+        }
+        return
     }
 
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -128,26 +146,34 @@ fun LocalSearchScreen(
             is Album -> it.album.thumbnailUrl
             is Artist -> it.artist.thumbnailUrl
             is Playlist -> it.thumbnails.firstOrNull()
-            else -> null
         }
     }
     val heroSource = rememberHeroSource(
         staticArt = heroUrl,
         songs = result.map[LocalFilter.SONG]?.filterIsInstance<Song>()?.map { it.song.thumbnailUrl to false } ?: emptyList()
     )
-    // Was hardcoded Color.Black regardless of the Theme settings color/pureBlack
-    // choice — the top bar and result background never matched what the rest of
-    // the app (online SearchScreen included) actually painted. Same token online
-    // search uses, with pureBlack forcing flat black same as every other
-    // hero-tinted screen already does (see rememberHeroTint's PureBlack override).
+    // Use the theme background unless pure-black mode is enabled.
     val tint = if (pureBlack) Color.Black else rememberAppBackgroundColor(AppTheme.colorScheme.background)
     val onTint = AppleTokens.onColor(tint)
 
-    // Glass Effect setting only drives the nav bar/mini player now — this
-    // screen's top-bar chrome keeps glass but pinned to the fixed style.
+    // Keep top-bar glass fixed; the global preference controls the nav bar and mini player.
     val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val heroBackdrop = rememberLayerBackdrop()
+
+    fun playSearchSongs(selectedSongId: String) {
+        val songs = result.map
+            .getOrDefault(LocalFilter.SONG, emptyList())
+            .filterIsInstance<Song>()
+            .map { it.toMediaItem() }
+        playerConnection.playQueue(
+            ListQueue(
+                title = context.getString(R.string.queue_searched_songs),
+                items = songs,
+                startIndex = songs.indexOfFirst { it.mediaId == selectedSongId },
+            )
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -161,7 +187,7 @@ fun LocalSearchScreen(
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeShape = ContinuousRoundedRectangle(percent = 50)
         val chromeBackgroundModifier = if (useGlass) {
-            Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
+            Modifier.chromeShadow(chromeShape).liquidGlass(config = glassConfig, shape = chromeShape)
         } else {
             Modifier.background(LocalContentColor.current.copy(alpha = 0.15f), chromeShape)
         }
@@ -169,7 +195,7 @@ fun LocalSearchScreen(
         LazyColumn(
             state = lazyListState,
             contentPadding = LocalPlayerAwareWindowInsets.current
-                .only(WindowInsetsSides.Bottom)
+                .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
                 .asPaddingValues(),
             modifier = Modifier
                 .fillMaxSize()
@@ -182,21 +208,23 @@ fun LocalSearchScreen(
                 }
         ) {
             stickyHeader {
+                // Same pills as the catalogue results; the page colour behind them so
+                // rows scroll under a clean edge.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(tint.copy(alpha = 0.8f))
+                        .background(com.convx.music.ui.ios.foundation.IosTheme.colors.systemBackground)
                 ) {
-                    ChipsRow(
-                        chips = listOf(
+                    AppleScopePills(
+                        pills = listOf(
                             LocalFilter.ALL to stringResource(R.string.filter_all),
                             LocalFilter.SONG to stringResource(R.string.filter_songs),
                             LocalFilter.ALBUM to stringResource(R.string.filter_albums),
                             LocalFilter.ARTIST to stringResource(R.string.filter_artists),
                             LocalFilter.PLAYLIST to stringResource(R.string.filter_playlists),
                         ),
-                        currentValue = searchFilter,
-                        onValueUpdate = { viewModel.filter.value = it },
+                        selected = searchFilter,
+                        onSelect = { viewModel.filter.value = it },
                     )
                 }
             }
@@ -222,9 +250,7 @@ fun LocalSearchScreen(
                     }
                 }
 
-            // itemsIndexed so listItemShape can use the index directly. It used to call
-            // items.indexOfFirst { ... } inside every row — a linear scan per row, i.e.
-            // O(n²) per frame — and re-derive the distinct list on each recomposition.
+            // Reuse the row index and distinct list instead of rescanning them per item.
             itemsIndexed(
                 items = distinctItems,
                 key = { _, it -> it.id },
@@ -254,10 +280,7 @@ fun LocalSearchScreen(
                                     }
                                 }
                             ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.more_horiz),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                             }
                         },
                         modifier = Modifier
@@ -266,17 +289,7 @@ fun LocalSearchScreen(
                                     if (item.id == mediaMetadata?.id) {
                                         playerConnection.togglePlayPause()
                                     } else {
-                                        val songs = result.map
-                                            .getOrDefault(LocalFilter.SONG, emptyList())
-                                            .filterIsInstance<Song>()
-                                            .map { it.toMediaItem() }
-                                        playerConnection.playQueue(
-                                            ListQueue(
-                                                title = context.getString(R.string.queue_searched_songs),
-                                                items = songs,
-                                                startIndex = songs.indexOfFirst { it.mediaId == item.id },
-                                            )
-                                        )
+                                        playSearchSongs(item.id)
                                     }
                                 },
                                 onLongClick = {

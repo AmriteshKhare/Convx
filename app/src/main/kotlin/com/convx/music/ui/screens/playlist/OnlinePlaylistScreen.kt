@@ -5,6 +5,13 @@
 
 package com.convx.music.ui.screens.playlist
 
+import com.convx.music.utils.makeTimeString
+
+import com.convx.music.ui.utils.sharedTitleTarget
+
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.chromeShadow
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -73,6 +80,7 @@ import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -86,6 +94,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEachReversed
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -96,7 +105,6 @@ import com.composables.sfsymbols.monochrome.SFArrowDownCircle
 import com.composables.sfsymbols.monochrome.SFECircle
 import com.composables.sfsymbols.monochrome.SFHeart
 import com.composables.sfsymbols.monochrome.SFHeartFill
-import com.composables.sfsymbols.monochrome.SFMagnifyingglass
 import com.composables.sfsymbols.monochrome.SFShuffle
 import com.composables.sfsymbols.monochrome.SFWifiSlash
 import com.composables.sfsymbols.monochrome.SFXmark
@@ -111,10 +119,13 @@ import com.convx.music.constants.HideExplicitKey
 import com.convx.music.db.entities.Playlist
 import com.convx.music.db.entities.PlaylistEntity
 import com.convx.music.db.entities.PlaylistSongMap
+import com.convx.music.extensions.toMediaItem
 import com.convx.music.models.toMediaMetadata
 import com.convx.music.playback.DownloadTarget
+import com.convx.music.playback.combinedDownloadState
 import com.convx.music.playback.cancelDownloads
 import com.convx.music.playback.downloadSongs
+import com.convx.music.playback.queues.ListQueue
 import com.convx.music.playback.queues.YouTubePlaylistQueue
 import com.convx.music.playback.queues.YouTubeQueue
 import com.convx.music.playback.removeDownloads
@@ -129,6 +140,7 @@ import com.convx.music.ui.component.HeroTopBlur
 import com.convx.music.ui.component.LocalAppBackdrop
 import com.convx.music.ui.component.LocalGlassEffectConfig
 import com.convx.music.ui.component.LocalMenuState
+import com.convx.music.ui.ios.compat.TextButton
 import com.convx.music.ui.component.NavigationTitle
 import com.convx.music.ui.component.YouTubeGridItem
 import com.convx.music.ui.component.YouTubeListItem
@@ -162,7 +174,6 @@ import com.convx.music.ui.menu.YouTubeSelectionSongMenu
 import com.convx.music.ui.menu.YouTubeSongMenu
 import com.convx.music.ui.player.MeshGradientBackground
 import com.convx.music.ui.player.dimmed
-import com.convx.music.ui.player.rememberArtworkMeshPalette
 import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.theme.rememberArtworkTint
 import com.convx.music.ui.utils.FloatingChromeSpacer
@@ -191,6 +202,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -200,21 +212,21 @@ fun OnlinePlaylistScreen(
     viewModel: OnlinePlaylistViewModel = hiltViewModel(),
 ) {
     val menuState = LocalMenuState.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val coroutineScope = rememberCoroutineScope()
 
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val playlist by viewModel.playlist.collectAsState()
-    val songs by viewModel.playlistSongs.collectAsState()
-    val dbPlaylist by viewModel.dbPlaylist.collectAsState()
-    val relatedItems by viewModel.relatedItems.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
-    val error by viewModel.error.collectAsState()
+    val playlist by viewModel.playlist.collectAsStateWithLifecycle()
+    val songs by viewModel.playlistSongs.collectAsStateWithLifecycle()
+    val dbPlaylist by viewModel.dbPlaylist.collectAsStateWithLifecycle()
+    val relatedItems by viewModel.relatedItems.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
 
     val hideExplicit by rememberPreference(key = HideExplicitKey, defaultValue = false)
 
@@ -223,30 +235,19 @@ fun OnlinePlaylistScreen(
 
     var isSearching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
-    val downloadUtil = LocalDownloadUtil.current
+    val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+    val exitSearch = {
+        focusManager.clearFocus()
+        isSearching = false
+        query = TextFieldValue()
+    }
+    val downloadUtil = LocalDownloadUtil.current.get()
     val context = LocalContext.current
-    // Collected rather than folded into a LaunchedEffect so the current state of each
-    // download is also available at click time — the download and cancel actions filter
-    // on it, see DownloadActions.
-    val downloads by downloadUtil.downloads.collectAsState()
+    val downloads by downloadUtil.downloads.collectAsStateWithLifecycle()
 
     val downloadState = remember(songs, downloads) {
-        // Bound to a local first: `songs` is a delegated val, which blocks the smart cast
-        // the null check below would otherwise give us.
-        val current = songs
-        when {
-            current.isNullOrEmpty() -> Download.STATE_STOPPED
-            current.all { downloads[it.id]?.state == Download.STATE_COMPLETED } ->
-                Download.STATE_COMPLETED
-
-            current.all {
-                downloads[it.id]?.state == Download.STATE_QUEUED ||
-                    downloads[it.id]?.state == Download.STATE_DOWNLOADING ||
-                    downloads[it.id]?.state == Download.STATE_COMPLETED
-            } -> Download.STATE_DOWNLOADING
-
-            else -> Download.STATE_STOPPED
-        }
+        combinedDownloadState(songs, downloads) { it.id }
     }
 
     val filteredSongs = remember(songs, query) {
@@ -269,7 +270,6 @@ fun OnlinePlaylistScreen(
         selection.clear()
     }
 
-    val focusRequester = remember { FocusRequester() }
     LaunchedEffect(isSearching) { if (isSearching) focusRequester.requestFocus() }
 
     LaunchedEffect(filteredSongs) {
@@ -287,28 +287,12 @@ fun OnlinePlaylistScreen(
     }
 
     if (isSearching) {
-        BackHandler {
-            isSearching = false
-            query = TextFieldValue()
-        }
+        BackHandler(onBack = exitSearch)
     } else if (inSelectMode) {
         BackHandler(onBack = onExitSelectionMode)
     }
 
-    // Apple Music style: a single dominant color pulled from the playlist's own
-    // artwork washes the screen, and the circular back/search/select chrome is
-    // real liquid glass sampling this screen's own content behind it — same
-    // treatment as Artist/Album.
-    val artworkColors = rememberArtworkTint(playlist?.thumbnail)
-    val screenBackground = AppTheme.colorScheme.background
-    val tintColor by animateColorAsState(
-        targetValue = artworkColors.getOrNull(0)?.copy(alpha = 0.55f) ?: Color.Transparent,
-        animationSpec = tween(durationMillis = 800),
-        label = "OnlinePlaylistScreenTint",
-    )
-
-    // Glass Effect setting only drives the nav bar/mini player now — this
-    // screen's top-bar chrome keeps glass but pinned to the fixed style.
+    // Keep top-bar glass fixed; the global preference controls the nav bar and mini player.
     val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
@@ -319,12 +303,7 @@ fun OnlinePlaylistScreen(
     // See ArtistScreen.kt for the full explanation of the cycle this avoids.
     val heroBackdrop = rememberLayerBackdrop()
 
-    // A SECOND, ATTACHED backdrop: .layerBackdrop'd onto the LazyColumn below,
-    // which is a *sibling* of the floating chrome row, not an ancestor — the
-    // chrome row samples a texture of already-drawn list content, it never
-    // captures its own draw pass, so no cycle. This is what lets the chrome
-    // buttons show real blurred list/hero content instead of heroBackdrop's
-    // flat empty-capture fallback.
+    // Attach the list backdrop so sibling chrome can blur list content without sampling itself.
     val heroZoom = rememberHeroZoom()
 
     // Instant seed: route thumbnail arg (every caller passes it) -> live tile
@@ -336,35 +315,16 @@ fun OnlinePlaylistScreen(
     )
     val onlineChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 3)
 
-    val heroSource = rememberHeroSource (
-        staticArt = instantPlaylistThumb ?: playlist?.thumbnail,
-        songs = songs.map { it.thumbnail to false },
+    val appearance = com.convx.music.ui.component.rememberPlaylistAppearance(
+        instantPlaylistThumb ?: playlist?.thumbnail,
+        0xFFFF375F.toInt(),
     )
-    // Same mesh backdrop as ArtistScreen/the player's BITCHORD_MESH style, not the
-    // flat single-swatch fill rememberHeroPalette used to paint here -- this screen
-    // is reached straight off the artist page and read visibly flatter than the
-    // player over the same artwork.
-    val meshPalette = rememberArtworkMeshPalette(instantPlaylistThumb ?: playlist?.thumbnail)
-    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
+    val tint = appearance.background
     com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Same flat white every icon/text reads in the player on a mesh background,
-    // rather than a per-artwork computed contrast colour.
-    val onTint = Color.White
+    val onTint = appearance.foreground
 
-    // Fills the screen tint into the capture BEFORE the content, exactly like
-    // MainActivity's appBackdrop does with its own background. Without it the
-    // list records onto a transparent canvas (the tint is painted by the outer
-    // Box, outside this capture), so the blurred result is itself part
-    // transparent and the sharp content shows straight through it — the glass
-    // read as a doubled/ghosted image, or as no glass at all where the list is
-    // sparse. This is the difference that made the nav bar look right and these
-    // screens look wrong.
-    val listBackdrop = rememberLayerBackdrop(
-        onDraw = remember(tint) {
-            val bg = tint
-            { drawRect(bg); drawContent() }
-        }
-    )
+    // Include the page tint in the captured backdrop so blur matches the visible page.
+    val listBackdrop = rememberLayerBackdrop()
     val backdropFreeze = rememberBackdropFreeze()
 
     // Per-screen Haze source, the same one Album and Artist already keep: the hero
@@ -376,47 +336,28 @@ fun OnlinePlaylistScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(tint)
-            .hazeSource(hazeState),
+            .background(tint),
     ) {
-      MeshGradientBackground(
-          palette = meshPalette,
-          trackKey = instantPlaylistThumb ?: playlist?.thumbnail,
-          modifier = Modifier.matchParentSize(),
-      )
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         // Built INSIDE the provider so liquidGlass captures heroBackdrop, not the
         // root appBackdrop — sampling appBackdrop here is the RenderNode cycle.
         val chromeBackgroundModifier = if (useGlass) {
-            Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
+            Modifier.chromeShadow(chromeShape).liquidGlass(config = glassConfig, shape = chromeShape)
         } else {
             Modifier.background(LocalContentColor.current.copy(alpha = 0.15f), chromeShape)
         }
-        // Capture from a plain Box wrapping the LazyColumn, not the LazyColumn's
-        // own modifier: LazyColumn promotes its items to their own RenderNodes
-        // for scroll recycling, which a capture attached directly to it doesn't
-        // reliably flatten (images came through, text/icons didn't). A plain
-        // Box one level up just sees "a fully-drawn child" and captures all of
-        // it, same as it would any other already-rendered composable.
+        // Capture through a plain Box; LazyColumn's recycled item layers do not flatten reliably.
         Box(modifier = Modifier
             .nestedScroll(backdropFreeze.connection)
 
-            // OUTER layer, and it must come BEFORE layerBackdrop: the layer has to
-            // enclose the backdrop node, or that node's draw re-runs whenever anything
-            // else in the window redraws. The mini player, the playing indicator and
-            // the position poll are all siblings that tick on their own schedule, and
-            // each tick was re-recording this entire list. MainActivity pairs an outer
-            // and inner layer for exactly this; the screen-local backdrops were left
-            // with only the inner half.
+            // Cache list content so sibling redraws do not re-record the backdrop.
             .graphicsLayer()
             .layerBackdrop(listBackdrop, frozen = backdropFreeze.frozen)
-            // Content becomes ONE cached RenderNode, so the backdrop's
-            // layer.record { drawContent() } records a single drawRenderNode
-            // instead of re-issuing every op in the list.
-            .graphicsLayer()) {
+            .graphicsLayer()
+            .hazeSource(hazeState)) {
+                com.convx.music.ui.component.ArtworkMeshBackground(instantPlaylistThumb ?: playlist?.thumbnail, paused = { lazyListState.isScrollInProgress }, appearance = appearance)
         LazyColumn(
             state = lazyListState,
-            // No bounce here: the top pull drives the hero zoom instead.
             overscrollEffect = heroZoom.listOverscroll(),
             modifier = Modifier.heroPullZoom(heroZoom),
             contentPadding = LocalPlayerAwareWindowInsets.current
@@ -424,58 +365,91 @@ fun OnlinePlaylistScreen(
                 .union(WindowInsets.ime)
                 .asPaddingValues(),
         ) {
-            if (playlist == null || songs.isEmpty()) {
-                // Loading mirrors loaded: seeded hero + meta skeleton on the
-                // seeded bg, so arrival swaps content, never layout. No spinner.
-                item(key = "shimmer_header", contentType = "header") {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (instantPlaylistThumb != null) {
-                            com.convx.music.ui.component.SeededShimmerHero(
-                                thumbUrl = instantPlaylistThumb,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        com.convx.music.ui.component.ShimmerLine(fraction = 0.55f, height = 24.dp)
-                        Spacer(Modifier.height(24.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-                            verticalAlignment = Alignment.CenterVertically
+            if (!isLoading && (error != null || songs.isEmpty())) {
+                playlist?.let { loadedPlaylist ->
+                    item(key = "playlist_header", contentType = "header") {
+                        OnlinePlaylistHeader(
+                            playlist = loadedPlaylist,
+                            songs = songs,
+                            dbPlaylist = dbPlaylist,
+                            downloadState = downloadState,
+                            navController = navController,
+                            coroutineScope = coroutineScope,
+                            continuation = viewModel.continuation,
+                            heroBackdrop = heroBackdrop,
+                            heroScale = heroZoom.scale,
+                            hazeState = hazeState,
+                            pageColor = tint,
+                            scrollBlurProgress = rememberHeroTopBlur(lazyListState),
+                            onStartSearch = { isSearching = true },
+                            searchValue = query.takeIf { isSearching },
+                            onSearchValueChange = { query = it },
+                            onSearchImeAction = { focusManager.clearFocus() },
+                            searchFocusRequester = focusRequester,
+                        )
+                    }
+                    item(key = "playlist_unavailable", contentType = "placeholder") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            com.convx.music.ui.component.ShimmerBox(
-                                Modifier.size(48.dp),
-                                androidx.compose.foundation.shape.CircleShape
+                            Text(
+                                stringResource(if (error != null) R.string.playlist_load_failed else R.string.playlist_is_empty),
+                                color = AppTheme.colorScheme.onBackground,
                             )
-                            com.convx.music.ui.component.ShimmerBox(
-                                Modifier.size(72.dp),
-                                androidx.compose.foundation.shape.CircleShape
-                            )
-                            com.convx.music.ui.component.ShimmerBox(
-                                Modifier.size(48.dp),
-                                androidx.compose.foundation.shape.CircleShape
-                            )
+                            if (error != null) TextButton(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }
                         }
-                        Spacer(Modifier.height(24.dp))
+                    }
+                } ?: item(key = "playlist_unavailable", contentType = "placeholder") {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = com.convx.music.ui.component.topBarContentPadding(), start = 24.dp, end = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(stringResource(R.string.filter_playlists), style = AppTheme.typography.headlineSmall, color = AppTheme.colorScheme.onBackground)
+                        Spacer(Modifier.height(16.dp))
+                        Text(stringResource(R.string.playlist_load_failed), color = AppTheme.colorScheme.onBackground)
+                        TextButton(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }
                     }
                 }
-                items(8) { index ->
-                    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                        com.convx.music.ui.component.SongRowSkeleton(index = index)
+            } else if (playlist == null || songs.isEmpty()) {
+                // Loading draws the loaded page's own header from the tile's seed, so the shared artwork
+                // lands on the same bounds and nothing shimmers or swaps when the data arrives.
+                item(key = "playlist_header", contentType = "header") {
+                    com.convx.music.ui.component.CollectionDetailHeader(
+                        title = com.convx.music.ui.utils.selectedArtworkTitle() ?: viewModel.routeTitle.orEmpty(),
+                        artwork = instantPlaylistThumb,
+                        metadata = "",
+                        foreground = onTint,
+                        playing = false,
+                        enabled = false,
+                        onPlay = {},
+                        onShuffle = {},
+                        modifier = Modifier.padding(top = com.convx.music.ui.component.topBarContentPadding()),
+                    )
+                }
+                // The loaded page has a search field and song rows under this header; hold their space so
+                // the content fades into place instead of pushing the list down.
+                item(key = "playlist_loading_rows", contentType = "placeholder") {
+                    com.convx.music.ui.component.shimmer.ShimmerHost {
+                        Column {
+                            com.convx.music.ui.component.ShimmerBox(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(36.dp),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            repeat(8) { com.convx.music.ui.component.shimmer.ListItemPlaceHolder() }
+                        }
                     }
                 }
             } else {
                 playlist?.let { playlist ->
-                    if (isSearching) {
-                        // No hero header in search mode — reserve the floating chrome's
-                        // height so the first row doesn't start under the status bar.
-                        item(key = "search_chrome_spacer", contentType = "spacer") { FloatingChromeSpacer() }
-                    }
-                    if (!isSearching) {
-                        item(key = "playlist_header", contentType = "header") {
-                            OnlinePlaylistHeader(
+                    item(key = "playlist_header", contentType = "header") {
+                        OnlinePlaylistHeader(
+                                onStartSearch = { isSearching = true },
+                                searchValue = query.takeIf { isSearching },
+                                onSearchValueChange = { query = it },
+                                onSearchImeAction = { focusManager.clearFocus() },
+                                searchFocusRequester = focusRequester,
                                 playlist = playlist,
                                 songs = songs,
                                 dbPlaylist = dbPlaylist,
@@ -488,8 +462,7 @@ fun OnlinePlaylistScreen(
                                 hazeState = hazeState,
                                 pageColor = tint,
                                 scrollBlurProgress = rememberHeroTopBlur(lazyListState),
-                            )
-                        }
+                        )
                     }
 
                     itemsIndexed(
@@ -512,6 +485,9 @@ fun OnlinePlaylistScreen(
                             isSelected = inSelectMode && songItem.id in selection,
                             shape = listItemShape(index, filteredSongs.size),
                             flat = true,
+                            secondaryAdditiveChrome = onTint == androidx.compose.ui.graphics.Color.White,
+                            subtitleAdditiveChrome = false,
+                            subtitleColor = onTint.copy(alpha = 0.78f),
                             modifier = Modifier
                                 .combinedBounceClick(
                                     enabled = !hideExplicit || !songItem.explicit,
@@ -553,7 +529,7 @@ fun OnlinePlaylistScreen(
                                             YouTubeSongMenu(songItem, navController, menuState::dismiss)
                                         }
                                     }) {
-                                        Icon(painter = painterResource(R.drawable.more_horiz), null)
+                                        SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                                     }
                                 }
                             }
@@ -641,26 +617,13 @@ fun OnlinePlaylistScreen(
         }
         }
 
-        // Floating glass chrome over the tinted background, replacing the
-        // Material TopAppBar. Select mode and in-place search keep their exact
-        // prior behavior, just restyled containers; the title still only fades
-        // in once scrolled past the hero, same as before.
+        // Keep search and selection behavior; fade the title after scrolling past the hero.
         val chromeScrimProgress = rememberChromeScrimProgress(lazyListState)
-        // Built INSIDE the provider so liquidGlass captures listBackdrop (the
-        // LazyColumn's own recorded content, a sibling — see its declaration
-        // above), not the root appBackdrop — sampling appBackdrop here is the
-        // RenderNode cycle. listBackdrop is attached (unlike heroBackdrop), so
-        // this chrome actually shows blurred list/hero content, not just a
-        // flat tinted fallback.
+        // Sample the attached list capture so the glass blurs list and hero content.
         CompositionLocalProvider(LocalAppBackdrop provides listBackdrop) {
-        // Drawn BEFORE the chrome row below, not after: this used to sit as a
-        // sibling composed later than the whole button row, which put the
-        // blur ON TOP of the buttons/scrim instead of behind them — visually
-        // near-invisible against the already-dark ChromeScrim, and hid the
-        // hero-dissolve effect this exists for.
-        HeroTopBlur(
+        // Draw the blur before the chrome row so it stays behind the buttons and scrim.
+        com.convx.music.ui.component.TopFadeBlur(
             hazeState = hazeState,
-            progress = rememberHeroTopBlur(lazyListState),
             pageColor = tint,
             modifier = Modifier.align(Alignment.TopCenter),
         )
@@ -680,10 +643,7 @@ fun OnlinePlaylistScreen(
         ) {
             if (inSelectMode) {
                 GlassCircleButton(onClick = onExitSelectionMode) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFXmark,
-                        contentDescription = null
-                    )
+                    SymbolIcon(symbol = sf("SFXmark"), contentDescription = null)
                 }
 
                 Text(
@@ -726,73 +686,18 @@ fun OnlinePlaylistScreen(
                             }
                         }
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.more_horiz),
-                            contentDescription = null,
-                            modifier = Modifier.alpha(if (selection.isNotEmpty()) 1f else 0.4f)
-                        )
+                        SymbolIcon(symbol = sf("ellipsis"), contentDescription = null, modifier = Modifier.alpha(if (selection.isNotEmpty()) 1f else 0.4f))
                     }
-                }
-            } else if (isSearching) {
-                GlassCircleButton(
-                    onClick = {
-                        isSearching = false
-                        query = TextFieldValue()
-                    },
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.arrow_back_ios),
-                        contentDescription = null
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .clip(chromeShape)
-                        .then(chromeBackgroundModifier)
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        placeholder = {
-                            Text(
-                                text = stringResource(R.string.search),
-                                style = AppTheme.typography.titleMedium,
-                                color = chromeContentColor.copy(alpha = 0.6f)
-                            )
-                        },
-                        singleLine = true,
-                        textStyle = AppTheme.typography.titleMedium.copy(color = chromeContentColor),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                            cursorColor = chromeContentColor,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester)
-                    )
                 }
             } else {
                 GlassCircleButton(
-                    onClick = { navController.navigateUp() },
-                    onLongClick = { navController.backToMain() },
+                    onClick = { if (isSearching) exitSearch() else navController.navigateUp() },
+                    onLongClick = { if (isSearching) exitSearch() else navController.backToMain() },
                     modifier = with(onlineChrome) {
                         Modifier.backEnter().then(com.convx.music.ui.component.backExitModifier())
                     },
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.arrow_back_ios),
-                        contentDescription = null
-                    )
+                    SymbolIcon(symbol = sf("chevron.left"), contentDescription = null)
                 }
 
                 AnimatedContent(
@@ -826,22 +731,6 @@ fun OnlinePlaylistScreen(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     IconButton(
-                        onClick = { isSearching = true },
-                        modifier = Modifier.size(38.dp)
-                    ) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
-                            contentDescription = stringResource(R.string.search),
-                            modifier = with(onlineChrome) {
-                                Modifier.iconEnter(0)
-                                    .size(20.dp)
-                                    .additiveChrome(useGlass && ambientColor.isSpecified)
-                            },
-                            tint = pillIconTint
-                        )
-                    }
-
-                    IconButton(
                         onClick = {
                             playlist?.shareLink?.let { link ->
                                 val intent = Intent().apply {
@@ -854,16 +743,11 @@ fun OnlinePlaylistScreen(
                         },
                         modifier = Modifier.size(38.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ios_share),
-                            contentDescription = stringResource(R.string.share),
-                            modifier = with(onlineChrome) {
+                        SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = stringResource(R.string.share), size = 20.dp, modifier = with(onlineChrome) {
                                 Modifier.iconEnter(1)
-                                    .size(20.dp)
+
                                     .additiveChrome(useGlass && ambientColor.isSpecified)
-                            },
-                            tint = pillIconTint
-                        )
+                            }, tint = pillIconTint)
                     }
 
                     IconButton(
@@ -872,7 +756,7 @@ fun OnlinePlaylistScreen(
                                 menuState.show {
                                     YouTubePlaylistMenu(
                                         playlist = pl,
-                                        songs = songs ?: emptyList(),
+                                        songs = songs,
                                         coroutineScope = coroutineScope,
                                         onDismiss = menuState::dismiss,
                                     )
@@ -881,16 +765,11 @@ fun OnlinePlaylistScreen(
                         },
                         modifier = Modifier.size(38.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.more_horiz),
-                            contentDescription = stringResource(R.string.more_options),
-                            modifier = with(onlineChrome) {
+                        SymbolIcon(symbol = sf("ellipsis"), contentDescription = stringResource(R.string.more_options), size = 20.dp, modifier = with(onlineChrome) {
                                 Modifier.iconEnter(2)
-                                    .size(20.dp)
+
                                     .additiveChrome(useGlass && ambientColor.isSpecified)
-                            },
-                            tint = pillIconTint
-                        )
+                            }, tint = pillIconTint)
                     }
                 }
             }
@@ -922,397 +801,46 @@ private fun OnlinePlaylistHeader(
     hazeState: HazeState? = null,
     pageColor: Color = Color.Black,
     scrollBlurProgress: State<Float> = ZeroScrollProgress,
+    onStartSearch: () -> Unit = {},
+    searchValue: TextFieldValue? = null,
+    onSearchValueChange: (TextFieldValue) -> Unit = {},
+    onSearchImeAction: () -> Unit = {},
+    searchFocusRequester: FocusRequester? = null,
 ) {
-    val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val database = LocalDatabase.current
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+    val database = LocalDatabase.current.get()
     val menuState = LocalMenuState.current
-    val downloads by LocalDownloadUtil.current.downloads.collectAsState()
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-
-    val hasExplicitContent = remember(songs) {
-        songs.any { it.explicit }
-    }
-
-    // Same glass/tint chrome as the enclosing OnlinePlaylistScreen's floating
-    // top bar — recomputed here since this is a separate composable function.
-    val artworkColors = rememberArtworkTint(playlist.thumbnail)
-    // Glass Effect setting only drives the nav bar/mini player now — this
-    // screen's top-bar chrome keeps glass but pinned to the fixed style.
-    val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
-    val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
-    val chromeShape = ContinuousRoundedRectangle(percent = 50)
-    val chromeContentColor = if (useGlass) glassConfig.resolvedTextColor() else AppTheme.colorScheme.onSurface
-    val chromeBackgroundModifier = if (useGlass) {
-        Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
-    } else {
-        Modifier.background(AppTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f), chromeShape)
-    }
-
-    val heroUrl = playlist.thumbnail
-    val heroSource = rememberHeroSource(
-        staticArt = heroUrl,
-        songs = songs.map { it.thumbnail to false },
-    )
-    // The enclosing OnlinePlaylistScreen paints the actual mesh background; this header
-    // only needs the same flat white every icon/text reads over it, like the player.
-    val onTint = Color.White
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Wide layout: bounded artwork card with the title beside it instead of
-            // the full-bleed square, which would fill the fold on a tablet.
-            if (LocalTabView.current) {
-                HeroCardHeader(
-                    artworkUrl = heroUrl,
-                    title = {
-                        Text(
-                            text = playlist.title,
-                            style = AppTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = onTint,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    subtitle = playlist.author?.name?.let { author ->
-                        {
-                            Text(
-                                text = author,
-                                style = AppTheme.typography.titleMedium,
-                                color = onTint.copy(alpha = 0.7f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    },
-                )
-            } else {
-                AlbumStyleHeroImage(
-                    artworkUrl = heroUrl,
-                    heroScale = heroScale,
-                    hazeState = hazeState,
-                    pageColor = pageColor,
-                    scrollBlurProgress = scrollBlurProgress,
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                // Title
-                Text(
-                    text = playlist.title,
-                    style = AppTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    color = onTint,
-                    modifier = Modifier.padding(horizontal = 32.dp)
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-                // Action Buttons Row — Redesigned for unified circular look
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 32.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Share Button (Left - Circular)
-                    ContrastCircleButton(
-                        onTint = onTint,
-                        onClick = {
-                            val intent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, playlist.shareLink)
-                            }
-                            context.startActivity(Intent.createChooser(intent, null))
-                        },
-                        size = 48.dp,
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ios_share),
-                            contentDescription = stringResource(R.string.share),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    // Play Button (Center - Large Circle)
-                    // playlist.id is a YouTube playlist id, never equal to a
-                    // song's albumId — that comparison was always false, so this
-                    // never showed "pause" and always restarted the queue on tap.
-                    // Membership of the current song in this playlist's own list
-                    // is the same "is this the active context" heuristic
-                    // AlbumScreen uses (there, albumId happens to match directly).
-                    val isPlayingThisPlaylist = isPlaying && songs.any { it.id == mediaMetadata?.id }
-                    ContrastCircleButton(
-                        onTint = onTint,
-                        onClick = {
-                            if (songs.isNotEmpty()) {
-                                if (isPlayingThisPlaylist) {
-                                    playerConnection.player.pause()
-                                } else if (songs.any { it.id == mediaMetadata?.id }) {
-                                    playerConnection.player.play()
-                                } else {
-                                    playerConnection.playQueue(
-                                        YouTubePlaylistQueue(
-                                            playlistId = playlist.id,
-                                            playlistTitle = playlist.title,
-                                            initialSongs = songs,
-                                            initialContinuation = continuation
-                                        )
-                                    )
-                                }
-                            }
-                        },
-                        size = 72.dp,
-                    ) {
-                        AnimatedPlayPauseIcon(
-                            isPlaying = isPlayingThisPlaylist,
-                            tint = onTint,
-                            size = 32.dp,
-                        )
-                    }
-
-                    // Save Button (Right - Circular)
-                    val isBookmarked = dbPlaylist?.playlist?.bookmarkedAt != null
-                    ContrastCircleButton(
-                        onTint = onTint,
-                        onClick = {
-                            coroutineScope.launch(Dispatchers.IO) {
-                                if (dbPlaylist != null) {
-                                    database.withTransaction {
-                                        val currentPlaylist = dbPlaylist.playlist
-                                        update(currentPlaylist, playlist)
-                                        update(currentPlaylist.toggleLike())
-                                    }
-                                } else {
-                                    database.withTransaction {
-                                        val playlistEntity = PlaylistEntity(
-                                            name = playlist.title,
-                                            browseId = playlist.id,
-                                            thumbnailUrl = playlist.thumbnail,
-                                            isEditable = playlist.isEditable,
-                                            remoteSongCount = playlist.songCountText?.let {
-                                                Regex("""\d+""").find(it)?.value?.toIntOrNull()
-                                            },
-                                            playEndpointParams = playlist.playEndpoint?.params,
-                                            shuffleEndpointParams = playlist.shuffleEndpoint?.params,
-                                            radioEndpointParams = playlist.radioEndpoint?.params
-                                        ).toggleLike()
-                                        insert(playlistEntity)
-                                        songs.map { it.toMediaMetadata() }
-                                            .onEach { insert(it) }
-                                            .mapIndexed { index, song ->
-                                                PlaylistSongMap(
-                                                    songId = song.id,
-                                                    playlistId = playlistEntity.id,
-                                                    position = index,
-                                                    setVideoId = song.setVideoId
-                                                )
-                                            }
-                                            .forEach { insert(it) }
-                                    }
-                                }
-                            }
-                        },
-                        size = 48.dp,
-                    ) {
-                        Icon(
-                            imageVector = if (isBookmarked) SfSymbols.Monochrome.SFHeartFill else SfSymbols.Monochrome.SFHeart,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = if (isBookmarked) AppTheme.colorScheme.error else LocalContentColor.current
-                        )
-                    }
-                }
-
-            Spacer(Modifier.height(24.dp))
-
-            // Explicit Label
-            if (hasExplicitContent) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier
-                        .clip(chromeShape)
-                        .then(chromeBackgroundModifier)
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFECircle,
-                        contentDescription = "Explicit",
-                        tint = chromeContentColor,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = stringResource(R.string.explicit),
-                        style = AppTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = chromeContentColor
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-            }
-
-            // Metadata Badge
-            val totalDuration = songs.sumOf { it.duration ?: 0 }
-            Text(
-                text = buildString {
-                    append(pluralStringResource(R.plurals.n_song, songs.size, songs.size))
-                    if (totalDuration > 0) {
-                        append(" • ")
-                        val hours = totalDuration / 3600
-                        val minutes = (totalDuration % 3600) / 60
-                        if (hours > 0) {
-                            append("${hours}h ${minutes}m")
-                        } else {
-                            append("${minutes}m")
-                        }
-                    }
-                },
-                style = AppTheme.typography.bodyMedium,
-                color = onTint.copy(alpha = 0.7f),
-                modifier = Modifier
-                    .padding(horizontal = 32.dp)
-                    .clip(chromeShape)
-                    .then(chromeBackgroundModifier)
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            )
-
-            // Author Name
-            playlist.author?.name?.let { authorName ->
-                Text(
-                    text = authorName,
-                    style = AppTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = onTint,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 32.dp)
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Toggle Buttons Row (Download, Shuffle, More)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // Download Toggle
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .weight(1f)
-                        // Figma Button height: 50 (225:2439).
-                        .height(50.dp)
-                        .clip(chromeShape)
-                        .then(chromeBackgroundModifier)
-                        .bounceClick(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(),
-                            onClick = {
-                                when (downloadState) {
-                                    Download.STATE_COMPLETED ->
-                                        removeDownloads(context, songs.map { it.id })
-
-                                    // Cancel, not remove: this used to delete every song
-                                    // in the playlist, already-finished ones included.
-                                    Download.STATE_DOWNLOADING -> cancelDownloads(
-                                        context,
-                                        songs.map { it.id },
-                                        downloads,
-                                    )
-
-                                    else -> downloadSongs(
-                                        context,
-                                        songs.map { DownloadTarget(it.id, it.title) },
-                                        downloads,
-                                    )
-                                }
-                            }
-                        )
-                        .semantics { role = Role.Button }
-                ) {
-                    when (downloadState) {
-                        Download.STATE_COMPLETED -> {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFWifiSlash,
-                                contentDescription = stringResource(R.string.saved),
-                                modifier = Modifier.size(20.dp),
-                                tint = chromeContentColor
-                            )
-                        }
-                        Download.STATE_DOWNLOADING -> {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp),
-                                color = chromeContentColor
-                            )
-                        }
-                        else -> {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFArrowDownCircle,
-                                contentDescription = stringResource(R.string.action_download),
-                                modifier = Modifier.size(20.dp),
-                                tint = chromeContentColor
-                            )
-                        }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = when (downloadState) {
-                            Download.STATE_COMPLETED -> stringResource(R.string.saved)
-                            Download.STATE_DOWNLOADING -> stringResource(R.string.saving)
-                            else -> stringResource(R.string.save_album)
-                        },
-                        style = AppTheme.typography.labelMedium,
-                        color = chromeContentColor
-                    )
-                }
-
-                // Shuffle Button
-                ContrastCircleButton(
-                    onTint = onTint,
-                    onClick = {
-                        if (songs.isNotEmpty()) {
-                            playerConnection.playQueue(
-                                YouTubePlaylistQueue(
-                                    playlistId = playlist.id,
-                                    playlistTitle = playlist.title,
-                                    initialSongs = songs.shuffled(),
-                                    initialContinuation = continuation
-                                )
-                            )
-                        }
-                    },
-                    size = 48.dp,
-                ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFShuffle,
-                        contentDescription = stringResource(R.string.shuffle_content_desc),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // More Options Button
-                ContrastCircleButton(
-                    onTint = onTint,
-                    onClick = {
+    val downloads by LocalDownloadUtil.current.get().downloads.collectAsStateWithLifecycle()
+    val artwork = com.convx.music.ui.utils.pendingSharedArtworkThumbFor(playlist.id) ?: playlist.thumbnail
+    val appearance = com.convx.music.ui.component.rememberPlaylistAppearance(artwork)
+    val duration = remember(songs) { songs.sumOf { it.duration ?: 0 } }
+    com.convx.music.ui.component.CollectionDetailHeader(
+        title = playlist.title,
+        subtitle = playlist.author?.name,
+        artwork = artwork,
+        metadata = pluralStringResource(R.plurals.n_song, songs.size, songs.size) +
+            if (duration > 0) " \u00b7 " + makeTimeString(duration * 1000L) else "",
+        foreground = appearance.foreground,
+        playing = isPlaying && songs.any { it.id == mediaMetadata?.id },
+        enabled = songs.isNotEmpty(),
+        onPlay = {
+            if (songs.any { it.id == mediaMetadata?.id }) playerConnection.togglePlayPause()
+            else playerConnection.playQueue(YouTubePlaylistQueue(
+                playlistId = playlist.id, playlistTitle = playlist.title,
+                initialSongs = songs, initialContinuation = continuation,
+            ))
+        },
+        onShuffle = { playerConnection.playQueue(ListQueue(title = playlist.title, items = songs.shuffled().map { it.toMediaItem() })) },
+        onSearch = onStartSearch,
+        searchValue = searchValue,
+        onSearchValueChange = onSearchValueChange,
+        onSearchImeAction = onSearchImeAction,
+        searchFocusRequester = searchFocusRequester,
+        onRightAction = {
                         menuState.show {
                             YouTubePlaylistMenu(
                                 playlist = playlist,
@@ -1322,15 +850,6 @@ private fun OnlinePlaylistHeader(
                             )
                         }
                     },
-                    size = 48.dp,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.more_horiz),
-                        contentDescription = stringResource(R.string.more_options),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-    }
+        modifier = modifier.padding(top = com.convx.music.ui.component.topBarContentPadding()),
+    )
 }

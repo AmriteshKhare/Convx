@@ -3,7 +3,7 @@
 ## What the page looked like before
 
 `ArtistScreen.kt` already drew the mesh (criterion 1 was in place from the
-BitChord integration commit `9103148b`): `rememberArtworkMeshPalette` →
+the reference app integration commit `9103148b`): `rememberArtworkMeshPalette` →
 `artistScreenSaturated()` → `MeshGradientBackground(MeshPalette(meshColors))`
 filling the screen behind everything.
 
@@ -162,7 +162,7 @@ verified:
   lands around `#574D1C` rather than a glare — and the type is a warm off-white
   that stays readable *inside* the blob cores, which is where it previously
   disappeared. This deepening is deliberate and is what makes the criterion
-  reachable at all; it is also what BitChord/Apple Music do.
+  reachable at all; it is also what the reference app/Apple Music do.
 * Monochrome photo: mesh unchanged in hue, type is plain neutral greys stepping
   down cleanly. No purple cast invented from nothing.
 * Back and share buttons keep their glass pill; only the glyph colour moves off

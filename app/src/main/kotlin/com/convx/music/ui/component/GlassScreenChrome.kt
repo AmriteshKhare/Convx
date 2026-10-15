@@ -19,56 +19,24 @@ import com.convx.music.ui.component.backdrop.backdrops.rememberLayerBackdrop
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 
-/**
- * The backdrop + haze wiring every flat (non-hero-artwork) screen needs to give
- * its [FrostedTopBar] real live-refraction glass instead of either a plain tint
- * or a RenderNode self-capture crash.
- *
- * [FrostedTopBar]'s back/action buttons sample `LocalAppBackdrop` — provide
- * [backdrop] there, then apply [contentModifier] to the screen's own scrolling
- * root (LazyColumn/LazyVerticalGrid/etc) so it becomes an ATTACHED, already-drawn
- * capture. The top bar must be a *sibling* of that scrolling root, never a
- * descendant, or the capture includes its own draw pass — see
- * `glass-chrome-rendernode-cycle` for the crash this avoids (hit on Settings'
- * own back button, and the standing pattern already used on
- * Artist/Album/Playlist/History/Stats).
- */
+/** Provides attached backdrop and Haze wiring for flat screens. Keep [FrostedTopBar] a sibling of the captured scrolling content to avoid self-capture. */
 @Stable
 class GlassScreenChrome internal constructor(
     val backdrop: LayerBackdrop,
     val hazeState: HazeState,
     private val freeze: com.convx.music.ui.component.backdrop.backdrops.BackdropFreeze,
 ) {
-    // Same freeze the scrolling content's own layerBackdrop uses — a consumer
-    // of [backdrop] that doesn't pass this to its own `frozen` param re-runs
-    // its whole effect chain every scroll frame
-    // instead of reusing the last one, which is where the scroll jank came
-    // from measured elsewhere in this codebase (47ms/frame re-recorded vs
-    // 1.9ms reused).
+    // Reuse the scrolling content's frozen state to avoid re-running its effects on every scroll frame.
     val frozen: () -> Boolean get() = freeze.frozen
-    // hazeSource must wrap ONLY the scrollable content — NEVER a container that
-    // also holds TopFadeBlur/FrostedTopBar as children/siblings-within-it. Haze
-    // captures everything drawn inside the hazeSource'd node; if the blur
-    // overlay itself is inside that node, the "source" ends up being the
-    // overlay's own draw output, and the blur silently does nothing (no crash,
-    // no error — just an empty/no-op capture). MainActivity's proven wiring
-    // keeps them structurally separate: topBarHazeState marks the NavHost
-    // content Box, while TopFadeBlur/FrostedTopBar live in the Scaffold's
-    // topBar slot — a different subtree entirely, connected only by the shared
-    // HazeState reference. Mirror that: wrap a Box around just the scrolling
-    // content with this modifier, and keep TopFadeBlur/FrostedTopBar as later
-    // siblings of THAT wrapping Box, not inside it.
-    /** Apply to a Box wrapping ONLY the screen's scrolling content — nothing else. */
+    // Keep the haze source around scrollable content only. If it contains the blur overlay,
+    // Haze captures that overlay itself and the blur has no useful source.
+    /** Apply to a Box that wraps only the screen's scrolling content. */
     fun screenModifier(): Modifier = Modifier.hazeSource(hazeState)
 
     /** Apply to the screen's scrolling root (LazyColumn/Column/etc). */
     fun contentModifier(): Modifier = Modifier
         .nestedScroll(freeze.connection)
-        // Outer layer must enclose the backdrop node so unrelated siblings
-        // (mini player, playing indicator) ticking on their own schedule don't
-        // force a re-record; inner layer flattens the list into one RenderNode
-        // so the capture records a single drawRenderNode instead of replaying
-        // every item — same pairing MainActivity's own appBackdrop uses.
+        // Isolate sibling redraws and flatten list content for the backdrop capture.
         .graphicsLayer()
         .layerBackdrop(backdrop, frozen = freeze.frozen)
         .graphicsLayer()

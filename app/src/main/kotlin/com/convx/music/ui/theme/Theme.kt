@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.SaverScope
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontFamily
@@ -65,16 +66,13 @@ fun accentTextColor(accent: Color, dark: Boolean): Color {
 val LocalAccentTextColor = androidx.compose.runtime.compositionLocalOf { DefaultThemeColor }
 
 @Composable
-fun vivimusicTheme(
+fun ConvxTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     pureBlack: Boolean = false,
     themeColor: Color = DefaultThemeColor,
     content: @Composable () -> Unit,
 ) {
-    // iOS has no tonal-palette colour science: the system greys are fixed and the
-    // accent is the only thing the user's colour drives. The old dynamic Material You
-    // scheme is gone with it -- themeColor now feeds IosColors.accent instead of a
-    // seed. See IosMaterialBridge for the M3 shim the unconverted screens still read.
+    // Keep iOS-style neutrals fixed; the user's theme color controls the accent only.
     val iosColors = remember(darkTheme, themeColor) {
         if (darkTheme) darkIosColors(themeColor) else lightIosColors(themeColor)
     }
@@ -84,16 +82,12 @@ fun vivimusicTheme(
 
     val colorScheme = remember(baseColorScheme, pureBlack, darkTheme, themeColor, appTextColorInt) {
         val withBlack = if (darkTheme && pureBlack) baseColorScheme.pureBlack(true) else baseColorScheme
-        // No accentText() here any more: iOS labels are neutral (label / secondaryLabel)
-        // and the accent belongs to interactive elements only. Tinting every text role
-        // with the theme colour is exactly what still read as a Material You skin.
-        // Hero screens keep their tint — see HeroTheme, where it is the artwork's.
-        //
-        // Theme screen's explicit text color, when set, still replaces every text role.
+        // Keep text roles neutral; the theme accent is for interactive elements. Hero screens
+        // derive their tint from artwork, and the explicit text-color setting still wins.
         if (appTextColorInt != 0) withBlack.flatText(Color(appTextColorInt)) else withBlack
     }
 
-    val (selectedFont) = rememberPreference(SelectedFontKey, defaultValue = AppFont.SYSTEM.value)
+    val (selectedFont) = rememberPreference(SelectedFontKey, defaultValue = AppFont.PLUS_JAKARTA_SANS.value)
     val customFont = rememberCustomFontFamily()
 
     val appFont = remember(selectedFont, customFont) {
@@ -108,10 +102,9 @@ fun vivimusicTheme(
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalAccentColor provides themeColor,
-        // Same override as flatText just above: the user's explicit text color,
-        // when set, wins over the accent-derived one — this is what the shared
-        // top bar (wordmark + every screen's title, including Settings) actually
-        // reads, since it sits outside any screen's own theme scope.
+        // Vibrator-backed: fires even with the system touch-vibration switch off.
+        androidx.compose.ui.platform.LocalHapticFeedback provides rememberAppHaptics(),
+        // The shared top bar sits outside screen themes, so expose the user's text override here.
         LocalAccentTextColor provides (
             if (appTextColorInt != 0) Color(appTextColorInt) else accentTextColor(themeColor, darkTheme)
         ),
@@ -121,8 +114,7 @@ fun vivimusicTheme(
             accent = themeColor,
             typography = remember(appFont) { com.convx.music.ui.ios.foundation.iosTypography(appFont) },
         ) {
-            // ponytail: MaterialTheme stays only to colour the screens that have not
-            // been ported yet. Drop it once no file imports androidx.compose.material3.
+            // Keeps unported screens on the app palette while they still use Material3.
             MaterialTheme(
                 colorScheme = colorScheme,
                 typography = remember(appFont) { iosMaterialTypography(appFont) },
@@ -270,6 +262,18 @@ fun ColorScheme.appleSurfaces() = copy(
     onPrimaryContainer = Color.White,
 )
 
+/** Pulls this text color toward white ([light]) or black until it reaches 4.5:1 on [background]; no-op when unspecified. */
+private fun Color.passingOn(background: Color, light: Boolean): Color {
+    if (!background.isSpecified) return this
+    val extreme = if (light) Color.White else Color.Black
+    var result = this
+    var step = 0
+    while (AppleTokens.contrastRatio(result, background) < 4.5f && step++ < 10) {
+        result = androidx.compose.ui.graphics.lerp(result, extreme, 0.2f)
+    }
+    return result
+}
+
 /**
  * Swaps Material's neutral text roles for accent-contrast ones, so every screen
  * picks it up from `MaterialTheme.colorScheme` without being edited.
@@ -279,13 +283,13 @@ fun ColorScheme.appleSurfaces() = copy(
  * M3's washed-out grey. Tune the two lerp amounts to taste; they are the whole
  * calibration.
  */
-fun ColorScheme.accentText(accent: Color, dark: Boolean): ColorScheme {
+fun ColorScheme.accentText(accent: Color, dark: Boolean, background: Color = Color.Unspecified): ColorScheme {
     val body = if (dark) {
         androidx.compose.ui.graphics.lerp(accent, Color.White, 0.86f)
     } else {
         androidx.compose.ui.graphics.lerp(accent, Color.Black, 0.86f)
-    }
-    val secondary = accentTextColor(accent, dark)
+    }.passingOn(background, dark)
+    val secondary = accentTextColor(accent, dark).passingOn(background, dark)
     return copy(
         onSurface = body,
         onBackground = body,
@@ -297,11 +301,7 @@ fun ColorScheme.accentText(accent: Color, dark: Boolean): ColorScheme {
         // The subtitle role: the artist name under a song or album title reads
         // through this everywhere in the app.
         secondary = secondary,
-        // `primary` is the app's second-largest text/icon role after
-        // onSurfaceVariant — links, selected states, section actions. appleSurfaces
-        // had pinned it to flat white in dark mode, which is most of what still
-        // read as untinted Material. It doubles as a fill (buttons, sliders), so
-        // onPrimary flips to the opposite extreme to keep those legible.
+        // Use the secondary color for links and selections; keep filled controls legible with onPrimary.
         primary = secondary,
         onPrimary = if (dark) Color.Black else Color.White,
     )

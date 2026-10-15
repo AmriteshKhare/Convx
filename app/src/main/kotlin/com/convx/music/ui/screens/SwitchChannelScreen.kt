@@ -82,7 +82,7 @@ fun SwitchChannelScreen(navController: NavController) {
         AndroidView(
             // Deliberately NOT the chrome's contentModifier: recording a
             // hardware-accelerated WebView into a backdrop layer makes the page
-            // tear (see MainActivity's WebViewRoutes note).
+            // tear (see AppRoutePolicy.isWebViewRoute).
             modifier = Modifier
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
                 .fillMaxSize(),
@@ -106,11 +106,7 @@ fun SwitchChannelScreen(navController: NavController) {
                                 dataSyncId = newDataSyncId
                                 YouTube.dataSyncId = newDataSyncId
 
-                                // Google can rotate the session cookie as part of a channel
-                                // switch. The cookie stored at initial login was never
-                                // refreshed after this point, so it went stale on the NEXT
-                                // switch and every request looked logged-out — forcing a
-                                // full re-login just to get a matching cookie again.
+                                // Refresh the cookie because Google may rotate it during a channel switch.
                                 CookieManager.getInstance().getCookie("https://music.youtube.com")
                                     ?.takeIf { it.isNotBlank() }
                                     ?.let { freshCookie ->

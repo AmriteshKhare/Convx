@@ -29,7 +29,7 @@ image, and none have before/after screenshots.
 
 ```kotlin
 top = if (thumbnail != null && !tabView) {
-    // BitChord's HEADER_DROP: the name block hangs 44dp past the
+    // the reference app's HEADER_DROP: the name block hangs 44dp past the
     // artwork's foot, onto the blurred colour the merge band leaves
     // there — it reads as a caption to the picture, not part of it.
     LocalResources.current.displayMetrics.widthPixels.let { screenWidth ->

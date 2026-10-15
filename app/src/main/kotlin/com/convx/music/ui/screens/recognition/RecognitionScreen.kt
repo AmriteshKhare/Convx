@@ -5,6 +5,10 @@
 
 package com.convx.music.ui.screens.recognition
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.utils.openSearchResults
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -96,6 +100,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import com.convx.music.ui.component.ScreenScaffold
 import com.convx.music.ui.component.topBarContentPadding
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,23 +108,20 @@ fun RecognitionScreen(
     navController: NavController
 ) {
     val context = LocalContext.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val coroutineScope = rememberCoroutineScope()
     
-    // Reset recognition status when entering the screen
     LaunchedEffect(Unit) {
         com.convx.music.recognition.MusicRecognitionService.reset()
     }
     
-    // Reset recognition status when leaving the screen
     DisposableEffect(Unit) {
         onDispose {
             com.convx.music.recognition.MusicRecognitionService.reset()
         }
     }
     
-    // Observe recognition status from service for real-time updates (Listening -> Processing -> Result)
-    val recognitionStatus by com.convx.music.recognition.MusicRecognitionService.recognitionStatus.collectAsState()
+    val recognitionStatus by com.convx.music.recognition.MusicRecognitionService.recognitionStatus.collectAsStateWithLifecycle()
     
     var hasPermission by remember {
         mutableStateOf(
@@ -187,10 +189,7 @@ fun RecognitionScreen(
         onBackLongClick = { navController.backToMain() },
         actions = {
             IconButton(onClick = { navController.navigate("recognition_history") }) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFClock,
-                    contentDescription = stringResource(R.string.recognition_history),
-                )
+                SymbolIcon(symbol = sf("SFClock"), contentDescription = stringResource(R.string.recognition_history))
             }
         },
     ) { chrome ->
@@ -227,7 +226,7 @@ fun RecognitionScreen(
                             onPlayOnApp = { result ->
                                 // Search for the track on YouTube Music
                                 val searchQuery = "${result.title} ${result.artist}"
-                                navController.navigate("search/${java.net.URLEncoder.encode(searchQuery, "UTF-8")}")
+                                navController.openSearchResults(searchQuery)
                             },
                             onTryAgain = {
                                 startRecognition()
@@ -289,12 +288,7 @@ private fun ReadyState(
                     .background(AppTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
-Icon(
-                imageVector = SfSymbols.Monochrome.SFMicrophone,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = AppTheme.colorScheme.onPrimary
-            )
+SymbolIcon(symbol = sf("SFMicrophone"), contentDescription = null, size = 64.dp, tint = AppTheme.colorScheme.onPrimary)
             }
         }
         
@@ -348,7 +342,6 @@ private fun ListeningState(
                     .background(AppTheme.colorScheme.primary.copy(alpha = 0.3f))
             )
             
-            // Main button
             Box(
                 modifier = Modifier
                     .size(160.dp)
@@ -357,12 +350,7 @@ private fun ListeningState(
                     .bounceClick { onCancel() },
                 contentAlignment = Alignment.Center
             ) {
-Icon(
-                imageVector = SfSymbols.Monochrome.SFMicrophone,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = AppTheme.colorScheme.onPrimary
-            )
+SymbolIcon(symbol = sf("SFMicrophone"), contentDescription = null, size = 64.dp, tint = AppTheme.colorScheme.onPrimary)
             }
         }
         
@@ -417,12 +405,7 @@ private fun ProcessingState() {
                     )
             )
             
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFMusicNote,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = AppTheme.colorScheme.primary
-            )
+            SymbolIcon(symbol = sf("SFMusicNote"), contentDescription = null, size = 48.dp, tint = AppTheme.colorScheme.primary)
         }
         
         Text(
@@ -441,7 +424,6 @@ private fun SuccessState(
     onClose: () -> Unit,
     onSaveToHistory: (RecognitionResult) -> Unit
 ) {
-    // Save to history when success is shown
     LaunchedEffect(result) {
         onSaveToHistory(result)
     }
@@ -451,7 +433,6 @@ private fun SuccessState(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.padding(horizontal = 16.dp)
     ) {
-        // Album art
         Card(
             modifier = Modifier
                 .size(180.dp)
@@ -469,7 +450,6 @@ private fun SuccessState(
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        // Track info
         Text(
             text = result.title,
             style = AppTheme.typography.headlineSmall,
@@ -510,11 +490,7 @@ private fun SuccessState(
                 onClick = { onPlayOnApp(result) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFPlayFill,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                SymbolIcon(symbol = sf("SFPlayFill"), contentDescription = null, size = 18.dp)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.play_on_app))
             }
@@ -523,25 +499,16 @@ private fun SuccessState(
                 onClick = onTryAgain,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFMicrophone,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                SymbolIcon(symbol = sf("SFMicrophone"), contentDescription = null, size = 18.dp)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.re_listen))
             }
             
-            // Close button - Material 3 Expressive outlined style
             OutlinedButton(
                 onClick = onClose,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFXmark,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                SymbolIcon(symbol = sf("SFXmark"), contentDescription = null, size = 18.dp)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.close))
             }
@@ -565,12 +532,7 @@ private fun NoMatchState(
                 .background(AppTheme.colorScheme.errorContainer),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFXmark,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = AppTheme.colorScheme.onErrorContainer
-            )
+            SymbolIcon(symbol = sf("SFXmark"), contentDescription = null, size = 48.dp, tint = AppTheme.colorScheme.onErrorContainer)
         }
         
         Text(
@@ -588,11 +550,7 @@ private fun NoMatchState(
         )
         
         Button(onClick = onTryAgain) {
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFArrowClockwise,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
+            SymbolIcon(symbol = sf("SFArrowClockwise"), contentDescription = null, size = 18.dp)
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.try_again))
         }
@@ -615,12 +573,7 @@ private fun ErrorState(
                 .background(AppTheme.colorScheme.errorContainer),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFExclamationmarkTriangle,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = AppTheme.colorScheme.onErrorContainer
-            )
+            SymbolIcon(symbol = sf("SFExclamationmarkTriangle"), contentDescription = null, size = 48.dp, tint = AppTheme.colorScheme.onErrorContainer)
         }
         
         Text(
@@ -638,11 +591,7 @@ private fun ErrorState(
         )
         
         Button(onClick = onTryAgain) {
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFArrowClockwise,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
+            SymbolIcon(symbol = sf("SFArrowClockwise"), contentDescription = null, size = 18.dp)
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.try_again))
         }

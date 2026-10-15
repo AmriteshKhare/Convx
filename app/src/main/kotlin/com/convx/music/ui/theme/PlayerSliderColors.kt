@@ -10,12 +10,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-/**
- * Player slider color configuration for consistent styling across all slider types
- *
- * This object provides standardized color schemes for Default, Squiggly, and Slim sliders
- * used in the music player interface, ensuring visual consistency and proper contrast.
- */
+/** Shared color configuration for the player's slider variants. */
 object PlayerSliderColors {
 
     /**

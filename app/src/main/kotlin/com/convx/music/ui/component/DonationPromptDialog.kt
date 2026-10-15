@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.core.edit
 import com.convx.music.R
 import com.convx.music.constants.DonationKofiUrl
 import com.convx.music.constants.DonationPromptDismissedKey
@@ -37,6 +38,7 @@ import com.convx.music.constants.DonationPromptLastShownKey
 import com.convx.music.constants.DonationUpiUri
 import com.convx.music.constants.FirstLaunchTimestampKey
 import com.convx.music.ui.utils.safeOpenUri
+import com.convx.music.utils.dataStore
 import com.convx.music.utils.rememberPreference
 import java.util.concurrent.TimeUnit
 
@@ -49,14 +51,16 @@ private val MIN_DAYS_BETWEEN_PROMPTS = TimeUnit.DAYS.toMillis(30)
  */
 @Composable
 fun DonationPromptHost() {
-    var firstLaunch by rememberPreference(FirstLaunchTimestampKey, 0L)
+    val context = LocalContext.current
+    val firstLaunch by rememberPreference(FirstLaunchTimestampKey, 0L)
     var lastShown by rememberPreference(DonationPromptLastShownKey, 0L)
     var dismissedForever by rememberPreference(DonationPromptDismissedKey, false)
 
-    // Stamp the very first composition, once, so "used for a while" has a start line.
-    LaunchedEffect(Unit) {
-        if (firstLaunch == 0L) {
-            firstLaunch = System.currentTimeMillis()
+    LaunchedEffect(context) {
+        context.dataStore.edit { preferences ->
+            if ((preferences[FirstLaunchTimestampKey] ?: 0L) == 0L) {
+                preferences[FirstLaunchTimestampKey] = System.currentTimeMillis()
+            }
         }
     }
 
@@ -71,7 +75,6 @@ fun DonationPromptHost() {
     var visible by remember(shouldShow) { mutableStateOf(shouldShow) }
     if (!visible) return
 
-    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
 
     fun dismiss() {
@@ -81,7 +84,7 @@ fun DonationPromptHost() {
 
     AlertDialog(
         onDismissRequest = ::dismiss,
-        icon = { Icon(painterResource(R.drawable.favorite), contentDescription = null) },
+        icon = { SymbolIcon(symbol = sf("heart.fill"), contentDescription = null) },
         title = { Text(stringResource(R.string.donation_prompt_title)) },
         text = { Text(stringResource(R.string.donation_prompt_message)) },
         confirmButton = {

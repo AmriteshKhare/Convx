@@ -35,9 +35,6 @@ import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.node.DrawModifierNode
 import kotlinx.coroutines.launch
 
-/**
- * Cupertino click effect
- * */
 @Composable
 @ExperimentalCupertinoApi
 fun rememberCupertinoIndication(color: Color = CupertinoIndication.DefaultColor): Indication =

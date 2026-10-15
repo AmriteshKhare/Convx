@@ -33,6 +33,7 @@ import com.convx.music.playback.PlayerConnection
 import com.convx.music.extensions.metadata
 import com.convx.music.ui.utils.additiveChrome
 import com.convx.music.ui.utils.resize
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun UpNextSong(
@@ -44,9 +45,9 @@ fun UpNextSong(
     // glyph, so additively blending it would wash it out rather than tint it.
     additiveChrome: Boolean = false,
 ) {
-    val queueWindows by playerConnection.queueWindows.collectAsState()
+    val queueWindows by playerConnection.queueWindows.collectAsStateWithLifecycle()
     // Play-order index (see PlayerExt.getQueueWindows): timeline-order +1 goes wrong on shuffle.
-    val currentIndex by playerConnection.currentWindowIndex.collectAsState()
+    val currentIndex by playerConnection.currentWindowIndex.collectAsStateWithLifecycle()
 
     val nextItem = queueWindows.getOrNull(currentIndex + 1)?.mediaItem?.metadata
 
@@ -98,13 +99,12 @@ fun UpNextSong(
                             maxLines = 1,
                         )
                         Text(
-                            text = item.title ?: "",
-                            // Figma Queue row title: Semibold (279:887).
+                            text = item.title,
                             style = AppTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                             color = titleColor,
                             maxLines = 1,
                         )
-                        val artist = item.artists?.firstOrNull()?.name
+                        val artist = item.artists.firstOrNull()?.name
                         if (!artist.isNullOrBlank()) {
                             Text(
                                 text = artist,

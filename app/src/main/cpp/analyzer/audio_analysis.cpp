@@ -2,11 +2,11 @@
  * Ported from Orchard (https://github.com/SFG5453/Orchard).
  *
  * Copyright (C) 2026 SFG545 (original Orchard implementation)
- * Copyright (C) 2026 Kushagra Singh (BitChord adaptation)
+ * Copyright (C) 2026 Convx contributors (adapted from an open-source base)
  *
  * Orchard's original source is licensed under the GNU Affero General Public
  * License, version 3 or later. Per AGPLv3 section 13, this file is combined
- * here into BitChord -- a work licensed under the GNU General Public
+ * here into the reference app -- a work licensed under the GNU General Public
  * License, version 3 or later -- and remains itself governed by the AGPLv3
  * as part of that combination.
  *
@@ -33,7 +33,7 @@
 // Offline DSP implementation: reusable vectors and percentile copies favor
 // readable whole-track analysis over real-time allocation constraints.
 
-namespace vivimusic::smart {
+namespace convx::smart {
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
@@ -294,16 +294,9 @@ double DownbeatAtOrBefore(const std::vector<double>& downbeats, double target, d
   return found == downbeats.begin() ? downbeats.front() : *(found - 1);
 }
 
-// Sparse 4096-point Hann frames feed chroma templates and broad spectral bands.
-// FFT power is log-compressed before aggregation; chroma is sum-normalized and
-// the vocal value is a bounded spectral heuristic rather than a classifier.
-// Band ratios and flatness map to a probability that a voice is present. Shared
-// by the per-frame curve and the track-wide summary so the two cannot drift.
-//
-// Compress spectral power before comparing bands. Raw FFT power lets kick
-// drums and bass overwhelm the much wider voice band, which made vocal-led
-// tracks look instrumental. Flatness adds a small boost for speech-like
-// broadband detail without making it the primary signal.
+// Log-compress FFT power before comparing bands so bass and kick do not
+// overwhelm the vocal range. Band ratios and spectral flatness form a shared
+// vocal-presence heuristic for both per-frame and track-wide scores.
 double VocalProbabilityFrom(double low, double vocal, double high, double flatness) {
   const double total = low + vocal + high;
   const double mid_ratio = vocal / std::max(1e-12, total);
@@ -426,9 +419,8 @@ void AnalyzeKeyAndTimbre(
     );
   }
 
-  // The track-wide summary keeps its existing meaning -- the same logistic over
-  // whole-track band totals -- so callers that only want "is this a vocal
-  // track" are unaffected by the per-frame curve.
+  // Keep the track-wide score based on aggregate bands; the per-frame curve is
+  // separate so callers get the same track-level result.
   result.vocal_probability = VocalProbabilityFrom(
     low_energy,
     vocal_energy,
@@ -566,10 +558,8 @@ void BuildStructure(const EnvelopeResult& envelope, AnalysisResult& result) {
 
   std::vector<MixCuePoint> mix_outs;
   if (result.mix_out_time > 0 && result.mix_out_time < envelope.content_end - 1.0) {
-    // FindMixOutTime only returns an interior anchor after observing an abrupt
-    // energy collapse into silence. Preserve that meaning for the planner: a
-    // cliff is useful because the remaining tail is silence, not because the
-    // song should be cut short at an arbitrary quiet passage.
+    // The planner treats this anchor as a mix-out only when the remaining tail
+    // is silent, not when the track has an arbitrary quiet passage.
     mix_outs.push_back({result.mix_out_time, 0.95, "energy_cliff"});
   }
   mix_outs.push_back({result.outro_start_time, 0.9, "outro_start"});
@@ -688,4 +678,4 @@ AnalysisResult AnalyzeAudio(
   return result;
 }
 
-}  // namespace vivimusic::smart
+}  // namespace convx::smart

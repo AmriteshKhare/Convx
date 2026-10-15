@@ -36,17 +36,37 @@ class SpatialAudioProcessorTest {
     }
 
     @Test
-    fun `enabled widens the side signal past the input level`() {
+    fun `enabled widens the stereo image with headroom`() {
         val processor = configured(enabled = true)
         // Pure side content (L = -R): widening amplifies it, and the delay line is
         // still zeroed on the first frames so no crossfeed muddies the comparison.
-        processor.queueInput(frames(listOf(1000 to -1000)))
+        processor.queueInput(frames(listOf(1000 to 0)))
 
         val output = processor.output.order(ByteOrder.nativeOrder()).asShortBuffer()
         val left = output.get().toInt()
         val right = output.get().toInt()
-        assertTrue("expected widening, got $left", left > 1000)
-        assertEquals(-left, right)
+        assertTrue("left channel must retain signal", left > 0)
+        assertTrue("widening adds negative side energy", right < 0)
+        assertTrue("retain headroom", left < 1000)
+    }
+
+    @Test
+    fun `full scale stereo does not saturate after crossfeed fills`() {
+        for (sampleRate in listOf(44_100, 48_000, 96_000)) {
+            for (pair in listOf(32767 to -32768, 32767 to 32767, -32768 to -32768, 32767 to 0)) {
+                val processor = SpatialAudioProcessor().apply {
+                    configure(AudioProcessor.AudioFormat(sampleRate, 2, C.ENCODING_PCM_16BIT))
+                    flush()
+                    enabled = true
+                }
+                processor.queueInput(frames(List(2048) { pair }))
+                val samples = processor.output.order(ByteOrder.nativeOrder()).asShortBuffer()
+                while (samples.hasRemaining()) {
+                    val sample = samples.get().toInt()
+                    assertTrue("clipped at $sampleRate Hz: $sample", sample > -32768 && sample < 32767)
+                }
+            }
+        }
     }
 
     private fun configured(enabled: Boolean) = SpatialAudioProcessor().apply {

@@ -9,11 +9,10 @@ import android.app.Activity
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import com.convx.music.ui.utils.Motion
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -40,10 +39,11 @@ import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.utils.LocalNavAnimatedVisibilityScope
-import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.morphContainer
-import com.convx.music.ui.utils.hasMorphSource
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.graphicsLayer
+import com.convx.music.ui.utils.LocalMorphArtworkId
+import com.convx.music.ui.utils.isMorphRoute
 import com.convx.music.ui.utils.morphArtworkId
 import com.convx.music.ui.screens.settings.HomeFeedOrderScreen
 import com.convx.music.ui.screens.artist.ArtistAlbumsScreen
@@ -75,6 +75,7 @@ import com.convx.music.ui.screens.settings.FontSelectionScreen
 import com.convx.music.ui.screens.settings.GlassEffectSettings
 import com.convx.music.ui.screens.settings.PlayerThemeScreen
 import com.convx.music.ui.screens.settings.BackupAndRestore
+import com.convx.music.ui.screens.settings.CrashLogsSettingsScreen
 import com.convx.music.ui.screens.settings.SpotifyScreen
 import com.convx.music.viewmodels.SpotifyImportViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -105,9 +106,9 @@ import com.convx.music.ui.screens.settings.ModuleSourceScreen
 import com.convx.music.ui.screens.settings.ModuleDetailScreen
 import com.convx.music.ui.screens.settings.UpdateSettings
 import com.convx.music.ui.screens.wrapped.WrappedScreen
-import com.convx.music.vivimusic.updater.UpdateScreen
-import com.convx.music.vivimusic.changelog.ChangelogScreen
-import com.convx.music.vivimusic.commitscreen.CommitScreen
+import com.convx.music.core.updater.UpdateScreen
+import com.convx.music.core.changelog.ChangelogScreen
+import com.convx.music.core.commitscreen.CommitScreen
 import com.convx.music.ui.screens.equalizer.axion.AxionEqScreen
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -116,19 +117,14 @@ fun NavGraphBuilder.navigationBuilder(
     scrollBehavior: TopAppBarScrollBehavior,
     activity: Activity,
     snackbarHostState: SnackbarHostState,
+    accountImageUrl: String? = null,
+    accountName: String = "",
+    onAccountClick: () -> Unit = { navController.navigate(Screens.Settings.route) },
 ) {
-    // Reverted from the pager (MainTabsPager.kt, still in the tree but unused): the
-    // pager itself became the lag source it was meant to fix, so these are real
-    // NavHost destinations again -- one AnimatedContent transition per switch (the
-    // iOS parallax push set at the NavHost level in MainActivity), multi-back-stack
-    // via popUpTo/saveState/restoreState in onNavItemClick, same as everything else
-    // in this file.
     sharedComposable(Screens.Home.route) {
-        HomeScreen(navController = navController, snackbarHostState = snackbarHostState)
+        HomeRoute(navController = navController, snackbarHostState = snackbarHostState)
     }
 
-    // A plain destination again, not an overlay layered above the tabs -- see the
-    // comment at its LaunchedEffect(Unit)/enterSearch site in MainActivity.kt for why.
     composable(Screens.Search.route) {
         val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
         val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
@@ -142,6 +138,9 @@ fun NavGraphBuilder.navigationBuilder(
         SearchScreen(
             navController = navController,
             pureBlack = pureBlack,
+            accountImageUrl = accountImageUrl,
+            accountName = accountName,
+            onAccountClick = onAccountClick,
         )
     }
 
@@ -160,6 +159,28 @@ fun NavGraphBuilder.navigationBuilder(
         ExploreScreen(navController = navController)
     }
 
+    sharedComposable(Screens.Radio.route) {
+        RadioScreen(navController = navController)
+    }
+
+    composable(
+        route = "radio_station/{seedId}?title={title}&artist={artist}&thumbnail={thumbnail}",
+        arguments = listOf(
+            navArgument("seedId") { type = NavType.StringType },
+            navArgument("title") { type = NavType.StringType; nullable = true; defaultValue = null },
+            navArgument("artist") { type = NavType.StringType; nullable = true; defaultValue = null },
+            navArgument("thumbnail") { type = NavType.StringType; nullable = true; defaultValue = null },
+        ),
+    ) { entry ->
+        RadioStationScreen(
+            navController = navController,
+            seedId = entry.arguments?.getString("seedId").orEmpty(),
+            seedTitle = entry.arguments?.getString("title").orEmpty(),
+            seedArtist = entry.arguments?.getString("artist").orEmpty(),
+            seedThumbnail = entry.arguments?.getString("thumbnail").orEmpty(),
+        )
+    }
+
     sharedComposable(Screens.Settings.route) {
         SettingsScreen(navController, scrollBehavior)
     }
@@ -167,7 +188,7 @@ fun NavGraphBuilder.navigationBuilder(
     sharedComposable(
         route = "listen_together_from_topbar",
     ) {
-        ListenTogetherScreen(navController, showTopBar = true)
+        com.convx.music.ui.screens.JamScreen(navController)
     }
 
     sharedComposable("listen_together/chat") {
@@ -245,12 +266,17 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     sharedComposable(
-        route = "album/{albumId}?thumb={thumb}",
+        route = "album/{albumId}?thumb={thumb}&morphId={morphId}",
         arguments = listOf(
             navArgument("albumId") {
                 type = NavType.StringType
             },
             navArgument("thumb") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+            navArgument("morphId") {
                 type = NavType.StringType
                 nullable = true
                 defaultValue = null
@@ -486,12 +512,26 @@ fun NavGraphBuilder.navigationBuilder(
         GlassEffectSettings(navController, scrollBehavior)
     }
 
+    sharedComposable("settings/appearance/liquidglass/advanced") {
+        GlassEffectSettings(navController, scrollBehavior, advanced = true)
+    }
+
     sharedComposable("settings/content") {
         ContentSettings(navController, scrollBehavior)
     }
 
     sharedComposable("settings/content/advanced") {
         ContentAdvancedSettings(navController, scrollBehavior)
+    }
+
+    com.convx.music.ui.screens.settings.SettingsHubs.all.forEach { hub ->
+        sharedComposable(hub.route) {
+            com.convx.music.ui.screens.settings.SettingsHubScreen(navController, hub)
+        }
+    }
+
+    sharedComposable("settings/network") {
+        ContentAdvancedSettings(navController, scrollBehavior, networkOnly = true)
     }
 
     sharedComposable("settings/content/romanization") {
@@ -526,6 +566,21 @@ fun NavGraphBuilder.navigationBuilder(
         LocalFoldersSettingsScreen(navController, scrollBehavior)
     }
 
+    sharedComposable("listen_together/party") {
+        com.convx.music.ui.screens.JamScreen(navController)
+    }
+
+    sharedComposable(
+        route = "network_browse/{serverId}",
+        arguments = listOf(navArgument("serverId") { type = NavType.StringType }),
+    ) {
+        com.convx.music.ui.screens.library.NetworkBrowserScreen(navController, it.arguments?.getString("serverId").orEmpty())
+    }
+
+    sharedComposable("settings/network_storage") {
+        com.convx.music.ui.screens.settings.NetworkStorageSettingsScreen(navController, scrollBehavior)
+    }
+
     sharedComposable("settings/storage") {
         StorageSettings(navController, scrollBehavior)
     }
@@ -540,6 +595,10 @@ fun NavGraphBuilder.navigationBuilder(
 
     sharedComposable("settings/backup_restore") {
         BackupAndRestore(navController, scrollBehavior)
+    }
+
+    sharedComposable("settings/help/crash_logs") {
+        CrashLogsSettingsScreen(navController)
     }
 
     sharedComposable("settings/spotify") {
@@ -653,82 +712,81 @@ fun NavGraphBuilder.navigationBuilder(
 }
 
 /**
- * [composable] that also publishes the destination's own [AnimatedVisibilityScope].
+ * A destination that may open from a tile: reference-style "one shot" transition.
  *
- * A shared element needs both ends to name the transition they are part of, and for a
- * NavHost destination that scope only exists inside the entry's content lambda. Rather
- * than repeat a CompositionLocalProvider in every screen, destinations that take part in
- * an artwork morph are declared with this instead of [composable].
+ * Detail routes (album, playlist, artist...) slide in from the right while the tapped
+ * tile's cover flies into the page's hero (`Modifier.sharedArtworkTarget`), and on pop
+ * the page slides a quarter-width back out and fades while the cover flies home. The
+ * screen behind holds still and dims, so the tile the cover returns to never moves.
  *
- * Applied only where there is actually a shared pair. A destination with no shared element
- * gains nothing from the local, and wrapping all sixty-odd of them would be churn.
- */
-
-/**
- * A destination that grows out of the tile that opened it, and shrinks back into it.
+ * Non-detail destinations (tabs, settings...) keep the plain cross-fade: a slide on a
+ * tab switch would read as drilling in when it is not.
  *
- * The whole screen is one shared element paired with the tapped tile's artwork box, so
- * the detail page reads as that tile opening rather than as a new page arriving over it.
- * See `Modifier.morphContainer` for the mechanics and for what the reference capture
- * actually does.
- *
- * The enter/exit specs here deliberately do almost nothing: the morph IS the transition,
- * and any slide or scale declared at this level would fight the shared element's own
- * interpolation of the same bounds. What is left is the treatment of the screen BEHIND
- * the morph -- it holds still and dims, because the tile the card is flying to and from
- * must not travel out from under it.
- *
- * Falls back to a plain cross-fade when the destination carries no id, or when its tile
- * was never on screen to be nominated (a deep link, a restored back stack): with no
- * source half, `morphContainer` is inert and this is all that is left.
+ * Publishes the destination's [AnimatedVisibilityScope] and its artwork id so the hero
+ * can claim its half of the shared element without any per-screen plumbing.
  */
 private fun NavGraphBuilder.sharedComposable(
     route: String,
     arguments: List<NamedNavArgument> = emptyList(),
     content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
-) = composable(
-    route = route,
-    arguments = arguments,
-    enterTransition = { fadeIn(tween(Motion.PushMillis)) },
-    exitTransition = { fadeOut(tween(180), targetAlpha = 0.7f) },
-    popEnterTransition = { fadeIn(tween(180), initialAlpha = 0.7f) },
-    popExitTransition = { fadeOut(Motion.appearExit()) },
-) { entry ->
-    CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides this) {
-        val morphId = entry.morphArtworkId()
-        // `morphContainer` no-ops with no id (deep link, restored back stack), and
-        // also finds no partner to interpolate from when the id's tile never called
-        // `sharedArtworkSource` -- a bespoke card rendering its own AsyncImage instead
-        // of going through one of Items.kt's shared composables. Both cases used to
-        // fall all the way back to the bare fadeIn(1) above: an instant pop with no
-        // motion at all. `animateEnterExit` is the generic, cheap fallback for both:
-        // a soft grow-and-fade that costs nothing but a graphicsLayer scale (no
-        // shared-element matching, no tile identity needed) -- which is the whole
-        // point: every tile-opened screen gets SOME grow-in, not only the ones that
-        // were wired into the shared-artwork system.
-        //
-        // Gated on `!hasMorphSource`, not id == null -- stacking this on TOP of an id
-        // that IS driving a real container morph would scale the card twice
-        // (morphContainer's own interpolation, then this fallback's 0.94 on top of
-        // it), which reads as the card overshooting past its target and snapping back.
-        val hasRealMorph = morphId != null && hasMorphSource(morphId)
-        Box(
-            Modifier
-                .morphContainer(morphId, isSource = false)
-                .then(
-                    if (!hasRealMorph) {
-                        Modifier.animateEnterExit(
-                            // enter (push, never gesture-driven): spring is fine.
-                            enter = fadeIn(Motion.appear()) + scaleIn(Motion.appear(), initialScale = 0.94f),
-                            // exit (pop, predictive-back-scrubbed): tween, see appearExit().
-                            exit = fadeOut(Motion.appearExit()) + scaleOut(Motion.appearExit(), targetScale = 0.94f),
-                        )
-                    } else {
-                        Modifier
-                    }
-                )
+): Unit {
+    val detail = isMorphRoute(route)
+    val collection = route.startsWith("album/") || route.contains("playlist/")
+    composable(
+        route = route,
+        arguments = arguments,
+        enterTransition = {
+            if (collection) {
+                if (com.convx.music.ui.utils.isLibraryArtworkMorph()) fadeIn(tween(PageEnterMillis))
+                else slideInHorizontally(Motion.collectionPush()) { it }
+            } else if (detail) {
+                slideInHorizontally(tween(PageEnterMillis, easing = FastOutSlowInEasing)) { it } +
+                    fadeIn(tween(PageEnterMillis, easing = FastOutSlowInEasing))
+            } else {
+                fadeIn(tween(Motion.PushMillis))
+            }
+        },
+        exitTransition = {
+            val nextCollection = targetState.destination.route?.let { it.startsWith("album/") || it.contains("playlist/") } == true
+            if (nextCollection) fadeOut(tween(PageExitMillis), targetAlpha = if (com.convx.music.ui.utils.isLibraryArtworkMorph()) 0f else .999f)
+            else fadeOut(tween(PageExitMillis), targetAlpha = 0.7f)
+        },
+        popEnterTransition = {
+            val leavingCollection = initialState.destination.route?.let { it.startsWith("album/") || it.contains("playlist/") } == true
+            if (leavingCollection) fadeIn(tween(PageEnterMillis), initialAlpha = if (com.convx.music.ui.utils.isLibraryArtworkMorph()) 0f else .999f)
+            else fadeIn(tween(PageEnterMillis), initialAlpha = 0.7f)
+        },
+        popExitTransition = {
+            if (collection) {
+                if (com.convx.music.ui.utils.isLibraryArtworkMorph()) fadeOut(tween(PageExitMillis))
+                else slideOutHorizontally(Motion.collectionPush()) { it }
+            } else if (detail) {
+                // Tween, not spring: predictive back scrubs this by gesture progress.
+                slideOutHorizontally(tween(PageExitMillis, easing = FastOutSlowInEasing)) { it / 4 } +
+                    fadeOut(tween(PageExitMillis, easing = FastOutSlowInEasing))
+            } else {
+                fadeOut(Motion.appearExit())
+            }
+        },
+    ) { entry ->
+        CompositionLocalProvider(
+            LocalNavAnimatedVisibilityScope provides this,
+            LocalMorphArtworkId provides entry.morphArtworkId(),
         ) {
-            content(entry)
+            if (collection) {
+                val corner = com.convx.music.ui.player.rememberScreenCornerRadius()
+                val shape = remember(corner) { com.convx.music.ui.component.shapes.ContinuousRoundedRectangle(corner) }
+                val pageTransition = transition
+                androidx.compose.foundation.layout.Box(
+                    Modifier.fillMaxSize().graphicsLayer {
+                        clip = pageTransition.currentState != pageTransition.targetState
+                        this.shape = shape
+                    },
+                ) { content(entry) }
+            } else content(entry)
         }
     }
 }
+
+private const val PageEnterMillis = 400
+private const val PageExitMillis = 400

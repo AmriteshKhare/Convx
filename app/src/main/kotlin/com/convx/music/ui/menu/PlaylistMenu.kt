@@ -5,8 +5,14 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.menuBottomInset
+import com.convx.music.utils.reportException
 import android.content.Intent
 import android.content.res.Configuration
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -68,6 +74,7 @@ import com.convx.music.db.entities.PlaylistSong
 import com.convx.music.db.entities.Song
 import com.convx.music.extensions.toMediaItem
 import com.convx.music.playback.DownloadTarget
+import com.convx.music.playback.combinedDownloadState
 import com.convx.music.playback.cancelDownloads
 import com.convx.music.playback.downloadSongs
 import com.convx.music.playback.removeDownloads
@@ -87,6 +94,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -99,8 +107,8 @@ fun PlaylistMenu(
     songList: List<Song>? = emptyList(),
 ) {
     val context = LocalContext.current
-    val database = LocalDatabase.current
-    val downloadUtil = LocalDownloadUtil.current
+    val database = LocalDatabase.current.get()
+    val downloadUtil = LocalDownloadUtil.current.get()
     val playerConnection = LocalPlayerConnection.current ?: return
     val listenTogetherManager = LocalListenTogetherManager.current
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
@@ -129,24 +137,9 @@ fun PlaylistMenu(
         }
     }
 
-    // Collected rather than folded into a LaunchedEffect so the current state of each
-    // download is also available at click time — the download and cancel actions filter
-    // on it, see DownloadActions.
-    val downloads by downloadUtil.downloads.collectAsState()
+    val downloads by downloadUtil.downloads.collectAsStateWithLifecycle()
     val downloadState = remember(songs, downloads) {
-        when {
-            songs.isEmpty() -> Download.STATE_STOPPED
-            songs.all { downloads[it.id]?.state == Download.STATE_COMPLETED } ->
-                Download.STATE_COMPLETED
-
-            songs.all {
-                downloads[it.id]?.state == Download.STATE_QUEUED ||
-                    downloads[it.id]?.state == Download.STATE_DOWNLOADING ||
-                    downloads[it.id]?.state == Download.STATE_COMPLETED
-            } -> Download.STATE_DOWNLOADING
-
-            else -> Download.STATE_STOPPED
-        }
+        combinedDownloadState(songs, downloads) { it.id }
     }
 
     val editable: Boolean = playlist.playlist.isEditable == true
@@ -172,7 +165,7 @@ fun PlaylistMenu(
 
     if (showEditDialog) {
         TextFieldDialog(
-            icon = { Icon(painter = painterResource(R.drawable.edit), contentDescription = null) },
+            icon = { SymbolIcon(symbol = sf("pencil"), contentDescription = null) },
             title = { Text(text = stringResource(R.string.edit_playlist)) },
             onDismiss = { showEditDialog = false },
             initialTextFieldValue =
@@ -195,6 +188,33 @@ fun PlaylistMenu(
                 }
             },
         )
+    }
+
+    var showMergeDialog by remember { mutableStateOf(false) }
+    if (showMergeDialog) {
+        val targets by database.playlists(com.convx.music.constants.PlaylistSortType.NAME, false)
+            .collectAsState(initial = emptyList())
+        com.convx.music.ui.component.ListDialog(onDismiss = { showMergeDialog = false }) {
+            item { Text(text = stringResource(R.string.merge_playlist_into), modifier = Modifier.padding(16.dp)) }
+            targets.filter { it.id != playlist.id && it.playlist.isEditable == true }.forEach { target ->
+                item(key = target.id) {
+                    Text(
+                        text = target.playlist.name,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showMergeDialog = false
+                                onDismiss()
+                                // This playlist's songs are appended to the target; this one is kept.
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    database.mergePlaylists(target, listOf(playlist.id))
+                                }
+                            }
+                            .padding(16.dp),
+                    )
+                }
+            }
+        }
     }
 
     var showRemoveDownloadDialog by remember {
@@ -263,12 +283,10 @@ fun PlaylistMenu(
                         showDeletePlaylistDialog = false
                         onDismiss()
                         database.transaction {
-                            // First toggle the like using the same logic as the like button
                             if (playlist.playlist.bookmarkedAt != null) {
-                                // Using the same toggleLike() method that's used in the like button
+                                // Clear the saved state before deleting a bookmarked playlist.
                                 update(playlist.playlist.toggleLike())
                             }
-                            // Then delete the playlist
                             delete(playlist.playlist)
                         }
 
@@ -303,11 +321,7 @@ fun PlaylistMenu(
                         }
                     }
                 ) {
-                    Icon(
-                        painter = painterResource(if (dbPlaylist?.playlist?.bookmarkedAt != null) R.drawable.favorite else R.drawable.favorite_border),
-                        tint = if (dbPlaylist?.playlist?.bookmarkedAt != null) AppTheme.colorScheme.error else LocalContentColor.current,
-                        contentDescription = null
-                    )
+                    SymbolIcon(symbol = if (dbPlaylist?.playlist?.bookmarkedAt != null) sf("heart.fill") else sf("heart"), contentDescription = null, tint = if (dbPlaylist?.playlist?.bookmarkedAt != null) AppTheme.colorScheme.error else LocalContentColor.current)
                 }
             }
         },
@@ -325,7 +339,7 @@ fun PlaylistMenu(
             start = 0.dp,
             top = 0.dp,
             end = 0.dp,
-            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+            bottom = 8.dp + menuBottomInset(),
         ),
     ) {
         item {
@@ -334,12 +348,7 @@ fun PlaylistMenu(
                     if (!isGuest) {
                         NewAction(
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.play),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("play.fill"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             text = stringResource(R.string.play),
                             onClick = {
@@ -356,12 +365,7 @@ fun PlaylistMenu(
                         )
                         NewAction(
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.shuffle),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("shuffle"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             text = stringResource(R.string.shuffle),
                             onClick = {
@@ -379,12 +383,7 @@ fun PlaylistMenu(
                     } else null,
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ios_share),
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.share),
                         onClick = {
@@ -413,10 +412,7 @@ fun PlaylistMenu(
                                     title = { Text(text = stringResource(R.string.start_radio)) },
                                     description = { Text(text = stringResource(R.string.start_radio_desc)) },
                                     icon = {
-                                        Icon(
-                                            painter = painterResource(R.drawable.radio),
-                                            contentDescription = null,
-                                        )
+                                        SymbolIcon(symbol = sf("dot.radiowaves.left.and.right"), contentDescription = null)
                                     },
                                     onClick = {
                                         coroutineScope.launch(Dispatchers.IO) {
@@ -440,10 +436,7 @@ fun PlaylistMenu(
                                 title = { Text(text = stringResource(R.string.play_next)) },
                                 description = { Text(text = stringResource(R.string.play_next_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.playlist_play),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("text.line.first.and.arrowtriangle.forward"), contentDescription = null)
                                 },
                                 onClick = {
                                     coroutineScope.launch {
@@ -460,10 +453,7 @@ fun PlaylistMenu(
                                 title = { Text(text = stringResource(R.string.add_to_queue)) },
                                 description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.queue_music),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                                 },
                                 onClick = {
                                     onDismiss()
@@ -487,14 +477,20 @@ fun PlaylistMenu(
                                 title = { Text(text = stringResource(R.string.edit)) },
                                 description = { Text(text = stringResource(R.string.edit_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.edit),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("pencil"), contentDescription = null)
                                 },
                                 onClick = {
                                     showEditDialog = true
                                 }
+                            )
+                        )
+                    }
+                    if (autoPlaylist != true && !isGuest) {
+                        add(
+                            IosMenuItemData(
+                                title = { Text(text = stringResource(R.string.merge_playlist)) },
+                                icon = { SymbolIcon(symbol = sf("rectangle.stack"), contentDescription = null) },
+                                onClick = { showMergeDialog = true }
                             )
                         )
                     }
@@ -505,10 +501,7 @@ fun PlaylistMenu(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.edit_playlist_cover)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.image),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("photo"), contentDescription = null)
                                 },
                                 // Don't dismiss: the pick/crop launchers live in this menu's
                                 // composition and must survive until the crop result returns.
@@ -525,10 +518,7 @@ fun PlaylistMenu(
                                     IosMenuItemData(
                                         title = { Text(text = stringResource(R.string.remove_custom_image)) },
                                         icon = {
-                                            Icon(
-                                                painter = painterResource(R.drawable.close),
-                                                contentDescription = null,
-                                            )
+                                            SymbolIcon(symbol = sf("xmark"), contentDescription = null)
                                         },
                                         onClick = {
                                             coroutineScope.launch {
@@ -551,10 +541,7 @@ fun PlaylistMenu(
                                 ) 
                             },
                             icon = {
-                                Icon(
-                                    painter = painterResource(if (isPinned) R.drawable.remove else R.drawable.add),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = if (isPinned) sf("minus") else sf("plus"), contentDescription = null)
                             },
                             onClick = {
                                 coroutineScope.launch(Dispatchers.IO) {
@@ -611,10 +598,7 @@ fun PlaylistMenu(
                                             )
                                         },
                                         icon = {
-                                            Icon(
-                                                painter = painterResource(R.drawable.offline),
-                                                contentDescription = null
-                                            )
+                                            SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
                                         },
                                         onClick = {
                                             showRemoveDownloadDialog = true
@@ -631,10 +615,6 @@ fun PlaylistMenu(
                                             )
                                         },
                                         onClick = {
-                                            // Cancel, not remove: this used to open the
-                                            // remove-download dialog, which deleted every
-                                            // song in the playlist including the ones that
-                                            // had already finished.
                                             cancelDownloads(context, songs.map { it.id }, downloads)
                                         }
                                     )
@@ -644,15 +624,12 @@ fun PlaylistMenu(
                                         title = { Text(text = stringResource(R.string.action_download)) },
                                         description = { Text(text = stringResource(R.string.download_desc)) },
                                         icon = {
-                                            Icon(
-                                                painter = painterResource(R.drawable.download),
-                                                contentDescription = null,
-                                            )
+                                            SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
                                         },
                                         onClick = {
                                             downloadSongs(
                                                 context,
-                                                songs.map { DownloadTarget(it.id, it.song.title) },
+                                                songs.map { DownloadTarget(it.id, it.song.title, it.artists.firstOrNull()?.name, it.song.duration) },
                                                 downloads,
                                             )
                                         }
@@ -667,10 +644,7 @@ fun PlaylistMenu(
                                 title = { Text(text = stringResource(R.string.delete)) },
                                 description = { Text(text = stringResource(R.string.delete_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.delete),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("trash"), contentDescription = null)
                                 },
                                 onClick = {
                                     showDeletePlaylistDialog = true
@@ -685,10 +659,7 @@ fun PlaylistMenu(
                                 title = { Text(text = stringResource(R.string.sync_playlist)) },
                                 description = { Text(text = stringResource(R.string.sync_playlist_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.sync),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.triangle.2.circlepath"), contentDescription = null)
                                 },
                                 onClick = {
                                     isSyncing = true
@@ -696,52 +667,38 @@ fun PlaylistMenu(
                                     isSyncComplete = false
                                     coroutineScope.launch(Dispatchers.IO) {
                                         try {
-                                            var browseId: String? = null
-                                            var attempt = 0
-                                            val maxAttempts = 3
-                                            while (attempt < maxAttempts) {
-                                                try {
-                                                    browseId = YouTube.createPlaylist(playlist.playlist.name)
-                                                    if (browseId != null) break
-                                                } catch (e: Exception) {
-                                                    attempt++
-                                                    if (attempt >= maxAttempts) throw e
-                                                    kotlinx.coroutines.delay(1000)
-                                                }
+                                            val browseId = createPlaylistWithRetry(playlist.playlist.name)
+                                            database.query {
+                                                update(playlist.playlist.copy(browseId = browseId))
                                             }
-                                            if (browseId != null) {
-                                                database.query {
-                                                    update(playlist.playlist.copy(browseId = browseId))
+                                            var successCount = 0
+                                            songs.forEachIndexed { index, song ->
+                                                val result = YouTube.addToPlaylist(browseId, song.id)
+                                                if (result.isSuccess) {
+                                                    successCount++
+                                                } else {
+                                                    result.exceptionOrNull()?.let(::reportException)
                                                 }
-                                                var successCount = 0
-                                                songs.forEachIndexed { index, song ->
-                                                    val result = YouTube.addToPlaylist(browseId, song.id)
-                                                    if (result.isSuccess) {
-                                                        successCount++
-                                                    } else {
-                                                        result.exceptionOrNull()?.printStackTrace()
-                                                    }
-                                                    withContext(Dispatchers.Main) {
-                                                        syncedCount = index + 1
-                                                    }
-                                                    kotlinx.coroutines.delay(200)
+                                                withContext(Dispatchers.Main) {
+                                                    syncedCount = index + 1
                                                 }
-                                                kotlinx.coroutines.withContext(Dispatchers.Main) {
-                                                    if (successCount == songs.size) {
-                                                        Toast.makeText(
-                                                            context,
-                                                            context.getString(R.string.sync_completed_success, songs.size),
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-                                                    } else {
-                                                        Toast.makeText(
-                                                            context,
-                                                            context.getString(R.string.sync_completed_partial, successCount, songs.size),
-                                                            Toast.LENGTH_LONG
-                                                        ).show()
-                                                    }
-                                                    isSyncComplete = true
+                                                kotlinx.coroutines.delay(200)
+                                            }
+                                            kotlinx.coroutines.withContext(Dispatchers.Main) {
+                                                if (successCount == songs.size) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        context.getString(R.string.sync_completed_success, songs.size),
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                } else {
+                                                    Toast.makeText(
+                                                        context,
+                                                        context.getString(R.string.sync_completed_partial, successCount, songs.size),
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
                                                 }
+                                                isSyncComplete = true
                                             }
                                         } catch (e: Exception) {
                                             kotlinx.coroutines.withContext(Dispatchers.Main) {
@@ -760,10 +717,7 @@ fun PlaylistMenu(
                                 title = { Text(text = stringResource(R.string.share)) },
                                 description = { Text(text = stringResource(R.string.share_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ios_share),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null)
                                 },
                                 onClick = {
                                     val intent = Intent().apply {
@@ -819,12 +773,7 @@ fun PlaylistMenu(
                             progress = { 1f },
                             modifier = Modifier.size(80.dp)
                         )
-                        Icon(
-                            painter = painterResource(R.drawable.check),
-                            contentDescription = null,
-                            modifier = Modifier.size(36.dp),
-                            tint = AppTheme.colorScheme.primary
-                        )
+                        SymbolIcon(symbol = sf("checkmark"), contentDescription = null, size = 36.dp, tint = AppTheme.colorScheme.primary)
                     }
                     Text(
                         text = stringResource(R.string.playlist_uploaded),
@@ -855,6 +804,19 @@ fun PlaylistMenu(
                     )
                 }
             }
+        }
+    }
+}
+
+private suspend fun createPlaylistWithRetry(name: String): String {
+    var attempts = 0
+    while (true) {
+        try {
+            return YouTube.createPlaylist(name)
+        } catch (e: Exception) {
+            attempts++
+            if (attempts >= 3) throw e
+            kotlinx.coroutines.delay(1000)
         }
     }
 }

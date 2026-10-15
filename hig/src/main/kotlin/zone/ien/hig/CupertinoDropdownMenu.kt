@@ -111,26 +111,12 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.tanh
 
-/**
- * A scope for defining menu items within a dropdown menu.
- */
+/** Scope for declaring dropdown menu items. */
+
 sealed interface CupertinoMenuScope
 
-/**
- * Creates a Cupertino-style dropdown menu.
- *
- * @param expanded Whether the dropdown menu is currently visible.
- * @param onDismissRequest Called when the user tries to dismiss the menu.
- * @param modifier Modifier to be applied to the menu.
- * @param offset Offset for positioning the menu.
- * @param paddingValues Padding values for the menu content.
- * @param containerColor Color for the menu background.
- * @param width Width of the dropdown menu.
- * @param scrollState Scroll state for the menu content.
- * @param properties Popup properties for the menu.
- * @param backdrop Backdrop effect to apply to the menu.
- * @param content The content of the dropdown menu.
- */
+/** Displays an anchored popup menu with optional backdrop and scroll state. */
+
 @Composable
 @ExperimentalCupertinoApi
 fun CupertinoDropdownMenu(
@@ -184,13 +170,8 @@ fun CupertinoDropdownMenu(
     }
 }
 
-/**
- * Creates a menu item within the dropdown menu.
- *
- * @param modifier Modifier to be applied to the menu item.
- * @param minHeight Minimum height for the menu item.
- * @param content Content to be displayed within the menu item.
- */
+/** Adds a row with standard menu padding. */
+
 @Composable
 fun CupertinoMenuScope.MenuItem(
     modifier: Modifier = Modifier,
@@ -214,12 +195,8 @@ fun CupertinoMenuScope.MenuItem(
     }
 }
 
-/**
- * Creates a menu section with an optional title.
- *
- * @param title Optional title for the menu section.
- * @param content Content to be displayed within the menu section.
- */
+/** Groups menu items under an optional title. */
+
 @Composable
 inline fun CupertinoMenuScope.MenuSection(
     noinline title: (@Composable () -> Unit)? = null,
@@ -229,12 +206,8 @@ inline fun CupertinoMenuScope.MenuSection(
     content()
 }
 
-/**
- * Creates a menu title within the dropdown menu.
- *
- * @param modifier Modifier to be applied to the menu title.
- * @param title The title content to be displayed.
- */
+/** Adds a section title to the menu. */
+
 @Composable
 fun CupertinoMenuScope.MenuTitle(
     modifier: Modifier = Modifier,
@@ -255,18 +228,8 @@ fun CupertinoMenuScope.MenuTitle(
     }
 }
 
-/**
- * Creates a menu action within the dropdown menu.
- *
- * @param onClick Called when the menu action is clicked.
- * @param modifier Modifier to be applied to the menu action.
- * @param onClickLabel Optional label for accessibility when the action is clicked.
- * @param enabled Whether the menu action is enabled.
- * @param contentColor Color for the menu action content.
- * @param leadingIcon Optional leading icon for the menu action.
- * @param trailingIcon Optional trailing icon for the menu action.
- * @param title The title content to be displayed.
- */
+/** Adds a clickable menu row. Leading icons share a reserved column. */
+
 @Composable
 fun CupertinoMenuScope.MenuAction(
     onClick: () -> Unit,
@@ -280,7 +243,7 @@ fun CupertinoMenuScope.MenuAction(
 ) {
     this as CupertinoMenuScopeImpl
 
-    // If at least one item has an icon, set hasIcon to true
+    // Reserve the icon column for every row while any item has a leading icon.
     if (leadingIcon != null) {
         DisposableEffect(this) {
             val prev = hasIcon
@@ -302,20 +265,8 @@ fun CupertinoMenuScope.MenuAction(
     }
 }
 
-/**
- * Creates a menu picker action within the dropdown menu.
- *
- * @param isSelected Whether the menu picker action is currently selected.
- * @param onClick Called when the menu picker action is clicked.
- * @param modifier Modifier to be applied to the menu picker action.
- * @param onClickLabel Optional label for accessibility when the action is clicked.
- * @param enabled Whether the menu picker action is enabled.
- * @param contentColor Color for the menu picker action content.
- * @param selectionIcon Icon to show when the item is selected.
- * @param leadingIcon Optional leading icon for the menu picker action.
- * @param trailingIcon Optional trailing icon for the menu picker action.
- * @param title The title content to be displayed.
- */
+/** Adds a selectable menu row with an optional selection icon. */
+
 @Composable
 fun CupertinoMenuScope.MenuPickerAction(
     isSelected: Boolean,
@@ -362,13 +313,8 @@ fun CupertinoMenuScope.MenuPickerAction(
     )
 }
 
-/**
- * Creates a menu divider within the dropdown menu.
- *
- * @param modifier Modifier to be applied to the menu divider.
- * @param color Color for the menu divider.
- * @param height Height of the menu divider.
- */
+/** Adds a divider between menu rows. */
+
 @Composable
 fun CupertinoMenuScope.MenuDivider(
     modifier: Modifier = Modifier,
@@ -384,18 +330,7 @@ fun CupertinoMenuScope.MenuDivider(
     )
 }
 
-/**
- * Creates a menu action without padding, for internal use.
- *
- * @param onClick Called when the menu action is clicked.
- * @param modifier Modifier to be applied to the menu action.
- * @param onClickLabel Optional label for accessibility when the action is clicked.
- * @param enabled Whether the menu action is enabled.
- * @param contentColor Color for the menu action content.
- * @param leadingIcon Optional leading icon for the menu action.
- * @param trailingIcon Optional trailing icon for the menu action.
- * @param title The title content to be displayed.
- */
+/** Menu action without the default horizontal padding. */
 @OptIn(ExperimentalCupertinoApi::class)
 @Composable
 private fun CupertinoMenuScope.ActionWithoutPadding(
@@ -465,9 +400,8 @@ private fun CupertinoMenuScope.ActionWithoutPadding(
     }
 }
 
-/**
- * Default values for Cupertino dropdown menu.
- */
+/** Default sizing, colors, and icons for dropdown menus. */
+
 @Immutable
 object CupertinoDropdownMenuDefaults {
     val DefaultWidth = 260.dp
@@ -501,19 +435,8 @@ object CupertinoDropdownMenuDefaults {
     }
 }
 
-/**
- * Creates the content for the dropdown menu.
- *
- * @param width Width of the menu.
- * @param containerColor Color for the menu background.
- * @param expandedStates State for the menu expansion animation.
- * @param transformOriginState Transform origin for the menu animation.
- * @param scrollState Scroll state for the menu content.
- * @param paddingValue Padding values for the menu content.
- * @param modifier Modifier to be applied to the menu.
- * @param backdrop Backdrop effect to apply to the menu.
- * @param content The content to be displayed in the menu.
- */
+/** Renders the popup menu content and its expansion animation. */
+
 @Composable
 private fun DropdownMenuContent(
     width: Dp,

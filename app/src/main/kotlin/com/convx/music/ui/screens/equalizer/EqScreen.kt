@@ -1,5 +1,7 @@
 package com.convx.music.ui.screens.equalizer
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.media.audiofx.AudioEffect
@@ -75,7 +77,6 @@ fun EqScreen(
 
     var showError by remember { mutableStateOf<String?>(null) }
 
-    // Activity result launcher for system equalizer
     val activityResultLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { }
@@ -217,7 +218,6 @@ private fun EqScreenContent(
             .padding(vertical = 24.dp) // Optional extra padding if desired, but dialog handles it.
     ) {
         Column {
-            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -242,22 +242,13 @@ private fun EqScreenContent(
                 }
                 Row {
                     IconButton(onClick = onNavigateToAxion) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFSliderHorizontal3,
-                            contentDescription = stringResource(R.string.vivi_equalizer)
-                        )
+                        SymbolIcon(symbol = sf("SFSliderHorizontal3"), contentDescription = stringResource(R.string.convx_equalizer))
                     }
                     IconButton(onClick = onImportCustomEQ) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFPlus,
-                            contentDescription = stringResource(R.string.import_profile)
-                        )
+                        SymbolIcon(symbol = sf("SFPlus"), contentDescription = stringResource(R.string.import_profile))
                     }
                     IconButton(onClick = onOpenSystemEqualizer) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFSliderHorizontal3,
-                            contentDescription = stringResource(R.string.system_equalizer)
-                        )
+                        SymbolIcon(symbol = sf("SFSliderHorizontal3"), contentDescription = stringResource(R.string.system_equalizer))
                     }
                 }
             }
@@ -279,7 +270,7 @@ private fun EqScreenContent(
                 val customProfiles = profiles.filter { it.isCustom }
 
                 if (customProfiles.isNotEmpty()) {
-                    items(customProfiles) { profile ->
+                    items(customProfiles, key = { it.id }) { profile ->
                         EQProfileItem(
                             profile = profile,
                             isSelected = activeProfileId == profile.id,
@@ -301,12 +292,7 @@ private fun EqScreenContent(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.equalizer),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("slider.vertical.3"), contentDescription = null, size = 48.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
                                     text = stringResource(R.string.no_profiles),
@@ -387,11 +373,7 @@ private fun EQProfileItem(
         },
         trailingContent = {
             IconButton(onClick = { showDeleteDialog = true }) {
-                Icon(
-                    painter = painterResource(R.drawable.delete),
-                    contentDescription = stringResource(R.string.delete_profile_desc),
-                    tint = AppTheme.colorScheme.error
-                )
+                SymbolIcon(symbol = sf("trash"), contentDescription = stringResource(R.string.delete_profile_desc), tint = AppTheme.colorScheme.error)
             }
         },
         modifier = Modifier

@@ -15,7 +15,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-/**
+/*
  * Stages 1, 3 and 4 of the pipeline: sample the artwork down, build the spatial weight
  * map, and derive the tone statistics the scheme builder needs.
  *

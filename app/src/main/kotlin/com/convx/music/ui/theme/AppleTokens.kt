@@ -26,11 +26,14 @@ object AppleTokens {
     val Card = Color(0xFF1C1C1E)
     val CardSecondary = Color(0xFF2C2C2E)
 
-    /** Hairline rule on whatever surface the caller sits on. Derived from content colour, not white: a fixed white rule is invisible on light theme and reads foreign on artwork-tinted screens. */
+    /**
+     * Hairline rule derived from the current content color, so it stays visible on light and
+     * artwork-tinted surfaces.
+     */
     val divider: Color
         @Composable get() = LocalContentColor.current.copy(alpha = 0.12f)
 
-    /** Metadata text — one contrast step below on-surface. Reads [LocalMetadataColor] so artwork-painted screens can hand this tier their own colour. */
+    /** Metadata text color on artwork-tinted screens. */
     val Metadata: Color
         @Composable get() = LocalMetadataColor.current
 
@@ -122,10 +125,27 @@ object AppleTokens {
     /**
      * @param lightness (on-dark, on-light) target lightness.
      */
+    /**
+     * Luminance where black and white text have equal WCAG contrast (~0.179). Above it black wins;
+     * the old 0.5 split gave mid-tone backgrounds white text at about 2.5:1.
+     */
+    const val LightContentMaxLuminance = 0.179f
+
+    /** True when light content reads better than dark content on this background. */
+    fun prefersLightContent(bg: Color): Boolean = bg.luminance() <= LightContentMaxLuminance
+
+    fun contrastRatio(a: Color, b: Color): Float {
+        val l1 = maxOf(a.luminance(), b.luminance())
+        val l2 = minOf(a.luminance(), b.luminance())
+        return (l1 + 0.05f) / (l2 + 0.05f)
+    }
+
+    private const val MinTextContrast = 4.5f
+
     private fun Color.shiftedForContrast(saturation: Float, lightness: Pair<Float, Float>): Color {
         val hsl = FloatArray(3)
         androidx.core.graphics.ColorUtils.colorToHSL(toArgb(), hsl)
-        val onDark = luminance() <= 0.5f
+        val onDark = prefersLightContent(this)
         val target = if (onDark) lightness.first else lightness.second
         // No artwork (the tint is still black) or a monochrome cover means there
         // is no hue to carry. For primary text, nudging lightness off the extreme
@@ -138,7 +158,14 @@ object AppleTokens {
             hsl[1] = minOf(hsl[1], saturation)
             hsl[2] = target
         }
-        return Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+        var result = Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+        // Secondary and heading targets sit back from the extreme; walk toward it until the text passes.
+        var steps = 0
+        while (contrastRatio(result, this) < MinTextContrast && steps++ < 12) {
+            hsl[2] = (hsl[2] + if (onDark) 0.04f else -0.04f).coerceIn(0f, 1f)
+            result = Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+        }
+        return result
     }
 }
 

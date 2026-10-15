@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.component.sf
+import dev.chrisbanes.haze.hazeSource
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.only
@@ -101,6 +104,7 @@ import com.convx.music.utils.makeTimeString
 import com.convx.music.viewmodels.StatsViewModel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -111,22 +115,22 @@ fun StatsScreen(
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    val indexChips by viewModel.indexChips.collectAsState()
-    val mostPlayedSongs by viewModel.mostPlayedSongs.collectAsState()
-    val mostPlayedSongsStats by viewModel.mostPlayedSongsStats.collectAsState()
-    val mostPlayedArtists by viewModel.mostPlayedArtists.collectAsState()
-    val mostPlayedAlbums by viewModel.mostPlayedAlbums.collectAsState()
-    val firstEvent by viewModel.firstEvent.collectAsState()
+    val indexChips by viewModel.indexChips.collectAsStateWithLifecycle()
+    val mostPlayedSongs by viewModel.mostPlayedSongs.collectAsStateWithLifecycle()
+    val mostPlayedSongsStats by viewModel.mostPlayedSongsStats.collectAsStateWithLifecycle()
+    val mostPlayedArtists by viewModel.mostPlayedArtists.collectAsStateWithLifecycle()
+    val mostPlayedAlbums by viewModel.mostPlayedAlbums.collectAsStateWithLifecycle()
+    val firstEvent by viewModel.firstEvent.collectAsStateWithLifecycle()
     val currentDate = LocalDateTime.now()
 
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
     val statsTitleProgress = rememberTitleCollapseProgressState(lazyListState)
-    val selectedOption by viewModel.selectedOption.collectAsState()
+    val selectedOption by viewModel.selectedOption.collectAsStateWithLifecycle()
 
     val weeklyDates =
         if (currentDate != null && firstEvent != null) {
@@ -223,12 +227,12 @@ fun StatsScreen(
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeShape = ContinuousRoundedRectangle(percent = 50)
+        val hazeState = androidx.compose.runtime.remember { dev.chrisbanes.haze.HazeState() }
 
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
-                // No bounce here: the top pull drives the hero zoom instead.
                 overscrollEffect = heroZoom.listOverscroll(),
-                modifier = Modifier.heroPullZoom(heroZoom),
+                modifier = Modifier.heroPullZoom(heroZoom).hazeSource(hazeState),
                 state = lazyListState,
                 contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
             ) {
@@ -433,18 +437,20 @@ fun StatsScreen(
                                 items = mostPlayedAlbums,
                                 key = { _, album -> album.id },
                             ) { index, album ->
+                                val playCount = album.songCountListened ?: 0
                                 LocalAlbumsGrid(
                                     title = "${index + 1}. ${album.album.title}",
                                     subtitle =
                                     joinByBullet(
                                         pluralStringResource(
                                             R.plurals.n_time,
-                                            album.songCountListened!!,
-                                            album.songCountListened
+                                            playCount,
+                                            playCount,
                                         ),
                                         makeTimeString(album.timeListened),
                                     ),
                                     thumbnailUrl = album.album.thumbnailUrl,
+                                    sharedArtworkId = album.id,
                                     isActive = album.id == mediaMetadata?.album?.id,
                                     isPlaying = isPlaying,
                                     modifier =
@@ -488,6 +494,12 @@ fun StatsScreen(
                 )
             }
 
+            com.convx.music.ui.component.TopFadeBlur(
+                hazeState = hazeState,
+                pageColor = tint,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+
             FrostedTopBar(
                 title = stringResource(R.string.stats),
                 titleAlpha = 0f,
@@ -509,10 +521,7 @@ fun StatsScreen(
                     onClick = navController::navigateUp,
                     onLongClick = navController::backToMain,
                 ) {
-                    Icon(
-                        painterResource(R.drawable.arrow_back),
-                        contentDescription = null,
-                    )
+                    SymbolIcon(symbol = sf("arrow.left"), contentDescription = null)
                 }
 
                 Spacer(Modifier.weight(1f))

@@ -115,16 +115,11 @@ fun DiyPlayerMockup(
     topOverlay: @Composable BoxScope.(scale: Float) -> Unit = {},
 ) {
     val style = rememberMockupStyle()
-    // Glass Effect setting only drives the nav bar/mini player now — the DIY
-    // editor preview keeps glass but pinned to the fixed style.
+    // Keep preview glass fixed; the global preference controls the nav bar and mini player.
     val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val glassActive = isGlassAllowed()
 
-    // Same frosted-chrome trick as ArtistScreen/AlbumScreen: this editor is a NavHost
-    // destination, so liquidGlass must NOT sample the root appBackdrop (that capture
-    // includes the screen itself -> native RenderNode cycle, SIGSEGV). An unattached
-    // screen-local backdrop (never .layerBackdrop'd onto anything) gives real glass
-    // material with zero self-reference, just without live artwork refraction.
+    // Use a screen-local backdrop to avoid sampling the root capture from inside itself.
     val mockupBackdrop = rememberLayerBackdrop()
 
     CompositionLocalProvider(LocalAppBackdrop provides mockupBackdrop) {
@@ -170,13 +165,6 @@ fun DiyPlayerMockup(
 }
 
 /**
- * The same fixed virtual canvas + uniform centered scale [DiyPlayerMockup] lays its content out
- * against, factored out so the real player can wrap its sticker layer in it too. A sticker's
- * normalised (x, y) only means the same thing in the editor and on the real player if both
- * resolve it against this identical canvas — the real player has no other reason to match a
- * 360:780 aspect ratio on its own.
- */
-/**
  * The mockup's actual rendered width for [orientation] within a [maxWidth]x[maxHeight] area —
  * the same scale formula [DiyDesignCanvas] computes internally, exposed so sibling UI (the
  * editor's floating control pills) can match the mockup's real on-screen bounds. Without this,
@@ -194,6 +182,10 @@ fun diyMockupRenderedWidth(orientation: DiyOrientation, maxWidth: Dp, maxHeight:
     return design.width * scale
 }
 
+/**
+ * Lays out the mockup and real sticker layer on the same virtual canvas and centered scale.
+ * Sticker coordinates then resolve to the same positions in both places.
+ */
 @Composable
 fun DiyDesignCanvas(
     orientation: DiyOrientation,
@@ -240,7 +232,7 @@ private fun rememberMockupStyle(): MockupStyle {
     val accent = AppTheme.colorScheme.primary
     val background by rememberEnumPreference(
         PlayerBackgroundStyleKey,
-        defaultValue = PlayerBackgroundStyle.APPLE_MUSIC,
+        defaultValue = PlayerBackgroundStyle.GRADIENT,
     )
     val artwork by rememberEnumPreference(
         PlayerArtworkStyleKey,

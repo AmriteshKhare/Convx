@@ -7,6 +7,10 @@
 
 package com.convx.music.ui.component
 
+import com.convx.music.ui.ios.foundation.IosTheme
+import com.convx.music.ui.utils.MenuIconChrome
+import com.composables.sfsymbols.SfRenderingMode
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.activity.compose.BackHandler
 import com.convx.music.LocalAmbientBackgroundColor
 import com.convx.music.constants.AppBackgroundColorKey
@@ -19,7 +23,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -27,10 +30,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -57,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -64,7 +65,14 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import com.composables.sfsymbols.SfSymbols
+import com.composables.sfsymbols.dualtone.SFSquareGrid2x2Fill
+import com.composables.sfsymbols.monochrome.SFHouseFill
+import com.composables.sfsymbols.monochrome.SFMusicNoteSquareStackFill
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -82,67 +90,34 @@ import com.convx.music.ui.ios.component.IosMenuSection
 import com.convx.music.ui.player.FloatingMiniPlayer
 import com.convx.music.ui.screens.Screens
 import com.convx.music.ui.screens.search.DynamicSearchPlaceholder
-import com.convx.music.ui.component.floatingtabbar.FloatingTabBar
-import com.convx.music.ui.component.floatingtabbar.LocalTabBarBackdropFrozen
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBarDefaults
+import com.convx.music.ui.component.floatingtabbar.FoldingTabBar
+import com.convx.music.ui.component.floatingtabbar.FoldingTabCell
+import com.convx.music.ui.component.floatingtabbar.FoldingTabGroup
 import com.convx.music.ui.component.floatingtabbar.FloatingTabBarScrollConnection
+import com.convx.music.ui.component.floatingtabbar.clipWhilePressed
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.utils.bounceClick
 import com.convx.music.ui.utils.additiveChrome
+import com.convx.music.ui.utils.vibrantChrome
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
-// Kyant0/Capsule's continuous (superellipse) capsule instead of a circular-arc
-// RoundedCornerShape — smoother corners, and lerp-able for the puck's
-// drag-to-search morph (see FloatingTabBar's ExpandedTabs).
-// Continuous (G2) capsule for the bar's glass; circles stay true circles. See NavContinuousCapsule.
+// Continuous capsule shape supports the tab puck morph and the bar glass.
 private val NavBarShape = com.convx.music.ui.component.shapes.NavContinuousCapsule
 
-// Matches FloatingTabBar's own SearchBarRowHeight (the search-expanded row's
-// height, itself matched to the inline mini player's shrunk height) so the
-// bar doesn't visibly resize the moment the keyboard opens.
+// Keep search mode the same height as the expanded tab row.
 private val NavBarSearchBarHeight = 48.dp
 
-// Width the expanded row needs for everything that is NOT a tab slot: the
-// standalone search circle (a square as tall as the row — ~57dp at fontScale 1,
-// more as the label grows) plus the gap before it and the pill's own horizontal
-// content padding. Whatever is left is split between the tabs.
-//
-// Now 62 (circle) + 8 (componentSpacing) + 8 (pill padding, 4 each side, equal all round
-// so the puck is concentric) = 78, held at 80 so the circle still measures square. Before: 57 + 8 + 4 = 69, so the
-// old 80dp handed the circle 11dp it never used and took that width off the tab
-// pill. The reference bars (designRefrence/navbar.png, navbar.webp) run the tab
-// pill right up to the circle; the pill is the wide element, the circle only as
-// wide as it needs to be. Held one dp under the arithmetic minimum's rounding so
-// the circle still measures square at fontScale 1.
-private val NavBarStandaloneReserve = 80.dp
+// Open tab row height: 32dp glyph, label and the selector's inset.
+private val NavBarRowHeight = 68.dp
 
-// Floor for a tab slot. Below this the icon and its label stop reading as one
-// target; a phone narrow enough to hit this floor gets a bar that overflows
-// slightly instead of tabs that are unusable.
-private val NavBarMinTabWidth = 56.dp
-
-// How long the mini player/icon hide transition (AnimatedContent in
-// AppFloatingNavBar) takes to clear the screen before the keyboard pulls up.
+// Let the player and tab icons clear before opening the keyboard.
 private const val KeyboardOpenDelayMs = 260L
 
 /**
- * The iOS 26 style floating navigation bar — the app's only bottom bar.
- *
- * Collapses to an inline pill while scrolling down (driven by [scrollConnection]) and
- * expands back on scroll up. The search destination is rendered as the standalone
- * circular tab. When the liquid glass effect is enabled for the navigation bar, the tab
- * bar surfaces sample the app backdrop through [Modifier.liquidGlass].
- *
- * When [showPlayerAccessory] is true the now playing controls dock into the bar as an
- * accessory (a pill above the tabs when expanded, inline between the tab pill and the
- * search tab when collapsed) and [onAccessoryClick] opens the full player.
- *
- * Search mode (whenever [currentRoute] is `search_input` or `search/{query}`) is driven
- * by [LocalNavSearchState]: the tab group shrinks to the current screen's own icon and
- * the search circle expands into a search bar (see [FloatingTabBar]'s searchMode). A
- * second tap on that bar flips [NavSearchState.keyboardActive], swapping the whole bar
- * for [NavBarSearchInputBar] — a real text field docked above the keyboard.
+ * Bottom navigation bar with scroll collapse, an optional player accessory,
+ * and search mode driven by [LocalNavSearchState]. Glass surfaces sample the
+ * app backdrop when liquid glass is enabled.
  */
 @Composable
 fun AppFloatingNavBar(
@@ -157,22 +132,13 @@ fun AppFloatingNavBar(
     onAccessoryLyricsClick: (() -> Unit)? = null,
     onAccessoryQueueClick: (() -> Unit)? = null,
     onAccessoryLongClick: (() -> Unit)? = null,
-    // Press-and-hold a tab for its context menu (iOS's own tab bar behaviour). Supplied
-    // from the call site, which is where the nav controller lives; returning an empty
-    // list for a destination means that tab simply has no menu.
+    // Builds each tab menu at the call site, where the navigation controller is available.
     tabContextMenu: (@Composable (Screens) -> List<IosMenuSection>)? = null,
-    // Live fractional tab index while the main tabs pager is moving, null otherwise --
-    // see FloatingTabBar's own `tabPosition`. This is what makes the puck travel WITH
-    // the page instead of springing to it once the page has already arrived.
-    tabPosition: (() -> Float?)? = null,
 ) {
     val navSearch = LocalNavSearchState.current
+    // Plain chrome: the old backdrop-pixel sampler flipped the bar between light and dark while scrolling.
+    androidx.compose.runtime.CompositionLocalProvider(LocalSampledChromeDark provides null) {
 
-    // Slide + spring bounce instead of a flat Crossfade: the mini player/current-
-    // screen icon side drops down and out, the keyboard pill rises up and in
-    // (and reverses on the way back). Bouncier (Medium) coming in, no-bounce
-    // going out — matches how the rest of the bar's own spring transitions
-    // read (settle in, not settle out).
     AnimatedContent(
         targetState = navSearch.keyboardActive,
         modifier = modifier,
@@ -216,10 +182,10 @@ fun AppFloatingNavBar(
                 tabContextMenu = tabContextMenu,
                 searchModeActive = navSearch.visualActive,
                 navSearch = navSearch,
-                tabPosition = tabPosition,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
     }
 }
 
@@ -238,7 +204,6 @@ private fun AppFloatingNavBarChrome(
     tabContextMenu: (@Composable (Screens) -> List<IosMenuSection>)?,
     searchModeActive: Boolean,
     navSearch: NavSearchState,
-    tabPosition: (() -> Float?)?,
     modifier: Modifier,
 ) {
     // System back while search-expanded/search-inline (keyboard not active yet,
@@ -246,74 +211,28 @@ private fun AppFloatingNavBarChrome(
     // animate-then-navigate exit as the bar's own back arrow / icon tap.
     BackHandler(enabled = searchModeActive, onBack = navSearch.onExit)
 
-    // Last measured width of the normal (all-tabs) expanded row, held across
-    // the switch into search mode so the bar doesn't visibly widen — search
-    // mode's row targets this same width instead of filling all available space.
-    var expandedContentWidthPx by remember { mutableStateOf<Int?>(null) }
-
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val appleMusicUi = LocalAppleMusicUi.current
 
     val (appBackgroundColorInt) = rememberPreference(AppBackgroundColorKey, 0)
     val (appTextColorInt) = rememberPreference(AppTextColorKey, 0)
-    // Design system default: semantic grouped card. The Advanced background
-    // override (non-zero) wins; 0 = system. Glass stays transparent so the
-    // liquid surface — not an opaque fill — shows through.
+    // A custom color overrides the system surface; glass stays transparent.
     val backgroundColor = when {
         useGlass -> Color.Transparent
         pureBlack -> Color.Black
         appBackgroundColorInt != 0 -> Color(appBackgroundColorInt)
         else -> AppTheme.colorScheme.surfaceContainerLow
     }
-    // Both derive from the glass content colour, which adapts to what the pill
-    // composites to. Unselected used to be hardcoded white, which vanished on a
-    // light-tinted bar; dimming the adaptive colour keeps the selected/unselected
-    // distinction at any tint instead of only on dark ones.
-    //
-    // The app-wide AppTextColorKey override (Theme screen) wins whenever the
-    // user set one, glass on or off — glassConfig.textColor is only the
-    // fallback for "no explicit override chosen".
-    // Animated: this used to snap instantly whenever the source changed --
-    // switching tabs into a screen with a different hero tint, or the app-wide
-    // override being toggled -- which on a bar that is otherwise all springs and
-    // glass reads as a glitch rather than a colour change. Motion.appear() rather
-    // than the puck's own morph/select curves: a colour isn't travelling anywhere,
-    // it's arriving, which is what appear() is for.
+    // Theme-only: the sampled backdrop appearance flips while scrolling and made the tabs flicker.
     val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
-    val ambientColor = LocalAmbientBackgroundColor.current.value
-    val animatedAmbientColor by animateColorAsState(
-        targetValue = if (ambientColor.isSpecified && !ambientColor.isHueless()) {
-            ambientColor
-        } else {
-            com.convx.music.ui.theme.GlassTintTokens.neutralTintColor(isDark)
-        },
-        animationSpec = androidx.compose.animation.core.tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing),
-        label = "navBarAmbientTint",
-    )
-
-    val selectedIconColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
-        isDark = isDark,
-        isSelected = true,
-        isTitle = false,
-    )
-    val selectedLabelColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
-        isDark = isDark,
-        isSelected = true,
-        isTitle = true,
-    )
-    val unselectedIconColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
-        isDark = isDark,
-        activeTint = animatedAmbientColor,
-        isSelected = false,
-        isTitle = false,
-    )
-    val unselectedLabelColor = com.convx.music.ui.theme.GlassTintTokens.glassContentColor(
-        isDark = isDark,
-        activeTint = animatedAmbientColor,
-        isSelected = false,
-        isUnselectedTabLabel = true,
-    )
+    val ambientColor = Color.Unspecified // plain: no artwork-driven tinting
+    // The Library screens' accent, so the selected tab matches the icons on those screens.
+    val selectedIconColor = IosTheme.tint
+    val selectedLabelColor = selectedIconColor
+    // Inactive tabs are a fixed grey; the additive chrome lifts it a little.
+    val unselectedIconColor = if (isDark) NavInactiveGreyDark else NavInactiveGreyLight
+    val unselectedLabelColor = unselectedIconColor
 
     val targetRimColor = com.convx.music.ui.theme.GlassTintTokens.pluckColor(isDark, ambientColor, glassConfig.highlightColor)
     val rimTintColor by animateColorAsState(
@@ -323,22 +242,18 @@ private fun AppFloatingNavBarChrome(
     )
     val navHighlightAlpha = com.convx.music.ui.theme.GlassTintTokens.pluckOpacity(isDark, ambientColor.isSpecified && !ambientColor.isHueless())
 
+    val backdropFrozen = LocalAppBackdropFrozen.current
+    val combinedBackdropFrozen: () -> Boolean = remember(backdropFrozen) {
+        { com.convx.music.ui.player.PlayerMorph.glassFrozen || backdropFrozen() }
+    }
     val tabBarContentModifier = if (useGlass) {
-        // Tab-bar freeze covers the bar's own inline/expanded/search transition;
-        // OR the app-wide freeze so nav-transitions and list scroll also hold
-        // the last capture (the default alone would be overridden by passing
-        // frozen explicitly).
-        val appBackdropFrozen = LocalAppBackdropFrozen.current
-        val tabBackdropFrozen = LocalTabBarBackdropFrozen.current
-        val combinedBackdropFrozen = remember(appBackdropFrozen, tabBackdropFrozen) {
-            { appBackdropFrozen() || tabBackdropFrozen() }
-        }
         Modifier.liquidGlass(
             config = glassConfig,
             shape = NavBarShape,
             highlightAlpha = navHighlightAlpha,
             frozen = combinedBackdropFrozen,
             rimTintColor = rimTintColor,
+            outerShadow = false,
         )
     } else {
         Modifier
@@ -347,39 +262,16 @@ private fun AppFloatingNavBarChrome(
     val searchScreen = navigationItems.firstOrNull { it == Screens.Search }
     val tabScreens = remember(navigationItems) { navigationItems.filter { it != Screens.Search } }
 
-    // Puck/indicator: sticky, so a non-tab destination (a drilled-in detail,
-    // settings sub-page) holds the last tab instead of snapping the puck to Home.
-    // Matched against tabScreens (not navigationItems) — Search is one of the
-    // navigationItems too, so matching against the full list would let
-    // search_input match itself instead of falling back to the last real tab,
-    // leaving the search-expanded row's shrunk icon with nothing to show.
+    // Search is not a content tab; detail routes keep the indicator on the last tab.
     val selectedTabKey = rememberStickySelectedRoute(currentRoute, tabScreens)
 
     val accessoryContentColor = when {
         appTextColorInt != 0 -> Color(appTextColorInt)
-        useGlass -> glassConfig.resolvedTextColor()
+        useGlass -> IosTheme.colors.label
         pureBlack -> Color.White
         else -> AppTheme.colorScheme.onSurface
     }
-    // Whole-bar snap thump: the mini fires onSnapRelease on drag release and
-    // the bar answers with one small bouncy scale, so the snap reads as
-    // shared between accessory and bar rather than the pill alone.
-    val chromeScope = rememberCoroutineScope()
-    val snapPulse = remember { Animatable(0f) }
-    val onMiniSnapRelease: () -> Unit = {
-        chromeScope.launch {
-            snapPulse.snapTo(1f)
-            snapPulse.animateTo(
-                0f,
-                spring(
-                    dampingRatio = 0.65f,
-                    stiffness = 450f,
-                )
-            )
-        }
-    }
-    // One mini player for both bar states: the tab bar composes it once and flies it
-    // between its inline and expanded slots (see AccessoryHost), [isInline] only restyles it.
+    // One mini player for every fold state; [isInline] only restyles it.
     val playerAccessory: (@Composable (Modifier, Boolean) -> Unit)? =
         if (showPlayerAccessory) {
             { accessoryModifier, isInline ->
@@ -390,7 +282,6 @@ private fun AppFloatingNavBarChrome(
                     onLyricsClick = onAccessoryLyricsClick,
                     onQueueClick = onAccessoryQueueClick,
                     onLongClick = onAccessoryLongClick,
-                    onSnapRelease = onMiniSnapRelease,
                     modifier = accessoryModifier.then(tabBarContentModifier),
                 )
             }
@@ -398,15 +289,7 @@ private fun AppFloatingNavBarChrome(
             null
         }
 
-    // Tab slots are a fixed width so the drag puck can map an offset to an index
-    // (see FloatingTabBarSizes.tabWidth), and at the design's 88dp the pill plus
-    // the search circle overruns anything narrower than ~410dp. The Row measures
-    // the pill first and hands the circle whatever width is left, so on a slim
-    // phone the bar read as oversized with a shrunken search icon beside it.
-    // Fitting the tabs to the width actually available fixes both at once, and
-    // the ceiling keeps wider phones pixel-identical to what they render today.
-    // Which tab is being held, and exactly where it sits -- the menu grows out of that
-    // cell, not out of the middle of the bar.
+    // Fit tabs to the available width and anchor a held tab menu to its cell.
     var heldTab by remember { mutableStateOf<Pair<Screens, Rect>?>(null) }
     val heldSections = heldTab?.let { (screen, _) -> tabContextMenu?.invoke(screen) }.orEmpty()
 
@@ -416,153 +299,135 @@ private fun AppFloatingNavBarChrome(
         onDismissRequest = { heldTab = null },
     )
 
-    BoxWithConstraints(modifier) {
-        val tabWidth = if (tabScreens.isEmpty()) {
-            FloatingTabBarDefaults.TabWidth
-        } else {
-            // No 88dp ceiling: with 3 tabs the capped row came out ~34dp narrower than the
-            // screen and was centred, so the bar read small next to the reference, which
-            // runs pill + circle edge to edge inside the gutter (m2: 21pt margins).
-            ((maxWidth - NavBarStandaloneReserve) / tabScreens.size)
-                .coerceAtLeast(NavBarMinTabWidth)
-        }
+    val barTabs = remember(tabScreens, searchScreen) { tabScreens + listOfNotNull(searchScreen) }
+    val appBackdrop = LocalAppBackdrop.current
 
-        FloatingTabBar(
-            selectedTabKey = selectedTabKey,
-            tabPosition = tabPosition,
-            scrollConnection = scrollConnection,
-            snapPulse = { snapPulse.value },
-            modifier = Modifier.fillMaxWidth(),
-            tabBarContentModifier = tabBarContentModifier,
-            accessory = playerAccessory,
-            colors = FloatingTabBarDefaults.colors(
-                backgroundColor = backgroundColor,
-                accessoryBackgroundColor = backgroundColor,
-            ),
-            // Pill and mini pill share the bar's continuous capsule so shadow, glass and
-            // clip are one outline; the search circle keeps the circle.
-            shapes = FloatingTabBarDefaults.shapes(
-                tabBarShape = com.convx.music.ui.component.shapes.NavContinuousCapsule,
-                accessoryShape = com.convx.music.ui.component.shapes.NavContinuousCapsule,
-            ),
-            sizes = FloatingTabBarDefaults.sizes(
-                // Narrow 4dp inset, equal on all four sides so the puck's radius is the bar's
-                // minus the inset everywhere -- concentric, like iOS. The bar's height now
-                // comes from the content: 32dp glyph + label + 5dp cell padding = 54, +8 = 62.
-                tabBarContentPadding = PaddingValues(4.dp),
-                tabExpandedContentPadding = PaddingValues(vertical = 5.dp, horizontal = 6.dp),
-                tabInlineContentPadding = PaddingValues(8.dp),
-                tabWidth = tabWidth,
-            ),
-            // The selection puck's lens/accent-tint effects only make sense when the
-            // bar itself is sampling the app backdrop through liquid glass.
-            backdrop = if (useGlass) LocalAppBackdrop.current else null,
-            // The puck tints its whole sampled icon row with this one colour, and a
-            // second crisp copy of the icon (below, "the selected icon drawn a second
-            // time") is redrawn on top in selectedContentColor as the drag settles. The two
-            // must match exactly — the lens warp offsets this sampled copy slightly
-            // from the crisp one, so any color mismatch between them reads as a
-            // doubled/ghosted icon, not just a subtle glow.
-            accentColor = selectedIconColor,
-            searchMode = searchModeActive,
-            searchBarContent = if (searchModeActive) {
-                { contentModifier ->
-                    SearchBarPlaceholder(
-                        state = navSearch,
-                        contentColor = accessoryContentColor,
-                        modifier = contentModifier,
-                        useGlass = useGlass,
-                    )
+    FoldingTabBar(
+        selectedTabKey = selectedTabKey,
+        scrollConnection = scrollConnection,
+        rowHeight = NavBarRowHeight,
+        tabBarContentModifier = tabBarContentModifier,
+        colors = FloatingTabBarDefaults.colors(
+            backgroundColor = backgroundColor,
+            accessoryBackgroundColor = backgroundColor,
+        ),
+        shapes = FloatingTabBarDefaults.shapes(
+            tabBarShape = NavBarShape,
+            accessoryShape = NavBarShape,
+        ),
+        sizes = FloatingTabBarDefaults.sizes(),
+        elevations = FloatingTabBarDefaults.elevations(),
+        modifier = modifier,
+        accessory = playerAccessory,
+        searchMode = searchModeActive,
+        searchBarContent = { contentModifier ->
+            SearchBarPlaceholder(
+                state = navSearch,
+                contentColor = accessoryContentColor,
+                modifier = contentModifier,
+                useGlass = useGlass,
+            )
+        },
+        expandedTabs = { tabs, surfaceBackdrop ->
+            val selectedIndex = tabs.indexOfFirst { it.key == selectedTabKey }.coerceAtLeast(0)
+            val selectedIndexState = androidx.compose.runtime.rememberUpdatedState(selectedIndex)
+            FoldingTabGroup(
+                selectedTabIndex = { selectedIndexState.value },
+                onTabSelected = { index -> tabs.getOrNull(index)?.onClick?.invoke() },
+                backdrop = if (useGlass) appBackdrop else surfaceBackdrop,
+                surfaceBackdrop = surfaceBackdrop,
+                tabsCount = tabs.size,
+                accentColor = selectedIconColor,
+                containerColor = Color.Transparent,
+                height = NavBarRowHeight,
+                indicatorVisible = tabs.any { it.key == selectedTabKey },
+            ) {
+                tabs.forEach { tab ->
+                    FoldingTabCell(onClick = tab.onClick, onLongClick = tab.onLongClick) {
+                        tab.icon()
+                        tab.title()
+                    }
                 }
-            } else {
-                null
-            },
-            expandedContentWidthPx = expandedContentWidthPx,
-            onExpandedWidthChanged = { expandedContentWidthPx = it },
-        ) {
-            tabScreens.forEach { screen ->
-                val isSelected = screen.route == selectedTabKey
-                tab(
-                    key = screen.route,
-                    title = {
-                        Text(
-                            text = stringResource(screen.titleId),
-                            color = if (isSelected) selectedLabelColor else unselectedLabelColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            // Figma Tab Bar tabs: Bold 10 selected, Medium 10
-                            // unselected (348:2524).
-                            fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            modifier = Modifier.additiveChrome(useGlass && !isSelected && isDark && ambientColor.isSpecified),
-                        )
-                    },
-                    icon = {
-                        Icon(
-                            painter = painterResource(
-                                screen.icon(appleMusicUi)
-                            ),
-                            contentDescription = stringResource(screen.titleId),
-                            tint = if (isSelected) selectedIconColor else unselectedIconColor,
-                            // 32 (Figma cell 28): bigger per user, same as search.
-                            modifier = Modifier.size(32.dp).additiveChrome(useGlass && !isSelected && isDark),
-                        )
-                    },
-                    onClick = {
-                        // In search mode this is the shrunk current-screen icon —
-                        // tapping it exits (animate back, then navigate) rather than
-                        // re-navigating to itself.
-                        if (searchModeActive) {
-                            navSearch.onExit()
-                        } else {
-                            onItemClick(screen, isRouteSelected(currentRoute, screen.route, navigationItems))
-                        }
-                    },
-                    onLongClick = tabContextMenu?.let { { bounds: Rect -> heldTab = screen to bounds } },
-                )
             }
-
-            if (searchScreen != null) {
-                val screen = searchScreen
-                val isSelected = screen.route == selectedTabKey
-                standaloneTab(
-                    key = screen.route,
-                    title = {
-                        Text(
-                            text = stringResource(screen.titleId),
-                            color = if (isSelected) selectedLabelColor else unselectedLabelColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            // Figma Tab Bar tabs: Bold 10 selected, Medium 10
-                            // unselected (348:2524).
-                            fontSize = 10.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            modifier = Modifier.additiveChrome(useGlass && !isSelected && ambientColor.isSpecified),
-                        )
-                    },
-                    icon = {
-                        Icon(
-                            painter = painterResource(
-                                screen.icon(appleMusicUi)
-                            ),
-                            contentDescription = stringResource(screen.titleId),
-                            tint = if (isSelected) selectedIconColor else unselectedIconColor,
-                            // Same 32 as the tab glyphs, so every bar icon reads one height.
-                            modifier = Modifier.size(32.dp).additiveChrome(useGlass && !isSelected),
-                        )
-                    },
-                    onClick = {
-                        if (searchModeActive) {
-                            navSearch.onTapBar()
-                        } else {
-                            navSearch.onTapSearchIcon()
+        },
+    ) {
+        barTabs.forEach { screen ->
+            val isSelected = screen.route == selectedTabKey
+            tab(
+                key = screen.route,
+                title = {
+                    // Inactive labels get the same chrome as the glyphs: light ink, colour-dodged onto the glass.
+                    val labelChrome = isDark && !isSelected
+                    Text(
+                        text = stringResource(screen.titleId),
+                        modifier = Modifier.vibrantChrome(labelChrome).additiveChrome(labelChrome, 0.5f),
+                        color = if (isSelected) selectedLabelColor else if (isDark) VibrantIconInk else unselectedLabelColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 10.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    )
+                },
+                icon = {
+                    val name = screen.navSymbol()
+                    val tint = if (isSelected) selectedIconColor else unselectedIconColor
+                    if (name != null) {
+                        // Headroom: the bounce scales the glyph up, so it is drawn at 80% inside the slot.
+                        Box(Modifier.size(screen.glyphSize()), contentAlignment = Alignment.Center) {
+                            SymbolIcon(
+                                symbol = sf(name),
+                                contentDescription = stringResource(screen.titleId),
+                                size = screen.glyphSize() * 0.8f,
+                                chrome = MenuIconChrome,
+                                tint = tint,
+                                mode = SfRenderingMode.Monochrome,
+                                bounceOnEnter = true,
+                                // The whole row bounces as the bar folds inline or expands.
+                                replayOn = scrollConnection.isInline,
+                                selected = isSelected,
+                            )
                         }
-                    },
-                    onLongClick = tabContextMenu?.let { { bounds: Rect -> heldTab = screen to bounds } },
-                )
-            }
+                    } else {
+                        Icon(
+                            painter = painterResource(screen.icon(appleMusicUi)),
+                            contentDescription = stringResource(screen.titleId),
+                            tint = tint,
+                            modifier = Modifier.size(screen.glyphSize()),
+                        )
+                    }
+                },
+                onClick = {
+                    when {
+                        screen == Screens.Search -> if (searchModeActive) navSearch.onTapBar() else navSearch.onTapSearchIcon()
+                        searchModeActive -> navSearch.onExit()
+                        else -> onItemClick(screen, isRouteSelected(currentRoute, screen.route, navigationItems))
+                    }
+                },
+                onLongClick = tabContextMenu?.let { { bounds: Rect -> heldTab = screen to bounds } },
+            )
         }
     }
+}
+
+private val NavInactiveGreyDark = Color(0xFF8E8E93)
+private val NavInactiveGreyLight = Color(0xFF6C6C70)
+
+/** Glyphs that fill their whole viewbox are drawn smaller so every tab reads the same size. */
+private fun Screens.glyphSize() = when (this) {
+    Screens.Explore, Screens.Search -> 28.dp
+    else -> 32.dp
+}
+
+/** SF Symbol name for destinations that have one; null keeps the destination's own drawable. */
+internal fun Screens.navSymbol(): String? = when (this) {
+    Screens.Home -> "house.fill"
+    Screens.Library -> "music.note.square.stack.fill"
+    Screens.Explore -> "square.grid.2x2.fill"
+    Screens.Search -> "magnifyingglass"
+    Screens.Songs -> "music.note"
+    Screens.Radio -> "dot.radiowaves.left.and.right"
+    Screens.ListenTogether -> "person.2.fill"
+    else -> null
 }
 
 /**
@@ -590,6 +455,8 @@ private fun SearchBarPlaceholder(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .then(glow.gestureModifier)
+            // Clip the sheen to the bar shape while pressed.
+            .clipWhilePressed(glow, NavBarShape)
             .then(glow.modifier)
             .bounceClick(onClick = state.onTapBar)
             .padding(start = 4.dp, end = 4.dp),
@@ -600,18 +467,24 @@ private fun SearchBarPlaceholder(
                 .bounceClick { state.onExit() }
                 .padding(8.dp)
         ) {
-            Icon(
-                painter = painterResource(R.drawable.arrow_back),
-                contentDescription = stringResource(R.string.dismiss),
-                tint = contentColor,
-                modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
-            )
+            SymbolIcon(bounceOnEnter = true, symbol = sf("arrow.left"), contentDescription = stringResource(R.string.dismiss), modifier = Modifier.fillMaxSize().additiveChrome(useGlass), tint = contentColor)
         }
         Box(Modifier.weight(1f)) {
-            DynamicSearchPlaceholder(
-                searchSource = state.searchSource,
-                style = TextStyle(color = contentColor.copy(alpha = 0.6f), fontSize = 17.sp),
-            )
+            // After submit the keyboard closes and this bar takes over: keep showing
+            // what was searched instead of falling back to the hint.
+            if (state.query.text.isNotEmpty()) {
+                Text(
+                    text = state.query.text,
+                    style = TextStyle(color = contentColor, fontSize = 17.sp),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            } else {
+                DynamicSearchPlaceholder(
+                    searchSource = state.searchSource,
+                    style = TextStyle(color = contentColor.copy(alpha = 0.6f), fontSize = 17.sp),
+                )
+            }
         }
         if (state.canToggleSource) {
             Box(
@@ -620,29 +493,18 @@ private fun SearchBarPlaceholder(
                     .bounceClick { state.onToggleSource() }
                     .padding(9.dp)
             ) {
-                Icon(
-                    painter = painterResource(
+                SymbolIcon(bounceOnEnter = true, symbol = 
                         when (state.searchSource) {
-                            SearchSource.LOCAL -> R.drawable.library_music
-                            SearchSource.ONLINE -> R.drawable.globe_search
+                            SearchSource.LOCAL -> sf("music.note.list")
+                            SearchSource.ONLINE -> sf("globe")
                         }
-                    ),
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
-                )
+                    , contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass), tint = contentColor)
             }
         }
     }
 }
 
-/**
- * Keyboard-active search state — replaces the whole nav bar (mini player and
- * current-screen icon included) while focused, since the keyboard covers that
- * screen space anyway. Docked above the keyboard via [Modifier.imePadding].
- * Relocated from the old [com.convx.music.ui.screens.search.SearchScreen]
- * bottomBar pill — same markup, now driven by hoisted [NavSearchState].
- */
+/** Search input that replaces the navigation bar while focused and follows the keyboard. */
 @Composable
 fun NavBarSearchInputBar(
     state: NavSearchState,
@@ -651,12 +513,12 @@ fun NavBarSearchInputBar(
 ) {
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
-    val ambientColor = LocalAmbientBackgroundColor.current.value
-    val isDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
+    val ambientColor = Color.Unspecified // plain: no artwork-driven tinting
+    val isDark = glassUsesDarkAppearance()
     // On glass, take the adaptive glass content colour rather than a flat white —
     // the search field is the one piece of chrome the user is actively reading.
     val onTint = when {
-        useGlass -> glassConfig.resolvedTextColor()
+        useGlass -> IosTheme.colors.label
         pureBlack -> Color.White
         else -> AppTheme.colorScheme.onSurface
     }
@@ -675,7 +537,13 @@ fun NavBarSearchInputBar(
 
     // Keyboard's own back press just closes the keyboard (back to search-expanded)
     // rather than exiting search entirely — the visible back arrow does that.
-    BackHandler(onBack = state.onCloseKeyboard)
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    BackHandler {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        state.onCloseKeyboard()
+    }
 
     // Let the mini player/icon finish sliding down and out (the AnimatedContent
     // transition in AppFloatingNavBar) before pulling the keyboard up — opening
@@ -714,7 +582,6 @@ fun NavBarSearchInputBar(
             )
             .then(pillGlow.gestureModifier)
             .then(pillGlow.modifier)
-            // Figma Search Bar content pads L11/R10 (607:457).
             .padding(start = 11.dp, end = 10.dp)
     ) {
         Box(
@@ -723,12 +590,7 @@ fun NavBarSearchInputBar(
                 .bounceClick { state.onExit() }
                 .padding(12.dp)
         ) {
-            Icon(
-                painter = painterResource(R.drawable.arrow_back),
-                contentDescription = stringResource(R.string.dismiss),
-                tint = searchIconTint,
-                modifier = Modifier.fillMaxSize().additiveChrome(useGlass && isDark),
-            )
+            SymbolIcon(bounceOnEnter = true, symbol = sf("arrow.left"), contentDescription = stringResource(R.string.dismiss), modifier = Modifier.fillMaxSize().additiveChrome(useGlass && isDark), tint = searchIconTint)
         }
         Box(modifier = Modifier.weight(1f)) {
             if (state.query.text.isEmpty()) {
@@ -754,6 +616,11 @@ fun NavBarSearchInputBar(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onFocusChanged {
+                        // The tablet always mounts this input, so its automatic
+                        // focus must enter the same state as tapping the phone field.
+                        if (it.isFocused && !state.keyboardActive) state.onTapBar()
+                    }
                     .focusRequester(state.focusRequester)
                     // Some OEM keyboards (Samsung's included) don't reliably report
                     // the IME search action through KeyboardActions.onSearch — catch
@@ -776,12 +643,7 @@ fun NavBarSearchInputBar(
                     .bounceClick { state.onQueryChange(TextFieldValue("")) }
                     .padding(12.dp)
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.close),
-                    contentDescription = null,
-                    tint = searchIconTint,
-                    modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
-                )
+                SymbolIcon(bounceOnEnter = true, symbol = sf("xmark"), contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass), tint = searchIconTint)
             }
         }
         if (state.canToggleSource) {
@@ -791,17 +653,12 @@ fun NavBarSearchInputBar(
                     .bounceClick { state.onToggleSource() }
                     .padding(12.dp)
             ) {
-                Icon(
-                    painter = painterResource(
+                SymbolIcon(bounceOnEnter = true, symbol = 
                         when (state.searchSource) {
-                            SearchSource.LOCAL -> R.drawable.library_music
-                            SearchSource.ONLINE -> R.drawable.globe_search
+                            SearchSource.LOCAL -> sf("music.note.list")
+                            SearchSource.ONLINE -> sf("globe")
                         }
-                    ),
-                    contentDescription = null,
-                    tint = searchIconTint,
-                    modifier = Modifier.fillMaxSize().additiveChrome(useGlass),
-                )
+                    , contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass), tint = searchIconTint)
             }
         }
     }

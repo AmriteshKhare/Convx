@@ -1,5 +1,7 @@
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.ios.compat.AppTheme
 
 import androidx.compose.foundation.background
@@ -9,7 +11,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
+import com.convx.music.ui.ios.compat.rememberIosModalSheetState
 import com.convx.music.ui.ios.compat.Checkbox
 import com.convx.music.ui.ios.compat.HorizontalDivider
 import com.convx.music.ui.ios.compat.Icon
@@ -81,7 +83,7 @@ fun SpotifyPlaylistBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetState = rememberIosModalSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = AppTheme.colorScheme.surface,
     ) {
@@ -90,7 +92,6 @@ fun SpotifyPlaylistBottomSheet(
                 .fillMaxWidth()
                 .fillMaxHeight(0.85f)
         ) {
-            // Header Row (Title and Select All checkbox)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,24 +136,17 @@ fun SpotifyPlaylistBottomSheet(
                 }
             }
 
-            // Search Text Field
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 placeholder = { Text(stringResource(R.string.search)) },
                 leadingIcon = {
-                    Icon(
-                        painter = painterResource(R.drawable.search),
-                        contentDescription = null
-                    )
+                    SymbolIcon(symbol = sf("magnifyingglass"), contentDescription = null)
                 },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                painter = painterResource(R.drawable.close),
-                                contentDescription = null
-                            )
+                            SymbolIcon(symbol = sf("xmark"), contentDescription = null)
                         }
                     }
                 },
@@ -167,14 +161,12 @@ fun SpotifyPlaylistBottomSheet(
                 )
             )
 
-            // Top Divider
             HorizontalDivider(
                 color = AppTheme.colorScheme.outlineVariant,
                 thickness = 1.dp,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Playlist list
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -222,14 +214,12 @@ fun SpotifyPlaylistBottomSheet(
                 }
             }
 
-            // Bottom Divider
             HorizontalDivider(
                 color = AppTheme.colorScheme.outlineVariant,
                 thickness = 1.dp,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Bottom OK Button Row
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -292,12 +282,7 @@ private fun SpotifySourceRow(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
-                    Icon(
-                        painter = painterResource(R.drawable.favorite),
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp),
-                    )
+                    SymbolIcon(symbol = sf("heart.fill"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.primary)
                 }
             }
             Column(

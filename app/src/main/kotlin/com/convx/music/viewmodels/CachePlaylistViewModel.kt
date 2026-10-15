@@ -48,9 +48,10 @@ class CachePlaylistViewModel @Inject constructor(
             while (true) {
                 val hideExplicit = context.dataStore.get(HideExplicitKey, false)
                 val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false) || context.dataStore.get(DataSaverEnabledKey, false)
-                val cachedIds = playerCache.keys.toSet()
-                val downloadedIds = downloadCache.keys.toSet()
-                val pureCacheIds = cachedIds.subtract(downloadedIds)
+                // Player cache keys carry suffixes ("id#source-<hash>", "id#aac"), so group them by song id.
+                val keysById = playerCache.keys.groupBy { it.substringBefore('#') }
+                val downloadedIds = downloadCache.keys.map { it.substringBefore('#') }.toSet()
+                val pureCacheIds = keysById.keys.subtract(downloadedIds)
 
                 val songs = if (pureCacheIds.isNotEmpty()) {
                     database.getSongsByIds(pureCacheIds.toList())
@@ -58,9 +59,9 @@ class CachePlaylistViewModel @Inject constructor(
                     emptyList()
                 }
 
-                val completeSongs = songs.filter {
-                    val contentLength = it.format?.contentLength
-                    contentLength != null && playerCache.isCached(it.song.id, 0, contentLength)
+                val completeSongs = songs.filter { song ->
+                    val contentLength = song.format?.contentLength?.takeIf { it > 0 } ?: return@filter false
+                    keysById[song.song.id].orEmpty().any { playerCache.isCached(it, 0, contentLength) }
                 }
 
                 if (completeSongs.isNotEmpty()) {

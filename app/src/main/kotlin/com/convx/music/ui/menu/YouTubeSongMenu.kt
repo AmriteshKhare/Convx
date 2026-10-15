@@ -5,6 +5,10 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.DownloadRingIcon
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.menuBottomInset
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -100,15 +104,15 @@ fun YouTubeSongMenu(
 ) {
     val context = LocalContext.current
     val ringtoneViewModel = com.convx.music.LocalRingtoneViewModel.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val playerConnection = LocalPlayerConnection.current ?: return
     val librarySong by database.song(song.id).collectAsState(initial = null)
-    val download by LocalDownloadUtil.current.getDownload(song.id).collectAsState(initial = null)
+    val download by LocalDownloadUtil.current.get().getDownload(song.id).collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
-    val syncUtils = LocalSyncUtils.current
+    val syncUtils = LocalSyncUtils.current.get()
     val listenTogetherManager = LocalListenTogetherManager.current
     val isPinned by database.speedDialDao.isPinned(song.id).collectAsState(initial = false)
-    val artists = remember {
+    val artists = remember(song.artists) {
         song.artists.mapNotNull {
             it.id?.let { artistId ->
                 MediaMetadata.Artist(id = artistId, name = it.name)
@@ -144,7 +148,7 @@ fun YouTubeSongMenu(
         ListDialog(  
             onDismiss = { showSelectArtistDialog = false },  
         ) {  
-            items(artists) { artist ->  
+            items(artists, key = { it.id!! }) { artist ->
                 Row(  
                     verticalAlignment = Alignment.CenterVertically,  
                     modifier =  
@@ -234,11 +238,7 @@ fun YouTubeSongMenu(
                     }  
                 },  
             ) {  
-                Icon(  
-                    painter = painterResource(if (librarySong?.song?.liked == true) R.drawable.favorite else R.drawable.favorite_border),  
-                    tint = if (librarySong?.song?.liked == true) AppTheme.colorScheme.error else LocalContentColor.current,  
-                    contentDescription = null,  
-                )  
+                SymbolIcon(symbol = if (librarySong?.song?.liked == true) sf("heart.fill") else sf("heart"), contentDescription = null, tint = if (librarySong?.song?.liked == true) AppTheme.colorScheme.error else LocalContentColor.current)  
             }  
         },  
     )  
@@ -258,7 +258,7 @@ fun YouTubeSongMenu(
             start = 0.dp,
             top = 0.dp,
             end = 0.dp,
-            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+            bottom = 8.dp + menuBottomInset(),
         ),
     ) {
         item {
@@ -267,12 +267,7 @@ fun YouTubeSongMenu(
                     if (!isGuest) {
                         NewAction(
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.playlist_play),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("text.line.first.and.arrowtriangle.forward"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             text = stringResource(R.string.play_next),
                             onClick = {
@@ -283,12 +278,7 @@ fun YouTubeSongMenu(
                     } else null,
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.playlist_add),
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("text.badge.plus"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.add_to_an_playlist),
                         onClick = {
@@ -297,12 +287,7 @@ fun YouTubeSongMenu(
                     ),
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ios_share),
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.share),
                         onClick = {
@@ -328,13 +313,10 @@ fun YouTubeSongMenu(
                         IosMenuItemData(
                             title = { Text(text = stringResource(R.string.suggest_to_host)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.queue_music),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                             },
                             onClick = {
-                                val durationMs = if (song.duration != null && song.duration!! > 0) song.duration!! * 1000L else 180000L
+                                val durationMs = song.duration?.takeIf { it > 0 }?.times(1000L) ?: 180000L
                                 val trackInfo = com.convx.music.listentogether.TrackInfo(
                                     id = song.id,
                                     title = song.title,
@@ -353,10 +335,7 @@ fun YouTubeSongMenu(
                             title = { Text(text = stringResource(R.string.start_radio)) },
                             description = { Text(text = stringResource(R.string.start_radio_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.radio),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("dot.radiowaves.left.and.right"), contentDescription = null)
                             },
                             onClick = {
                                 playerConnection.playQueue(YouTubeQueue.radio(song.toMediaMetadata()))
@@ -369,10 +348,7 @@ fun YouTubeSongMenu(
                             title = { Text(text = stringResource(R.string.add_to_queue)) },
                             description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.queue_music),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                             },
                             onClick = {
                                 playerConnection.addToQueue(song.toMediaItem())
@@ -389,19 +365,16 @@ fun YouTubeSongMenu(
         item {
             IosMenuGroup(
                 items = buildList {
-                    if (song.historyRemoveToken != null) {
+                    song.historyRemoveToken?.let { historyRemoveToken ->
                         add(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.remove_from_history)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.delete),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("trash"), contentDescription = null)
                                 },
                                 onClick = {
                                     coroutineScope.launch {
-                                        YouTube.feedback(listOf(song.historyRemoveToken!!))
+                                        YouTube.feedback(listOf(historyRemoveToken))
                                         delay(500)
                                         onHistoryRemoved()
                                         onDismiss()
@@ -418,10 +391,7 @@ fun YouTubeSongMenu(
                                 ) 
                             },
                             icon = {
-                                Icon(
-                                    painter = painterResource(if (isPinned) R.drawable.remove else R.drawable.add),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = if (isPinned) sf("minus") else sf("plus"), contentDescription = null)
                             },
                             onClick = {
                                 coroutineScope.launch(Dispatchers.IO) {
@@ -442,15 +412,11 @@ fun YouTubeSongMenu(
                             },
                             description = { Text(text = stringResource(R.string.add_to_library_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(if (librarySong?.song?.inLibrary != null) R.drawable.library_add_check else R.drawable.library_add),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = if (librarySong?.song?.inLibrary != null) sf("text.badge.checkmark") else sf("text.badge.plus"), contentDescription = null)
                             },
                             onClick = {
                                 val isInLibrary = librarySong?.song?.inLibrary != null
 
-                                // Use the new reliable method that fetches fresh tokens
                                 coroutineScope.launch {
                                     YouTube.toggleSongLibrary(song.id, !isInLibrary)
                                 }
@@ -491,10 +457,7 @@ fun YouTubeSongMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.offline),
-                                        contentDescription = null
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
                                 },
                                 onClick = {
                                     DownloadService.sendRemoveDownload(
@@ -510,10 +473,7 @@ fun YouTubeSongMenu(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
-                                    )
+                                    DownloadRingIcon(download)
                                 },
                                 onClick = {
                                     DownloadService.sendRemoveDownload(
@@ -530,10 +490,7 @@ fun YouTubeSongMenu(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 description = { Text(text = stringResource(R.string.download_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.download),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
                                 },
                                 onClick = {
                                     database.transaction {
@@ -569,10 +526,7 @@ fun YouTubeSongMenu(
                                 title = { Text(text = stringResource(R.string.view_artist)) },
                                 description = { Text(text = song.artists.joinToString { it.name }) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.artist),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("music.mic"), contentDescription = null)
                                 },
                                 onClick = {
                                     if (artists.size == 1) {
@@ -599,10 +553,7 @@ fun YouTubeSongMenu(
                                     { Text(text = name) }
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.album),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("square.stack"), contentDescription = null)
                                 },
                                 onClick = {
                                     navController.navigate("album/$albumId")
@@ -616,14 +567,11 @@ fun YouTubeSongMenu(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.info),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("info.circle"), contentDescription = null)
                             },
                             onClick = {
                                 onDismiss()
-                                bottomSheetPageState.show {
+                                bottomSheetPageState.showFloating {
                                     ShowMediaInfo(song.id)
                                 }
                             }
@@ -633,22 +581,15 @@ fun YouTubeSongMenu(
                         IosMenuItemData(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.notification),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("bell"), contentDescription = null)
                             },
                             onClick = {
-                                if (ringtoneViewModel.hasSettingsPermission(context)) {
-                                    ringtoneViewModel.showTrimmer(
-                                        song.id,
-                                        song.title,
-                                        song.artists.joinToString { it.name },
-                                        song.duration ?: 0
-                                    )
-                                } else {
-                                    ringtoneViewModel.requestSettingsPermission(context)
-                                }
+                                ringtoneViewModel.showTrimmer(
+                                    song.id,
+                                    song.title,
+                                    song.artists.joinToString { it.name },
+                                    song.duration ?: 0
+                                )
                                 onDismiss()
                             }
                         )

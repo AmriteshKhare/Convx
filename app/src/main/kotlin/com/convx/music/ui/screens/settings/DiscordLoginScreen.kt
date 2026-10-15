@@ -64,11 +64,7 @@ fun DiscordLoginScreen(navController: NavController) {
         pageColor = AppTheme.colorScheme.background,
     ) {
         AndroidView(
-            // Deliberately NOT the chrome's contentModifier: recording a
-            // hardware-accelerated WebView into a backdrop layer makes the page
-            // tear and flicker (see MainActivity's WebViewRoutes note). The bar
-            // still gets its blur — of the page colour, since the WebView sits
-            // below it rather than scrolling under it.
+            // Keep WebView out of the backdrop capture; recording it causes flicker.
             modifier = Modifier
                 .windowInsetsPadding(LocalPlayerAwareWindowInsets.current)
                 .fillMaxSize(),
@@ -87,7 +83,7 @@ fun DiscordLoginScreen(navController: NavController) {
                     // partway through login with no visible error.
                     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
-                    // Fix for Motorola devices - UA parsing issue breaks Discord login
+                    // Motorola WebView needs the Samsung user agent to complete Discord login.
                     // See: https://github.com/dead8309/Kizzy/issues/345#issuecomment-2699729072
                     if (Build.MANUFACTURER.equals(MOTOROLA, ignoreCase = true)) {
                         settings.userAgentString = SAMSUNG_USER_AGENT

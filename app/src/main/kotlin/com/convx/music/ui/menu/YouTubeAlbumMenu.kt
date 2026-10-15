@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.menuBottomInset
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -77,9 +80,11 @@ import com.convx.music.utils.reportException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.convx.music.playback.DownloadTarget
+import com.convx.music.playback.combinedDownloadState
 import com.convx.music.playback.cancelDownloads
 import com.convx.music.playback.downloadSongs
 import com.convx.music.playback.removeDownloads
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("MutableCollectionMutableState")
@@ -90,8 +95,8 @@ fun YouTubeAlbumMenu(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val database = LocalDatabase.current
-    val downloadUtil = LocalDownloadUtil.current
+    val database = LocalDatabase.current.get()
+    val downloadUtil = LocalDownloadUtil.current.get()
     val playerConnection = LocalPlayerConnection.current ?: return
     val listenTogetherManager = LocalListenTogetherManager.current
     val isGuest = listenTogetherManager?.isInRoom == true && !listenTogetherManager.isHost
@@ -115,25 +120,9 @@ fun YouTubeAlbumMenu(
         }
     }
 
-    // Collected rather than folded into a LaunchedEffect so the current state of each
-    // download is also available at click time — the download and cancel actions filter
-    // on it, see DownloadActions.
-    val downloads by downloadUtil.downloads.collectAsState()
+    val downloads by downloadUtil.downloads.collectAsStateWithLifecycle()
     val downloadState = remember(album, downloads) {
-        val ids = album?.songs?.map { it.id }
-        when {
-            ids.isNullOrEmpty() -> Download.STATE_STOPPED
-            ids.all { downloads[it]?.state == Download.STATE_COMPLETED } ->
-                Download.STATE_COMPLETED
-
-            ids.all {
-                downloads[it]?.state == Download.STATE_QUEUED ||
-                    downloads[it]?.state == Download.STATE_DOWNLOADING ||
-                    downloads[it]?.state == Download.STATE_COMPLETED
-            } -> Download.STATE_DOWNLOADING
-
-            else -> Download.STATE_STOPPED
-        }
+        combinedDownloadState(album?.songs, downloads) { it.id }
     }
 
     var showChoosePlaylistDialog by rememberSaveable {
@@ -185,7 +174,7 @@ fun YouTubeAlbumMenu(
                 )
             }
 
-            items(notAddedList) { song ->
+            items(notAddedList, key = { it.id }) { song ->
                 SongListItem(song = song)
             }
         }
@@ -250,11 +239,7 @@ fun YouTubeAlbumMenu(
                     }
                 },
             ) {
-                Icon(
-                    painter = painterResource(if (album?.album?.bookmarkedAt != null) R.drawable.favorite else R.drawable.favorite_border),
-                    tint = if (album?.album?.bookmarkedAt != null) AppTheme.colorScheme.error else LocalContentColor.current,
-                    contentDescription = null,
-                )
+                SymbolIcon(symbol = if (album?.album?.bookmarkedAt != null) sf("heart.fill") else sf("heart"), contentDescription = null, tint = if (album?.album?.bookmarkedAt != null) AppTheme.colorScheme.error else LocalContentColor.current)
             }
         },
     )
@@ -271,7 +256,7 @@ fun YouTubeAlbumMenu(
             start = 0.dp,
             top = 0.dp,
             end = 0.dp,
-            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+            bottom = 8.dp + menuBottomInset(),
         ),
     ) {
         item {
@@ -280,12 +265,7 @@ fun YouTubeAlbumMenu(
                     if (!isGuest) {
                         NewAction(
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.play),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("play.fill"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             text = stringResource(R.string.play),
                             onClick = {
@@ -299,12 +279,7 @@ fun YouTubeAlbumMenu(
                         )
                         NewAction(
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.shuffle),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(28.dp),
-                                    tint = AppTheme.colorScheme.onSurfaceVariant
-                                )
+                                SymbolIcon(symbol = sf("shuffle"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                             },
                             text = stringResource(R.string.shuffle),
                             onClick = {
@@ -319,12 +294,7 @@ fun YouTubeAlbumMenu(
                     } else null,
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ios_share),
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.share),
                         onClick = {
@@ -350,10 +320,7 @@ fun YouTubeAlbumMenu(
                             title = { Text(text = stringResource(R.string.play_next)) },
                             description = { Text(text = stringResource(R.string.play_next_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.playlist_play),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("text.line.first.and.arrowtriangle.forward"), contentDescription = null)
                             },
                             onClick = {
                                 album
@@ -369,10 +336,7 @@ fun YouTubeAlbumMenu(
                             title = { Text(text = stringResource(R.string.add_to_queue)) },
                             description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.queue_music),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                             },
                             onClick = {
                                 album
@@ -387,10 +351,7 @@ fun YouTubeAlbumMenu(
                         title = { Text(text = stringResource(R.string.add_to_playlist)) },
                         description = { Text(text = stringResource(R.string.add_to_playlist_desc)) },
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.playlist_add),
-                                contentDescription = null,
-                            )
+                            SymbolIcon(symbol = sf("text.badge.plus"), contentDescription = null)
                         },
                         onClick = {
                             showChoosePlaylistDialog = true
@@ -403,10 +364,7 @@ fun YouTubeAlbumMenu(
                             ) 
                         },
                         icon = {
-                            Icon(
-                                painter = painterResource(if (isPinned) R.drawable.remove else R.drawable.add),
-                                contentDescription = null,
-                            )
+                            SymbolIcon(symbol = if (isPinned) sf("minus") else sf("plus"), contentDescription = null)
                         },
                         onClick = {
                             coroutineScope.launch(Dispatchers.IO) {
@@ -437,10 +395,7 @@ fun YouTubeAlbumMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.offline),
-                                        contentDescription = null
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
                                 },
                                 onClick = {
                                     removeDownloads(context, album?.songs?.map { it.id }.orEmpty())
@@ -457,8 +412,6 @@ fun YouTubeAlbumMenu(
                                     )
                                 },
                                 onClick = {
-                                    // Cancel, not remove: this used to delete every song
-                                    // in the album including the already-finished ones.
                                     cancelDownloads(
                                         context,
                                         album?.songs?.map { it.id }.orEmpty(),
@@ -472,16 +425,13 @@ fun YouTubeAlbumMenu(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 description = { Text(text = stringResource(R.string.download_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.download),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null)
                                 },
                                 onClick = {
                                     downloadSongs(
                                         context,
                                         album?.songs
-                                            ?.map { DownloadTarget(it.id, it.song.title) }
+                                            ?.map { DownloadTarget(it.id, it.song.title, it.artists.firstOrNull()?.name, it.song.duration) }
                                             .orEmpty(),
                                         downloads,
                                     )
@@ -502,10 +452,7 @@ fun YouTubeAlbumMenu(
                             title = { Text(text = stringResource(R.string.view_artist)) },
                             description = { Text(text = artists.joinToString { it.name }) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.artist),
-                                    contentDescription = null,
-                                )
+                                SymbolIcon(symbol = sf("music.mic"), contentDescription = null)
                             },
                             onClick = {
                                 if (artists.size == 1) {

@@ -115,8 +115,6 @@ fun CupertinoText(
                 LocalContentColor.current
             }
         }
-    // NOTE(text-perf-review): It might be worthwhile writing a bespoke merge implementation that
-    // will avoid reallocating if all of the options here are the defaults
     val mergedStyle =
         style.merge(
             TextStyle(
@@ -266,8 +264,6 @@ fun CupertinoText(
                 LocalContentColor.current
             }
         }
-    // NOTE(text-perf-review): It might be worthwhile writing a bespoke merge implementation that
-    // will avoid reallocating if all of the options here are the defaults
     val mergedStyle =
         style.merge(
             TextStyle(
@@ -342,9 +338,8 @@ fun CupertinoText(
 }
 
 /**
- * This function is used to set the current value of [LocalTextStyle], merging the given style
- * with the current style values for any missing attributes. Any [CupertinoText] components included in
- * this component's [content] will be styled with this style unless styled explicitly.
+ * Merges [value] with the current [LocalTextStyle]. Descendant text inherits the result
+ * unless it provides its own style.
  *
  * @see LocalTextStyle
  */

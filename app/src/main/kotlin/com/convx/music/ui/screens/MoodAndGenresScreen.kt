@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,6 +58,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import dev.chrisbanes.haze.hazeSource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.convx.music.utils.rememberPreference
@@ -71,10 +74,12 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.NavigationTitle
+import com.convx.music.ui.utils.youtubeBrowseRoute
 import com.convx.music.ui.component.shimmer.ListItemPlaceHolder
 import com.convx.music.ui.component.shimmer.ShimmerHost
 import com.convx.music.ui.utils.backToMain
 import com.convx.music.viewmodels.MoodAndGenresViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +91,7 @@ fun MoodAndGenresScreen(
     val localConfiguration = LocalConfiguration.current
     val itemsPerRow = if (localConfiguration.orientation == ORIENTATION_LANDSCAPE) 3 else 2
 
-    val moodAndGenresList by viewModel.moodAndGenres.collectAsState()
+    val moodAndGenresList by viewModel.moodAndGenres.collectAsStateWithLifecycle()
 
     val tint = Color.Black
     val onTint = AppleTokens.onColor(tint)
@@ -120,30 +125,19 @@ fun MoodAndGenresScreen(
         modifier = Modifier.fillMaxSize(),
     ) {
       HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
+        val hazeState = remember { dev.chrisbanes.haze.HazeState() }
         Box(modifier = Modifier.fillMaxSize()) {
-            // Capture from a plain Box wrapping the LazyColumn, not the
-            // LazyColumn itself: it promotes its items to their own RenderNodes
-            // for recycling, which a capture attached directly to it doesn't
-            // reliably flatten.
+            // Capture through a plain Box; LazyColumn's recycled item layers do not flatten reliably.
             Box(modifier = Modifier
             .nestedScroll(backdropFreeze.connection)
 
-            // OUTER layer, and it must come BEFORE layerBackdrop: the layer has to
-            // enclose the backdrop node, or that node's draw re-runs whenever anything
-            // else in the window redraws. The mini player, the playing indicator and
-            // the position poll are all siblings that tick on their own schedule, and
-            // each tick was re-recording this entire list. MainActivity pairs an outer
-            // and inner layer for exactly this; the screen-local backdrops were left
-            // with only the inner half.
+            // Cache list content so sibling redraws do not re-record the backdrop.
             .graphicsLayer()
             .layerBackdrop(listBackdrop, frozen = backdropFreeze.frozen)
-            // Content becomes ONE cached RenderNode, so the backdrop's
-            // layer.record { drawContent() } records a single drawRenderNode
-            // instead of re-issuing every op in the list.
-            .graphicsLayer()) {
+            .graphicsLayer()
+            .hazeSource(hazeState)) {
             LazyColumn(
                 state = lazyListState,
-                // No bounce here: the top pull drives the hero zoom instead.
                 overscrollEffect = heroZoom.listOverscroll(),
                 modifier = Modifier.heroPullZoom(heroZoom),
                 contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
@@ -184,7 +178,7 @@ fun MoodAndGenresScreen(
                                             title = item.title,
                                             stripeColor = item.stripeColor,
                                             onClick = {
-                                                navController.navigate("youtube_browse/${item.endpoint.browseId}?params=${item.endpoint.params}")
+                                                navController.navigate(youtubeBrowseRoute(item.endpoint.browseId, item.endpoint.params))
                                             },
                                             modifier =
                                             Modifier
@@ -208,8 +202,12 @@ fun MoodAndGenresScreen(
             }
             }
 
-            // Top bar logic. `align` is resolved out here, in BoxScope, because
-            // the provider lambda below is not a BoxScope.
+            com.convx.music.ui.component.TopFadeBlur(
+                hazeState = hazeState,
+                pageColor = tint,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+            // Resolve `align` here because the provider lambda below is not a BoxScope.
             val chromeRowModifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopCenter)
@@ -226,10 +224,7 @@ fun MoodAndGenresScreen(
                         onClick = { navController.navigateUp() },
                         onLongClick = { navController.backToMain() },
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.arrow_back_ios),
-                            contentDescription = null,
-                        )
+                        SymbolIcon(symbol = sf("chevron.left"), contentDescription = null)
                     }
 
                     Spacer(Modifier.weight(1f))

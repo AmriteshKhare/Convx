@@ -14,19 +14,8 @@ import com.convx.music.models.MediaMetadata
 import kotlinx.coroutines.delay
 
 /**
- * Track-change choreographer: the new track reaches each layer of the player in priority
- * order instead of all in one frame.
- *
- * A skip used to land everything at once -- the skip glyph's nudge, the artwork melt
- * (bitmap decode + shader), both title lines, the like glyph, the background palette and
- * the canvas video -- so the first frames of the melt competed with a recomposition of the
- * whole screen and the nudge stuttered. Each layer reads its OWN stage below; a stage is
- * released a fixed beat after the one before it, so both the composition work and the
- * animations are spread out, and the eye gets one thing at a time: touch feedback, then
- * the cover, then the words, then the details, then the ambience.
- *
- * Same-track updates (a liked flag, a better thumbnail rung) pass straight through to
- * every stage -- only a change of track is staged.
+ * Stages track changes across artwork, text, details, and ambient layers so their work
+ * does not land in one frame. Updates to the same track propagate immediately.
  */
 @Stable
 class TrackChoreography internal constructor(

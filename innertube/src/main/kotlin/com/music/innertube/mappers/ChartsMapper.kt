@@ -41,7 +41,7 @@ internal object ChartsMapper {
                             convertMusicTwoRowItem(item.musicTwoRowItemRenderer)
                         else -> null
                     }
-                }.filterNotNull()
+                }
 
                 if (items.isNotEmpty()) {
                     sections.add(
@@ -62,7 +62,7 @@ internal object ChartsMapper {
                     item.musicTwoRowItemRenderer?.let { renderer ->
                         convertMusicTwoRowItem(renderer)
                     }
-                }.filterNotNull()
+                }
 
                 if (items.isNotEmpty()) {
                     sections.add(

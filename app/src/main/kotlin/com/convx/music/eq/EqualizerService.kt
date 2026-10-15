@@ -42,9 +42,10 @@ class EqualizerService @Inject constructor() {
         if (shouldDisable) {
             processor.disable()
             // Don't clear shouldDisable here, as we might add more processors
-        } else if (pendingProfile != null) {
-            val profile = pendingProfile!!
-            applyProfileToProcessor(processor, profile)
+        } else {
+            pendingProfile?.let { profile ->
+                applyProfileToProcessor(processor, profile)
+            }
             // Don't clear pendingProfile here
         }
     }
@@ -62,6 +63,7 @@ class EqualizerService @Inject constructor() {
      */
     @OptIn(UnstableApi::class)
     fun applyProfile(profile: SavedEQProfile): Result<Unit> {
+        if (!shouldDisable && pendingProfile == profile && audioProcessors.isNotEmpty()) return Result.success(Unit)
         if (audioProcessors.isEmpty()) {
             Timber.tag(TAG)
                 .w("No audio processors set yet. Storing profile as pending: ${profile.name}")
@@ -132,24 +134,15 @@ class EqualizerService @Inject constructor() {
         audioProcessors.forEach { it.forceBypass = bypass }
     }
 
-    /**
-     * Check if audio processor is set
-     */
     fun isInitialized(): Boolean {
         return audioProcessors.isNotEmpty()
     }
 
-    /**
-     * Check if equalizer is enabled
-     */
     @OptIn(UnstableApi::class)
     fun isEnabled(): Boolean {
         return audioProcessors.any { it.isEnabled() }
     }
 
-    /**
-     * Get information about the current EQ capabilities
-     */
     fun getEqualizerInfo(): EqualizerInfo {
         return EqualizerInfo(
             supportsUnlimitedBands = true,

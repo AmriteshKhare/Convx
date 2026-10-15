@@ -115,6 +115,7 @@ object PresetKeys {
     )
 
     val GLASS: List<Preferences.Key<*>> = listOf(
+        TopBarBlurStyleKey,
         LiquidGlassGlobalEnabledKey,
         LiquidGlassAdaptiveContrastKey,
         LiquidGlassTextColorKey,
@@ -127,6 +128,7 @@ object PresetKeys {
         LiquidGlassHighlightOpacityKey,
         LiquidGlassVibrancyKey,
         LiquidGlassBlurRadiusKey,
+        MenuBackdropResolutionKey,
         LiquidGlassLensHeightKey,
         LiquidGlassLensAmountKey,
         LiquidGlassChromaticAberrationKey,
@@ -273,6 +275,7 @@ val presetKeyTypes: Map<String, PrefType> = mapOf(
         "liquidGlassHighlightOpacity" to PrefType.FLOAT,
         "liquidGlassVibrancy" to PrefType.FLOAT,
         "liquidGlassBlurRadius" to PrefType.FLOAT,
+        "menuBackdropResolution" to PrefType.FLOAT,
         "liquidGlassLensHeight" to PrefType.FLOAT,
         "liquidGlassLensAmount" to PrefType.FLOAT,
         "liquidGlassChromaticAberration" to PrefType.BOOL,

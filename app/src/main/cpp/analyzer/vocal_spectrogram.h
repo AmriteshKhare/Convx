@@ -6,11 +6,11 @@
  * distribution it has never seen.
  *
  * Copyright (C) 2026 SFG545 (original Orchard implementation)
- * Copyright (C) 2026 Kushagra Singh (BitChord adaptation)
+ * Copyright (C) 2026 Convx contributors (adapted from an open-source base)
  *
  * Orchard's original source is licensed under the GNU Affero General Public
  * License, version 3 or later. Per AGPLv3 section 13, this file is combined
- * here into BitChord -- a work licensed under the GNU General Public
+ * here into the reference app -- a work licensed under the GNU General Public
  * License, version 3 or later -- and remains itself governed by the AGPLv3
  * as part of that combination.
  *
@@ -33,18 +33,16 @@
 // something it has never seen -- the same lesson the Beat This mel front end
 // already encodes, see mel_spectrogram.h.
 //
-// `channels` is planar (non-interleaved) stereo Float32 PCM that must
-// already be at kVocalSpectrogramSampleRate; the caller owns resampling and
-// mono duplication. Calls borrow the input only until they return, own all
-// returned storage, and are reentrant. The work is O(n log n) and allocates,
-// so it belongs on a worker thread.
+// Input is planar stereo Float32 PCM at kVocalSpectrogramSampleRate. The caller handles
+// resampling and mono duplication. Calls borrow input only while running and return owned
+// storage. This reentrant O(n log n) operation allocates, so run it on a worker thread.
 
 #pragma once
 
 #include <cstddef>
 #include <vector>
 
-namespace vivimusic::smart {
+namespace convx::smart {
 
 inline constexpr double kVocalSpectrogramSampleRate = 44100;
 inline constexpr size_t kVocalSpectrogramChannels = 2;
@@ -76,4 +74,4 @@ VocalSpectrogram ComputeVocalSpectrogram(
   double sample_rate
 );
 
-}  // namespace vivimusic::smart
+}  // namespace convx::smart

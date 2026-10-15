@@ -9,20 +9,7 @@ import coil3.intercept.Interceptor
 import coil3.request.ErrorResult
 import coil3.request.ImageResult
 
-/**
- * Re-fetches YouTube artwork at the next size down when the requested one does not
- * exist.
- *
- * `i.ytimg.com` thumbnails are addressed by filename, not by dimensions, and not every
- * video has every size — `maxresdefault.jpg` in particular is missing for a large share
- * of tracks and answers 404. The player asks for it anyway (see
- * `com.convx.music.ui.utils.resize`), because when it *is* there it is by far the best
- * artwork available; without this the miss just showed as no artwork at all.
- *
- * Only the error path costs anything: a successful load never runs a second request, and
- * list/grid artwork already asks for `hqdefault`, which effectively always exists. So the
- * extra round trip is at most one small 404 per *played* song, not one per row.
- */
+/** Retries failed YouTube artwork requests with smaller thumbnail sizes. */
 class ArtworkQualityInterceptor : Interceptor {
 
     override suspend fun intercept(chain: Interceptor.Chain): ImageResult {
@@ -37,6 +24,7 @@ class ArtworkQualityInterceptor : Interceptor {
         // Unknown or already-lowest quality: nothing left to step down to.
         if (startIndex < 0 || startIndex >= QualityLadder.lastIndex) return result
 
+        // maxresdefault is missing for many videos, so try smaller sizes before giving up.
         var lastResult: ImageResult = result
         for (index in (startIndex + 1)..QualityLadder.lastIndex) {
             val candidate = url.replace(QualityPattern, QualityLadder[index])

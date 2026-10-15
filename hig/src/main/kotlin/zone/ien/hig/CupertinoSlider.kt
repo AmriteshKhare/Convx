@@ -83,39 +83,8 @@ import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
-/**
- * Sliders allow users to make selections from a range of values.
- *
- * Sliders reflect a range of values along a bar, from which users may select a single value.
- * They are ideal for adjusting settings such as volume, brightness, or applying image filters.
- *
- * @param value current value of the slider. If outside of [valueRange] provided, value will be
- * coerced to this range.
- * @param onValueChange callback in which value should be updated
- * @param modifier the [Modifier] to be applied to this slider
- * @param enabled controls the enabled state of this slider. When `false`, this component will not
- * respond to user input, and it will appear visually disabled and disabled to accessibility
- * services.
- * @param valueRange range of values that this slider can take. The passed [value] will be coerced
- * to this range.
- * @param steps if greater than 0, specifies the amount of discrete allowable values, evenly
- * distributed across the whole value range. If 0, the slider will behave continuously and allow any
- * value from the range specified. Must not be negative.
- * @param showStepIndicator Determines whether to display dot indicators at each step position.
- * Defaults to true if [steps] is greater than 0.
- * @param backdrop Provides a [LayerBackdrop] used to render the "Liquid Glass" visual effects of the slider.
- * @param onValueChangeFinished called when value change has ended. This should not be used to
- * update the slider value (use [onValueChange] instead), but rather to know when the user has
- * completed selecting a new value by ending a drag or a click.
- * @param visibilityThreshold Specifies the precision threshold at which the spring animation is
- * considered "finished." A smaller value results in higher precision but may take longer to settle,
- * while a larger value allows the animation to stop earlier once it is visually close enough to the target.
- * @param colors [CupertinoSliderColors] that will be used to resolve the colors used for this slider in
- * different states. See [CupertinoLiquidSliderDefaults.colors].
- * @param interactionSource the [MutableInteractionSource] representing the stream of [Interaction]s
- * for this slider. You can create and pass in your own `remember`ed instance to observe
- * [Interaction]s and customize the appearance / behavior of this slider in different states.
- */
+/** Single-value slider with optional discrete steps and liquid-glass backdrop. */
+
 @Composable
 fun CupertinoSlider(
     value: Float,
@@ -166,46 +135,8 @@ fun CupertinoSlider(
     )
 }
 
-/***
- * Sliders allow users to make selections from a range of values.
- *
- * Sliders reflect a range of values along a bar, from which users may select a single value.
- * They are ideal for adjusting settings such as volume, brightness, or applying image filters.
- *
- * @param value current value of the slider. If outside of [valueRange] provided, value will be
- * coerced to this range.
- * @param onValueChange callback in which value should be updated
- * @param modifier the [Modifier] to be applied to this slider
- * @param enabled controls the enabled state of this slider. When `false`, this component will not
- * respond to user input, and it will appear visually disabled and disabled to accessibility
- * services.
- * @param valueRange range of values that this slider can take. The passed [value] will be coerced
- * to this range.
- * @param steps if greater than 0, specifies the amount of discrete allowable values, evenly
- * distributed across the whole value range. If 0, the slider will behave continuously and allow any
- * value from the range specified. Must not be negative.
- * @param showStepIndicator Determines whether to display dot indicators at each step position.
- * Defaults to true if [steps] is greater than 0.
- * @param backdrop Provides a [LayerBackdrop] used to render the "Liquid Glass" visual effects of the slider.
- * @param onValueChangeFinished called when value change has ended. This should not be used to
- * update the slider value (use [onValueChange] instead), but rather to know when the user has
- * completed selecting a new value by ending a drag or a click.
- * @param visibilityThreshold Specifies the precision threshold at which the spring animation is
- * considered "finished." A smaller value results in higher precision but may take longer to settle,
- * while a larger value allows the animation to stop earlier once it is visually close enough to the target.
- * @param colors [CupertinoSliderColors] that will be used to resolve the colors used for this slider in
- * different states. See [CupertinoSliderDefaults.colors].
- * @param interactionSource the [MutableInteractionSource] representing the stream of [Interaction]s
- * for this slider. You can create and pass in your own `remember`ed instance to observe
- * [Interaction]s and customize the appearance / behavior of this slider in different states.
- * @param thumb The thumb component to be displayed on the slider, rendered on top of the track.
- * The lambda provides a [DampedDragAnimation] to access real-time animation
- * states (such as position, scale, and velocity) and a [LayerBackdrop] for rendering
- * advanced visual effects like "Liquid Glass."
- * @param track The track component to be displayed on the slider, rendered underneath the thumb.
- * The lambda provides a [DampedDragAnimation] to resolve the active track's progress
- * and a [LayerBackdrop] to ensure visual consistency with the thumb's liquid effects.
- */
+/** Single-value slider with a customizable thumb and track. */
+
 @Composable
 fun CupertinoSlider(
     value: Float,
@@ -213,7 +144,6 @@ fun CupertinoSlider(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
-    // @IntRange(from = 0)
     steps: Int = 0,
     showStepIndicator: Boolean = steps > 0,
     backdrop: Backdrop,
@@ -259,34 +189,8 @@ fun CupertinoSlider(
     )
 }
 
-/**
- * Sliders allow users to make selections from a range of values.
- *
- * Sliders reflect a range of values along a bar, from which users may select a single value.
- * They are ideal for adjusting settings such as volume, brightness, or applying image filters.
- *
- * @param value current values of the RangeSlider. If either value is outside of [valueRange]
- * provided, it will be coerced to this range.
- * @param onValueChange lambda in which values should be updated
- * @param modifier modifiers for the Range Slider layout
- * @param enabled whether or not component is enabled and can we interacted with or not
- * @param valueRange range of values that Range Slider values can take. Passed [value] will be
- * coerced to this range
- * @param steps if greater than 0, specifies the amounts of discrete values, evenly distributed
- * between across the whole value range. If 0, range slider will behave as a continuous slider and
- * allow to choose any value from the range specified. Must not be negative.
- * @param showStepIndicator Determines whether to display dot indicators at each step position.
- * Defaults to true if [steps] is greater than 0.
- * @param backdrop Provides a [LayerBackdrop] used to render the "Liquid Glass" visual effects of the slider.
- * @param onValueChangeFinished lambda to be invoked when value change has ended. This callback
- * shouldn't be used to update the range slider values (use [onValueChange] for that), but rather to
- * know when the user has completed selecting a new value by ending a drag or a click.
- * @param visibilityThreshold Specifies the precision threshold at which the spring animation is
- * considered "finished." A smaller value results in higher precision but may take longer to settle,
- * while a larger value allows the animation to stop earlier once it is visually close enough to the target.
- * @param colors [CupertinoSliderColors] that will be used to determine the color of the Range Slider
- * parts in different state. See [CupertinoSliderDefaults.colors] to customize.
- */
+/** Range slider with optional discrete steps and liquid-glass backdrop. */
+
 @Composable
 fun CupertinoRangeSlider(
     value: ClosedFloatingPointRange<Float>,
@@ -294,7 +198,6 @@ fun CupertinoRangeSlider(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
-    // @IntRange(from = 0)
     steps: Int = 0,
     showStepIndicator: Boolean = steps > 0,
     backdrop: Backdrop,
@@ -437,12 +340,10 @@ private fun SliderImpl(
 
                         currentVirtualValue = (currentVirtualValue + delta).coerceIn(valueRange)
 
-                        // Snap point
                         val snappedValue = getSnappedValue(currentVirtualValue)
                         val stepGap = rangeLength / (steps + 1)
                         val magneticThreshold = stepGap * 0.35f
 
-                        // Snapping
                         val finalTargetValue = if (abs(currentVirtualValue - snappedValue) < magneticThreshold) {
                             if (steps > 0) {
                                 if (prevValue != snappedValue) {
@@ -450,9 +351,9 @@ private fun SliderImpl(
                                     haptic.performHapticFeedback(CupertinoHapticFeedback.SelectionChanged)
                                 }
                             }
-                            snappedValue // Fix when on magnetic threshold
+                            snappedValue
                         } else {
-                            currentVirtualValue // set to current
+                            currentVirtualValue
                         }
 
                         updateValue(finalTargetValue)
@@ -656,12 +557,10 @@ private fun RangeSliderImpl(
 
                         currentVirtualStartValue = (currentVirtualStartValue + delta).coerceIn(valueRange)
 
-                        // Snap point
                         val snappedValue = getSnappedValue(currentVirtualStartValue)
                         val stepGap = rangeLength / (steps + 1)
                         val magneticThreshold = stepGap * 0.35f
 
-                        // Snapping
                         val finalTargetValue = if (abs(currentVirtualStartValue - snappedValue) < magneticThreshold) {
                             if (steps > 0) {
                                 if (prevStartValue != snappedValue) {
@@ -669,9 +568,9 @@ private fun RangeSliderImpl(
                                     haptic.performHapticFeedback(CupertinoHapticFeedback.SelectionChanged)
                                 }
                             }
-                            snappedValue // Fix when on magnetic threshold
+                            snappedValue
                         } else {
-                            currentVirtualStartValue // set to current
+                            currentVirtualStartValue
                         }
 
                         if (finalTargetValue <= updatedEndValue) {
@@ -715,12 +614,10 @@ private fun RangeSliderImpl(
 
                         currentVirtualEndValue = (currentVirtualEndValue + delta).coerceIn(valueRange)
 
-                        // Snap point
                         val snappedValue = getSnappedValue(currentVirtualEndValue)
                         val stepGap = rangeLength / (steps + 1)
                         val magneticThreshold = stepGap * 0.35f
 
-                        // Snapping
                         val finalTargetValue = if (abs(currentVirtualEndValue - snappedValue) < magneticThreshold) {
                             if (steps > 0) {
                                 if (prevEndValue != snappedValue) {
@@ -728,9 +625,9 @@ private fun RangeSliderImpl(
                                     haptic.performHapticFeedback(CupertinoHapticFeedback.SelectionChanged)
                                 }
                             }
-                            snappedValue // Fix when on magnetic threshold
+                            snappedValue
                         } else {
-                            currentVirtualEndValue // set to current
+                            currentVirtualEndValue
                         }
 
                         if (finalTargetValue >= updatedStartValue) {

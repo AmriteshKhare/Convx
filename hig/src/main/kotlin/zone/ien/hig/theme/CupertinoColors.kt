@@ -487,7 +487,7 @@ fun CupertinoColors.systemGray6(
     }
 }
 
-fun CupertinoColors.systemGray7(dark: Boolean) = // remove todo
+fun CupertinoColors.systemGray7(dark: Boolean) =
     if (dark) {
         Color(35, 35, 35)
     } else {

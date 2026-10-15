@@ -9,12 +9,20 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import java.net.InetSocketAddress
 import java.net.InetSocketAddress.createUnresolved
 
+/** Enum names persisted before their constants were renamed, mapped to the current names. */
+@PublishedApi
+internal val legacyEnumNames = mapOf(
+    "VIVIMUSIC_1" to "CONVX_1",
+    "VIVIMUSIC" to "CONVX",
+    "BITCHORD_MESH" to "FLUID_MESH",
+)
+
 inline fun <reified T : Enum<T>> String?.toEnum(defaultValue: T): T =
     if (this == null) {
         defaultValue
     } else {
         try {
-            enumValueOf(this)
+            enumValueOf(legacyEnumNames[this] ?: this)
         } catch (e: IllegalArgumentException) {
             defaultValue
         }

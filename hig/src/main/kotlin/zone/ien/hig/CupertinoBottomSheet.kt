@@ -64,21 +64,8 @@ import zone.ien.hig.CupertinoSheetState.Companion.Saver
 import zone.ien.hig.theme.CupertinoTheme
 import kotlin.jvm.JvmName
 
-/**
- * Content of the Cupertino modal bottom sheet.
- *
- * This composable creates the content area for a Cupertino modal bottom sheet.
- *
- * @param modifier The modifier to be applied to the bottom sheet
- * @param containerColor The color of the bottom sheet container
- * @param contentColor The color of the content in the bottom sheet
- * @param appBarsAlpha The alpha value for app bars
- * @param appBarsBlurRadius The blur radius for app bars
- * @param hasNavigationTitle Whether the sheet has a navigation title
- * @param topBar The top bar content of the bottom sheet
- * @param bottomBar The bottom bar content of the bottom sheet
- * @param content The main content of the bottom sheet
- */
+/** Scaffold content for a Cupertino modal bottom sheet. */
+
 @Composable
 @ExperimentalCupertinoApi
 fun CupertinoBottomSheetContent(
@@ -168,9 +155,8 @@ object CupertinoBottomSheetDefaults {
     }
 }
 
-/**
- * Type of sheet nested scroll behavior
- * */
+/** Controls whether nested scrolling can resize the sheet. */
+
 @Stable
 @Immutable
 enum class PresentationContentInteraction {
@@ -185,24 +171,20 @@ enum class PresentationContentInteraction {
     Resize,
 }
 
-/**
- * Expanded sheet position
- * */
+/** A position where the sheet can settle. */
+
 @Serializable
 @Immutable
 sealed interface PresentationDetent {
-    /**
-     * Calculate sheet offset using [density] and sheet max [height]
-     * */
+    /** Returns this detent's top offset in pixels. */
+
     fun calculate(
         density: Density,
         height: Float,
     ): Float
 
-    /**
-     * The biggest detent for modal presentation. Adds a size reduce effect for
-     * the background content
-     * */
+    /** Largest detent; also applies the background size reduction. */
+
     @Immutable
     @Serializable
     data object Large: PresentationDetent {
@@ -214,16 +196,14 @@ sealed interface PresentationDetent {
         }
     }
 
-    /**
-     * Medium detent
-     * */
+    /** Half-height detent. */
+
     @Immutable
     @Serializable
     data object Medium: PresentationDetent by Fraction(.5f)
 
-    /**
-     * Detent with fixed sheet [height]
-     * */
+    /** Detent at a fixed height. */
+
     @Immutable
     @Serializable(with = HeightSerializer::class)
     class Height(
@@ -241,9 +221,8 @@ sealed interface PresentationDetent {
         override fun toString(): String = "Height(height=$height)"
     }
 
-    /**
-     * Detent with height calculated as [fraction] of maximum height
-     * */
+    /** Detent at a fraction of the maximum sheet height. */
+
     @Immutable
     @Serializable
     class Fraction(
@@ -271,16 +250,14 @@ sealed interface PresentationDetent {
 @Serializable
 @Immutable
 sealed interface CupertinoSheetValue {
-    /**
-     * Sheet is hidden
-     * */
+    /** The sheet is hidden. */
+
     @Serializable
     @Immutable
     data object Hidden: CupertinoSheetValue
 
-    /**
-     * Sheet is partially expanded with [detent]
-     * */
+    /** The sheet is at a configured partial detent. */
+
     @Serializable
     @Immutable
     class PartiallyExpanded(
@@ -293,17 +270,15 @@ sealed interface CupertinoSheetValue {
         override fun toString(): String = "PartiallyExpanded(detent = $detent)"
     }
 
-    /**
-     * Sheet is fully expanded with the biggest [PresentationDetent] or with [PresentationStyle.Fullscreen]
-     * */
+    /** The sheet is fully expanded. */
+
     @Serializable
     @Immutable
     data object Expanded: CupertinoSheetValue
 }
 
-/**
- * Style of the sheet presentation
- * */
+/** Presentation mode for a Cupertino sheet. */
+
 @Immutable
 sealed interface PresentationStyle {
     /**
@@ -442,22 +417,14 @@ class CupertinoSheetState(
 
     internal var expandedDetent: PresentationDetent? by mutableStateOf(null)
 
-    /**
-     * Fully expand the bottom sheet with animation and suspend until it is fully expanded or
-     * animation has been cancelled.
-     * *
-     * @throws [CancellationException] if the animation is interrupted
-     */
+    /** Animates the sheet to its fully expanded state. */
+
     suspend fun expand() {
         swipeableState.animateTo(CupertinoSheetValue.Expanded)
     }
 
-    /**
-     * Animate the bottom sheet and suspend until it is partially expanded or animation has been
-     * cancelled.
-     * @throws [CancellationException] if the animation is interrupted
-     * @throws [IllegalStateException] if [skipPartiallyExpanded] is set to true
-     */
+    /** Animates to [detent], which must be configured in the modal presentation. */
+
     suspend fun partialExpand(detent: PresentationDetent) {
         require(presentationStyle is PresentationStyle.Modal) {
             "Sheet can be partially expanded only in Modal PresentationStyle"
@@ -469,11 +436,8 @@ class CupertinoSheetState(
         animateTo(CupertinoSheetValue.PartiallyExpanded(detent))
     }
 
-    /**
-     * Expand the bottom sheet with animation and suspend until it is [PartiallyExpanded] if defined
-     * else [Expanded].
-     * @throws [CancellationException] if the animation is interrupted
-     */
+    /** Shows the sheet at its first partial detent, or fully expands it when none exists. */
+
     suspend fun show() {
         val targetValue =
             when (presentationStyle) {
@@ -490,11 +454,8 @@ class CupertinoSheetState(
         animateTo(targetValue)
     }
 
-    /**
-     * Hide the bottom sheet with animation and suspend until it is fully hidden or animation has
-     * been cancelled.
-     * @throws [CancellationException] if the animation is interrupted
-     */
+    /** Animates the sheet to its hidden state. */
+
     suspend fun hide() {
         animateTo(CupertinoSheetValue.Hidden)
     }
@@ -602,7 +563,7 @@ fun rememberCupertinoSheetState(
     }
 }
 
-private class HeightSerializer: KSerializer<PresentationDetent.Height> {
+class HeightSerializer: KSerializer<PresentationDetent.Height> {
     override val descriptor: SerialDescriptor
         get() = Float.serializer().descriptor
 
@@ -717,8 +678,6 @@ internal val CupertinoSheetState.isBackgroundInteractive: Boolean
             if (this is CupertinoSheetValue.PartiallyExpanded) {
                 return presentationStyle.isBackgroundInteractive(detent)
             }
-
-            // this is CupertinoSheetValue.Expanded
 
             expandedDetent?.let {
                 presentationStyle.isBackgroundInteractive(it)

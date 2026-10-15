@@ -128,7 +128,12 @@ fun BoxScope.HomeVideoBackground(
         },
         modifier = Modifier
             .matchParentSize()
-            .graphicsLayer { this.alpha = alpha }
+            .graphicsLayer {
+                this.alpha = alpha
+                val overscan = if (blur > 0f) 1.12f else 1f
+                scaleX = overscan
+                scaleY = overscan
+            }
             .blur(blur.dp),
     )
     Box(

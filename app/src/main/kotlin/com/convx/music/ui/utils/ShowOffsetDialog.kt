@@ -1,5 +1,7 @@
 package com.convx.music.ui.utils
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,7 +49,7 @@ import kotlinx.coroutines.FlowPreview
 @OptIn(FlowPreview::class)
 @Composable
 fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val song = songProvider()
     var lyricsOffset by rememberSaveable { mutableIntStateOf(song?.lyricsOffset ?: 0) }
     var textFieldValue by rememberSaveable { mutableStateOf(lyricsOffset.toString()) }
@@ -77,12 +79,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 20.dp)
     ) {
-        Icon(
-            imageVector = SfSymbols.Monochrome.SFForwardFill,
-            contentDescription = null,
-            modifier = Modifier.size(40.dp),
-            tint = AppTheme.colorScheme.primary
-        )
+        SymbolIcon(symbol = sf("SFForwardFill"), contentDescription = null, size = 40.dp, tint = AppTheme.colorScheme.primary)
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -178,11 +175,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                         textFieldValue = "0"
                     }
                 ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFArrowCounterclockwise,
-                        tint = AppTheme.colorScheme.primary,
-                        contentDescription = "Reset"
-                    )
+                    SymbolIcon(symbol = sf("SFArrowCounterclockwise"), contentDescription = "Reset", tint = AppTheme.colorScheme.primary)
                 }
             }
         }
@@ -199,10 +192,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                     textFieldValue = lyricsOffset.toString()
                 }
             ) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFMinus,
-                    contentDescription = "Decrease"
-                )
+                SymbolIcon(symbol = sf("SFMinus"), contentDescription = "Decrease")
             }
 
             Slider(
@@ -223,10 +213,7 @@ fun ShowOffsetDialog(songProvider: () -> SongEntity?) {
                     textFieldValue = lyricsOffset.toString()
                 }
             ) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFPlus,
-                    contentDescription = "Increase"
-                )
+                SymbolIcon(symbol = sf("SFPlus"), contentDescription = "Increase")
             }
         }
 

@@ -32,7 +32,7 @@ fun <T> EnumDialog(
     ListDialog(
         onDismiss = onDismiss,
     ) {
-        items(values) { value ->
+        items(values, key = { it.toString() }) { value ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier =

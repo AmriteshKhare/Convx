@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.screens.playlist
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.chromeShadow
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -42,10 +45,10 @@ import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Surface
 import com.convx.music.ui.ios.compat.Text
 import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.Button
 import com.convx.music.ui.ios.compat.OutlinedTextField as TextField
 import com.composables.sfsymbols.SfSymbols
 import com.composables.sfsymbols.monochrome.SFArrowClockwise
-import com.composables.sfsymbols.monochrome.SFMagnifyingglass
 import com.composables.sfsymbols.monochrome.SFShuffle
 import com.composables.sfsymbols.monochrome.SFXmark
 import androidx.compose.material3.TextFieldDefaults
@@ -113,7 +116,6 @@ import com.convx.music.extensions.toMediaItem
 import com.convx.music.playback.queues.ListQueue
 import com.convx.music.ui.component.EmptyPlaceholder
 import com.convx.music.ui.component.ExpandableText
-import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.LocalMenuState
 import com.convx.music.ui.component.SongListItem
 import com.convx.music.ui.component.SortHeader
@@ -127,9 +129,7 @@ import com.convx.music.utils.rememberEnumPreference
 import com.convx.music.utils.rememberPreference
 import com.convx.music.viewmodels.CachePlaylistViewModel
 import com.convx.music.ui.component.rememberHeroTint
-import com.convx.music.ui.player.MeshGradientBackground
 import com.convx.music.ui.player.dimmed
-import com.convx.music.ui.player.rememberArtworkMeshPalette
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.theme.AppleTokens
@@ -155,6 +155,7 @@ import com.convx.music.ui.component.rememberChromeScrimProgress
 import java.time.LocalDateTime
 import com.convx.music.playback.DownloadTarget
 import com.convx.music.playback.downloadSongs
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -169,9 +170,9 @@ fun CachePlaylistScreen(
     val haptic = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
 
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-    val cachedSongs by viewModel.cachedSongs.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+    val cachedSongs by viewModel.cachedSongs.collectAsStateWithLifecycle()
 
     val (sortType, onSortTypeChange) = rememberEnumPreference(
         SongSortTypeKey,
@@ -208,6 +209,11 @@ fun CachePlaylistScreen(
     var query by remember { mutableStateOf(TextFieldValue()) }
     val focusRequester = remember { FocusRequester() }
     val lazyListState = rememberLazyListState()
+    val exitSearch = {
+        focusManager.clearFocus()
+        isSearching = false
+        query = TextFieldValue()
+    }
 
     LaunchedEffect(isSearching) {
         if (isSearching) {
@@ -216,10 +222,7 @@ fun CachePlaylistScreen(
     }
 
     if (isSearching) {
-        BackHandler {
-            isSearching = false
-            query = TextFieldValue()
-        }
+        BackHandler(onBack = exitSearch)
     } else if (inSelectMode) {
         BackHandler(onBack = onExitSelectionMode)
     }
@@ -240,8 +243,6 @@ fun CachePlaylistScreen(
         }
     }
 
-    // Same mesh backdrop as ArtistScreen/AlbumScreen/OnlinePlaylistScreen/the player's
-    // BITCHORD_MESH style, not the blurred-photo HeroBackground that used to paint here.
     val heroUrl = filteredSongs.firstOrNull()?.thumbnailUrl
     // Instant seed: route thumb -> live tile thumb. Paints mesh bg frame one.
     val instantCacheThumb = com.convx.music.ui.component.detailSeed(
@@ -253,34 +254,19 @@ fun CachePlaylistScreen(
     )
     val bgCacheUrl = instantCacheThumb ?: heroUrl
     val cacheChrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 1)
-    val meshPalette = rememberArtworkMeshPalette(bgCacheUrl)
-    val tint = remember(meshPalette) { meshPalette.colors.first().dimmed() }
+    val appearance = com.convx.music.ui.component.rememberPlaylistAppearance(bgCacheUrl, 0xFF30D158.toInt())
+    val tint = appearance.background
     com.convx.music.PublishAmbientBackgroundColor(tint)
-    // Same flat white every icon/text reads in the player on a mesh background,
-    // rather than a per-artwork computed contrast colour.
-    val onTint = Color.White
+    val onTint = appearance.foreground
 
-    // Glass Effect setting only drives the nav bar/mini player now — this
-    // screen's top-bar chrome keeps glass but pinned to the fixed style.
+    // Keep top-bar glass fixed; the global preference controls the nav bar and mini player.
     val glassConfig = LocalGlassEffectConfig.current.withFixedStyle()
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassAllowed()
     val heroBackdrop = rememberLayerBackdrop()
     val hazeState = remember { HazeState() }
 
-    // Attached capture of the list, sampled by the floating chrome below. The
-    // chrome is a *sibling* of the capture, never inside it, so there is no
-    // RenderNode self-reference. heroBackdrop alone is unattached — its
-    // drawBackdrop early-returns, which is why this chrome rendered flat with
-    // no real blur behind it. The tint is filled into the capture BEFORE the
-    // content (same as MainActivity's appBackdrop) so the recording is opaque;
-    // without it the blurred result is part-transparent and the sharp content
-    // shows straight through it as a doubled image.
-    val listBackdrop = rememberLayerBackdrop(
-        onDraw = remember(tint) {
-            val bg = tint
-            { drawRect(bg); drawContent() }
-        }
-    )
+    // Capture the tinted list behind sibling chrome; an opaque capture avoids a doubled image.
+    val listBackdrop = rememberLayerBackdrop()
     val backdropFreeze = rememberBackdropFreeze()
     val heroZoom = rememberHeroZoom()
 
@@ -288,53 +274,41 @@ fun CachePlaylistScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(tint)
-            .hazeSource(hazeState)
     ) {
-      MeshGradientBackground(
-          palette = meshPalette,
-          trackKey = bgCacheUrl,
-          modifier = Modifier.matchParentSize(),
-      )
-      HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
+        HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
         val chromeShape = ContinuousRoundedRectangle(percent = 50)
-        
+
         Box(modifier = Modifier.fillMaxSize()) {
-            // Capture from a plain Box wrapping the LazyColumn, not the
-            // LazyColumn's own modifier: LazyColumn promotes its items to their
-            // own RenderNodes for scroll recycling, which a capture attached
-            // directly to it doesn't reliably flatten.
+            // Capture through a plain Box; LazyColumn's recycled item layers do not flatten reliably.
             Box(modifier = Modifier
             .nestedScroll(backdropFreeze.connection)
 
-            // OUTER layer, and it must come BEFORE layerBackdrop: the layer has to
-            // enclose the backdrop node, or that node's draw re-runs whenever anything
-            // else in the window redraws. The mini player, the playing indicator and
-            // the position poll are all siblings that tick on their own schedule, and
-            // each tick was re-recording this entire list. MainActivity pairs an outer
-            // and inner layer for exactly this; the screen-local backdrops were left
-            // with only the inner half.
+            // Cache list content so sibling redraws do not re-record the backdrop.
             .graphicsLayer()
             .layerBackdrop(listBackdrop, frozen = backdropFreeze.frozen)
-            // Content becomes ONE cached RenderNode, so the backdrop's
-            // layer.record { drawContent() } records a single drawRenderNode
-            // instead of re-issuing every op in the list.
-            .graphicsLayer()) {
+            .graphicsLayer()
+            .hazeSource(hazeState)) {
+                com.convx.music.ui.component.ArtworkMeshBackground(bgCacheUrl, paused = { lazyListState.isScrollInProgress }, appearance = appearance)
             LazyColumn(
                 state = lazyListState,
-                // No bounce here: the top pull drives the hero zoom instead.
                 overscrollEffect = heroZoom.listOverscroll(),
                 modifier = Modifier.heroPullZoom(heroZoom),
                 contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
             ) {
-                item(key = "header_title") {
-                    Column {
-                        LargeScreenTitle(
-                            title = stringResource(R.string.cached_playlist),
-                            color = onTint,
+                    item(key = "playlist_header") {
+                        CachePlaylistHeader(
+                            onStartSearch = { isSearching = true },
+                            searchValue = query.takeIf { isSearching },
+                            onSearchValueChange = { query = it },
+                            onSearchImeAction = { focusManager.clearFocus() },
+                            searchFocusRequester = focusRequester,
+                            songs = filteredSongs,
+                            context = context,
+                            menuState = menuState,
+                            modifier = Modifier.animateItem()
                         )
                     }
-                }
-                
+
                 if (filteredSongs.isEmpty() && !isSearching) {
                     item(key = "empty_placeholder") {
                         EmptyPlaceholder(
@@ -354,16 +328,7 @@ fun CachePlaylistScreen(
                         )
                     }
                 } else {
-                    if (filteredSongs.isNotEmpty() && !isSearching) {
-                        item(key = "playlist_header") {
-                            CachePlaylistHeader(
-                                songs = filteredSongs,
-                                context = context,
-                                menuState = menuState,
-                                modifier = Modifier.animateItem()
-                            )
-                        }
-                    }
+
 
                     if (filteredSongs.isNotEmpty()) {
                         item(key = "sort_header") {
@@ -411,6 +376,9 @@ fun CachePlaylistScreen(
                             isPlaying = isPlaying,
                             showInLibraryIcon = true,
                             flat = true,
+                            secondaryAdditiveChrome = onTint == androidx.compose.ui.graphics.Color.White,
+                            subtitleAdditiveChrome = false,
+                            subtitleColor = onTint.copy(alpha = 0.78f),
                             shape = listItemShape(index, filteredSongs.size),
                             trailingContent = {
                                 if (inSelectMode) {
@@ -429,10 +397,7 @@ fun CachePlaylistScreen(
                                             )
                                         }
                                     }) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.more_horiz),
-                                            contentDescription = null
-                                        )
+                                        SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                                     }
                                 }
                             },
@@ -494,16 +459,16 @@ fun CachePlaylistScreen(
                 },
             )
 
-            // Top bar logic
             val chromeScrimProgress = rememberChromeScrimProgress(lazyListState)
             // Sample the list's own attached capture (a sibling, so no
             // RenderNode cycle) rather than the ambient unattached heroBackdrop,
             // whose drawBackdrop early-returns and left this chrome flat.
             CompositionLocalProvider(LocalAppBackdrop provides listBackdrop) {
+            com.convx.music.ui.component.TopFadeBlur(hazeState, tint, Modifier.align(Alignment.TopCenter))
             // Built inside the provider so liquidGlass captures listBackdrop at
             // composition time, not the ambient unattached backdrop.
             val chromeBackgroundModifier = if (useGlass) {
-                Modifier.liquidGlass(config = glassConfig, shape = chromeShape)
+                Modifier.chromeShadow(chromeShape).liquidGlass(config = glassConfig, shape = chromeShape)
             } else {
                 Modifier.background(onTint.copy(alpha = 0.15f), chromeShape)
             }
@@ -523,10 +488,7 @@ fun CachePlaylistScreen(
             ) {
                 if (inSelectMode) {
                     GlassCircleButton(onClick = onExitSelectionMode) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFXmark,
-                            contentDescription = null,
-                        )
+                        SymbolIcon(symbol = sf("SFXmark"), contentDescription = null)
                     }
 
                     Text(
@@ -568,90 +530,28 @@ fun CachePlaylistScreen(
                                 }
                             }
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.more_horiz),
-                                contentDescription = null,
-                                tint = if (useGlass && ambientColor.isSpecified) ambientColor.asSoftIconTint() else onTint,
-                                modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
-                            )
+                            SymbolIcon(symbol = sf("ellipsis"), contentDescription = null, modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified), tint = if (useGlass && ambientColor.isSpecified) ambientColor.asSoftIconTint() else onTint)
                         }
-                    }
-                } else if (isSearching) {
-                    GlassCircleButton(
-                        onClick = {
-                            isSearching = false
-                            query = TextFieldValue()
-                            focusManager.clearFocus()
-                        },
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.arrow_back_ios),
-                            contentDescription = null
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .clip(chromeShape)
-                            .then(chromeBackgroundModifier)
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        TextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            placeholder = {
-                                Text(
-                                    text = stringResource(R.string.search),
-                                    style = AppTheme.typography.titleMedium,
-                                    color = onTint.copy(alpha = 0.6f)
-                                )
-                            },
-                            singleLine = true,
-                            textStyle = AppTheme.typography.titleMedium.copy(color = onTint),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                disabledIndicatorColor = Color.Transparent,
-                                cursorColor = onTint,
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusRequester(focusRequester)
-                        )
                     }
                 } else {
                     GlassCircleButton(
-                        onClick = { navController.navigateUp() },
-                        onLongClick = { navController.backToMain() },
+                        onClick = { if (isSearching) exitSearch() else navController.navigateUp() },
+                        onLongClick = { if (isSearching) exitSearch() else navController.backToMain() },
                         modifier = with(cacheChrome) {
                             Modifier.backEnter().then(com.convx.music.ui.component.backExitModifier())
                         },
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.arrow_back_ios),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("chevron.left"), contentDescription = null)
                     }
 
-                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = stringResource(R.string.cached_playlist),
+                        color = onTint,
+                        style = AppTheme.typography.titleMedium,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                    )
 
-                    GlassCircleButton(
-                        onClick = { isSearching = true },
-                        modifier = with(cacheChrome) {
-                            Modifier.iconEnter(0).then(com.convx.music.ui.component.backExitModifier())
-                        },
-                    ) {
-                        Icon(
-                            imageVector = SfSymbols.Monochrome.SFMagnifyingglass,
-                            contentDescription = null
-                        )
-                    }
                 }
             }
             }
@@ -666,171 +566,41 @@ private fun CachePlaylistHeader(
     songs: List<Song>,
     context: android.content.Context,
     menuState: com.convx.music.ui.component.MenuState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onStartSearch: () -> Unit = {},
+    searchValue: TextFieldValue? = null,
+    onSearchValueChange: (TextFieldValue) -> Unit = {},
+    onSearchImeAction: () -> Unit = {},
+    searchFocusRequester: FocusRequester? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
-    val downloads by com.convx.music.LocalDownloadUtil.current.downloads.collectAsState()
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-    val cacheLength = remember(songs) { songs.fastSumBy { it.song.duration ?: 0 } }
-
-    // The enclosing screen already paints the mesh background; this header only needs
-    // the same flat white text/icons plus the raw artwork colour for the play glyph
-    // (drawn on the white button fill, same reverse-contrast pairing AlbumScreen uses).
-    val heroUrl = songs.firstOrNull()?.thumbnailUrl
-    val meshPalette = rememberArtworkMeshPalette(heroUrl)
-    val tint = remember(meshPalette) { meshPalette.colors.first() }
-    val onTint = Color.White
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(Modifier.height(24.dp))
-
-        // Title with Icon
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 24.dp)
-        ) {
-            Icon(
-                imageVector = SfSymbols.Monochrome.SFArrowClockwise,
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-                tint = onTint
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = stringResource(R.string.cached_playlist),
-                style = AppTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                color = onTint
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Metadata - Song Count • Duration
-        Text(
-            text = buildString {
-                append(pluralStringResource(R.plurals.n_song, songs.size, songs.size))
-                if (cacheLength > 0) {
-                    append(" • ")
-                    append(makeTimeString(cacheLength * 1000L))
-                }
-            },
-            style = AppTheme.typography.bodyMedium,
-            color = onTint.copy(alpha = 0.7f)
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        // Action Buttons Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Play Button
-            val isThisPlaylistPlaying = isPlaying && mediaMetadata?.let { media ->
-                songs.any { it.id == media.id }
-            } ?: false
-
-            androidx.compose.material3.Button(
-                onClick = {
-                    if (isThisPlaylistPlaying) {
-                        playerConnection.player.pause()
-                    } else {
-                        playerConnection.playQueue(
-                            ListQueue(
-                                title = context.getString(R.string.cached_playlist),
-                                items = songs.map { it.toMediaItem() },
-                            )
-                        )
-                    }
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = LocalContentColor.current,
-                    contentColor = tint
-                ),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AnimatedPlayPauseIcon(
-                        isPlaying = isThisPlaylistPlaying,
-                        modifier = Modifier.size(20.dp),
-                        tint = tint,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.play),
-                        style = AppTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = tint
-                    )
-                }
-            }
-
-            // Shuffle Button
-            androidx.compose.material3.Button(
-                onClick = {
-                    playerConnection.playQueue(
-                        ListQueue(
-                            title = context.getString(R.string.cached_playlist),
-                            items = songs.shuffled().map { it.toMediaItem() },
-                        )
-                    )
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = LocalContentColor.current.copy(alpha = 0.15f),
-                    contentColor = LocalContentColor.current
-                ),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 12.dp)
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFShuffle,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = LocalContentColor.current
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.shuffle),
-                        style = AppTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = LocalContentColor.current
-                    )
-                }
-            }
-
-            // More Options
-            Surface(
-                onClick = {
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+val cacheLength = remember(songs) { songs.fastSumBy { it.song.duration } }
+    val downloads by com.convx.music.LocalDownloadUtil.current.get().downloads.collectAsStateWithLifecycle()
+    val title = context.getString(R.string.cached_playlist)
+    val artwork = com.convx.music.ui.utils.pendingSharedArtworkThumbFor(com.convx.music.ui.utils.LocalMorphArtworkId.current)
+        ?: songs.firstOrNull()?.thumbnailUrl
+    val appearance = com.convx.music.ui.component.rememberPlaylistAppearance(artwork)
+    com.convx.music.ui.component.CollectionDetailHeader(
+        title = title,
+        artwork = artwork,
+        metadata = pluralStringResource(R.plurals.n_song, songs.size, songs.size) +
+            if (cacheLength > 0) " \u00b7 " + makeTimeString(cacheLength * 1000L) else "",
+        foreground = appearance.foreground,
+        playing = isPlaying && songs.any { it.id == mediaMetadata?.id },
+        enabled = songs.isNotEmpty(),
+        onPlay = {
+            if (songs.any { it.id == mediaMetadata?.id }) playerConnection.togglePlayPause()
+            else playerConnection.playQueue(ListQueue(title = title, items = songs.map { it.toMediaItem() }))
+        },
+        onShuffle = { playerConnection.playQueue(ListQueue(title = title, items = songs.shuffled().map { it.toMediaItem() })) },
+        onSearch = onStartSearch,
+        searchValue = searchValue,
+        onSearchValueChange = onSearchValueChange,
+        onSearchImeAction = onSearchImeAction,
+        searchFocusRequester = searchFocusRequester,
+        onRightAction = {
                     menuState.show {
                         CachePlaylistMenu(
                             downloadState = Download.STATE_STOPPED,
@@ -842,7 +612,7 @@ private fun CachePlaylistHeader(
                             onDownload = {
                                 downloadSongs(
                                     context,
-                                    songs.map { DownloadTarget(it.id, it.title) },
+                                    songs.map { DownloadTarget(it.id, it.title, it.artists.firstOrNull()?.name, it.song.duration) },
                                     downloads,
                                 )
                             },
@@ -850,57 +620,6 @@ private fun CachePlaylistHeader(
                         )
                     }
                 },
-                shape = androidx.compose.foundation.shape.CircleShape,
-                color = LocalContentColor.current.copy(alpha = 0.15f),
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.more_horiz),
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = LocalContentColor.current
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        val staticDescription = remember(songs.size, cacheLength) {
-            val name = context.getString(R.string.cached_playlist)
-            val trackCountText = context.resources.getQuantityString(R.plurals.n_song, songs.size, songs.size)
-            "$name is your local collection of cached tracks, featuring $trackCountText.${
-                if (cacheLength > 0) " Combined duration is ${makeTimeString(cacheLength * 1000L)}." else ""
-            } These songs are stored on your device for quick access."
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.about_album),
-                style = AppTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = onTint,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            androidx.compose.runtime.CompositionLocalProvider(
-                androidx.compose.material3.LocalContentColor provides onTint.copy(alpha = 0.7f),
-            ) {
-                ExpandableText(
-                    text = staticDescription,
-                    runs = null,
-                    collapsedMaxLines = 3
-                )
-            }
-        }
-        }
-    }
+        modifier = modifier.padding(top = com.convx.music.ui.component.topBarContentPadding()),
+    )
 }

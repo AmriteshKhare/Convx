@@ -16,24 +16,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.ios.compat.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetDefaults
-import androidx.compose.material3.ModalBottomSheetProperties
-import androidx.compose.material3.SheetState
-import androidx.compose.material3.contentColorFor
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -47,10 +37,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.convx.music.ui.ios.compat.LocalContentColor
+import com.convx.music.ui.ios.foundation.IosMenuMaterial
 import com.convx.music.ui.ios.foundation.IosTheme
 import com.convx.music.ui.utils.concentricRadius
 import kotlin.math.tanh
@@ -60,7 +52,6 @@ import zone.ien.hig.PresentationDetent
 import zone.ien.hig.PresentationStyle
 import zone.ien.hig.rememberCupertinoSheetState
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import com.convx.music.constants.SheetCornerRadiusKey
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
@@ -86,61 +77,6 @@ class MenuState(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AnimatedBottomSheet(
-    isVisible: Boolean,
-    onDismissRequest: () -> Unit,
-    modifier: Modifier = Modifier,
-    sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
-    sheetMaxWidth: Dp = BottomSheetDefaults.SheetMaxWidth,
-    shape: Shape = BottomSheetDefaults.ExpandedShape,
-    containerColor: Color = BottomSheetDefaults.ContainerColor,
-    contentColor: Color = contentColorFor(containerColor),
-    tonalElevation: Dp = 0.dp,
-    scrimColor: Color = BottomSheetDefaults.ScrimColor,
-    dragHandle: @Composable (() -> Unit)? = { BottomSheetDefaults.DragHandle() },
-    contentWindowInsets: @Composable () -> WindowInsets = { BottomSheetDefaults.windowInsets },
-    properties: ModalBottomSheetProperties = ModalBottomSheetDefaults.properties,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    var lastContent by remember { mutableStateOf(content) }
-
-    LaunchedEffect(content) {
-        if (isVisible) {
-            lastContent = content
-        }
-    }
-
-    LaunchedEffect(isVisible) {
-        if (isVisible) {
-            sheetState.show()
-        } else {
-            sheetState.hide()
-        }
-    }
-
-    if (!sheetState.isVisible && !isVisible) {
-        return
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        modifier = modifier,
-        sheetState = sheetState,
-        sheetMaxWidth = sheetMaxWidth,
-        shape = shape,
-        containerColor = containerColor,
-        contentColor = contentColor,
-        tonalElevation = tonalElevation,
-        scrimColor = scrimColor,
-        dragHandle = dragHandle,
-        contentWindowInsets = contentWindowInsets,
-        properties = properties,
-        content = lastContent,
-    )
-}
-
 /**
  * Outer radius for every menu sheet — continuous (superellipse) corners are the iOS
  * sheet silhouette; Material's smaller circular-arc default is why sheets didn't match.
@@ -154,13 +90,20 @@ val MenuSheetContentInset = 16.dp
 val MenuSheetItemRadius: Dp = concentricRadius(MenuSheetCornerRadius, MenuSheetContentInset)
 
 /** Cupertino's action-sheet timing (from its source): 400ms in on this cubic-bezier, 150ms of [EaseIn] out. */
-private val CupertinoSheetEasing = CubicBezierEasing(0.2833f, 0.99f, 0.31833f, 0.99f)
-private const val CupertinoSheetEnterMillis = 400
-private const val CupertinoSheetExitMillis = 150
+val CupertinoSheetEasing = CubicBezierEasing(0.2833f, 0.99f, 0.31833f, 0.99f)
+const val CupertinoSheetEnterMillis = 400
+const val CupertinoSheetExitMillis = 150
 
 /** Range the rubber-band resist eases across — pulling past this barely moves it further. */
 private val MenuDragResistRange = 320.dp
 
+/** Below this height a landscape screen has too little room for a half-height sheet. */
+private const val CompactLandscapeHeightDp = 480
+
+/**
+ * On a short landscape screen the half-height detent shows only a few rows and the rest of the
+ * menu sits out of reach, so menus there open at full height and scroll inside it.
+ */
 @Composable
 fun BottomSheetMenu(
     modifier: Modifier = Modifier,
@@ -168,8 +111,23 @@ fun BottomSheetMenu(
     // Sheet is the grouped background — darker/greyer than the cards laid on it.
     background: Color = Color.Unspecified,
 ) {
+    val configuration = LocalConfiguration.current
+    val compactLandscape = configuration.screenWidthDp > configuration.screenHeightDp &&
+        configuration.screenHeightDp < CompactLandscapeHeightDp
+    androidx.compose.runtime.key(compactLandscape) {
+        MenuSheet(modifier, state, background, compactLandscape)
+    }
+}
+
+@Composable
+private fun MenuSheet(
+    modifier: Modifier,
+    state: MenuState,
+    background: Color,
+    compactLandscape: Boolean,
+) {
     val iosColors = IosTheme.colors
-    val isDark = isSystemInDarkTheme()
+    val isDark = glassUsesDarkAppearance()
     val (sheetCornerRadius) = rememberPreference(SheetCornerRadiusKey, MenuSheetCornerRadius.value)
     val sheetShape = remember(sheetCornerRadius) {
         ContinuousRoundedRectangle(
@@ -183,7 +141,11 @@ fun BottomSheetMenu(
     val scope = rememberCoroutineScope()
     val sheetState = rememberCupertinoSheetState(
         presentationStyle = PresentationStyle.Modal(
-            detents = setOf(PresentationDetent.Medium, PresentationDetent.Large),
+            detents = if (compactLandscape) {
+                setOf(PresentationDetent.Large)
+            } else {
+                setOf(PresentationDetent.Medium, PresentationDetent.Large)
+            },
         ),
     )
 
@@ -205,7 +167,7 @@ fun BottomSheetMenu(
 
             val resolvedContainerColor = when {
                 background.isSpecified -> background
-                isDark -> Color(0xFF141416)
+                isDark -> IosMenuMaterial.DarkPanelFill
                 else -> iosColors.secondarySystemGroupedBackground
             }
 

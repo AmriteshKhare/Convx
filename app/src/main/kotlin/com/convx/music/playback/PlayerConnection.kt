@@ -30,39 +30,45 @@ import com.convx.music.utils.dataStore
 import com.convx.music.utils.get
 import com.convx.music.utils.reportException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
+
+sealed interface VideoStreamLookup {
+    data object Idle : VideoStreamLookup
+    data object Loading : VideoStreamLookup
+    data object Unavailable : VideoStreamLookup
+    data class Ready(val stream: com.convx.music.utils.YTPlayerUtils.VideoStream) : VideoStreamLookup
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerConnection(
     context: Context,
     binder: MusicBinder,
     val database: MusicDatabase,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
 ) : Player.Listener {
+    private val connectionJob = SupervisorJob(scope.coroutineContext[Job])
+    private val scope = CoroutineScope(scope.coroutineContext + connectionJob)
     private companion object {
         private const val TAG = "PlayerConnection"
-        /** Tap -> seek gap: long enough for the press animation to lead, short enough to
-         *  still read as instant. Also the window rapid taps coalesce in. */
         private const val SKIP_COMMIT_DELAY_MS = 140L
-        private const val PLAYER_INIT_TIMEOUT_MS = 5000L // 5 second timeout for player initialization
     }
 
     val service = binder.service
     private val appContext = context.applicationContext
     private val playerReadinessFlow = service.isPlayerReady
     
-    /**
-     * Safe player accessor checks readiness & handles errors.
-     * Should be used by all player access within this class.
-     */
-    private fun getPlayerSafe(): ExoPlayer {
+    private fun getPlayerOrThrow(): ExoPlayer {
         return try {
             if (!playerReadinessFlow.value) {
                 Timber.tag(TAG).w("Player accessed before service initialization complete; returning best-effort reference")
@@ -74,15 +80,8 @@ class PlayerConnection(
         }
     }
 
-    /**
-     * Public accessor for player. Throws if player not ready.
-     * Callers should check [isPlayerInitialized] before calling, or handle exceptions.
-     */
     val player: ExoPlayer
-        get() = getPlayerSafe()
-
-    /** Tracks whether player initialization completed successfully */
-    private val isPlayerInitialized = MutableStateFlow(service.isPlayerReady.value)
+        get() = getPlayerOrThrow()
 
     val playbackState: MutableStateFlow<Int>
     private val playWhenReady: MutableStateFlow<Boolean>
@@ -91,40 +90,26 @@ class PlayerConnection(
     init {
         Timber.tag(TAG).d("PlayerConnection init: playerReady=${playerReadinessFlow.value}")
         
-        // Initialize with player state or safe defaults if player not ready
-        val initialState = try {
-            val initialPlayer = getPlayerSafe()
-            Triple(initialPlayer.playbackState, initialPlayer.playWhenReady, 
-                   initialPlayer.playWhenReady && initialPlayer.playbackState != STATE_ENDED)
+        val initialPlayer = try {
+            getPlayerOrThrow()
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error during PlayerConnection initialization, using defaults")
-            Triple(Player.STATE_IDLE, false, false)
+            null
         }
         
-        playbackState = MutableStateFlow(initialState.first)
-        playWhenReady = MutableStateFlow(initialState.second)
+        playbackState = MutableStateFlow(initialPlayer?.playbackState ?: Player.STATE_IDLE)
+        playWhenReady = MutableStateFlow(initialPlayer?.playWhenReady ?: false)
         isPlaying = combine(playbackState, playWhenReady) { state, ready ->
             ready && state != STATE_ENDED
         }.stateIn(
             scope,
             SharingStarted.Lazily,
-            initialState.third
+            initialPlayer?.let { it.playWhenReady && it.playbackState != STATE_ENDED } ?: false
         )
-        
-        // Track service readiness changes in background.
-        scope.launch {
-            playerReadinessFlow.collect { ready ->
-                isPlayerInitialized.value = ready
-                if (ready) {
-                    Timber.tag(TAG).d("Service player initialization detected by PlayerConnection")
-                }
-            }
-        }
         
         Timber.tag(TAG).d("PlayerConnection state flows initialized successfully")
     }
     
-    // Effective playing state, considers Cast when active
     val isEffectivelyPlaying = combine(
         isPlaying,
         service.castConnectionHandler?.isCasting ?: MutableStateFlow(false),
@@ -138,6 +123,51 @@ class PlayerConnection(
     )
     
     val mediaMetadata = MutableStateFlow(player.currentMetadata)
+    private val requestedVideo = MutableStateFlow<Pair<String, Long>?>(null)
+    private var videoRequestGeneration = 0L
+    private val officialVideos = com.music.innertube.OfficialVideoResolver()
+    private val requestedVideoAvailability = MutableStateFlow<String?>(null)
+
+    val videoAvailability = combine(mediaMetadata, requestedVideoAvailability) { metadata, requestedId ->
+        metadata?.takeIf { it.id == requestedId }
+    }.flatMapLatest { metadata ->
+        flow {
+            emit(metadata?.let {
+                officialVideos.resolve(it.id, it.title, it.artists.map { artist -> artist.name }, it.duration, it.musicVideoType).getOrNull()
+            })
+        }
+    }.stateIn(scope, SharingStarted.WhileSubscribed(0, 0), null)
+
+    fun requestVideoAvailability(mediaId: String?) {
+        requestedVideoAvailability.value = mediaId?.takeIf { it == mediaMetadata.value?.id }
+    }
+
+    /** Video lookup starts only after the user asks to watch the current track. */
+    val videoStreamLookup = combine(mediaMetadata, requestedVideo) { metadata, request ->
+        metadata?.takeIf { it.id == request?.first }?.let { it to requireNotNull(request) }
+    }.flatMapLatest { request ->
+        flow {
+            if (request == null) {
+                emit(VideoStreamLookup.Idle)
+            } else {
+                emit(VideoStreamLookup.Loading)
+                val metadata = request.first
+                val video = officialVideos.resolve(metadata.id, metadata.title, metadata.artists.map { it.name }, metadata.duration, metadata.musicVideoType).getOrNull()
+                val stream = video?.let { com.convx.music.utils.YTPlayerUtils.videoStream(it.videoId)?.copy(mediaId = metadata.id) }
+                emit(stream?.let(VideoStreamLookup::Ready) ?: VideoStreamLookup.Unavailable)
+            }
+        }
+    }.stateIn(scope, SharingStarted.WhileSubscribed(0, 0), VideoStreamLookup.Idle)
+
+    fun requestVideoStream(mediaId: String) {
+        if (mediaMetadata.value?.id == mediaId) {
+            requestedVideo.value = mediaId to ++videoRequestGeneration
+        }
+    }
+
+    fun clearVideoStreamRequest() {
+        requestedVideo.value = null
+    }
     val currentSong =
         mediaMetadata.flatMapLatest {
             database.song(it?.id)
@@ -153,8 +183,6 @@ class PlayerConnection(
     /** BPM, key, tier and transition style, straight from the DJ engine. */
     val djState = service.djState
 
-    /** The fade length of the DJ crossfade that just handed off, or 0 outside
-     *  one — see [com.convx.music.playback.MusicService.crossfadeDurationMs]. */
     val crossfadeDurationMs = service.crossfadeDurationMs
 
     val queueTitle = MutableStateFlow<String?>(null)
@@ -168,9 +196,6 @@ class PlayerConnection(
     val canSkipPrevious = MutableStateFlow(true)
     val canSkipNext = MutableStateFlow(true)
 
-    /** Set by the floating mini bar's lyrics/queue icons (which live outside
-     *  Player.kt's own composable scope) to ask the player to open already
-     *  showing lyrics/queue. Player.kt observes these and resets them. */
     val requestShowLyrics = MutableStateFlow(false)
     val requestShowQueue = MutableStateFlow(false)
 
@@ -193,7 +218,6 @@ class PlayerConnection(
 
     init {
         try {
-            // Observe player changes (e.g. crossfade swap)
             scope.launch {
                 service.playerFlow.collect { newPlayer ->
                     if (newPlayer != null && newPlayer != attachedPlayer) {
@@ -202,7 +226,6 @@ class PlayerConnection(
                 }
             }
             
-            // Initial setup if flow hasn't emitted yet but service is ready
             if (attachedPlayer == null && service.isPlayerReady.value) {
                  updateAttachedPlayer(player)
             }
@@ -220,7 +243,6 @@ class PlayerConnection(
         attachedPlayer = newPlayer
         newPlayer.addListener(this)
         
-        // Refresh all state from new player
         playbackState.value = newPlayer.playbackState
         playWhenReady.value = newPlayer.playWhenReady
         mediaMetadata.value = newPlayer.currentMetadata
@@ -234,43 +256,20 @@ class PlayerConnection(
         Timber.tag(TAG).d("Attached to new player instance: $newPlayer")
     }
 
-    /**
-     * Set when a playback change was refused because this device is a Listen
-     * Together guest without control. The UI observes it to say so and resets it;
-     * blocking silently reads as the app being broken.
-     */
     val playbackBlockedByRoom = MutableStateFlow(false)
 
     /** True while playback controls must be inert: in a room, without control. */
     val playbackLockedByRoom: Boolean
         get() = !allowInternalSync && shouldBlockPlaybackChanges?.invoke() == true
 
-    /**
-     * A queue the user asked to play while something else was already queued, parked here
-     * until they say whether to keep or clear what is playing. Consumed by
-     * `QueueConflictDialog`, which is hosted once at the root — the prompt has to live at a
-     * single point because every "play this" in the app funnels through [playQueue].
-     */
+    /** Replacement awaiting the user's keep-or-clear choice. */
     val pendingQueue = MutableStateFlow<Queue?>(null)
 
-    /**
-     * The queue that was just silently replaced (asking-before-replacing is off), so a
-     * snackbar can offer to undo it. Not set when the user replaced via the prompt or force
-     * came from an internal caller — both are already a deliberate choice with nothing to
-     * undo.
-     */
+    /** Previous queue available to the undo action. */
     val queueReplacedForUndo = MutableStateFlow<Queue?>(null)
 
-    /**
-     * @param force skips the keep-or-clear prompt. Set by the prompt itself when the user
-     *   picks "clear and play", and by internal callers that are already a deliberate replace
-     *   (queue restore, Listen Together sync).
-     */
+    /** [force] bypasses the queue replacement prompt. */
     fun playQueue(queue: Queue, force: Boolean = false) {
-        // Every "play this" in the app funnels through here — song rows, album and
-        // playlist headers, search results, Home tiles, radio. It was the one entry
-        // point with no room gate, so an owner-only room still let a guest start its
-        // own local or online playback and desync the whole session.
         if (playbackLockedByRoom) {
             Timber.tag(TAG).d("playQueue blocked - Listen Together guest without control")
             playbackBlockedByRoom.value = true
@@ -284,8 +283,7 @@ class PlayerConnection(
             pendingQueue.value = queue
             return
         }
-        // Only a silent replace (prompt off) needs an undo offer — a forced replace is
-        // already the user's or the system's deliberate choice.
+        // Forced replacements already reflect a deliberate choice.
         val previousQueue = if (!force && isReplace) snapshotCurrentQueue() else null
         try {
             service.playQueue(queue)
@@ -317,11 +315,6 @@ class PlayerConnection(
         service.enqueueQueue(queue)
     }
 
-    /**
-     * True when there is a queue worth asking about: at least one more item than the one the
-     * user just tapped would replace, and a player that is not sitting idle after being
-     * emptied.
-     */
     private fun hasLiveQueue(): Boolean = try {
         playerReadinessFlow.value &&
             player.mediaItemCount > 0 &&
@@ -331,12 +324,6 @@ class PlayerConnection(
         false
     }
 
-    /**
-     * True when the song this queue would start on is already sitting in the current queue —
-     * i.e. the user tapped another row of the list they are already playing. Replacing there
-     * is what they expect, so the keep-or-clear prompt would only be in the way; it is meant
-     * for starting something genuinely unrelated.
-     */
     private fun startsInsideCurrentQueue(queue: Queue): Boolean = try {
         val startId = when (queue) {
             is ListQueue -> queue.items.getOrNull(queue.startIndex)?.mediaId
@@ -349,7 +336,6 @@ class PlayerConnection(
     }
 
     fun startRadioSeamlessly() {
-        // Block if Listen Together guest
         if (shouldBlockPlaybackChanges?.invoke() == true) {
             Timber.tag("PlayerConnection").d("startRadioSeamlessly blocked - Listen Together guest")
             return
@@ -368,7 +354,6 @@ class PlayerConnection(
     fun playNext(item: MediaItem) = playNext(listOf(item))
 
     fun playNext(items: List<MediaItem>) {
-        // Block if Listen Together guest (unless internal sync)
         if (playbackLockedByRoom) {
             Timber.tag("PlayerConnection").d("playNext blocked - Listen Together guest")
             playbackBlockedByRoom.value = true
@@ -385,7 +370,6 @@ class PlayerConnection(
     fun addToQueue(item: MediaItem) = addToQueue(listOf(item))
 
     fun addToQueue(items: List<MediaItem>) {
-        // Block if Listen Together guest (unless internal sync)
         if (playbackLockedByRoom) {
             Timber.tag("PlayerConnection").d("addToQueue blocked - Listen Together guest")
             playbackBlockedByRoom.value = true
@@ -499,12 +483,7 @@ class PlayerConnection(
     private var pendingSkip = 0
     private var skipCommitJob: kotlinx.coroutines.Job? = null
 
-    /**
-     * Tap-first skip for the transport buttons: the button's own animation plays on the tap,
-     * and the actual seek lands [SKIP_COMMIT_DELAY_MS] later, off the tap's frame. Taps inside
-     * that window coalesce into ONE jump (+3 = the third track ahead), so rapid tapping runs a
-     * single track transition instead of stacking a player seek + UI transition per tap.
-     */
+    /** Coalesces rapid transport taps into one timeline jump. */
     fun requestSkip(forward: Boolean) {
         pendingSkip += if (forward) 1 else -1
         skipCommitJob?.cancel()
@@ -532,7 +511,7 @@ class PlayerConnection(
             }
             val timeline = player.currentTimeline
             if (timeline.isEmpty) return
-            // Repeat-one repeats the track, not the skip: step as if repeat were off.
+            // A multi-skip advances through tracks even in repeat-one mode.
             val mode = if (player.repeatMode == Player.REPEAT_MODE_ONE) Player.REPEAT_MODE_OFF else player.repeatMode
             var index = player.currentMediaItemIndex
             for (step in 0 until kotlin.math.abs(steps)) {
@@ -558,7 +537,6 @@ class PlayerConnection(
 
     fun seekToNext() {
         try {
-            // When casting, use Cast skip instead of local player
             val castHandler = service.castConnectionHandler
             if (castHandler?.isCasting?.value == true) {
                 castHandler.skipToNext()
@@ -589,31 +567,23 @@ class PlayerConnection(
 
     fun seekToPrevious() {
         try {
-            // When casting, use Cast skip instead of local player
             val castHandler = service.castConnectionHandler
             if (castHandler?.isCasting?.value == true) {
                 castHandler.skipToPrevious()
                 return
             }
 
-            // Logic to mimic standard seekToPrevious behavior but with explicit callbacks
-            // If we are more than 3 seconds in, just restart the song
-            if (player.currentPosition > 3000 || !player.hasPreviousMediaItem()) {
+            val restartCurrentItem = player.currentPosition > 3000 || !player.hasPreviousMediaItem()
+            if (restartCurrentItem) {
                 player.seekTo(0)
-                if (player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
-                    player.prepare()
-                }
-                player.playWhenReady = true
-                onRestartSong?.invoke()
             } else {
-                // Otherwise go to previous media item
                 player.seekToPreviousMediaItem()
-                if (player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
-                    player.prepare()
-                }
-                player.playWhenReady = true
-                onSkipPrevious?.invoke()
             }
+            if (player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
+                player.prepare()
+            }
+            player.playWhenReady = true
+            if (restartCurrentItem) onRestartSong?.invoke() else onSkipPrevious?.invoke()
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error in seekToPrevious")
         }
@@ -688,6 +658,9 @@ class PlayerConnection(
     }
 
     fun dispose() {
+        scope.cancel()
+        skipCommitJob = null
+        pendingSkip = 0
         try {
             attachedPlayer?.removeListener(this)
             attachedPlayer = null

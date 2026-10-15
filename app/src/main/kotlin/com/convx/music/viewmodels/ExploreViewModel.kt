@@ -33,12 +33,11 @@ constructor(
     @ApplicationContext val context: Context,
     val database: MusicDatabase,
 ) : ViewModel() {
-    val explorePage = MutableStateFlow<ExplorePage?>(null)
+    // Seeded from the last fetch so a return visit paints immediately; a refresh then replaces it.
+    val explorePage = MutableStateFlow<ExplorePage?>(ExploreCache.page)
 
-    /** A shelf of items related to whatever the user played most recently — the same
-     *  seed-and-related approach Home's own similar-recommendations shelf uses, just
-     *  one seed rather than several, since this is a single row, not multiple. */
-    val recommendedForYou = MutableStateFlow<List<YTItem>?>(null)
+    /** Related items seeded from the most recently played track. */
+    val recommendedForYou = MutableStateFlow<List<YTItem>?>(ExploreCache.recommended)
 
     private suspend fun loadRecommendedForYou() {
         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
@@ -50,6 +49,7 @@ constructor(
                 .filterExplicit(hideExplicit)
                 .shuffled()
                 .take(15)
+            recommendedForYou.value?.let(ExploreCache::putRecommended)
         }
     }
 
@@ -86,13 +86,16 @@ constructor(
                                 firstArtistKey
                             }.filterExplicit(context.dataStore.get(HideExplicitKey, false)),
                     )
+                explorePage.value?.let(ExploreCache::put)
             }.onFailure {
                 reportException(it)
             }
     }
 
     init {
-        refresh()
+        // Fresh data is already on screen; only fetch when there is none or it has gone stale.
+        if (!ExploreCache.isFresh) refresh()
+        else viewModelScope.launch(Dispatchers.IO) { if (recommendedForYou.value == null) loadRecommendedForYou() }
     }
 
     /** Re-fetches the explore page. Bound to the pull-to-refresh gesture. */

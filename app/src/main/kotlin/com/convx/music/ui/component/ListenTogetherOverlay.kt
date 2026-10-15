@@ -52,6 +52,7 @@ import com.convx.music.listentogether.ListenTogetherManager
 import com.convx.music.playback.PlayerConnection
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.utils.bounceClick
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /** How far the music is pulled down while a request is waiting. Not silence —
  *  the point is that someone with the phone in their pocket notices the dip
@@ -78,7 +79,7 @@ fun BoxScope.ListenTogetherOverlay(
 ) {
     if (manager == null) return
 
-    val pendingRequests by manager.pendingJoinRequests.collectAsState()
+    val pendingRequests by manager.pendingJoinRequests.collectAsStateWithLifecycle()
     val request = pendingRequests.firstOrNull()
 
     // Latest queue change, cleared on a timer.
@@ -233,12 +234,7 @@ private fun QueueNotice(title: String, addedBy: String?) {
             .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            painter = painterResource(R.drawable.playlist_add),
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = AppTheme.colorScheme.primary,
-        )
+        SymbolIcon(symbol = sf("text.badge.plus"), contentDescription = null, size = 20.dp, tint = AppTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
         Text(
             text = if (addedBy.isNullOrBlank()) {

@@ -33,13 +33,10 @@ import kotlinx.coroutines.delay
 import java.util.*
 import kotlin.io.encoding.Base64
 
-/**
- * Provide access to InnerTube endpoints.
- * For making HTTP requests, not parsing response.
- */
 @OptIn(ExperimentalEncodingApi::class)
 class InnerTube {
     private var httpClient = createClient()
+    private val rateLimitUntilMillis = java.util.concurrent.atomic.AtomicLong(0)
 
     var locale = YouTubeLocale(
         gl = Locale.getDefault().country,
@@ -48,15 +45,7 @@ class InnerTube {
     var visitorData: String? = null
     var dataSyncId: String? = null
         set(value) {
-            // YouTube hands out DATASYNC_ID as "<id>||" (primary account) or
-            // "<channelId>||<accountId>" (second/brand channel), but the API's
-            // onBehalfOfUser only accepts the bare LEADING id — the "||" form makes
-            // every authenticated request fail with HTTP 500, and keeping the
-            // trailing half instead resolves every channel of one Google account to
-            // the same identity, which is what silently reverted channel switches.
-            // Normalized here rather than at each call site so login, session
-            // restore, channel switch and token import all get it, including
-            // already-stored bad values.
+            // API requests need the leading channel id; DATASYNC_ID may include a second id after "||".
             field = value?.takeIf { it.isNotBlank() && it != "null" }?.substringBefore("||")
         }
     var cookie: String? = null
@@ -101,10 +90,8 @@ class InnerTube {
             deflate(0.8F)
         }
 
-        // Enhanced network configuration for better performance
         engine {
             config {
-                // Connection pool settings for better connection reuse
                 connectionPool(
                     okhttp3.ConnectionPool(
                         10, // maxIdleConnections
@@ -113,23 +100,16 @@ class InnerTube {
                     )
                 )
                 
-                // Timeout configurations
                 connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                 readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
                 writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
                 
-                // Enable HTTP/2 for better performance
                 protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
                 
-                // Retry on connection failure
-                retryOnConnectionFailure(true)
+                // Only the read wrapper may replay calls. An engine retry can replay
+                // a mutation after the server committed it but lost the response.
+                retryOnConnectionFailure(false)
 
-                // No okhttp3.Cache here: every Innertube call is a POST (only
-                // OkHttp-cachable for GETs), and java.io.tmpdir is not a
-                // writable, app-scoped directory on Android anyway — the 50 MB
-                // cache could never have held entries.
-                
-                // Apply IP version filtering
                 dns(object : Dns {
                     override fun lookup(hostname: String): List<InetAddress> {
                         val addresses = Dns.SYSTEM.lookup(hostname)
@@ -141,12 +121,10 @@ class InnerTube {
                     }
                 })
 
-                // Apply proxy configuration
                 this@InnerTube.proxy?.let { proxyConfig ->
                     proxy(proxyConfig)
                 }
                 
-                // Apply proxy authentication
                 this@InnerTube.proxyAuth?.let { auth ->
                     proxyAuthenticator { _, response ->
                         response.request.newBuilder()
@@ -157,7 +135,6 @@ class InnerTube {
             }
         }
 
-        // Request timeout configuration
         install(HttpTimeout) {
             requestTimeoutMillis = 60000
             connectTimeoutMillis = 30000
@@ -166,10 +143,6 @@ class InnerTube {
 
         defaultRequest {
             url(YouTubeClient.API_URL_YOUTUBE_MUSIC)
-            // Was force-sending Accept-Language: en-US on every request regardless
-            // of the account's actual locale — clashes with the hl/gl fields the
-            // Context body already carries per-request, and vivi-music (working,
-            // same device/account/network) sends neither header at all.
         }
     }
 
@@ -196,24 +169,7 @@ class InnerTube {
         parameter("prettyPrint", false)
     }
 
-    /**
-     * Simple retry wrapper for transient IO errors (socket aborts, timeouts) and
-     * for 429/5xx HTTP responses (rate-limited or a momentary server hiccup —
-     * expectSuccess = true makes Ktor throw ResponseException for these instead
-     * of IOException). Other 4xx (400/401/403/404...) are not retried — retrying
-     * a genuine client error just wastes attempts. Retries up to [maxAttempts]
-     * times with exponential backoff, honoring a Retry-After header if the
-     * server sent one. Cancellation is respected since [delay] throws if the
-     * coroutine is cancelled.
-     */
-    /**
-     * Runs [block], retrying transient transport failures and rate-limit /
-     * server-hiccup responses. A *timeout* is deliberately never retried: it
-     * is this client's own budget being spent, so repeating it multiplies the
-     * cost instead of sharing it (a timed-out call re-run three times turns a
-     * 6 s ceiling into 18 s on exactly the requests most likely to be on a
-     * latency-sensitive path).
-     */
+    /** Retries transient failures, but not timeouts, which would exceed the caller's time budget. */
     private suspend fun <T> withRetry(
         maxAttempts: Int = 3,
         initialDelay: Long = 500L,
@@ -223,6 +179,14 @@ class InnerTube {
         var currentDelay = initialDelay
         var attempt = 0
         while (true) {
+            val cooldownMs = rateLimitUntilMillis.get() - System.currentTimeMillis()
+            if (cooldownMs > RetryPolicy.MAX_INLINE_WAIT_MS) {
+                throw InnerTubeRateLimitException(cooldownMs)
+            }
+            if (cooldownMs > 0) {
+                delay(cooldownMs + 1)
+                continue
+            }
             try {
                 return block()
             } catch (e: io.ktor.client.plugins.HttpRequestTimeoutException) {
@@ -230,14 +194,22 @@ class InnerTube {
             } catch (e: IOException) {
                 attempt++
                 if (attempt >= maxAttempts) throw e
-                delay(currentDelay)
+                delay(RetryPolicy.jitter(currentDelay))
                 currentDelay = (currentDelay * factor).toLong()
             } catch (e: io.ktor.client.plugins.ResponseException) {
                 val status = e.response.status.value
                 attempt++
+                val retryAfterMs = RetryPolicy.retryAfterMillis(e.response.headers[HttpHeaders.RetryAfter])
+                if (status == 429) {
+                    // All read calls share the cooldown, including when this call has no attempts left.
+                    val now = System.currentTimeMillis()
+                    val waitMs = (retryAfterMs ?: 5_000L).coerceAtMost(Long.MAX_VALUE - now)
+                    val until = now + waitMs
+                    rateLimitUntilMillis.updateAndGet { old -> maxOf(old, until) }
+                }
                 if ((status != 429 && status !in 500..599) || attempt >= maxAttempts) throw e
-                val retryAfterMs = e.response.headers[HttpHeaders.RetryAfter]?.toLongOrNull()?.times(1000L)
-                delay(retryAfterMs ?: currentDelay)
+                if (retryAfterMs != null && retryAfterMs > RetryPolicy.MAX_INLINE_WAIT_MS) throw e
+                delay(maxOf(retryAfterMs ?: 0L, RetryPolicy.jitter(currentDelay)))
                 currentDelay = (currentDelay * factor).toLong()
             }
         }
@@ -276,11 +248,7 @@ class InnerTube {
     ) = withRetry {
         httpClient.post("player") {
             ytClient(client, setLogin = true)
-            // Tight budget just for this endpoint: it sits on the playback hot
-            // path and healthy answers arrive in 120-330 ms; one that hangs
-            // would otherwise hold the queue start for the full 60 s shared
-            // ceiling. Browse/search keep that wider ceiling — their payloads
-            // are far larger over the same connection.
+            // Keep playback startup from waiting for the shared 60-second timeout.
             timeout { requestTimeoutMillis = 6_000 }
             setBody(
                 PlayerBody(
@@ -315,7 +283,7 @@ class InnerTube {
         cpn: String,
         playlistId: String?,
         client: YouTubeClient = YouTubeClient.WEB_REMIX,
-    ) = withRetry {
+    ) = run {
         httpClient.get(url) {
             ytClient(client, true)
             parameter("ver", "2")
@@ -381,7 +349,7 @@ class InnerTube {
     suspend fun feedback(
         client: YouTubeClient,
         tokens: List<String>
-    ) = withRetry {
+    ) = run {
         httpClient.post("feedback") {
             ytClient(client, setLogin = true)
             setBody(
@@ -465,9 +433,7 @@ class InnerTube {
         }
     }
 
-    // Not wrapped in withRetry: a mutation, and an IOException/5xx can happen
-    // after the server already applied it — an auto-retry risks double-firing
-    // (e.g. liking twice). Let the caller retry explicitly instead.
+    // Avoid automatic retries: a failed response may follow a successful mutation.
     suspend fun likeVideo(
         client: YouTubeClient,
         videoId: String,
@@ -486,7 +452,7 @@ class InnerTube {
     suspend fun unlikeVideo(
         client: YouTubeClient,
         videoId: String,
-    ) = withRetry {
+    ) = run {
         httpClient.post("like/removelike") {
             ytClient(client, setLogin = true)
             setBody(
@@ -501,7 +467,7 @@ class InnerTube {
     suspend fun subscribeChannel(
         client: YouTubeClient,
         channelId: String,
-    ) = withRetry {
+    ) = run {
         httpClient.post("subscription/subscribe") {
             ytClient(client, setLogin = true)
             setBody(
@@ -516,7 +482,7 @@ class InnerTube {
     suspend fun unsubscribeChannel(
         client: YouTubeClient,
         channelId: String,
-    ) = withRetry {
+    ) = run {
         httpClient.post("subscription/unsubscribe") {
             ytClient(client, setLogin = true)
             setBody(
@@ -531,7 +497,7 @@ class InnerTube {
     suspend fun likePlaylist(
         client: YouTubeClient,
         playlistId: String,
-    ) = withRetry {
+    ) = run {
         httpClient.post("like/like") {
             ytClient(client, setLogin = true)
             setBody(
@@ -546,7 +512,7 @@ class InnerTube {
     suspend fun unlikePlaylist(
         client: YouTubeClient,
         playlistId: String,
-    ) = withRetry {
+    ) = run {
         httpClient.post("like/removelike") {
             ytClient(client, setLogin = true)
             setBody(
@@ -558,7 +524,7 @@ class InnerTube {
         }
     }
 
-    // Not wrapped in withRetry — see likeVideo's comment.
+    // Avoid automatic retries: a failed response may follow a successful mutation.
     suspend fun addToPlaylist(
         client: YouTubeClient,
         playlistId: String,
@@ -582,7 +548,7 @@ class InnerTube {
         client: YouTubeClient,
         playlistId: String,
         addPlaylistId: String,
-    ) = withRetry {
+    ) = run {
         httpClient.post("browse/edit_playlist") {
             ytClient(client, setLogin = true)
             setBody(
@@ -602,7 +568,7 @@ class InnerTube {
         playlistId: String,
         videoId: String,
         setVideoId: String,
-    ) = withRetry {
+    ) = run {
         httpClient.post("browse/edit_playlist") {
             ytClient(client, setLogin = true)
             setBody(
@@ -625,7 +591,7 @@ class InnerTube {
         playlistId: String,
         setVideoId: String,
         successorSetVideoId: String?,
-    ) = withRetry {
+    ) = run {
         httpClient.post("browse/edit_playlist") {
             ytClient(client, setLogin = true)
             setBody(
@@ -643,7 +609,7 @@ class InnerTube {
         }
     }
 
-    // Not wrapped in withRetry — see likeVideo's comment.
+    // Avoid automatic retries: a failed response may follow a successful mutation.
     suspend fun createPlaylist(
         client: YouTubeClient,
         title: String,
@@ -659,7 +625,7 @@ class InnerTube {
         }
     }
 
-    // Not wrapped in withRetry — see likeVideo's comment.
+    // Avoid automatic retries: a failed response may follow a successful mutation.
     suspend fun renamePlaylist(
         client: YouTubeClient,
         playlistId: String,
@@ -699,7 +665,7 @@ class InnerTube {
         client: YouTubeClient,
         uploadId: String,
         image: ByteArray,
-    ) = withRetry {
+    ) = run {
         httpClient.post("https://music.youtube.com/playlist_image_upload/playlist_custom_thumbnail") {
             ytClient(client, setLogin = true)
             parameter("upload_id", uploadId)
@@ -716,7 +682,7 @@ class InnerTube {
         client: YouTubeClient,
         playlistId: String,
         blobId: String,
-    ) = withRetry {
+    ) = run {
         httpClient.post("browse/edit_playlist") {
             ytClient(client, setLogin = true)
             setBody(
@@ -738,7 +704,7 @@ class InnerTube {
     suspend fun removeThumbnailPlaylist(
         client: YouTubeClient,
         playlistId: String
-    ) = withRetry {
+    ) = run {
         httpClient.post("browse/edit_playlist") {
             ytClient(client, setLogin = true)
             setBody(
@@ -753,13 +719,12 @@ class InnerTube {
         }
     }
 
-    // Not wrapped in withRetry — see likeVideo's comment.
+    // Avoid automatic retries: a failed response may follow a successful mutation.
     suspend fun deletePlaylist(
         client: YouTubeClient,
         playlistId: String,
     ) = run {
         httpClient.post("playlist/delete") {
-            println("deleting $playlistId")
             ytClient(client, setLogin = true)
             setBody(
                 PlaylistDeleteBody(

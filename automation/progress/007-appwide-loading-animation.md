@@ -1,4 +1,4 @@
-# Task 007 — app-wide loading animation — root cause found, replaced with BitChord shimmer
+# Task 007 — app-wide loading animation — root cause found, replaced with the reference app shimmer
 
 ## Root cause
 
@@ -29,14 +29,14 @@ import progress, was a raw `Dialog(onDismissRequest = {})` with no `Surface`/
 background — just white text floating on the platform's default black dialog
 scrim.
 
-## Fix — ported BitChord's shimmer skeleton look
+## Fix — ported the reference app's shimmer skeleton look
 
 New file: `app/src/main/kotlin/com/convx/music/ui/component/Skeletons.kt`,
-ported from `BitChord/app/src/main/java/com/music/bitchord/ui/components/Skeletons.kt`
+ported from `the reference app/app/src/main/java/com/music/reference/ui/components/Skeletons.kt`
 (`ShimmerBox`, ported `SongRowSkeleton`, plus a small `ShimmerLine`/`TextBlockSkeleton`
-pair for paragraph-shaped loading spots that don't exist in BitChord). Colors
+pair for paragraph-shaped loading spots that don't exist in the reference app). Colors
 use `AppTheme.colorScheme.surfaceVariant`/`onSurfaceVariant` (this app's iOS-backed
-theme role accessor) instead of BitChord's raw `MaterialTheme.colorScheme`, since
+theme role accessor) instead of the reference app's raw `MaterialTheme.colorScheme`, since
 every screen here is already written against `AppTheme`.
 
 Replaced every default-color `LoadingIndicator()` / `ContainedLoadingIndicator()`
@@ -51,7 +51,7 @@ placeholder sized to what it's standing in for:
 - `ui/screens/search/suggestions/TabNewsSuggestion.kt:312,360,411` — three `SubcomposeAsyncImage`
   `loading = { ... }` slots (trending track/artist/album art) → `ShimmerBox` shaped to match
   each target (rounded rect / circle / rounded rect).
-- `vivimusic/updater/vivimusicupdater.kt:384` — "checking for update" state → `ShimmerBox`.
+- `convx/updater/convxupdater.kt:384` — "checking for update" state → `ShimmerBox`.
 - `ui/menu/LoadingScreen.kt` (backup/restore/CSV import progress dialog) — restyled to a
   themed `AppTheme.colorScheme.surface` card with a `ShimmerLine` accent and
   `AppTheme.colorScheme.onSurface` text, replacing the raw black-scrim `Dialog`.
@@ -63,7 +63,7 @@ every file edited (`ShowMediaInfo.kt`, `Player.kt`, `AlbumScreen.kt`,
 ## Explicitly out of scope (verified, not touched)
 
 - `RandomizeGridItem.kt:118` — passes an explicit `color=`, never hit the bug,
-  and BitChord has no equivalent "collapsing dice" loading state to port —
+  and the reference app has no equivalent "collapsing dice" loading state to port —
   left as-is.
 - `PullToRefreshDefaults.LoadingIndicator(...)` (HomeScreen, ExploreScreen,
   LibraryMixScreen, TabNewsSuggestion, changelogscreen, commitscreen) —
@@ -89,7 +89,7 @@ places already covered by existing screen tests/compilation; sizes/shapes on
 each replacement were chosen to match the artwork/row/card metrics already
 present at that call site so no layout should shift. Expected result: every
 formerly red/black spinner surfaces on screen now shows a grey shimmer sweep
-(BitChord's look) instead, and the backup/restore progress dialog shows a
+(the reference app's look) instead, and the backup/restore progress dialog shows a
 themed card instead of a black scrim.
 
 **Next step for whoever picks this up:** build, install, and screenshot each

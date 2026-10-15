@@ -5,6 +5,10 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.DownloadRingIcon
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.menuBottomInset
 import android.content.Context
 import android.content.res.Configuration
 import android.widget.Toast
@@ -93,6 +97,7 @@ import com.convx.music.listentogether.MAX_ROOM_CODE_LENGTH
 import com.convx.music.listentogether.MIN_ROOM_CODE_LENGTH
 import com.convx.music.models.MediaMetadata
 import com.convx.music.playback.ExoDownloadService
+import com.convx.music.core.AudioDeviceMenu
 import com.convx.music.ui.component.BottomSheetState
 import com.convx.music.ui.component.ListDialog
 import com.convx.music.ui.component.IosMenuGroup
@@ -101,11 +106,14 @@ import com.convx.music.ui.component.NewAction
 import com.convx.music.ui.component.NewActionGrid
 import com.convx.music.constants.EnableSaavnStreamingKey
 import com.convx.music.utils.rememberPreference
+import com.convx.music.ui.player.rememberSleepTimerState
+import com.convx.music.ui.player.SleepTimerDialogHost
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.round
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun PlayerMenu(
@@ -119,13 +127,17 @@ fun PlayerMenu(
     mediaMetadata ?: return
     val context = LocalContext.current
     val ringtoneViewModel = com.convx.music.LocalRingtoneViewModel.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val playerConnection = LocalPlayerConnection.current ?: return
+    val sleepTimer = rememberSleepTimerState(playerConnection)
+    SleepTimerDialogHost(playerConnection, sleepTimer)
+    var showAudioDevices by remember { mutableStateOf(false) }
+    if (showAudioDevices) AudioDeviceMenu(onDismiss = { showAudioDevices = false })
     val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
     val (saavnEnabled) = rememberPreference(EnableSaavnStreamingKey, defaultValue = false)
 
-    val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id)
+    val download by LocalDownloadUtil.current.get().getDownload(mediaMetadata.id)
         .collectAsState(initial = null)
 
     val artists =
@@ -178,7 +190,7 @@ fun PlayerMenu(
         ListDialog(
             onDismiss = { showSelectArtistDialog = false },
         ) {
-            items(artists) { artist ->
+            items(artists, key = { it.id!! }) { artist ->
                 Box(
                     contentAlignment = Alignment.CenterStart,
                     modifier =
@@ -229,21 +241,17 @@ fun PlayerMenu(
             start = 0.dp,
             top = 0.dp,
             end = 0.dp,
-            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+            bottom = 8.dp + menuBottomInset(),
         ),
     ) {
         item {
             val startingRadioText = stringResource(R.string.starting_radio)
             NewActionGrid(
                 actions = listOfNotNull(
-                    if (!isListenTogetherGuest) {
+                    if (!isListenTogetherGuest && !mediaMetadata.isLocalFile) {
                         NewAction(
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.radio),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(32.dp),
-                                )
+                                SymbolIcon(symbol = sf("dot.radiowaves.left.and.right"), contentDescription = null, size = 32.dp)
                             },
                             text = stringResource(R.string.start_an_radio),
                             onClick = {
@@ -255,22 +263,14 @@ fun PlayerMenu(
                     } else null,
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.playlist_add),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp),
-                            )
+                            SymbolIcon(symbol = sf("text.badge.plus"), contentDescription = null, size = 32.dp)
                         },
                         text = stringResource(R.string.add_to_an_playlist),
                         onClick = { showChoosePlaylistDialog = true }
                     ),
-                    NewAction(
+                    if (mediaMetadata.isLocalFile) null else NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ios_share),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp),
-                            )
+                            SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null, size = 32.dp)
                         },
                         text = stringResource(R.string.share),
                         onClick = {
@@ -295,7 +295,6 @@ fun PlayerMenu(
         item {
             IosMenuGroup(
                 items = buildList {
-                    // ── Single smart Retry button ────────────────────────────
                     // Always visible. Re-triggers the full resolution chain.
                     add(
                         IosMenuItemData(
@@ -309,11 +308,7 @@ fun PlayerMenu(
                                 )
                             },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.replay),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("arrow.counterclockwise"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 val player = playerConnection.player
@@ -337,11 +332,7 @@ fun PlayerMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.artist),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("music.mic"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     if (mediaMetadata.artists.size == 1) {
@@ -355,6 +346,26 @@ fun PlayerMenu(
                             )
                         )
                     }
+                    add(
+                        IosMenuItemData(
+                            title = { Text(text = stringResource(R.string.sleep_timer)) },
+                            icon = { SymbolIcon(symbol = sf("moon.zzz.fill"), contentDescription = null, size = 24.dp) },
+                            onClick = {
+                                onDismiss()
+                                sleepTimer.showDialog.value = true
+                            },
+                        )
+                    )
+                    add(
+                        IosMenuItemData(
+                            title = { Text(text = stringResource(R.string.audio_devices)) },
+                            icon = { SymbolIcon(symbol = sf("airplayaudio"), contentDescription = null, size = 24.dp) },
+                            onClick = {
+                                onDismiss()
+                                showAudioDevices = true
+                            },
+                        )
+                    )
                     if (mediaMetadata.album != null) {
                         add(
                             IosMenuItemData(
@@ -367,11 +378,7 @@ fun PlayerMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.album),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("square.stack"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     navController.navigate("album/${mediaMetadata.album.id}")
@@ -381,7 +388,6 @@ fun PlayerMenu(
                             )
                         )
                     }
-                    // Add to Library option
                     val isInLibrary = librarySong?.song?.inLibrary != null
                     add(
                         IosMenuItemData(
@@ -394,13 +400,10 @@ fun PlayerMenu(
                                 )
                             },
                             icon = {
-                                Icon(
-                                    painter = painterResource(
-                                        if (isInLibrary) R.drawable.library_add_check
-                                        else R.drawable.library_add
-                                    ),
+                                SymbolIcon(
+                                    symbol = if (isInLibrary) sf("text.badge.checkmark") else sf("text.badge.plus"),
                                     contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
+                                    size = 24.dp,
                                 )
                             },
                             onClick = {
@@ -415,7 +418,7 @@ fun PlayerMenu(
 
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
-        item {
+        if (!mediaMetadata.isLocalFile) item {
             IosMenuGroup(
                 items = listOf(
                     when (download?.state) {
@@ -427,11 +430,7 @@ fun PlayerMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.offline),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     DownloadService.sendRemoveDownload(
@@ -448,10 +447,7 @@ fun PlayerMenu(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
-                                    )
+                                    DownloadRingIcon(download)
                                 },
                                 onClick = {
                                     DownloadService.sendRemoveDownload(
@@ -468,11 +464,7 @@ fun PlayerMenu(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.download),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     database.transaction {
@@ -509,11 +501,7 @@ fun PlayerMenu(
                             icon = {
                                 // Show a small badge when there are pending suggestions
                                 Box {
-                                    Icon(
-                                        painter = painterResource(R.drawable.group),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("person.2.fill"), contentDescription = null, size = 24.dp)
                                     if (pendingSuggestions.isNotEmpty()) {
                                         Surface(
                                             shape = ContinuousRoundedRectangle(12.dp),
@@ -532,7 +520,7 @@ fun PlayerMenu(
                                     }
                                 }
                             },
-                            onClick = { showListenTogetherDialog = true }
+                            onClick = { onDismiss(); navController.navigate("listen_together/party") }
                         )
                     )
                     if (isListenTogetherGuest) {
@@ -540,11 +528,7 @@ fun PlayerMenu(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.resync)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.replay),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.counterclockwise"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     listenTogetherManager.requestSync()
@@ -567,11 +551,7 @@ fun PlayerMenu(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.info),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("info.circle"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 onShowDetailsDialog()
@@ -586,14 +566,10 @@ fun PlayerMenu(
                                 title = { Text(text = stringResource(R.string.equalizer)) },
                                 description = { Text(text = stringResource(R.string.equalizer_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.equalizer),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("slider.vertical.3"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
-                                    navController.navigate("equalizer")
+                                    navController.navigate("settings/equalizer")
                                     onDismiss()
                                 }
                             )
@@ -603,11 +579,7 @@ fun PlayerMenu(
                                 title = { Text(text = stringResource(R.string.advanced)) },
                                 description = { Text(text = stringResource(R.string.advanced_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.tune),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("slider.horizontal.3"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     showPitchTempoDialog = true
@@ -619,23 +591,15 @@ fun PlayerMenu(
                         IosMenuItemData(
                             title = { Text(text = stringResource(R.string.set_as_ringtone)) },
                             icon = {
-                                Icon(
-                                    imageVector = SfSymbols.Monochrome.SFBellFill,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("SFBellFill"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
-                                if (ringtoneViewModel.hasSettingsPermission(context)) {
-                                    ringtoneViewModel.showTrimmer(
-                                        mediaMetadata.id,
-                                        mediaMetadata.title,
-                                        mediaMetadata.artists.joinToString { it.name },
-                                        mediaMetadata.duration
-                                    )
-                                } else {
-                                    ringtoneViewModel.requestSettingsPermission(context)
-                                }
+                                ringtoneViewModel.showTrimmer(
+                                    mediaMetadata.id,
+                                    mediaMetadata.title,
+                                    mediaMetadata.artists.joinToString { it.name },
+                                    mediaMetadata.duration
+                                )
                                 onDismiss()
                             }
                         )
@@ -644,11 +608,7 @@ fun PlayerMenu(
                         IosMenuItemData(
                             title = { Text(text = stringResource(R.string.ambient_mode)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.fullscreen),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("arrow.up.left.and.arrow.down.right"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 navController.navigate("ambient_mode")
@@ -759,10 +719,7 @@ fun <T> ValueAdjuster(
                 onValueUpdate(values[values.indexOf(currentValue) - 1])
             },
         ) {
-            Icon(
-                painter = painterResource(R.drawable.remove),
-                contentDescription = null,
-            )
+            SymbolIcon(symbol = sf("minus"), contentDescription = null)
         }
 
         Text(
@@ -778,10 +735,7 @@ fun <T> ValueAdjuster(
                 onValueUpdate(values[values.indexOf(currentValue) + 1])
             },
         ) {
-            Icon(
-                painter = painterResource(R.drawable.add),
-                contentDescription = null,
-            )
+            SymbolIcon(symbol = sf("plus"), contentDescription = null)
         }
     }
 }
@@ -797,7 +751,6 @@ fun ListenTogetherDialog(
     val context = LocalContext.current
     val listenTogetherManager = com.convx.music.LocalListenTogetherManager.current
     
-    // Handle case where manager is not available
     if (listenTogetherManager == null) {
         ListDialog(onDismiss = onDismiss) {
             item {
@@ -807,12 +760,7 @@ fun ListenTogetherDialog(
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.group),
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
+                    SymbolIcon(symbol = sf("person.2.fill"), contentDescription = null, size = 48.dp, tint = AppTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = stringResource(R.string.listen_together),
@@ -842,13 +790,12 @@ fun ListenTogetherDialog(
         return
     }
     
-    val connectionState by listenTogetherManager.connectionState.collectAsState()
-    val roomState by listenTogetherManager.roomState.collectAsState()
-    val userId by listenTogetherManager.userId.collectAsState()
-    val pendingJoinRequests by listenTogetherManager.pendingJoinRequests.collectAsState()
-    val pendingSuggestions by listenTogetherManager.pendingSuggestions.collectAsState()
+    val connectionState by listenTogetherManager.connectionState.collectAsStateWithLifecycle()
+    val roomState by listenTogetherManager.roomState.collectAsStateWithLifecycle()
+    val userId by listenTogetherManager.userId.collectAsStateWithLifecycle()
+    val pendingJoinRequests by listenTogetherManager.pendingJoinRequests.collectAsStateWithLifecycle()
+    val pendingSuggestions by listenTogetherManager.pendingSuggestions.collectAsStateWithLifecycle()
     
-    // Load saved username
     var savedUsername by rememberPreference(com.convx.music.constants.ListenTogetherUsernameKey, "")
     var roomCodeInput by rememberSaveable { mutableStateOf("") }
     var usernameInput by rememberSaveable { mutableStateOf(savedUsername) }
@@ -883,12 +830,7 @@ fun ListenTogetherDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Start
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.group),
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp)
-                    )
+                    SymbolIcon(symbol = sf("person.2.fill"), contentDescription = null, size = 40.dp, tint = AppTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
                         Text(
@@ -908,7 +850,6 @@ fun ListenTogetherDialog(
             
             item { Spacer(modifier = Modifier.height(12.dp)) }
             
-            // Kick button
             item {
                 Surface(
                     modifier = Modifier
@@ -928,12 +869,7 @@ fun ListenTogetherDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.close),
-                            contentDescription = null,
-                            tint = AppTheme.colorScheme.error,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        SymbolIcon(symbol = sf("xmark"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.error)
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -954,7 +890,6 @@ fun ListenTogetherDialog(
             
             item { Spacer(modifier = Modifier.height(8.dp)) }
             
-            // Permanently kick button
             item {
                 Surface(
                     modifier = Modifier
@@ -977,12 +912,7 @@ fun ListenTogetherDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.close),
-                            contentDescription = null,
-                            tint = AppTheme.colorScheme.error,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        SymbolIcon(symbol = sf("xmark"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.error)
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -1003,7 +933,6 @@ fun ListenTogetherDialog(
             
             item { Spacer(modifier = Modifier.height(8.dp)) }
             
-            // Transfer ownership button
             item {
                 Surface(
                     modifier = Modifier
@@ -1092,12 +1021,10 @@ fun ListenTogetherDialog(
         }
     }
 
-    // Check if already in a room
     val isInRoom = listenTogetherManager.isInRoom
     val isHost = roomState?.hostId == userId
     
     ListDialog(onDismiss = onDismiss) {
-        // Header - Icon on left, text left-aligned
         item {
             Row(
                 modifier = Modifier
@@ -1106,12 +1033,7 @@ fun ListenTogetherDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.group),
-                    contentDescription = null,
-                    tint = AppTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp)
-                )
+                SymbolIcon(symbol = sf("person.2.fill"), contentDescription = null, size = 40.dp, tint = AppTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = if (isInRoom) {
@@ -1292,11 +1214,7 @@ fun ListenTogetherDialog(
                                             Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
                                         }
                                     ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.link),
-                                            contentDescription = stringResource(R.string.copy_link),
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        SymbolIcon(symbol = sf("link"), contentDescription = stringResource(R.string.copy_link), size = 18.dp)
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(stringResource(R.string.copy_link))
                                     }
@@ -1311,11 +1229,7 @@ fun ListenTogetherDialog(
                                             Toast.makeText(context, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
                                         }
                                     ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.content_copy),
-                                            contentDescription = stringResource(R.string.copy_code),
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        SymbolIcon(symbol = sf("doc.on.doc"), contentDescription = stringResource(R.string.copy_code), size = 18.dp)
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(stringResource(R.string.copy_code))
                                     }
@@ -1344,13 +1258,11 @@ fun ListenTogetherDialog(
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         
-                        // Horizontal scrollable row for users
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             connectedUsers.forEach { user ->
-                                // User avatar card
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier
@@ -1363,7 +1275,6 @@ fun ListenTogetherDialog(
                                             }
                                         )
                                 ) {
-                                    // Circular avatar
                                     Box(
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -1426,7 +1337,6 @@ fun ListenTogetherDialog(
                                     
                                     Spacer(modifier = Modifier.height(6.dp))
                                     
-                                    // Username
                                     Text(
                                         text = user.username,
                                         style = AppTheme.typography.labelMedium,
@@ -1441,7 +1351,6 @@ fun ListenTogetherDialog(
                                         textAlign = TextAlign.Center
                                     )
                                     
-                                    // Role label
                                     if (user.isHost) {
                                         Text(
                                             text = stringResource(R.string.host_label),
@@ -1477,7 +1386,7 @@ fun ListenTogetherDialog(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     
-                    items(pendingJoinRequests) { request ->
+                    items(pendingJoinRequests, key = { it.userId }) { request ->
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1524,22 +1433,12 @@ fun ListenTogetherDialog(
                                     IconButton(
                                         onClick = { listenTogetherManager.approveJoin(request.userId) }
                                     ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.check),
-                                            contentDescription = stringResource(R.string.approve),
-                                            tint = AppTheme.colorScheme.primary,
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        SymbolIcon(symbol = sf("checkmark"), contentDescription = stringResource(R.string.approve), size = 24.dp, tint = AppTheme.colorScheme.primary)
                                     }
                                     IconButton(
                                         onClick = { listenTogetherManager.rejectJoin(request.userId, "Rejected by host") }
                                     ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.close),
-                                            contentDescription = stringResource(R.string.reject),
-                                            tint = AppTheme.colorScheme.error,
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        SymbolIcon(symbol = sf("xmark"), contentDescription = stringResource(R.string.reject), size = 24.dp, tint = AppTheme.colorScheme.error)
                                     }
                                 }
                             }
@@ -1563,7 +1462,7 @@ fun ListenTogetherDialog(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    items(pendingSuggestions) { suggestion ->
+                    items(pendingSuggestions, key = { it.suggestionId }) { suggestion ->
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1581,12 +1480,7 @@ fun ListenTogetherDialog(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.queue_music),
-                                        contentDescription = null,
-                                        tint = AppTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("music.note.list"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.primary)
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = suggestion.trackInfo.title,
@@ -1610,22 +1504,12 @@ fun ListenTogetherDialog(
                                     IconButton(
                                         onClick = { listenTogetherManager.approveSuggestion(suggestion.suggestionId) }
                                     ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.check),
-                                            contentDescription = stringResource(R.string.approve),
-                                            tint = AppTheme.colorScheme.primary,
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        SymbolIcon(symbol = sf("checkmark"), contentDescription = stringResource(R.string.approve), size = 24.dp, tint = AppTheme.colorScheme.primary)
                                     }
                                     IconButton(
                                         onClick = { listenTogetherManager.rejectSuggestion(suggestion.suggestionId, "Rejected by host") }
                                     ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.close),
-                                            contentDescription = stringResource(R.string.reject),
-                                            tint = AppTheme.colorScheme.error,
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        SymbolIcon(symbol = sf("xmark"), contentDescription = stringResource(R.string.reject), size = 24.dp, tint = AppTheme.colorScheme.error)
                                     }
                                 }
                             }
@@ -1633,7 +1517,6 @@ fun ListenTogetherDialog(
                     }
                 }
                 
-                // Leave room button
                 item {
                     Spacer(modifier = Modifier.height(20.dp))
                     Row(
@@ -1661,11 +1544,7 @@ fun ListenTogetherDialog(
                                 containerColor = AppTheme.colorScheme.error
                             )
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.logout),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            SymbolIcon(symbol = sf("rectangle.portrait.and.arrow.right"), contentDescription = null, size = 18.dp)
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.leave_room), fontWeight = FontWeight.SemiBold)
                         }
@@ -1700,16 +1579,12 @@ fun ListenTogetherDialog(
                             label = { Text(stringResource(R.string.username)) },
                             placeholder = { Text(stringResource(R.string.enter_username)) },
                             leadingIcon = {
-                                Icon(
-                                    painterResource(R.drawable.person),
-                                    null,
-                                    tint = AppTheme.colorScheme.primary
-                                )
+                                SymbolIcon(symbol = sf("person.fill"), contentDescription = null, tint = AppTheme.colorScheme.primary)
                             },
                             trailingIcon = {
                                 if (usernameInput.isNotBlank()) {
                                     IconButton(onClick = { usernameInput = "" }) {
-                                        Icon(painterResource(R.drawable.close), null)
+                                        SymbolIcon(symbol = sf("xmark"), contentDescription = null)
                                     }
                                 }
                             },
@@ -1794,12 +1669,7 @@ fun ListenTogetherDialog(
                                     horizontalArrangement = Arrangement.Center,
                                     modifier = Modifier.padding(12.dp)
                                 ) {
-                                    Icon(
-                                        painterResource(R.drawable.error),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = AppTheme.colorScheme.error
-                                    )
+                                    SymbolIcon(symbol = sf("exclamationmark.circle"), contentDescription = null, size = 18.dp, tint = AppTheme.colorScheme.error)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = msg,
@@ -1814,7 +1684,6 @@ fun ListenTogetherDialog(
                 }
             }
             
-            // Action buttons
             item {
                 Spacer(modifier = Modifier.height(20.dp))
                 Column(
@@ -1827,7 +1696,6 @@ fun ListenTogetherDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Create Room button (left side)
                         Button(
                             onClick = {
                                 val username = usernameInput.takeIf { it.isNotBlank() } ?: savedUsername
@@ -1853,16 +1721,11 @@ fun ListenTogetherDialog(
                                 containerColor = AppTheme.colorScheme.primary
                             )
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.add),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            SymbolIcon(symbol = sf("plus"), contentDescription = null, size = 18.dp)
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.create_room), fontWeight = FontWeight.SemiBold)
                         }
                         
-                        // Join Room button (right side - only visible when room code is complete)
                         if (roomCodeInput.trim().length >= MIN_ROOM_CODE_LENGTH) {
                             Button(
                                 onClick = {
@@ -1889,11 +1752,7 @@ fun ListenTogetherDialog(
                                     containerColor = AppTheme.colorScheme.secondary
                                 )
                             ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.login),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                SymbolIcon(symbol = sf("arrow.right.to.line"), contentDescription = null, size = 18.dp)
                                 Spacer(Modifier.width(8.dp))
                                 Text(stringResource(R.string.join_room), fontWeight = FontWeight.SemiBold)
                             }

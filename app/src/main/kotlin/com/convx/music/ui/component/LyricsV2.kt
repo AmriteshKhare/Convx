@@ -2,7 +2,7 @@
  * Convx Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  * 
- * Ported and adapted from ArchiveTune-dev (LyricsV2.kt)
+ * Ported and adapted from reference-dev (LyricsV2.kt)
  */
 
 package com.convx.music.ui.component
@@ -41,6 +41,7 @@ import com.convx.music.lyrics.LyricsEntry
 import com.convx.music.lyrics.WordTimestamp
 import kotlin.math.PI
 import kotlin.math.sin
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -101,9 +102,8 @@ fun LyricsLineV2(
             text = entry.text,
             style = AppTheme.typography.headlineMedium.copy(
                 fontSize = if (entry.isBackground) (baseFontSize * 0.85f).sp else baseFontSize.sp,
-                // Figma Lyric Line: Bold in every state (642:23917).
                 fontWeight = FontWeight.Bold,
-                // Figma main tracking: +0.4px @ 34px ≈ +1.2% of size.
+                // Keep tracking proportional to the lyric size.
                 letterSpacing = ((if (entry.isBackground) baseFontSize * 0.85f else baseFontSize) * 0.012f).sp,
                 fontStyle = if (entry.isBackground) FontStyle.Italic else FontStyle.Normal,
                 lineHeight = lineHeight.coerceAtMost(baseFontSize * 1.3f).sp,
@@ -116,14 +116,14 @@ fun LyricsLineV2(
 
     // Translated text support
     if (showTranslated) {
-        val translatedText by entry.translatedTextFlow.collectAsState()
+        val translatedText by entry.translatedTextFlow.collectAsStateWithLifecycle()
         translatedText?.let { translated ->
             Text(
                 text = translated,
                 fontSize = (baseFontSize * 0.7f).sp,
                 color = expressiveAccent.copy(alpha = if (isActive) 0.8f else inactiveAlpha * 0.8f),
                 textAlign = agentTextAlign,
-                // Figma translation: Bold, -0.26px @ 22px ≈ -1.2% (642:23917).
+                // Slightly tighten translated text.
                 fontWeight = FontWeight.Bold,
                 letterSpacing = (baseFontSize * 0.7f * -0.012f).sp,
                 modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
@@ -152,7 +152,6 @@ fun AnimatedWordV2(
     val isWordComplete = isLinePast || effectivePlaybackPosition >= wordEndMs
     val isWordActive = isLineActive && effectivePlaybackPosition in wordStartMs until wordEndMs
 
-    // Perfect linear progress [0..1]
     val progress = when {
         isWordComplete -> 1f
         !isLineActive || effectivePlaybackPosition <= wordStartMs -> 0f
@@ -179,7 +178,6 @@ fun AnimatedWordV2(
     val glowRadius = if (isWordActive) glowProgress * 12f else 0f
 
     val density = LocalDensity.current
-    // Figma Lyric Line: Bold in every state (642:23917).
     val fontWeight = FontWeight.Bold
 
     Box(

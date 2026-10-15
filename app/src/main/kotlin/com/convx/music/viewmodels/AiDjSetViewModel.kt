@@ -26,12 +26,10 @@ data class AiDjSetState(
     val isRunning: Boolean = false,
     val logs: List<String> = emptyList(),
     val result: AiDjSetResult? = null,
-    /** Set only when the run ended with nothing to show — a log line already
-     *  said why (missing key, no songs found, etc). */
+    /** True when generation finishes without a result. */
     val failed: Boolean = false,
     val isSaving: Boolean = false,
-    /** Set once [save] commits [result] to the library — before that, the set
-     *  exists only in memory and can be played or discarded for free. */
+    /** Playlist id after the generated set is saved. */
     val savedPlaylistId: String? = null,
 )
 
@@ -65,17 +63,13 @@ class AiDjSetViewModel @Inject constructor(
                 songCount = songCount,
                 targetDurationSeconds = targetDurationSeconds,
                 concertMode = concertMode,
-                // Also to Logcat: the running-state UI drops these once the
-                // result lands, which is exactly the moment they're most
-                // useful for diagnosing a bad set after the fact.
+                // Keep a Logcat copy because the running UI clears logs with the result.
                 onLog = { line -> Log.d("AiDjSet", line); _state.update { it.copy(logs = it.logs + line) } },
             )
             _state.update { it.copy(isRunning = false, result = result, failed = result == null) }
         }
     }
 
-    /** Commits the current result to the library. No-op if there's nothing to
-     *  save, a save is already running, or it's already been saved once. */
     fun save() {
         val result = _state.value.result ?: return
         if (_state.value.isSaving || _state.value.savedPlaylistId != null) return
@@ -86,8 +80,6 @@ class AiDjSetViewModel @Inject constructor(
         }
     }
 
-    /** Leaving the screen mid-generation shouldn't leave a zombie job writing
-     *  to the DB after the ViewModel that owns its state is gone. */
     override fun onCleared() {
         job?.cancel()
     }

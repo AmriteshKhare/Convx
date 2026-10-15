@@ -5,6 +5,10 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.utils.sharedTitleTarget
+
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.valentinilk.shimmer.shimmer
 import com.convx.music.ui.utils.Motion
 import com.convx.music.ui.utils.appTopBarWindowInsets
@@ -133,6 +137,7 @@ import com.convx.music.constants.AlbumCanvasEnabledKey
 import com.convx.music.db.entities.Album
 import com.convx.music.extensions.toMediaItem
 import com.convx.music.playback.ExoDownloadService
+import com.convx.music.playback.combinedDownloadState
 import com.convx.music.playback.queues.ListQueue
 import com.convx.music.playback.queues.LocalAlbumRadio
 import com.convx.music.playback.queues.YouTubeQueue
@@ -186,6 +191,7 @@ import com.convx.music.ui.theme.HeroTintedContent
 import com.convx.music.ui.component.rememberHeroTint
 import com.convx.music.ui.component.rememberHeroTopBlur
 import com.convx.music.utils.listItemShape
+import com.convx.music.utils.makeTimeString
 import com.convx.music.utils.rememberPreference
 import com.convx.music.ui.component.AnimatedPlayPauseIcon
 import com.convx.music.viewmodels.AlbumViewModel
@@ -206,7 +212,7 @@ fun AlbumScreen(
 ) {
     val context = LocalContext.current
     val menuState = LocalMenuState.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -218,6 +224,8 @@ fun AlbumScreen(
 
     val playlistId by viewModel.playlistId.collectAsState()
     val albumWithSongs by viewModel.albumWithSongs.collectAsState()
+    val artistSignatureUrl by viewModel.artistSignatureUrl.collectAsState()
+    val artistBundledLogo by viewModel.artistBundledLogo.collectAsState()
     val otherVersions by viewModel.otherVersions.collectAsState()
     val releasesForYou by viewModel.releasesForYou.collectAsState()
     val description by viewModel.description.collectAsState()
@@ -261,19 +269,6 @@ fun AlbumScreen(
     if (inSelectMode) {
         BackHandler(onBack = onExitSelectionMode)
     }
-    // Timed pop: consume system back here so NavHost predictive scrub (finger-
-    // tracking the fade) never runs for this route. Gesture commits, then the
-    // 260ms shrink-to-tile plays on a timer. Selection/long-press/deep-link
-    // keep their existing behavior via the guards agreed in grill.
-    if (!inSelectMode) {
-        PredictiveBackHandler(enabled = true) { progress ->
-            // Collect to completion: commit navigates, cancel throws
-            // CancellationException so navigateUp is skipped.
-            progress.collect {}
-            navController.navigateUp()
-        }
-    }
-
     LaunchedEffect(filteredSongs) {
         selection.fastForEachReversed { songId ->
             if (filteredSongs.find { it.id == songId } == null) {
@@ -282,28 +277,28 @@ fun AlbumScreen(
         }
     }
 
-    val downloadUtil = LocalDownloadUtil.current
+    val downloadUtil = LocalDownloadUtil.current.get()
+    var showRemoveDownloadDialog by rememberSaveable { mutableStateOf(false) }
+    if (showRemoveDownloadDialog) {
+        com.convx.music.ui.component.ActionPromptDialog(
+            title = stringResource(R.string.remove_download),
+            onDismiss = { showRemoveDownloadDialog = false },
+            onCancel = { showRemoveDownloadDialog = false },
+            onConfirm = {
+                showRemoveDownloadDialog = false
+                com.convx.music.playback.removeDownloads(context, filteredSongs.map { it.id })
+            },
+        ) { Text(stringResource(R.string.remove_download)) }
+    }
     var downloadState by remember {
         mutableIntStateOf(Download.STATE_STOPPED)
     }
 
     LaunchedEffect(albumWithSongs) {
-        val songs = albumWithSongs?.songs?.map { it.id }
+        val songs = albumWithSongs?.songs
         if (songs.isNullOrEmpty()) return@LaunchedEffect
         downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it]?.state == Download.STATE_QUEUED ||
-                                downloads[it]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
+            downloadState = combinedDownloadState(songs, downloads) { it.id }
         }
     }
 
@@ -341,22 +336,8 @@ fun AlbumScreen(
     // Scroll progress driving the heroart progressive blur + the top blur strip:
     // hoisted so the header artwork and the floating chrome share one value.
     val heroTopBlurProgress = rememberHeroTopBlur(lazyListState)
+    val chrome = com.convx.music.ui.component.rememberDetailChromeEntrance(iconCount = 2)
 
-    // Enter stagger: hero opaque frame 0 (container fade), body fades + rises 70ms
-    // later over 180ms. Draw-phase only (graphicsLayer), no recomposition per frame.
-    // ponytail: exit body-first is the container hold in SharedArtwork, not here.
-    val bodyEnter = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(70)
-        bodyEnter.animateTo(1f, androidx.compose.animation.core.tween(180))
-    }
-
-    // Chrome entrance shared with every detail top bar: pill grows right-to-
-    // left after the morph lands, icons deblur staggered, back 60ms earlier.
-    val chrome = rememberDetailChromeEntrance(iconCount = 2)
-
-    // Instant seed: route thumb arg -> live tile thumb -> DB. Paints hero + bg on
-    // frame one instead of after the DB round trip; DB/full-res overwrites below.
     val instantThumbUrl = viewModel.thumbArg
         ?: pendingSharedArtworkThumbFor(viewModel.albumId)
         ?: albumWithSongs?.album?.thumbnailUrl
@@ -371,6 +352,9 @@ fun AlbumScreen(
     )
     val appleAlbumLoading = appleAlbumState.loading
     val appleAlbum = appleAlbumState.art
+    val albumArtistState = com.convx.music.utils.rememberAppleArtist(
+        albumWithSongs?.artists?.firstOrNull()?.name.orEmpty(),
+    )
     // Only estimate from YouTube's art once Apple has settled without a match.
     val estimatedArtworkBg = com.convx.music.utils.rememberEstimatedArtworkBg(
         bgUrl.takeIf { !appleAlbumLoading && appleAlbum == null },
@@ -391,26 +375,11 @@ fun AlbumScreen(
     val chromeShape = ContinuousRoundedRectangle(percent = 50)
     val chromeContentColor = if (useGlass) glassConfig.resolvedTextColor() else AppTheme.colorScheme.onSurface
 
-    // Unattached backdrop (never .layerBackdrop'd): glass chrome sampling it
-    // early-returns, so it draws a translucent frosted surface with no live
-    // refraction — but crucially no RenderNode self-reference. See ArtistScreen.kt
-    // for the full explanation of the cycle this avoids.
+    // The unattached backdrop avoids a RenderNode cycle in the floating chrome.
     val heroBackdrop = rememberLayerBackdrop()
 
-    // A SECOND, ATTACHED backdrop: .layerBackdrop'd onto the LazyColumn below,
-    // which is a *sibling* of the floating chrome row, not an ancestor — the
-    // chrome row samples a texture of already-drawn list content, it never
-    // captures its own draw pass, so no cycle. This is what lets the chrome
-    // buttons show real blurred list/hero content instead of heroBackdrop's
-    // flat empty-capture fallback.
-    // Fills the screen tint into the capture BEFORE the content, exactly like
-    // MainActivity's appBackdrop does with its own background. Without it the
-    // list records onto a transparent canvas (the tint is painted by the outer
-    // Box, outside this capture), so the blurred result is itself part
-    // transparent and the sharp content shows straight through it — the glass
-    // read as a doubled/ghosted image, or as no glass at all where the list is
-    // sparse. This is the difference that made the nav bar look right and these
-    // screens look wrong.
+    // The chrome samples this attached sibling backdrop, not its own draw pass.
+    // Include the page tint so the blurred surface matches the visible page.
     val listBackdrop = rememberLayerBackdrop(
         onDraw = remember(tint) {
             val bg = tint
@@ -420,48 +389,25 @@ fun AlbumScreen(
     val backdropFreeze = rememberBackdropFreeze()
     val heroZoom = rememberHeroZoom()
 
-    // A flat fill of `tint` reads as a hard-edged color mismatch once the hero
-    // art (which the tint is extracted from) ends and the plain track list
-    // begins — the vivid artwork gives way to a uniformly dark tint with no
-    // visual continuation. Easing into the screen's real background color
-    // over the lower half turns that seam into a deliberate wash instead.
+    // Blend the artwork tint into the page background below the hero to hide the color seam.
     val screenBackground = AppTheme.colorScheme.background
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(tint)
-            .hazeSource(hazeState)
     ) {
     HeroTintedContent(tint = tint, backdrop = heroBackdrop) {
-    // Pills paint fixed-style liquidGlass (see pillGlassBackground) inside this
-    // provider so they sample the list backdrop, not the root appBackdrop —
-    // sampling appBackdrop here is the RenderNode cycle.
-    // Capture from a plain Box wrapping the LazyColumn, not the LazyColumn's own
-    // modifier: LazyColumn promotes its items to their own RenderNodes for
-    // scroll recycling, which a capture attached directly to it doesn't
-    // reliably flatten (images came through, text/icons didn't). A plain Box
-    // one level up just sees "a fully-drawn child" and captures all of it,
-    // same as it would any other already-rendered composable.
+    // Capture through a plain Box; LazyColumn's recycled item layers do not flatten reliably.
     Box(modifier = Modifier
             .nestedScroll(backdropFreeze.connection)
 
-            // OUTER layer, and it must come BEFORE layerBackdrop: the layer has to
-            // enclose the backdrop node, or that node's draw re-runs whenever anything
-            // else in the window redraws. The mini player, the playing indicator and
-            // the position poll are all siblings that tick on their own schedule, and
-            // each tick was re-recording this entire list. MainActivity pairs an outer
-            // and inner layer for exactly this; the screen-local backdrops were left
-            // with only the inner half.
+            // Cache list content so sibling redraws do not re-record the backdrop.
             .graphicsLayer()
             .layerBackdrop(listBackdrop, frozen = backdropFreeze.frozen)
-            // Content becomes ONE cached RenderNode, so the backdrop's
-            // layer.record { drawContent() } records a single drawRenderNode
-            // instead of re-issuing every op in the list. Same inner layer as
-            // MainActivity's app backdrop.
-            .graphicsLayer()) {
+            .graphicsLayer()
+            .hazeSource(hazeState)) {
     LazyColumn(
         state = lazyListState,
-        // No bounce here: the top pull drives the hero zoom instead.
         overscrollEffect = heroZoom.listOverscroll(),
         modifier = Modifier.heroPullZoom(heroZoom),
         contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
@@ -469,435 +415,69 @@ fun AlbumScreen(
         val albumWithSongs = albumWithSongs
         if (albumWithSongs != null && albumWithSongs.songs.isNotEmpty()) {
              item(key = "album_header", contentType = "header") {
-                val systemBarsTopPadding = WindowInsets.systemBars.asPaddingValues().calculateTopPadding()
-                val density = LocalDensity.current
-                val headerOffset = with(density) {
-                    -(systemBarsTopPadding + AppBarHeight).roundToPx()
+                val title = albumWithSongs.album.title
+                val artistName = albumWithSongs.artists.joinToString { it.name }
+                val albumInfo = buildString {
+                    albumWithSongs.album.year?.let { append(it).append(" \u00b7 ") }
+                    append(pluralStringResource(R.plurals.n_song, filteredSongs.size, filteredSongs.size))
+                    val duration = filteredSongs.sumOf { it.song.duration }
+                    if (duration > 0) append(" \u00b7 ").append(makeTimeString(duration * 1000L))
                 }
-
-                val onTintHeader = androidx.compose.ui.graphics.Color.White
-
-                val albumInfoText = buildString {
-                    append(stringResource(R.string.album_text))
-                    if (albumWithSongs.album.year != null) {
-                        append(" • ${albumWithSongs.album.year}")
-                    }
-                    append(" • ${albumWithSongs.songs.size} Tracks")
-                    val totalDuration = albumWithSongs.songs.sumOf { it.song.duration }
-                    val hours = totalDuration / 3600
-                    val minutes = (totalDuration % 3600) / 60
-                    if (hours > 0) {
-                        append(" • ${hours}h ${minutes}m")
-                    } else {
-                        append(" • ${minutes}m")
-                    }
-                }
-
-                // Wide layout: the full-bleed square would fill the whole fold and
-                // push the track list below it, so the artwork becomes a bounded
-                // card with the title set beside it (same as ArtistScreen).
-                val tabView = LocalTabView.current
-
-                Box(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Album Image with offset (like ArtistScreen). Wrapped in a Box of its
-                    // own so the merge band below can align to the ARTWORK's bottom edge --
-                    // the outer Box's height is driven by the content column underneath it,
-                    // which is nowhere near the join.
-                    // Pixel-copy of the artist hero: same W x 1.36h foot, knee 0.78 wash,
-                    // full-live canvas tail + baked poster. Replaces the old square +
-                    // MergeBand pair so album shares one seam with artist/player/V2.
-                    if (!tabView) Box(modifier = Modifier.fillMaxWidth()) {
-                        // YouTube's art immediately, Apple's crossfades over it the moment it
-                        // resolves -- never blocks on the lookup when a fallback is known.
-                        val fallbackHeroUrl = instantThumbUrl ?: albumWithSongs.album.thumbnailUrl
-                        com.convx.music.ui.component.ArtistHeroImage(
-                            artworkUrl = fallbackHeroUrl,
-                            appleArtworkUrl = appleAlbum?.sized(1200),
-                            pageColor = tint,
-                            heroScale = heroZoom.scale,
-                            loading = appleAlbumLoading && fallbackHeroUrl.isNullOrBlank(),
-                            liveOverlay = albumCanvasEnabled && canvasArtwork != null,
-                            scrollBlur = { heroTopBlurProgress.value },
-                            modifier = Modifier.offset { IntOffset(x = 0, y = headerOffset) },
-                            overlay = {
-                                if (albumCanvasEnabled && canvasArtwork != null) {
-                                    CanvasArtworkPlayer(
-                                        primaryUrl = canvasArtwork.animated,
-                                        fallbackUrl = canvasArtwork.videoUrl,
-                                        isPlaying = true,
-                                        onExhausted = albumCanvas.onError,
-                                        onReady = albumCanvas.onReady,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                            },
-                        )
-                    }
-
-                    // Content column positioned at bottom part of the image
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                alpha = bodyEnter.value
-                                translationY = (1f - bodyEnter.value) * 8.dp.toPx()
-                            }
-                            .padding(
-                                top = if (tabView) 0.dp else {
-                                    LocalContext.current.resources.displayMetrics.widthPixels.let { screenWidth ->
-                                        with(density) {
-                                            ((screenWidth / 1.2f) - 144).toDp()
-                                        }
-                                    }
-                                }
-                            )
-                            .padding(bottom = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-
-                    if (tabView) {
-                        HeroCardHeader(
-                            artworkUrl = albumWithSongs.album.thumbnailUrl,
-                            title = {
-                                Text(
-                                    text = albumWithSongs.album.title,
-                                    style = AppTheme.typography.headlineLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = onTint,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
+                com.convx.music.ui.component.CollectionDetailHeader(
+                    title = title,
+                    subtitle = title,
+                    artwork = appleAlbum?.sized(1200) ?: instantThumbUrl ?: albumWithSongs.album.thumbnailUrl,
+                    metadata = albumInfo,
+                    description = description,
+                    descriptionRuns = descriptionRuns?.map { LinkSegment(it.text, it.navigationEndpoint?.urlEndpoint?.url) },
+                    foreground = onTint,
+                    playing = isPlaying && filteredSongs.any { it.id == mediaMetadata?.id },
+                    enabled = filteredSongs.isNotEmpty(),
+                    onPlay = {
+                        if (filteredSongs.any { it.id == mediaMetadata?.id }) playerConnection.togglePlayPause()
+                        else {
+                            playerConnection.service.getAutomix(playlistId)
+                            playerConnection.playQueue(LocalAlbumRadio(albumWithSongs))
+                        }
+                    },
+                    onShuffle = {
+                        playerConnection.service.getAutomix(playlistId)
+                        playerConnection.playQueue(LocalAlbumRadio(albumWithSongs.copy(songs = albumWithSongs.songs.shuffled())))
+                    },
+                    rightSymbol = if (downloadState == Download.STATE_COMPLETED) "checkmark" else "arrow.down",
+                    onRightAction = {
+                        when (downloadState) {
+                            Download.STATE_COMPLETED -> showRemoveDownloadDialog = true
+                            Download.STATE_DOWNLOADING -> com.convx.music.playback.cancelDownloads(context, filteredSongs.map { it.id }, downloadUtil.downloads.value)
+                            else -> com.convx.music.playback.downloadSongs(context,
+                                filteredSongs.map { com.convx.music.playback.DownloadTarget(it.id, it.song.title, it.artists.firstOrNull()?.name, it.song.duration) }, downloadUtil.downloads.value)
+                        }
+                    },
+                    titleContent = {
+                        Box(Modifier.fillMaxWidth().height(75.dp).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
+                            if (!albumArtistState.loading || artistBundledLogo != null || artistSignatureUrl != null) {
+                                com.convx.music.ui.screens.artist.ArtistWordmark(
+                                    logo = albumArtistState.artist?.logo,
+                                    name = artistName,
+                                    signatureUrl = artistSignatureUrl,
+                                    bundledLogo = artistBundledLogo,
                                 )
-                            },
-                            subtitle = {
-                                Text(
-                                    text = albumWithSongs.artists.joinToString { it.name },
-                                    style = AppTheme.typography.titleMedium,
-                                    color = onTint.copy(alpha = 0.7f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            actions = {
-                                Text(
-                                    text = albumInfoText,
-                                    style = AppTheme.typography.bodyMedium,
-                                    color = onTint.copy(alpha = 0.5f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                        )
-                    }
-
-                    // Metadata & Actions Section - Left Aligned
-                    if (!tabView) Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 32.dp)
-                            .padding(bottom = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (albumWithSongs.artists.size == 1) {
-                            val artist = albumWithSongs.artists.first()
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = albumWithSongs.album.title,
-                                    style = AppTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 30.sp,
-                                    color = onTint,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
-                                        modifier = Modifier
-                                            .combinedBounceClick(
-                                                onClick = {
-                                                    navController.navigate(artistRoute(artist.id, artist.thumbnailUrl))
-                                                }
-                                            )
-                                ) {
-                                    AsyncImage(
-                                        model = artist.thumbnailUrl,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        text = artist.name,
-                                        style = AppTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Medium,
-                                        color = onTint
-                                    )
-                                }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = albumInfoText,
-                                        style = AppTheme.typography.bodyMedium,
-                                        color = onTint.copy(alpha = 0.7f),
-                                        textAlign = TextAlign.Center
-                                    )
-                                    if (hasExplicitContent) {
-                                        Text(
-                                            text = " • ",
-                                            style = AppTheme.typography.bodyMedium,
-                                            color = onTint.copy(alpha = 0.7f)
-                                        )
-                                        Icon(
-                                            imageVector = SfSymbols.Monochrome.SFECircle,
-                                            contentDescription = stringResource(R.string.explicit),
-                                            modifier = Modifier.size(14.dp),
-                                            tint = onTint.copy(alpha = 0.7f)
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = stringResource(R.string.explicit),
-                                            style = AppTheme.typography.bodyMedium,
-                                            color = onTint.copy(alpha = 0.7f)
-                                        )
-                                    }
-                                }
-                            }
-                        } else {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                // Album Title with Logo Icon for multiple artists
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier
-                                ) {
-                                    Icon(
-                                        imageVector = SfSymbols.Monochrome.SFSquareStack,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(30.dp),
-                                        tint = onTint
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        text = albumWithSongs.album.title,
-                                        style = AppTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = onTint,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-                                }
-
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = albumInfoText,
-                                        style = AppTheme.typography.bodyMedium,
-                                        color = onTint.copy(alpha = 0.7f),
-                                        textAlign = TextAlign.Center
-                                    )
-                                    if (hasExplicitContent) {
-                                        Text(
-                                            text = " • ",
-                                            style = AppTheme.typography.bodyMedium,
-                                            color = onTint.copy(alpha = 0.7f)
-                                        )
-                                        Icon(
-                                            imageVector = SfSymbols.Monochrome.SFECircle,
-                                            contentDescription = stringResource(R.string.explicit),
-                                            modifier = Modifier.size(14.dp),
-                                            tint = onTint.copy(alpha = 0.7f)
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = stringResource(R.string.explicit),
-                                            style = AppTheme.typography.bodyMedium,
-                                            color = onTint.copy(alpha = 0.7f)
-                                        )
-                                    }
-                                }
                             }
                         }
-
-                    Spacer(Modifier.height(24.dp))
-
-                    // Action Buttons Row
-                    // Action Buttons Row — Redesigned for unified circular look
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 32.dp),
-                        horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Shuffle Button (Left - Circular)
-                        ContrastCircleButton(
-                            onTint = onTint,
-                            onClick = {
-                                playerConnection.service.getAutomix(playlistId)
-                                playerConnection.playQueue(
-                                    LocalAlbumRadio(albumWithSongs.copy(songs = albumWithSongs.songs.shuffled())),
-                                )
-                            },
-                            size = 48.dp,
-                        ) {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFShuffle,
-                                contentDescription = stringResource(R.string.shuffle_label),
-                                modifier = Modifier.size(22.dp)
-                            )
+                    },
+                    artworkOverlay = {
+                        if (albumCanvasEnabled && canvasArtwork != null) {
+                            CanvasArtworkPlayer(primaryUrl = canvasArtwork.animated, fallbackUrl = canvasArtwork.videoUrl,
+                                isPlaying = !com.convx.music.ui.utils.artworkTransitionRunning(),
+                                onExhausted = albumCanvas.onError, onReady = albumCanvas.onReady,
+                                modifier = Modifier.fillMaxSize())
                         }
-                        // Play Button (Center - Large Circle)
-
-                        ContrastCircleButton(
-                            onTint = onTint,
-                            filled = true,
-                            onClick = {
-                                if (isPlaying && mediaMetadata?.album?.id == albumWithSongs.album.id) {
-                                    playerConnection.player.pause()
-                                } else if (mediaMetadata?.album?.id == albumWithSongs.album.id) {
-                                    playerConnection.player.play()
-                                } else {
-                                    playerConnection.service.getAutomix(playlistId)
-                                    playerConnection.playQueue(
-                                        LocalAlbumRadio(albumWithSongs)
-                                    )
-                                }
-                            },
-                            size = 72.dp,
-                        ) {
-                            AnimatedPlayPauseIcon(
-                                isPlaying = isPlaying && mediaMetadata?.album?.id == albumWithSongs.album.id,
-                                tint = tint,
-                                size = 32.dp,
-
-                            )
-                        }
-
-
-
-                        // Favorite/Save Button (Right - Circular)
-                        ContrastCircleButton(
-                            onTint = onTint,
-                            onClick = {
-                                database.query {
-                                    update(albumWithSongs.album.toggleLike())
-                                }
-                            },
-                            size = 48.dp,
-                        ) {
-                            Icon(
-                                imageVector = SfSymbols.Monochrome.SFStar,
-                                contentDescription = if (albumWithSongs.album.bookmarkedAt != null) stringResource(R.string.saved) else stringResource(R.string.save),
-                                modifier = Modifier.size(22.dp),
-                                tint = if (albumWithSongs.album.bookmarkedAt != null) {
-                                    AppTheme.colorScheme.error
-                                } else {
-                                    LocalContentColor.current
-                                }
-                            )
-                        }
-                    }
-
-
-                    }
-
-                    Spacer(Modifier.height(5.dp))
-
-                    val staticDescription = remember(albumWithSongs) {
-                        "${albumWithSongs.album.title} is an album by ${albumWithSongs.artists.joinToString { it.name }}${
-                            if (albumWithSongs.album.year != null) ", released in ${albumWithSongs.album.year}" else ""
-                        }. This collection features ${albumWithSongs.songs.size} tracks showcasing their musical artistry."
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.about_album),
-                            style = AppTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = onTint,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        androidx.compose.runtime.CompositionLocalProvider(
-                            // Same secondary alpha the player uses for its dimmer text.
-                            androidx.compose.material3.LocalContentColor provides onTint.copy(alpha = 0.7f),
-                        ) {
-                            ExpandableText(
-                                text = description ?: staticDescription,
-                                runs = descriptionRuns?.map {
-                                    LinkSegment(
-                                        text = it.text,
-                                        url = it.navigationEndpoint?.urlEndpoint?.url
-                                    )
-                                },
-                                collapsedMaxLines = 3
-                            )
-                        }
-                    }
-
-                    if (albumWithSongs.artists.size > 1) {
-                        Spacer(Modifier.height(16.dp))
-                        // Artist Names (clickable) - only for multiple artists
-                        Text(
-                            text = buildAnnotatedString {
-                                append(stringResource(R.string.by_text))
-                                append(" ")
-                                albumWithSongs.artists.fastForEachIndexed { index, artist ->
-                                    val link = LinkAnnotation.Clickable(artist.id) {
-                                        navController.navigate("artist/${artist.id}")
-                                    }
-                                    withLink(link) {
-                                        append(artist.name)
-                                    }
-                                    if (index != albumWithSongs.artists.lastIndex) {
-                                        append(", ")
-                                    }
-                                }
-                            },
-                            style = AppTheme.typography.bodyMedium,
-                            color = AppTheme.colorScheme.onSurface,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp),
-                            textAlign = TextAlign.Start
-                        )
-                    }
-                    }
-                }
+                    },
+                )
             }
 
             if (filteredSongs.isNotEmpty()) {
-                item(key = "songs_title") {
-                    NavigationTitle(
-                        title = stringResource(R.string.songs),
-                        modifier = Modifier.animateItem()
-                    )
-                }
+
 
                 itemsIndexed(
                     items = filteredSongs,
@@ -914,7 +494,11 @@ fun AlbumScreen(
 
                     SongListItem(
                         song = song,
-//                        albumIndex = index + 1,
+                        albumIndex = index + 1,
+                        subtitleColor = onTint.copy(alpha = 0.78f),
+                        subtitleAdditiveChrome = false,
+                        leadingDivider = index == 0,
+                        thumbnailStartInset = 0.dp,
                         isActive = song.id == mediaMetadata?.id,
                         isPlaying = isPlaying,
                         showInLibraryIcon = true,
@@ -938,10 +522,7 @@ fun AlbumScreen(
                                         }
                                     },
                                 ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.more_horiz),
-                                        contentDescription = null,
-                                    )
+                                    SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                                 }
                             }
                         },
@@ -1066,90 +647,17 @@ fun AlbumScreen(
             // the seeded bg, skeleton lines standing where title/artist/actions/
             // about/songs will land — so arrival swaps content, never layout.
             item(key = "shimmer_header", contentType = "header") {
-                val systemBarsTopPadding = WindowInsets.systemBars.asPaddingValues().calculateTopPadding()
-                val density = LocalDensity.current
-                val headerOffset = with(density) {
-                    -(systemBarsTopPadding + AppBarHeight).roundToPx()
-                }
-                val tabView = LocalTabView.current
-
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    if (!tabView && instantThumbUrl != null) Box(modifier = Modifier.fillMaxWidth()) {
-                        com.convx.music.ui.component.ArtistHeroImage(
-                            artworkUrl = instantThumbUrl,
-                            pageColor = tint,
-                            heroScale = heroZoom.scale,
-                            loading = false,
-                            modifier = Modifier.offset { IntOffset(x = 0, y = headerOffset) },
-                        )
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                top = if (tabView) 0.dp else {
-                                    LocalContext.current.resources.displayMetrics.widthPixels.let { screenWidth ->
-                                        with(density) {
-                                            ((screenWidth / 1.2f) - 144).toDp()
-                                        }
-                                    }
-                                }
-                            )
-                            .padding(bottom = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (!tabView) Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 32.dp)
-                                .padding(bottom = 16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            ShimmerLine(fraction = 0.62f, height = 30.dp)
-                            Spacer(Modifier.height(10.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                com.convx.music.ui.component.ShimmerBox(
-                                    Modifier.size(28.dp),
-                                    androidx.compose.foundation.shape.CircleShape
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                ShimmerLine(fraction = 0.4f, height = 16.dp, modifier = Modifier.fillMaxWidth(0.4f))
-                            }
-                            Spacer(Modifier.height(10.dp))
-                            ShimmerLine(fraction = 0.5f, height = 13.dp)
-                            Spacer(Modifier.height(24.dp))
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                com.convx.music.ui.component.ShimmerBox(
-                                    Modifier.size(48.dp),
-                                    androidx.compose.foundation.shape.CircleShape
-                                )
-                                com.convx.music.ui.component.ShimmerBox(
-                                    Modifier.size(72.dp),
-                                    androidx.compose.foundation.shape.CircleShape
-                                )
-                                com.convx.music.ui.component.ShimmerBox(
-                                    Modifier.size(48.dp),
-                                    androidx.compose.foundation.shape.CircleShape
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(5.dp))
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp)
-                        ) {
-                            ShimmerLine(fraction = 0.32f, height = 18.dp, modifier = Modifier.padding(bottom = 8.dp))
-                            ShimmerLine(fraction = 0.95f, height = 13.dp)
-                            Spacer(Modifier.height(8.dp))
-                            ShimmerLine(fraction = 0.88f, height = 13.dp)
-                        }
-                    }
-                }
+                com.convx.music.ui.component.CollectionDetailHeader(
+                    title = com.convx.music.ui.utils.selectedArtworkTitle().orEmpty(),
+                    artwork = instantThumbUrl,
+                    metadata = "",
+                    foreground = onTint,
+                    playing = false,
+                    enabled = false,
+                    onPlay = {},
+                    onShuffle = {},
+                    titleContent = { Box(Modifier.fillMaxWidth().height(75.dp), contentAlignment = Alignment.Center) { ShimmerLine(.55f, 34.dp) } },
+                )
             }
             item(key = "shimmer_songs_title") {
                 Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
@@ -1165,22 +673,12 @@ fun AlbumScreen(
     }
     }
 
-        // Floating glass back/share buttons over the hero art, replacing the
-        // Material TopAppBar — always visible, no title-bar-on-scroll behavior.
-        // Selection mode swaps in a close button + centered count + select-all/menu
-        // pill instead, same as the TopAppBar's title/actions used to. Backed by a
-        // scrim that ramps from transparent to a dark shade as the list scrolls
-        // past the hero art, same treatment as the Artist screen.
+        // Float navigation and selection actions over the hero; the scrim darkens as the list scrolls.
         CompositionLocalProvider(LocalAppBackdrop provides listBackdrop) {
-        // Drawn BEFORE the chrome row below, not after: this used to sit as a
-        // sibling composed later than the whole button row (right at the end
-        // of the composable), which put the blur ON TOP of the buttons/scrim
-        // instead of behind them — visually near-invisible against the
-        // already-dark scrim, and hid the hero-dissolve effect this exists for.
-        HeroTopBlur(
+        // Draw the blur before the chrome row so it stays behind the buttons.
+        com.convx.music.ui.component.TopFadeBlur(
             hazeState = hazeState,
-            progress = heroTopBlurProgress,
-            pageColor = screenBackground,
+            pageColor = tint,
             modifier = Modifier.align(Alignment.TopCenter),
         )
         Box(
@@ -1214,10 +712,7 @@ fun AlbumScreen(
             val pillIconTint = if (useGlass && ambientColor.isSpecified) ambientColor.asSoftIconTint() else chromeContentColor
             if (inSelectMode) {
                 GlassCircleButton(onClick = onExitSelectionMode) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFXmark,
-                        contentDescription = null,
-                    )
+                    SymbolIcon(symbol = sf("SFXmark"), contentDescription = null)
                 }
 
                 Text(
@@ -1260,12 +755,7 @@ fun AlbumScreen(
                             }
                         }
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.more_horiz),
-                            contentDescription = null,
-                            tint = pillIconTint,
-                            modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified)
-                        )
+                        SymbolIcon(symbol = sf("ellipsis"), contentDescription = null, modifier = Modifier.additiveChrome(useGlass && ambientColor.isSpecified), tint = pillIconTint)
                     }
                 }
             } else {
@@ -1274,10 +764,7 @@ fun AlbumScreen(
                     onLongClick = { navController.backToMain() },
                     modifier = with(chrome) { Modifier.backEnter().then(backExitModifier()) },
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.arrow_back_ios),
-                        contentDescription = null
-                    )
+                    SymbolIcon(symbol = sf("chevron.left"), contentDescription = null)
                 }
 
                 Spacer(Modifier.weight(1f))
@@ -1308,16 +795,11 @@ fun AlbumScreen(
                             },
                             modifier = Modifier.size(40.dp)
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ios_share),
-                                contentDescription = stringResource(R.string.share),
-                                tint = pillIconTint,
-                                modifier = with(chrome) {
+                            SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = stringResource(R.string.share), size = 20.dp, modifier = with(chrome) {
                                     Modifier.iconEnter(0)
-                                        .size(20.dp)
+                                        
                                         .additiveChrome(useGlass && ambientColor.isSpecified)
-                                }
-                            )
+                                }, tint = pillIconTint)
                         }
 
                         IconButton(
@@ -1335,16 +817,11 @@ fun AlbumScreen(
                             },
                             modifier = Modifier.size(40.dp)
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.more_horiz),
-                                contentDescription = stringResource(R.string.more_options),
-                                tint = pillIconTint,
-                                modifier = with(chrome) {
+                            SymbolIcon(symbol = sf("ellipsis"), contentDescription = stringResource(R.string.more_options), size = 20.dp, modifier = with(chrome) {
                                     Modifier.iconEnter(1)
-                                        .size(20.dp)
+                                        
                                         .additiveChrome(useGlass && ambientColor.isSpecified)
-                                }
-                            )
+                                }, tint = pillIconTint)
                         }
                     }
                 }

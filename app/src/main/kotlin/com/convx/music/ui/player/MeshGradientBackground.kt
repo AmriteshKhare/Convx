@@ -80,7 +80,9 @@ fun prewarmMeshPalette(context: android.content.Context, url: String?) {
             val bitmap = (result as? SuccessResult)?.image?.toBitmap() ?: return@launch
             val extracted = withContext(Dispatchers.Default) { paletteOf(bitmap) }
             meshPaletteCache.put(url, extracted)
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+            // Palette prewarming is optional; the background can load it later.
+        }
     }
 }
 
@@ -89,20 +91,10 @@ fun prewarmMeshPalette(context: android.content.Context, url: String?) {
 data class MeshPalette(val colors: List<Color>)
 
 /**
- * The BitChord / Apple-Music "Now Playing" backdrop: four luminous colour blobs pulled
- * off the album art, drawn as soft radial gradients and blurred into one mesh. On a
- * track skip the colours crossfade over ~1.4 s rather than snapping.
- *
- * The blobs drift when there is a reason to — the player opening, or [trackKey]
- * changing — and then come to rest. An endless orbit means re-blurring a full-screen
- * layer at the display's refresh rate for as long as the player is up, which is the
- * single most expensive thing this app can be asked to draw, in exchange for motion
- * that reads as ambient at best and is invisible with the phone in a pocket. The
- * settled frame looks the same.
- *
- * This is a different animal from [com.convx.music.constants.PlayerBackgroundStyle.LIVE_MESH],
- * which rotates three baked-blur copies of the artwork itself: that one keeps the
- * picture's shapes, this one keeps only its colours.
+ * Builds a blurred mesh from four colors sampled from album art and crossfades on track changes.
+ * Blobs drift during opening and track changes only; continuous drift would blur a full-screen
+ * layer every frame. [com.convx.music.constants.PlayerBackgroundStyle.LIVE_MESH] rotates artwork,
+ * while this backdrop uses its colors.
  */
 @Composable
 fun MeshGradientBackground(
@@ -113,9 +105,7 @@ fun MeshGradientBackground(
     /** Palette crossfade length; the player passes the ambient (DJ-synced) duration. */
     transitionMillis: Int = 1_400,
 ) {
-    // The app's existing low-power switch stands in for BitChord's `reduceAnimation`:
-    // someone who has asked for no dynamic blur is asking for exactly this drift to
-    // stop, since the drift is only visible through the blur.
+    // The dynamic-blur preference also controls motion visible only through this blur.
     val (reduceMotion) = rememberPreference(ReduceDynamicBlurKey, false)
 
     val tuned = remember(palette.colors) {
@@ -124,9 +114,7 @@ fun MeshGradientBackground(
             .map { it.tuned() }
     }
 
-    // Keep the animation States intact and read them from the Canvas below. Reading
-    // `.value` here used to recompose this whole composable every frame of the 1.4 s
-    // palette crossfade; a draw-phase read invalidates only the RenderNode instead.
+    // Read animation state in Canvas to redraw the layer without recomposing this tree.
     val colorSpec: AnimationSpec<Color> = remember(reduceMotion, transitionMillis) {
         if (reduceMotion) snap() else tween(transitionMillis, easing = SeamlessEasing)
     }

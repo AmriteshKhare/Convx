@@ -115,7 +115,7 @@ class MusicDatabase(
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 38,
+    version = 40,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -153,6 +153,7 @@ class MusicDatabase(
         AutoMigration(from = 34, to = 35),
         AutoMigration(from = 36, to = 37),
         AutoMigration(from = 37, to = 38),
+        AutoMigration(from = 38, to = 39),
     ],
 )
 @TypeConverters(Converters::class)
@@ -174,6 +175,7 @@ abstract class InternalDatabase : RoomDatabase() {
                         MIGRATION_22_24,
                         MIGRATION_24_25,
                         MIGRATION_35_36,
+                        MIGRATION_39_40,
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
@@ -198,6 +200,13 @@ abstract class InternalDatabase : RoomDatabase() {
 }
 
 // Migrations.
+
+val MIGRATION_39_40 =
+    object : Migration(39, 40) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `song` ADD COLUMN `isPodcastEpisode` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
 
 val MIGRATION_1_2 =
     object : Migration(1, 2) {
@@ -253,7 +262,7 @@ val MIGRATION_1_2 =
                 while (cursor.moveToNext()) {
                     playlistSongMaps.add(
                         PlaylistSongMap(
-                            playlistId = playlistMap[cursor.getInt(1)]!!,
+                            playlistId = playlistMap.getValue(cursor.getInt(1)),
                             songId = cursor.getString(2),
                             position = cursor.getInt(3),
                         ),
@@ -261,13 +270,6 @@ val MIGRATION_1_2 =
                 }
             }
             playlistSongMaps.sortBy { it.position }
-            val playlistSongCount = mutableMapOf<String, Int>()
-            playlistSongMaps.map { map ->
-                if (map.playlistId !in playlistSongCount) playlistSongCount[map.playlistId] = 0
-                map.copy(position = playlistSongCount[map.playlistId]!!).also {
-                    playlistSongCount[map.playlistId] = playlistSongCount[map.playlistId]!! + 1
-                }
-            }
             val songs = mutableListOf<OldSongEntity>()
             val songArtistMaps = mutableListOf<SongArtistMap>()
             db.query("SELECT * FROM song".toSQLiteQuery()).use { cursor ->
@@ -288,7 +290,7 @@ val MIGRATION_1_2 =
                     songArtistMaps.add(
                         SongArtistMap(
                             songId = songId,
-                            artistId = artistMap[cursor.getInt(2)]!!,
+                            artistId = artistMap.getValue(cursor.getInt(2)),
                             position = 0,
                         ),
                     )
@@ -665,7 +667,7 @@ class Migration23To24: AutoMigrationSpec {
 val MIGRATION_24_25 =
     object : Migration(24, 25) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            // Add perceptualLoudnessDb column to format table for improved audio normalization
+            // Add the loudness value used for audio normalization.
             var columnExists = false
             db.query("PRAGMA table_info(format)").use { cursor ->
                 val nameIndex = cursor.getColumnIndex("name")

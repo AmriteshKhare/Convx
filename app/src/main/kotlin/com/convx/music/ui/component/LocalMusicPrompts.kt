@@ -8,6 +8,7 @@ package com.convx.music.ui.component
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -24,25 +25,31 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.convx.music.R
 import com.convx.music.ui.ios.compat.AppTheme
 import com.convx.music.ui.ios.compat.Icon
 import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.foundation.IosTheme
+import com.convx.music.ui.ios.foundation.iosRowPress
+import com.convx.music.ui.screens.library.apple.SfStyle
 
 /** The runtime permission that gates reading audio files on this Android version. */
 fun localAudioPermission(): String =
@@ -66,22 +73,43 @@ fun hasLocalAudioPermission(context: Context): Boolean =
 @Composable
 fun rememberLocalAudioPermission(onResult: (granted: Boolean) -> Unit): LocalAudioPermission {
     val context = LocalContext.current
-    var blocked by remember { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        val activity = context as? Activity
-        blocked = !granted && activity != null &&
-            !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(activity, localAudioPermission())
-        onResult(granted)
+    val permission = remember { localAudioPermission() }
+    val preferences = remember(context) { context.getSharedPreferences("local_audio_access", Context.MODE_PRIVATE) }
+    val activity = remember(context) {
+        var current = context
+        while (current is ContextWrapper && current !is Activity) current = current.baseContext
+        current as? Activity
     }
-    return remember(launcher, blocked) {
+    var blocked by remember { mutableStateOf(preferences.getBoolean(permission, false) && !hasLocalAudioPermission(context)) }
+    var granted by remember { mutableStateOf(hasLocalAudioPermission(context)) }
+    val currentOnResult by rememberUpdatedState(onResult)
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        val current = hasLocalAudioPermission(context)
+        blocked = !current && preferences.getBoolean(permission, false)
+        if (current) preferences.edit().remove(permission).apply()
+        if (granted != current) {
+            granted = current
+            if (current) blocked = false
+            currentOnResult(current)
+        }
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+        granted = allowed
+        blocked = !allowed && activity != null &&
+            !androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
+        preferences.edit().putBoolean(permission, blocked).apply()
+        currentOnResult(allowed)
+    }
+    return remember(launcher, blocked, granted) {
         LocalAudioPermission(
             blocked = blocked,
-            request = { launcher.launch(localAudioPermission()) },
+            request = { if (blocked) openAppSettings(context) else launcher.launch(permission) },
+            granted = granted,
         )
     }
 }
 
-class LocalAudioPermission(val blocked: Boolean, val request: () -> Unit)
+class LocalAudioPermission(val blocked: Boolean, val request: () -> Unit, val granted: Boolean = false)
 
 private fun openAppSettings(context: Context) {
     context.startActivity(
@@ -91,9 +119,8 @@ private fun openAppSettings(context: Context) {
 }
 
 /**
- * Full-width prompt shown where local music needs storage access, in place of the one-line
- * "Grant permission" text this used to be. Says what is being asked for and why, and switches to
- * "Open Settings" when the system dialog can no longer be shown.
+ * Full-width prompt explaining the storage request and offering Settings when the
+ * system permission dialog can no longer be shown.
  */
 @Composable
 fun LocalMusicPermissionPrompt(
@@ -109,14 +136,10 @@ fun LocalMusicPermissionPrompt(
         ),
         modifier = modifier,
     ) {
-        Button(onClick = { if (permission.blocked) openAppSettings(context) else permission.request() }) {
-            Text(
-                stringResource(
-                    if (permission.blocked) R.string.local_permission_open_settings else R.string.local_permission_allow,
-                ),
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        PromptAction(
+            label = stringResource(if (permission.blocked) R.string.local_permission_open_settings else R.string.local_permission_allow),
+            onClick = { if (permission.blocked) openAppSettings(context) else permission.request() },
+        )
     }
 }
 
@@ -132,9 +155,7 @@ fun LocalMusicEmptyState(
         body = stringResource(R.string.local_empty_body),
         modifier = modifier,
     ) {
-        Button(onClick = onScan) {
-            Text(stringResource(R.string.local_empty_scan), fontWeight = FontWeight.SemiBold)
-        }
+        PromptAction(stringResource(R.string.local_empty_scan), onScan)
     }
 }
 
@@ -149,39 +170,49 @@ private fun PromptLayout(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 32.dp, vertical = 48.dp),
+            .padding(horizontal = 32.dp, vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Box(
             modifier = Modifier
-                .size(84.dp)
-                .background(AppTheme.colorScheme.surfaceVariant, CircleShape),
+                .size(72.dp)
+                .background(IosTheme.tint.copy(alpha = 0.14f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 painter = painterResource(icon),
                 contentDescription = null,
-                tint = AppTheme.colorScheme.primary,
+                tint = IosTheme.tint,
                 modifier = Modifier.size(38.dp),
             )
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(18.dp))
         Text(
             text = title,
-            style = AppTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = AppTheme.colorScheme.onSurface,
+            style = SfStyle(22.sp, 28.sp, FontWeight.Bold, (-0.26).sp),
+            color = IosTheme.colors.label,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
         Text(
             text = body,
-            style = AppTheme.typography.bodyMedium,
-            color = AppTheme.colorScheme.onSurfaceVariant,
+            style = SfStyle(15.sp, 20.sp, tracking = (-0.23).sp),
+            color = IosTheme.colors.secondaryLabel,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(22.dp))
         action()
+    }
+}
+
+@Composable
+private fun PromptAction(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().height(50.dp).clip(CircleShape)
+            .background(IosTheme.tint).iosRowPress(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = SfStyle(17.sp, 22.sp, FontWeight.SemiBold, (-0.43).sp), color = Color.White)
     }
 }

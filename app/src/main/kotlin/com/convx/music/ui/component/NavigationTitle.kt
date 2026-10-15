@@ -14,6 +14,12 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import com.convx.music.ui.ios.compat.AppTheme
@@ -49,14 +55,14 @@ fun NavigationTitle(
 ) {
     // Headings stay neutral per theme; only hero screens keep the
     // artwork-derived tint (provided into this local), so a section title
-    // matches the screen it is on. The See All/Play All link beside it
-    // always keeps the accent — links are in accent scope.
+    // matches the screen it is on.
     val ambient = LocalAmbientBackgroundColor.current.value
     val contentColor = color ?: if (ambient.isSpecified && !ambient.isHueless()) {
         LocalAccentTextColor.current
     } else {
         AppTheme.colorScheme.onSurface
     }
+    val chevron = onClick != null && LocalPageMetrics.current.chevronHeaders
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -104,14 +110,29 @@ fun NavigationTitle(
                     maxLines = 1,
                 )
             }
+            // The whole header is clickable; the chevron marks the linked section.
+            if (chevron) {
+                // SF chevron.right at Title2 bold: a short heavy stroke about the
+                // title's cap height. The monochrome SF vector is the regular weight
+                // and reads thin and oversized beside a bold header, so draw it.
+                val chevronColor = AppTheme.colorScheme.onSurfaceVariant
+                Canvas(Modifier.padding(start = 6.dp, top = 1.dp).size(width = 9.dp, height = 15.dp)) {
+                    val stroke = 2.6.dp.toPx()
+                    val inset = stroke / 2
+                    drawPath(
+                        Path().apply {
+                            moveTo(inset, inset)
+                            lineTo(size.width - inset, size.height / 2)
+                            lineTo(inset, size.height - inset)
+                        },
+                        color = chevronColor,
+                        style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                    )
+                }
+            }
         }
 
-        // "See All" / "Play all" as a plain accent text action rather than an
-        // outlined button or a chevron: the design keeps every section header to
-        // one weight of chrome, so the action reads as a link beside the title
-        // instead of as a control stacked on it. Links stay accent even though
-        // the title beside them is neutral.
-        val action = onPlayAllClick ?: onClick
+        val action = onPlayAllClick ?: onClick.takeUnless { chevron }
         if (action != null) {
             Text(
                 text = stringResource(
@@ -120,7 +141,7 @@ fun NavigationTitle(
                 fontSize = AppleTokens.ItemTitle,
                 lineHeight = AppleTokens.ItemTitleLineHeight,
                 fontWeight = FontWeight.Normal,
-                color = LocalAccentTextColor.current,
+                color = contentColor.copy(alpha = 0.6f),
                 maxLines = 1,
                 modifier = Modifier.clickable(onClick = action),
             )

@@ -5,6 +5,10 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.DownloadRingIcon
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
+import com.convx.music.ui.component.menuBottomInset
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.animation.core.animateFloatAsState
@@ -92,13 +96,13 @@ fun QueueMenu(
 ) {
     mediaMetadata ?: return
     val context = LocalContext.current
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val playerConnection = LocalPlayerConnection.current ?: return
     val coroutineScope = rememberCoroutineScope()
-    val syncUtils = LocalSyncUtils.current
+    val syncUtils = LocalSyncUtils.current.get()
 
     val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
-    val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id)
+    val download by LocalDownloadUtil.current.get().getDownload(mediaMetadata.id)
         .collectAsState(initial = null)
 
     var refetchIconDegree by remember { mutableFloatStateOf(0f) }
@@ -140,7 +144,7 @@ fun QueueMenu(
         ListDialog(
             onDismiss = { showSelectArtistDialog = false },
         ) {
-            items(artists) { artist ->
+            items(artists, key = { it.id!! }) { artist ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -204,15 +208,11 @@ fun QueueMenu(
                     }
                 },
             ) {
-                Icon(
-                    painter = painterResource(
-                        if (librarySong?.song?.liked == true) R.drawable.favorite
-                        else R.drawable.favorite_border
-                    ),
-                    tint = if (librarySong?.song?.liked == true) AppTheme.colorScheme.error
-                    else LocalContentColor.current,
-                    contentDescription = null,
-                )
+                SymbolIcon(symbol = 
+                        if (librarySong?.song?.liked == true) sf("heart.fill")
+                        else sf("heart")
+                    , contentDescription = null, tint = if (librarySong?.song?.liked == true) AppTheme.colorScheme.error
+                    else LocalContentColor.current)
             }
         },
     )
@@ -229,21 +229,16 @@ fun QueueMenu(
             start = 0.dp,
             top = 0.dp,
             end = 0.dp,
-            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+            bottom = 8.dp + menuBottomInset(),
         ),
     ) {
         // Quick actions grid
         item {
             NewActionGrid(
-                actions = listOf(
+                actions = listOfNotNull(
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.radio),
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("dot.radiowaves.left.and.right"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.start_an_radio),
                         onClick = {
@@ -255,24 +250,14 @@ fun QueueMenu(
                     ),
                     NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.playlist_add),
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("text.badge.plus"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.add_to_an_playlist),
                         onClick = { showChoosePlaylistDialog = true }
                     ),
-                    NewAction(
+                    if (mediaMetadata.isLocalFile) null else NewAction(
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ios_share),
-                                contentDescription = null,
-                                modifier = Modifier.size(28.dp),
-                                tint = AppTheme.colorScheme.onSurfaceVariant
-                            )
+                            SymbolIcon(symbol = sf("square.and.arrow.up"), contentDescription = null, size = 28.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
                         },
                         text = stringResource(R.string.share),
                         onClick = {
@@ -301,10 +286,7 @@ fun QueueMenu(
                         title = { Text(text = stringResource(R.string.play_next)) },
                         description = { Text(text = stringResource(R.string.play_next_desc)) },
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.playlist_play),
-                                contentDescription = null,
-                            )
+                            SymbolIcon(symbol = sf("text.line.first.and.arrowtriangle.forward"), contentDescription = null)
                         },
                         onClick = {
                             onDismiss()
@@ -319,10 +301,7 @@ fun QueueMenu(
                         title = { Text(text = stringResource(R.string.add_to_queue)) },
                         description = { Text(text = stringResource(R.string.add_to_queue_desc)) },
                         icon = {
-                            Icon(
-                                painter = painterResource(R.drawable.queue_music),
-                                contentDescription = null,
-                            )
+                            SymbolIcon(symbol = sf("music.note.list"), contentDescription = null)
                         },
                         onClick = {
                             onDismiss()
@@ -340,7 +319,7 @@ fun QueueMenu(
         item { Spacer(modifier = Modifier.height(12.dp)) }
 
         // Download section
-        item {
+        if (!mediaMetadata.isLocalFile) item {
             IosMenuGroup(
                 items = listOf(
                     when (download?.state) {
@@ -350,11 +329,7 @@ fun QueueMenu(
                                     Text(text = stringResource(R.string.remove_download))
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.offline),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     DownloadService.sendRemoveDownload(
@@ -371,10 +346,7 @@ fun QueueMenu(
                             IosMenuItemData(
                                 title = { Text(text = stringResource(R.string.downloading)) },
                                 icon = {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        strokeWidth = 2.dp
-                                    )
+                                    DownloadRingIcon(download)
                                 },
                                 onClick = {
                                     DownloadService.sendRemoveDownload(
@@ -392,11 +364,7 @@ fun QueueMenu(
                                 title = { Text(text = stringResource(R.string.action_download)) },
                                 description = { Text(text = stringResource(R.string.download_desc)) },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.download),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("arrow.down.circle"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     database.transaction {
@@ -440,11 +408,7 @@ fun QueueMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.artist),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("music.mic"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     if (mediaMetadata.artists.size == 1) {
@@ -470,11 +434,7 @@ fun QueueMenu(
                                     )
                                 },
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(R.drawable.album),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    SymbolIcon(symbol = sf("square.stack"), contentDescription = null, size = 24.dp)
                                 },
                                 onClick = {
                                     navController.navigate("album/${mediaMetadata.album.id}")
@@ -494,25 +454,23 @@ fun QueueMenu(
         item {
             IosMenuGroup(
                 items = buildList {
-                    add(
+                    if (!mediaMetadata.isLocalFile) add(
                         IosMenuItemData(
                             title = { Text(text = stringResource(R.string.refetch)) },
                             description = { Text(text = stringResource(R.string.refetch_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.sync),
-                                    contentDescription = null,
-                                    modifier = Modifier.graphicsLayer(rotationZ = rotationAnimation),
-                                )
+                                SymbolIcon(symbol = sf("arrow.triangle.2.circlepath"), contentDescription = null, modifier = Modifier.graphicsLayer(rotationZ = rotationAnimation))
                             },
                             onClick = {
                                 refetchIconDegree -= 360
                                 coroutineScope.launch(Dispatchers.IO) {
                                     YouTube.queue(listOf(mediaMetadata.id)).onSuccess {
                                         val newSong = it.firstOrNull()
-                                        if (newSong != null && librarySong != null) {
-                                            database.transaction {
-                                                update(librarySong!!, newSong.toMediaMetadata())
+                                        newSong?.let { refreshedSong ->
+                                            librarySong?.let { existingSong ->
+                                                database.transaction {
+                                                    update(existingSong, refreshedSong.toMediaMetadata())
+                                                }
                                             }
                                         }
                                     }
@@ -525,11 +483,7 @@ fun QueueMenu(
                             title = { Text(text = stringResource(R.string.details)) },
                             description = { Text(text = stringResource(R.string.details_desc)) },
                             icon = {
-                                Icon(
-                                    painter = painterResource(R.drawable.info),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                                SymbolIcon(symbol = sf("info.circle"), contentDescription = null, size = 24.dp)
                             },
                             onClick = {
                                 onShowDetailsDialog()

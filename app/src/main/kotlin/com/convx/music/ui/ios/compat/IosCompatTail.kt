@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,14 +37,22 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.platform.LocalView
 import com.convx.music.ui.component.shapes.ContinuousCapsule
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableIntStateOf
-import zone.ien.hig.CupertinoBottomSheetContent
+import kotlinx.coroutines.launch
+import zone.ien.hig.CupertinoModalBottomSheet
+import zone.ien.hig.CupertinoSheetState
+import zone.ien.hig.PresentationDetent
+import zone.ien.hig.PresentationStyle
+import zone.ien.hig.rememberCupertinoSheetState
 import zone.ien.hig.CupertinoScaffold
 import zone.ien.hig.CupertinoSegmentedControl
 import zone.ien.hig.CupertinoSegmentedControlTab
@@ -98,14 +107,24 @@ fun ripple(
     color: Color = Color.Unspecified,
 ): Indication? = null
 
-/** The iOS sheet chrome over Material's sheet mechanism. */
+@Composable
+fun rememberIosModalSheetState(skipPartiallyExpanded: Boolean = false): CupertinoSheetState =
+    rememberCupertinoSheetState(
+        presentationStyle = PresentationStyle.Modal(
+            detents = if (skipPartiallyExpanded) {
+                setOf(PresentationDetent.Large)
+            } else {
+                setOf(PresentationDetent.Medium, PresentationDetent.Large)
+            },
+        ),
+    )
+
 @Composable
 fun ModalBottomSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
-    sheetState: androidx.compose.material3.SheetState =
-        androidx.compose.material3.rememberModalBottomSheetState(),
-    sheetMaxWidth: Dp = androidx.compose.material3.BottomSheetDefaults.SheetMaxWidth,
+    sheetState: CupertinoSheetState = rememberIosModalSheetState(),
+    sheetMaxWidth: Dp = 640.dp,
     shape: Shape? = null,
     containerColor: Color = Color.Unspecified,
     contentColor: Color = Color.Unspecified,
@@ -113,48 +132,34 @@ fun ModalBottomSheet(
     tonalElevation: Dp = 0.dp,
     dragHandle: (@Composable () -> Unit)? = { com.convx.music.ui.component.IosGrabber() },
     contentWindowInsets: @Composable () -> WindowInsets = { WindowInsets(0, 0, 0, 0) },
-    properties: androidx.compose.material3.ModalBottomSheetProperties =
-        androidx.compose.material3.ModalBottomSheetDefaults.properties,
+    properties: DialogProperties = DialogProperties(
+        usePlatformDefaultWidth = false,
+        decorFitsSystemWindows = false,
+    ),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // The screen behind pushes back for as long as this sheet is composed. Registered
-    // here so it holds for every sheet in the app rather than the two that happen to own
-    // a MenuState.
     PresentingSheetEffect()
-
     val colors = IosTheme.colors
-    androidx.compose.material3.ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        modifier = modifier,
-        sheetState = sheetState,
-        sheetMaxWidth = sheetMaxWidth,
-        shape = shape ?: ContinuousRoundedRectangle(
-            topStart = 28.dp,
-            topEnd = 28.dp,
-        ),
-        // systemGroupedBackground is pure black in dark mode (that's correct for the
-        // base screen, which sits on the OLED background) — a floating sheet is an
-        // elevated surface, so it wants the *secondary* grouped background instead
-        // (Apple's #1C1C1E), or it reads as flat AMOLED black.
-        containerColor = if (containerColor.isSpecified) containerColor else colors.secondarySystemGroupedBackground,
-        contentColor = if (contentColor.isSpecified) contentColor else colors.label,
-        // The presenting screen shrinks behind the sheet, so a heavy scrim on top of
-        // that just muddies it.
-        scrimColor = if (scrimColor.isSpecified) scrimColor else Color.Black.copy(alpha = 0.12f),
-        dragHandle = dragHandle,
-        contentWindowInsets = contentWindowInsets,
+    val scope = rememberCoroutineScope()
+    Dialog(
+        onDismissRequest = { scope.launch { sheetState.hide() } },
         properties = properties,
     ) {
-        // The sheet's *body* is cupertino's; its presentation is not. Cupertino ships no
-        // modal presenter — only CupertinoBottomSheetScaffold, which owns the whole screen
-        // and would mean restructuring all seven callers around it. This is the seam where
-        // that stops: everything inside the sheet is cupertino, the thing that animates it
-        // up over the screen is still M3's.
-        CupertinoBottomSheetContent(
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        // The presenter draws its own animated scrim.
+        SideEffect { dialogWindow?.setDimAmount(0f) }
+        CupertinoModalBottomSheet(
+            onDismissRequest = onDismissRequest,
+            modifier = modifier,
+            sheetState = sheetState,
+            sheetMaxWidth = sheetMaxWidth,
+            shape = shape ?: ContinuousRoundedRectangle(topStart = 28.dp, topEnd = 28.dp),
             containerColor = if (containerColor.isSpecified) containerColor else colors.secondarySystemGroupedBackground,
             contentColor = if (contentColor.isSpecified) contentColor else colors.label,
+            scrimColor = if (scrimColor.isSpecified) scrimColor else Color.Black.copy(alpha = 0.12f),
+            dragHandle = dragHandle,
         ) {
-            Column { content() }
+            Column(Modifier.windowInsetsPadding(contentWindowInsets())) { content() }
         }
     }
 }
@@ -197,11 +202,6 @@ fun PlainTooltip(
     }
 }
 
-/**
- * The iOS segmented control: one recessed capsule track holding equal segments, the
- * selected one lifted out as a lighter capsule. Material draws outlined pills with a
- * check mark on the selected one; iOS draws neither.
- */
 /**
  * Cupertino's segmented control, driven from M3's call shape.
  *

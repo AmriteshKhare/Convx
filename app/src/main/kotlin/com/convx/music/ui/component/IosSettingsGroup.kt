@@ -8,6 +8,8 @@ package com.convx.music.ui.component
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,13 +55,17 @@ fun IosSettingsGroup(
 ) {
     val colors = IosTheme.colors
 
-    Column(Modifier.fillMaxWidth()) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(durationMillis = 220)),
+    ) {
         title?.let {
             IosText(
                 text = it,
                 style = IosTheme.typography.subheadline,
                 color = colors.secondaryLabel,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 8.dp),
             )
         }
 
@@ -99,8 +105,8 @@ private fun IosSettingsItemRow(item: IosSettingsItem) {
                 enabled = item.enabled,
                 onClick = item.onClick?.let { click -> { click() } },
             )
-            .defaultMinSize(minHeight = IosMetrics.ListRowHeight)
-            .padding(horizontal = 16.dp, vertical = 11.dp),
+            .defaultMinSize(minHeight = maxOf(IosMetrics.ListRowHeight, 56.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (item.leadingContent != null) {
@@ -111,7 +117,7 @@ private fun IosSettingsItemRow(item: IosSettingsItem) {
             Spacer(Modifier.width(12.dp))
         }
 
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             CompositionLocalProvider(
                 LocalIosTextStyle provides IosTheme.typography.body,
                 LocalIosContentColor provides contentColor,
@@ -127,7 +133,7 @@ private fun IosSettingsItemRow(item: IosSettingsItem) {
         }
 
         if (item.trailingContent != null) {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(12.dp))
             CompositionLocalProvider(
                 LocalIosTextStyle provides IosTheme.typography.body,
                 LocalIosContentColor provides colors.secondaryLabel,

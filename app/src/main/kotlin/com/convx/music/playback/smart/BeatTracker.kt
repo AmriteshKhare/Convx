@@ -2,11 +2,11 @@
  * Ported from Orchard (https://github.com/SFG5453/Orchard).
  *
  * Copyright (C) 2026 SFG545 (original Orchard implementation)
- * Copyright (C) 2026 Kushagra Singh (BitChord adaptation)
+ * Copyright (C) 2026 Convx contributors (adapted from an open-source base)
  *
  * Orchard's original source is licensed under the GNU Affero General Public
  * License, version 3 or later. Per AGPLv3 section 13, this file is combined
- * here into BitChord -- a work licensed under the GNU General Public
+ * here into the reference app -- a work licensed under the GNU General Public
  * License, version 3 or later -- and remains itself governed by the AGPLv3
  * as part of that combination.
  *
@@ -34,20 +34,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/**
- * Beat and downbeat tracking with the Beat This! model (CPJKU, ISMIR 2024).
- *
- * Why a model at all: tempo and *meter* are different problems. Autocorrelation reads tempo well,
- * but nothing in an autocorrelation says which of four beats is beat one, and a mix that enters on
- * beat three sounds wrong even when every beat lines up.
- *
- * Beat This! is the one that can be shipped: both its code and its trained weights are MIT. Most
- * published MIR weights, Essentia's included, are CC BY-NC-SA.
- *
- * Everything here is optional. A missing model, an unreadable graph, a rate mismatch, too few
- * peaks, all resolve to null, and the caller keeps whatever it had. A missing beat tracker
- * degrades transitions; a throwing one would break playback.
- */
+/** Optional Beat This! model for beat and downbeat grids. Missing model or input returns null for playback fallback. */
 class BeatTracker(private val context: Context) {
 
     /** A tracked grid on the analysed audio's own timeline, in seconds. */
@@ -61,6 +48,7 @@ class BeatTracker(private val context: Context) {
     )
 
     @Volatile private var session: OrtSession? = null
+    private var sessionOptions: OrtSession.SessionOptions? = null
     private val lock = Any()
 
     /** Parsing the graph is far too expensive to repeat per track, so one session is kept. */
@@ -78,17 +66,23 @@ class BeatTracker(private val context: Context) {
                 }
                 val options = OrtSession.SessionOptions().apply {
                     setIntraOpNumThreads(INFERENCE_THREADS)
+                    setInterOpNumThreads(1)
+                    addConfigEntry("session.intra_op.allow_spinning", "0")
+                    addConfigEntry("session.inter_op.allow_spinning", "0")
                     setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-                    // ORT's arena allocator keeps every block it has ever needed, which for this
-                    // graph is tens of megabytes of native heap retained for the life of the
-                    // session, far past the model's own size, on a process that also has to
-                    // survive in the background. Analysis runs a handful of times per track, so
-                    // allocating per run is the right trade.
+                    // Disable ORT memory caching; its arena otherwise retains peak allocations for the session lifetime.
                     setCPUArenaAllocator(false)
                     setMemoryPatternOptimization(false)
                 }
-                OrtEnvironment.getEnvironment().createSession(file.absolutePath, options)
-                    .also { session = it }
+                try {
+                    OrtEnvironment.getEnvironment().createSession(file.absolutePath, options).also {
+                        sessionOptions = options
+                        session = it
+                    }
+                } catch (error: Throwable) {
+                    options.close()
+                    throw error
+                }
             }.onFailure { Log.w(TAG, "Beat model unavailable; falling back to no grid", it) }
                 .getOrNull()
         }
@@ -101,10 +95,10 @@ class BeatTracker(private val context: Context) {
      * back onto the full track's timeline rather than starting at zero.
      */
     fun track(pcm: FloatArray, offsetSeconds: Double = 0.0): Grid? {
+        val active = session() ?: return null
         val melStarted = System.currentTimeMillis()
         val spectrogram = MelSpectrogram.compute(pcm) ?: return null
         val melMs = System.currentTimeMillis() - melStarted
-        val active = session() ?: return null
 
         val beatLogits = FloatArray(spectrogram.frames)
         val downbeatLogits = FloatArray(spectrogram.frames)
@@ -201,18 +195,20 @@ class BeatTracker(private val context: Context) {
         synchronized(lock) {
             runCatching { session?.close() }
             session = null
+            runCatching { sessionOptions?.close() }
+            sessionOptions = null
         }
     }
 
     companion object {
-        private const val TAG = "ViviBeatTracker"
+        private const val TAG = "ConvxBeatTracker"
         // ConvInteger weights shifted int8 -> uint8 (+128, zero points too; exact): the
         // shipped onnxruntime-android has no int8-weight ConvInteger kernel, so the
         // original failed createSession with ORT_NOT_IMPLEMENTED and DJ ran gridless.
         // Renamed so the stale copy session() cached in filesDir is not reused.
         private const val MODEL_ASSET = "beat_this_u8.onnx"
         private const val STALE_MODEL_ASSET = "beat_this_int8.onnx"
-        private const val INFERENCE_THREADS = 4
+        private const val INFERENCE_THREADS = 1
 
         /** The window the model was trained on, and the margin discarded from each chunk's edges. */
         const val CHUNK_FRAMES = 1500
@@ -238,15 +234,7 @@ class BeatTracker(private val context: Context) {
             return sorted[sorted.size / 2]
         }
 
-        /**
-         * Frame indices that are local maxima over [PEAK_WINDOW] and positive, with runs of
-         * adjacent peaks collapsed to their mean, then refined to sub-frame resolution.
-         *
-         * The refinement is not upstream's. The model's frame rate is 50 Hz, so an integer peak
-         * quantizes every beat to 20 ms, fine for drawing a grid, but a large share of the flam
-         * budget when beat-matching two tracks. Fitting a parabola through the peak and its
-         * neighbours recovers where the maximum actually sits.
-         */
+        /** Finds positive local maxima, merges adjacent peaks, and refines times between frames. */
         fun pickPeaks(logits: FloatArray): List<Double> {
             val half = PEAK_WINDOW / 2
             val peaks = ArrayList<Int>()

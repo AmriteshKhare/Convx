@@ -565,12 +565,12 @@ private class CupertinoSearchTextFieldNestedScroll(
         available: Offset,
         source: NestedScrollSource,
     ): Offset {
-        //  consume all scroll when scroll is blocked
+        // Keep the list still while focused search is empty.
         if (blockScrollWhenSearchIsFocusedAndEmpty && !state.canScroll) {
             return available
         }
 
-        // search should collapse after scrollable container reached top
+        // Let the list consume downward scroll until it reaches the top.
         if (available.y > 0 && scrollableState?.canScrollBackward == true) {
             return Offset.Zero
         }

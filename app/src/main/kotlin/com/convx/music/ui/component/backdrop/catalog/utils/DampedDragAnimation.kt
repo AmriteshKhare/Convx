@@ -2,7 +2,7 @@
  * Copyright 2026, compose-miuix-ui contributors
  * SPDX-License-Identifier: Apache-2.0
  *
- * Ported one-to-one from Melox's DampedDragAnimation. The only Convx extension is
+ * Ported one-to-one from the reference app's DampedDragAnimation. The only Convx extension is
  * snapValue(), used when an external pager already owns the position animation;
  * it is not used by pointer drag/press/release behavior.
  */
@@ -112,10 +112,7 @@ class DampedDragAnimation(
         pressJob?.cancel()
         releaseJob = animationScope.launch {
             withFrameMillis { }
-            // Keep the stretched glass shape visible until the position spring is nearly settled.
-            // Bounded: drag deltas arriving mid-release used to hold this await open forever
-            // (stuck stretch). Event-driven rule: a release settles the latest state, then
-            // deflates — it never waits unboundedly for quiet.
+            // Cap the wait so drag input during release cannot hold the stretch indefinitely.
             if (value != targetValue) {
                 val threshold = (valueRange.endInclusive - valueRange.start) * 0.025f
                 withTimeoutOrNull(400) {
@@ -183,7 +180,7 @@ class DampedDragAnimation(
         }
     }
 
-    /** Convx pager extension; pointer drag behavior remains identical to Melox. */
+    /** Convx pager extension; pointer drag behavior remains identical to the reference app. */
     suspend fun snapValue(value: Float) {
         valueAnimation.snapTo(if (value.isFinite()) value.coerceIn(valueRange) else valueAnimation.value)
     }

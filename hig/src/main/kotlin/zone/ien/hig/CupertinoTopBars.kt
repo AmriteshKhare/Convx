@@ -106,15 +106,11 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * Return true if container can't scroll backward
- * */
+/** True while the container cannot scroll backward. */
 inline val ScrollableState.isTopBarTransparent: Boolean
     get() = !canScrollBackward
 
-/**
- * Return true if container scroll offset is smaller than [topPadding]
- * */
+/** True while the first visible item remains within [topPadding]. */
 @Composable
 @ExperimentalCupertinoApi
 fun LazyListState.isTopBarTransparent(topPadding: Dp = 0.dp): Boolean {
@@ -427,7 +423,6 @@ private fun InlineTopAppBar(
 ) {
     val navTitleVisible by LocalNavigationTitleVisible.current
     val isLightTheme = !isSystemInDarkTheme()
-//    val layer = backdrop.graphicsLayer
     val layer = rememberGraphicsLayer()
     var titleX by remember { mutableStateOf(0) }
     var titleWidth by remember { mutableStateOf(0) }
@@ -667,13 +662,10 @@ private fun TopAppBarLayout(
             }
 
         layout(constraints.maxWidth, layoutHeight) {
-            // Navigation icon
             navigationIconPlaceable.placeRelative(
                 x = 0,
                 y = (layoutHeight - navigationIconPlaceable.height) / 2,
             )
-            // Title
-//            ((constraints.maxWidth - titlePlaceable.width) / 2)
             val safeMargin = 4.dp.roundToPx()
             titlePlaceable.placeRelative(
                 x =
@@ -710,7 +702,6 @@ private fun TopAppBarLayout(
                     },
             )
 
-            // Action icons
             actionIconsPlaceable.placeRelative(
                 x = constraints.maxWidth - actionIconsPlaceable.width,
                 y = (layoutHeight - actionIconsPlaceable.height) / 2,
@@ -719,13 +710,10 @@ private fun TopAppBarLayout(
     }
 }
 
-// internal val TopTitleAlphaEasing = CubicBezierEasing(.8f, 0f, .8f, .15f)
-
 private val TopAppBarHorizontalPadding = 4.dp
 private val TopAppBarHeight = 44.dp
 
-// A title inset when the App-Bar is a Medium or Large one. Also used to size a spacer when the
-// navigation icon is missing.
+// Title offset for medium/large bars; also sizes the spacer when no navigation icon is shown.
 private val TopAppBarTitleInset = 16.dp - TopAppBarHorizontalPadding
 
 @Immutable
@@ -735,23 +723,16 @@ object CupertinoTopAppBarDefaults {
      */
     val windowInsets: WindowInsets @Composable get() = WindowInsets.systemBars.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
 
-    /**
-     * Creates a [CupertinoTopAppBarColors] . The default implementation
-     * animates between the provided colors according to the Material Design specification.
+    /** Creates the colors used by [CupertinoTopAppBar].
      *
-     * Note: top app bar itself does not produce cupertino thin material glass effect.
-     * This effect works only inside [CupertinoScaffold], [CupertinoBottomSheetScaffold], [CupertinoBottomSheetContent].
-     * function that will communicate with scaffold and return either
-     * [Color.Transparent] if color was successfully applied to scaffold (and top bar itself
-     * should be transparent) or passed color if scaffold wasn't found.
-     *
-     * @param lightGradientColor the light-mode background gradient color
-     * @param darkGradientColor the dark-mode background gradient color
-     * @param navigationIconContentColor the content color used for the navigation icon
-     * @param lightTitleContentColor the light-mode content color used for the title
-     * @param darkTitleContentColor the dark-mode content color used for the title
-     * @param actionIconContentColor the content color used for actions
-     * @return the resulting [CupertinoTopAppBarColors] used for the top app bar
+     * @param lightGradientColor background gradient in light mode
+     * @param darkGradientColor background gradient in dark mode
+     * @param navigationIconContentColor navigation icon color
+     * @param lightTitleContentColor title color in light mode
+     * @param darkTitleContentColor title color in dark mode
+     * @param lightSubtitleContentColor subtitle color in light mode
+     * @param darkSubtitleContentColor subtitle color in dark mode
+     * @param actionIconContentColor action icon color
      */
     @Composable
     @ReadOnlyComposable

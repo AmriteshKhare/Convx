@@ -16,11 +16,7 @@ import com.music.innertube.pages.RelatedPage
 import io.ktor.client.call.body
 
 internal object HomeMapper {
-    /**
-     * [browseId] is a seam for padding the feed out of a second, differently-populated
-     * shelf list (FEmusic_new_releases). FEmusic_home alone is thin when signed out, and
-     * only its own continuation is worth following — see [HomePage.continuation].
-     */
+    /** Uses the requested browse shelf and follows that shelf's continuation. */
     suspend fun home(innerTube: InnerTube, continuation: String?, params: String?, browseId: String): Result<HomePage> = runCatching {
         if (continuation != null) {
             return@runCatching homeContinuation(innerTube, continuation).getOrThrow()
@@ -31,18 +27,11 @@ internal object HomeMapper {
             ?.tabRenderer?.content?.sectionListRenderer?.continuations?.getContinuation()
         val sectionListRender = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer
-        // A shape YouTube sometimes serves (empty/guest feed, transient response
-        // variant) has no sectionListRenderer contents at all. Force-unwrapping
-        // that threw an NPE that runCatching swallowed, silently failing the
-        // whole home load — same bug class as the Liked Music header NPE.
-        // Degrade to an empty (still valid) page instead of failing outright.
+        // Empty or guest feeds may omit sections; return a valid empty page.
         val sections = sectionListRender?.contents.orEmpty()
-            .mapNotNull { it.musicCarouselShelfRenderer }
-            .mapNotNull {
-                HomePage.Section.fromMusicCarouselShelfRenderer(it)
-            }.toMutableList()
+            .mapNotNull(HomePage.Section::fromSectionListContent)
         val chips = sectionListRender?.header?.chipCloudRenderer?.chips?.mapNotNull { HomePage.Chip.fromChipCloudChipRenderer(it) }
-        HomePage(chips, sections, continuation)
+        HomePage(chips, sections, continuation, response.background?.musicThumbnailRenderer?.getThumbnailUrl())
     }
 
     private suspend fun homeContinuation(innerTube: InnerTube, continuation: String): Result<HomePage> = runCatching {
@@ -53,10 +42,9 @@ internal object HomeMapper {
         HomePage(
             null,
             response.continuationContents?.sectionListContinuation?.contents
-            ?.mapNotNull { it.musicCarouselShelfRenderer }
-            ?.mapNotNull {
-                HomePage.Section.fromMusicCarouselShelfRenderer(it)
-            }.orEmpty(), continuation
+                ?.mapNotNull(HomePage.Section::fromSectionListContent)
+                .orEmpty(),
+            continuation
         )
     }
 

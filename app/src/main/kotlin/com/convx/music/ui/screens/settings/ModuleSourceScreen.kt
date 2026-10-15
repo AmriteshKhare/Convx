@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +43,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -70,6 +73,9 @@ import com.convx.music.utils.rememberPreference
 import com.music.spine.ModuleManager
 import com.music.spine.SpineModule
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import org.json.JSONArray
 
@@ -82,7 +88,13 @@ fun ModuleSourceScreen(
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
     val scope = rememberCoroutineScope()
-    val moduleManager = remember { ModuleManager() }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val moduleManager = remember {
+        ModuleManager.cacheDir = context.filesDir.resolve("module-scripts")
+        ModuleManager.shared
+    }
+    val sourceStatus = remember { mutableStateMapOf<String, String>() }
+    val checkingSources = remember { mutableStateMapOf<String, Boolean>() }
 
     val (sourcesJson, onSourcesJsonChange) = rememberPreference(ModuleSourcesKey, defaultValue = "[]")
     val (enabledJson, onEnabledJsonChange) = rememberPreference(EnabledModulesKey, defaultValue = "[]")
@@ -115,7 +127,6 @@ fun ModuleSourceScreen(
         fetchedModules.filter { it.id !in enabledIds }
     }
     var isLoading by remember { mutableStateOf(false) }
-    var loadingSource by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     fun saveSources(urls: List<String>) {
@@ -141,6 +152,7 @@ fun ModuleSourceScreen(
 
     fun removeSource(url: String) {
         saveSources(sourceUrls.filter { it != url })
+        moduleManager.unloadAll()
     }
 
     SettingsLazyPage(
@@ -195,17 +207,36 @@ fun ModuleSourceScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                                sourceStatus[url]?.let { status ->
+                                    Text(status, style = AppTheme.typography.bodySmall,
+                                        color = AppTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
+                            TextButton(
+                                enabled = checkingSources[url] != true,
+                                onClick = {
+                                    scope.launch {
+                                        checkingSources[url] = true
+                                        try {
+                                            val result = moduleManager.fetchIndex(url, refresh = true)
+                                            sourceStatus[url] = result.fold(
+                                                onSuccess = {
+                                                    if (it.isEmpty()) context.getString(R.string.module_source_empty)
+                                                    else context.getString(R.string.module_source_available, it.size)
+                                                },
+                                                onFailure = { context.getString(R.string.module_check_failed) },
+                                            )
+                                        } finally {
+                                            checkingSources[url] = false
+                                        }
+                                    }
+                                },
+                            ) { Text(stringResource(R.string.module_check)) }
                             IconButton(
                                 onClick = { removeSource(url) },
                                 onLongClick = { removeSource(url) },
                             ) {
-                                Icon(
-                                    painterResource(R.drawable.close),
-                                    contentDescription = stringResource(R.string.remove),
-                                    tint = AppTheme.colorScheme.error,
-                                    modifier = Modifier.size(18.dp),
-                                )
+                                SymbolIcon(symbol = sf("xmark"), contentDescription = stringResource(R.string.remove), size = 18.dp, tint = AppTheme.colorScheme.error)
                             }
                         }
                     }
@@ -217,12 +248,7 @@ fun ModuleSourceScreen(
                             .padding(horizontal = 16.dp, vertical = 13.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            painterResource(R.drawable.add),
-                            contentDescription = null,
-                            tint = AppTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
+                        SymbolIcon(symbol = sf("plus"), contentDescription = null, size = 20.dp, tint = AppTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Text(
                             text = stringResource(R.string.add_source),
@@ -241,19 +267,28 @@ fun ModuleSourceScreen(
                             scope.launch {
                                 isLoading = true
                                 errorMessage = null
-                                val allModules = mutableListOf<SpineModule>()
-                                for (url in sourceUrls) {
-                                    loadingSource = url
-                                    moduleManager.fetchIndex(url).onSuccess { allModules.addAll(it) }
-                                }
-                                onFetchedModulesJsonChange(
-                                    json.encodeToString(
-                                            kotlinx.serialization.builtins.ListSerializer(SpineModule.serializer()),
-                                            allModules.distinctBy { it.id }
+                                try {
+                                    val results = coroutineScope {
+                                        sourceUrls.map { url -> async { url to moduleManager.fetchIndex(url, refresh = true) } }.awaitAll()
+                                    }
+                                    val allModules = results.flatMap { (url, result) ->
+                                        sourceStatus[url] = result.fold(
+                                            onSuccess = { context.getString(R.string.module_source_available, it.size) },
+                                            onFailure = { context.getString(R.string.module_check_failed) },
                                         )
-                                )
-                                isLoading = false
-                                loadingSource = null
+                                        result.getOrNull().orEmpty()
+                                    }
+                                    if (results.any { it.second.isFailure }) {
+                                        errorMessage = context.getString(R.string.module_refresh_partial)
+                                    }
+                                    val retained = if (results.any { it.second.isFailure }) fetchedModules else emptyList()
+                                    onFetchedModulesJsonChange(json.encodeToString(
+                                        kotlinx.serialization.builtins.ListSerializer(SpineModule.serializer()),
+                                        (allModules + retained).distinctBy { it.id },
+                                    ))
+                                } finally {
+                                    isLoading = false
+                                }
                             }
                         },
                         modifier = Modifier
@@ -267,11 +302,17 @@ fun ModuleSourceScreen(
                                 strokeWidth = 2.dp,
                             )
                             Spacer(Modifier.width(8.dp))
-                            Text("Fetching from ${loadingSource?.substringAfter("://")?.take(30) ?: "..."}")
+                            Text(stringResource(R.string.module_refreshing))
                         } else {
                             Text(stringResource(R.string.fetch_modules))
                         }
                     }
+                }
+            }
+
+            errorMessage?.let { message ->
+                item {
+                    Text(message, color = AppTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 20.dp))
                 }
             }
 
@@ -439,6 +480,8 @@ private fun EnabledModulesPriorityList(
                     modifier = Modifier.width(24.dp),
                 )
                 Spacer(Modifier.width(8.dp))
+                ModuleLogo(module)
+                Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = module.name,
@@ -459,19 +502,10 @@ private fun EnabledModulesPriorityList(
                     onClick = { onDisable(moduleId) },
                     onLongClick = { onDisable(moduleId) },
                 ) {
-                    Icon(
-                        painterResource(R.drawable.close),
-                        contentDescription = stringResource(R.string.remove),
-                        tint = AppTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp),
-                    )
+                    SymbolIcon(symbol = sf("xmark"), contentDescription = stringResource(R.string.remove), size = 18.dp, tint = AppTheme.colorScheme.error)
                 }
-                Icon(
-                    painter = painterResource(R.drawable.drag_handle),
-                    contentDescription = null,
-                    tint = AppTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(24.dp)
+                SymbolIcon(symbol = sf("line.3.horizontal"), contentDescription = null, size = 24.dp, modifier = Modifier
+                        
                         .pointerInput(moduleId) {
                             detectDragGestures(
                                 onDragStart = {
@@ -508,8 +542,7 @@ private fun EnabledModulesPriorityList(
                                     }
                                 },
                             )
-                        },
-                )
+                        }, tint = AppTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -532,6 +565,8 @@ private fun ModuleItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        ModuleLogo(module)
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

@@ -31,20 +31,8 @@ import com.mocharealm.accompanist.lyrics.ui.composable.lyrics.KaraokeLyricsView
 import kotlin.math.roundToInt
 
 /**
- * The ArchiveTune lyrics treatment: Apple Music's karaoke view, where each syllable
- * lights as it is sung, the active line lifts and the ones around it blur back, and the
- * list eases rather than snaps between lines.
- *
- * Rendered by `com.mocharealm.accompanist:lyrics-ui` — the same renderer ArchiveTune
- * uses. Convx's own animation styles each animate one line at a time inside a plain
- * LazyColumn, which is why none of them can do the parts that need the whole column at
- * once: the smooth catch-up scroll, the depth-of-field falloff, and a duet's two
- * singers sitting on opposite sides of the screen.
- *
- * Two-singer support comes off the `agent` a TTML provider already gives every line
- * (Apple Music's `v1`/`v2`): `v2` alternates to the right, everything else stays left.
- * Lines the provider marks as background vocals are folded into the line above them as
- * accompaniment rather than taking a row of their own — which is what they are.
+ * Renders syllable highlighting, line depth, and duet alignment with the shared karaoke renderer.
+ * TTML `v2` lines appear on the right; background-vocal lines join the line above them.
  */
 @Composable
 fun KaraokeLyrics(
@@ -70,10 +58,10 @@ fun KaraokeLyrics(
         fontSize = fontSize.sp,
         lineHeight = (fontSize * lineSpacing).sp,
         fontWeight = FontWeight.Bold,
-        // Figma main tracking: +0.4px @ 34px ≈ +1.2% of size (642:23917).
+        // Keep tracking proportional to the lyric size.
         letterSpacing = (fontSize * 0.012f).sp,
     )
-    // Background vocals: Figma Bg Lyric is Bold at 28/34 ≈ 0.82x (642:23917).
+    // Background vocals use smaller, bold text.
     val accompanimentStyle = TextStyle(
         fontSize = (fontSize * 0.82f).sp,
         lineHeight = (fontSize * 0.82f * lineSpacing).sp,
@@ -91,9 +79,7 @@ fun KaraokeLyrics(
         // lines still to come get more of the screen than the ones already sung.
         val viewportOffset = maxHeight * 0.38f
 
-        // Rebuilt outright when the lyrics change, the way ArchiveTune does it: the view
-        // carries scroll and per-line animation state keyed to the lines it was given, and
-        // handed a different set it would carry the old song's state into the new one.
+        // Reset scroll and per-line animation state when the lyrics change.
         key(synced) {
         KaraokeLyricsView(
             listState = listState,

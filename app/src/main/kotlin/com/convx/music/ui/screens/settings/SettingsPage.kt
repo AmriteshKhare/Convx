@@ -8,7 +8,14 @@ package com.convx.music.ui.screens.settings
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -46,6 +53,16 @@ private fun settingsLargeTitle(title: String): @Composable () -> Unit = {
     )
 }
 
+/** Readable column width on tablets; phones are narrower so it never applies there. */
+private val SettingsContentMaxWidth = 720.dp
+
+/** Side gutter that centres a [maxWidth] column on wide windows and falls back to [minimum] on phones. */
+@Composable
+private fun settingsGutter(minimum: Dp, maxWidth: Dp): Dp {
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    return maxOf(minimum, (screenWidth - maxWidth) / 2)
+}
+
 /** A settings page whose body is a plain scrolling Column — most of them. */
 @Composable
 fun SettingsPage(
@@ -56,6 +73,7 @@ fun SettingsPage(
     onBack: (() -> Unit)? = null,
     pageColor: Color = IosTheme.colors.systemGroupedBackground,
     horizontalPadding: Dp = 0.dp,
+    maxContentWidth: Dp = SettingsContentMaxWidth,
     actions: @Composable () -> Unit = {},
     scrollState: ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
@@ -65,12 +83,16 @@ fun SettingsPage(
         modifier = modifier,
         onBack = onBack ?: { navController.navigateUp(); Unit },
         onBackLongClick = navController::backToMain,
-        pageColor = pageColor,
-        horizontalPadding = horizontalPadding,
+        // Cards are painted on the iOS grouped fill, so the page behind them must be too.
+        pageColor = IosTheme.colors.systemGroupedBackground,
+        horizontalPadding = settingsGutter(horizontalPadding, maxContentWidth),
         actions = actions,
         scrollState = scrollState,
         largeTitle = settingsLargeTitle(title),
-        content = content,
+        content = {
+            content()
+            Spacer(Modifier.height(32.dp))
+        },
     )
 }
 
@@ -83,6 +105,7 @@ fun SettingsLazyPage(
     onBack: (() -> Unit)? = null,
     pageColor: Color = IosTheme.colors.systemGroupedBackground,
     horizontalPadding: Dp = 0.dp,
+    maxContentWidth: Dp = SettingsContentMaxWidth,
     actions: @Composable () -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
@@ -92,8 +115,8 @@ fun SettingsLazyPage(
         modifier = modifier,
         onBack = onBack ?: { navController.navigateUp(); Unit },
         onBackLongClick = navController::backToMain,
-        pageColor = pageColor,
-        horizontalPadding = horizontalPadding,
+        pageColor = IosTheme.colors.systemGroupedBackground,
+        horizontalPadding = settingsGutter(horizontalPadding, maxContentWidth),
         actions = actions,
         listState = listState,
         largeTitle = settingsLargeTitle(title),
@@ -114,6 +137,7 @@ fun SettingsScaffold(
     pageColor: Color = IosTheme.colors.systemGroupedBackground,
     actions: @Composable () -> Unit = {},
     titleAlphaProvider: (() -> Float)? = null,
+    maxContentWidth: Dp = SettingsContentMaxWidth,
     content: @Composable BoxScope.(GlassScreenChrome) -> Unit,
 ) {
     ScreenScaffold(
@@ -124,6 +148,10 @@ fun SettingsScaffold(
         onBackLongClick = navController::backToMain,
         pageColor = pageColor,
         actions = actions,
-        content = content,
+        content = { chrome ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Box(Modifier.fillMaxSize().widthIn(max = maxContentWidth)) { content(chrome) }
+            }
+        },
     )
 }

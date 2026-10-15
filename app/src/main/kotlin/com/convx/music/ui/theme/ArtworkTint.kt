@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import android.util.LruCache
 import com.convx.music.ui.theme.colorengine.ColorEngine
+import com.convx.music.utils.reportException
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
@@ -75,7 +76,7 @@ fun rememberArtworkTint(thumbnailUrl: String?): List<Color> {
                         }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                reportException(e)
             }
         }
     }

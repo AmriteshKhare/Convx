@@ -15,7 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.convx.music.R
 
-/** Apple's SF Pro Text (Latin subset) — the Figma iOS design's typeface. */
+/** SF Pro Text font files used for the app's Latin typography. */
 val SfProFontFamily = FontFamily(
     Font(R.font.sf_pro_text_regular, FontWeight.Normal),
     Font(R.font.sf_pro_text_medium, FontWeight.Medium),
@@ -135,22 +135,10 @@ val PlusJakartaSansFontFamily = FontFamily(
     )
 )
 
-// TODO: Define or import actual M3 Expressive font families if needed.
-// For now, using default FontFamily as a placeholder.
+// TODO: Use M3 Expressive font families when the app adopts that type scale.
 
-// Define M3 Expressive Typography based on Material Design guidelines
-// https://m3.material.io/styles/typography/type-scale-tokens
-// Note: M3 Expressive might introduce subtle changes or new roles.
-// Referencing standard M3 roles for now, adjust if Expressive spec differs significantly.
-//
-// Takes the user's custom-installed font (see rememberCustomFontFamily in
-// Font.kt) so every text role in the app renders in it; falls back to the
-// system default when none is installed.
-// Tracking is size-specific, which is the point: Material's scale leaves every role
-// above 22sp at 0, and letters read as drifting apart the larger the type gets. Apple's
-// own rule is roughly -0.02em on display sizes, tapering to 0 by the time text is body
-// sized (small text wants slightly POSITIVE tracking, which the body/label roles below
-// already carry from M3). These are that curve, in sp at each role's own size.
+// Uses the selected app font and applies tighter tracking to large display styles.
+// Smaller body and label styles keep Material's tracking values.
 fun AppTypography(fontFamily: FontFamily = FontFamily.Default) = Typography(
     displayLarge = TextStyle(
         fontFamily = fontFamily,

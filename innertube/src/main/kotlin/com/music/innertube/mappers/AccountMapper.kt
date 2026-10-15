@@ -16,15 +16,14 @@ import kotlinx.serialization.json.jsonPrimitive
 
 internal object AccountMapper {
     suspend fun visitorData(innerTube: InnerTube): Result<String> = runCatching {
-        Json.parseToJsonElement(innerTube.getSwJsData().bodyAsText().substring(5))
-            .jsonArray[0]
-            .jsonArray[2]
-            .jsonArray.first {
-                (it as? JsonPrimitive)?.contentOrNull?.let { candidate ->
-                    VISITOR_DATA_REGEX.containsMatchIn(candidate)
-                } ?: false
-            }
-            .jsonPrimitive.content
+        val response = innerTube.getSwJsData().bodyAsText()
+        val root = Json.parseToJsonElement(response.substring(5)).jsonArray
+        val candidates = root[0].jsonArray[2].jsonArray
+        val visitorData = candidates.first { value ->
+            val candidate = (value as? JsonPrimitive)?.contentOrNull ?: return@first false
+            VISITOR_DATA_REGEX.containsMatchIn(candidate)
+        }
+        visitorData.jsonPrimitive.content
     }
 
     suspend fun accountInfo(innerTube: InnerTube): Result<AccountInfo> = runCatching {
@@ -36,12 +35,7 @@ internal object AccountMapper {
             ?: throw IllegalStateException("Active account info not found in header")
     }
 
-    /**
-     * Every YouTube channel the currently-set cookie can act as. A response wraps a
-     * deep, mostly-irrelevant renderer tree (buttons, banners, footer links) — walked
-     * as a generic [JsonElement] tree, same as [visitorData], rather than modeling the
-     * whole thing as data classes for the handful of fields actually used.
-     */
+    /** Lists the channels available through the current account cookie. */
     suspend fun getAccountChannels(innerTube: InnerTube): Result<List<AccountInfo>> = runCatching {
         val raw = innerTube.getAccountSwitcherEndpoint(WEB_REMIX).bodyAsText()
             .removePrefix(")]}'\n")
@@ -77,9 +71,8 @@ internal object AccountMapper {
         }
     }
 
-    suspend fun getMediaInfo(innerTube: InnerTube, videoId: String): Result<MediaInfo> = runCatching {
-        return innerTube.getMediaInfo(videoId)
-    }
+    suspend fun getMediaInfo(innerTube: InnerTube, videoId: String): Result<MediaInfo> =
+        innerTube.getMediaInfo(videoId)
 
     private val VISITOR_DATA_REGEX = Regex("^Cg[t|s]")
 }

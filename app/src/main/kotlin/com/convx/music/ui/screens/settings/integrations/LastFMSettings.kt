@@ -6,137 +6,73 @@
 package com.convx.music.ui.screens.settings.integrations
 
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.ui.component.GlassSwitchCompat as Switch
 import androidx.compose.foundation.layout.Arrangement
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.only
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.text.KeyboardOptions
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AlertDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.CircularProgressIndicator
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.OutlinedButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.OutlinedTextField
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Slider
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableFloatStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableIntStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.rememberCoroutineScope
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.draw.alpha
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.input.KeyboardType
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.music.lastfm.LastFM
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.EnableLastFMScrobblingKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LastFMSessionKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LastFMUseNowPlaying
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LastFMUseSendLikes
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LastFMUsernameKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ScrobbleDelayPercentKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ScrobbleDelaySecondsKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ScrobbleMinSongDurationKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.DefaultDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.makeTimeString
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.reportException
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.Dispatchers
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlinx.coroutines.launch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import kotlin.math.roundToInt
 import com.convx.music.ui.screens.settings.SettingsPage
 
@@ -234,7 +170,6 @@ fun LastFMSettings(
                         modifier = Modifier.fillMaxWidth()
                     )
                     
-                    // Show error message if login failed
                     loginError?.let { error ->
                         Text(
                             text = error,
@@ -244,7 +179,6 @@ fun LastFMSettings(
                         )
                     }
                     
-                    // Show loading indicator
                     if (isLoggingIn) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -387,7 +321,7 @@ fun LastFMSettings(
                     title = { Text(stringResource(R.string.enable_scrobbling)) },
                     enabled = isLoggedIn,
                     trailingContent = {
-                        androidx.compose.material3.Switch(
+                        Switch(
                             checked = lastfmScrobbling,
                             onCheckedChange = onlastfmScrobblingChange,
                             enabled = isLoggedIn
@@ -400,7 +334,7 @@ fun LastFMSettings(
                     title = { Text(stringResource(R.string.lastfm_now_playing)) },
                     enabled = isLoggedIn && lastfmScrobbling,
                     trailingContent = {
-                        androidx.compose.material3.Switch(
+                        Switch(
                             checked = useNowPlaying,
                             onCheckedChange = onUseNowPlayingChange,
                             enabled = isLoggedIn && lastfmScrobbling
@@ -414,7 +348,7 @@ fun LastFMSettings(
                     description = { Text(stringResource(R.string.last_fm_send_likes_description)) },
                     enabled = isLoggedIn,
                     trailingContent = {
-                        androidx.compose.material3.Switch(
+                        Switch(
                             checked = useSendLikes,
                             onCheckedChange = onUseSendLikes,
                             enabled = isLoggedIn

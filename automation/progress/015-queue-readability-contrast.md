@@ -23,7 +23,7 @@ touched.
 `Player.kt`'s `TextBackgroundColor` (used by `Queue.kt` for the header,
 "Continue Playing" title, and "Next in Queue" subtitle/count/duration text)
 is a **hardcoded `Color.White`** for every non-DEFAULT `PlayerBackgroundStyle`
-(BLUR, GRADIENT, GLOW_ANIMATED, APPLE_MUSIC, LIVE_MESH, BITCHORD_MESH,
+(BLUR, GRADIENT, GLOW_ANIMATED, APPLE_MUSIC, LIVE_MESH, FLUID_MESH,
 STATIC, CUSTOM_GRADIENT) — see `Player.kt` lines 750–762. Meanwhile the
 queue sheet's actual visible surface, `background` passed into `Queue()`, is
 `rememberHeroTint(mediaMetadata?.thumbnailUrl)` (`Player.kt` line 3551) — a

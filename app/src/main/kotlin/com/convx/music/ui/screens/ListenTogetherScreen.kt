@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.content.Context
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
@@ -118,6 +120,8 @@ import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.rememberPreference
 import kotlinx.coroutines.launch
 import com.convx.music.ui.component.ScreenScaffold
+import androidx.compose.ui.platform.LocalLocale
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -134,15 +138,15 @@ fun ListenTogetherScreen(
         return
     }
 
-    val connectionState by listenTogetherManager.connectionState.collectAsState()
-    val roomState by listenTogetherManager.roomState.collectAsState()
-    val userId by listenTogetherManager.userId.collectAsState()
-    val pendingJoinRequests by listenTogetherManager.pendingJoinRequests.collectAsState()
-    val pendingSuggestions by listenTogetherManager.pendingSuggestions.collectAsState()
-    val controlMode by listenTogetherManager.controlMode.collectAsState()
-    val roomExpiresAt by listenTogetherManager.roomExpiresAt.collectAsState()
-    val roomExpiring by listenTogetherManager.roomExpiring.collectAsState()
-    val extensionsLeft by listenTogetherManager.extensionsLeft.collectAsState()
+    val connectionState by listenTogetherManager.connectionState.collectAsStateWithLifecycle()
+    val roomState by listenTogetherManager.roomState.collectAsStateWithLifecycle()
+    val userId by listenTogetherManager.userId.collectAsStateWithLifecycle()
+    val pendingJoinRequests by listenTogetherManager.pendingJoinRequests.collectAsStateWithLifecycle()
+    val pendingSuggestions by listenTogetherManager.pendingSuggestions.collectAsStateWithLifecycle()
+    val controlMode by listenTogetherManager.controlMode.collectAsStateWithLifecycle()
+    val roomExpiresAt by listenTogetherManager.roomExpiresAt.collectAsStateWithLifecycle()
+    val roomExpiring by listenTogetherManager.roomExpiring.collectAsStateWithLifecycle()
+    val extensionsLeft by listenTogetherManager.extensionsLeft.collectAsStateWithLifecycle()
 
     val (listenTogetherInTopBar) = rememberPreference(ListenTogetherInTopBarKey, defaultValue = true)
     val shouldShowTopBar = showTopBar || listenTogetherInTopBar
@@ -198,8 +202,6 @@ fun ListenTogetherScreen(
 
     val isInRoom = listenTogetherManager.isInRoom
     val isHost = roomState?.hostId == userId
-
-    // User action menu dialog
     if (selectedUserForMenu != null && selectedUsername != null) {
         UserActionDialog(
             username = selectedUsername ?: "",
@@ -239,7 +241,7 @@ fun ListenTogetherScreen(
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val scrollToTop = backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsState()
+    val scrollToTop = backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
     
     LaunchedEffect(scrollToTop?.value) {
         if (scrollToTop?.value == true) {
@@ -272,12 +274,39 @@ fun ListenTogetherScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Header
         item {
             HeaderSection(isInRoom = isInRoom)
         }
 
-        // Connection status card
+        // Party mode: a code on a BitChord server, no account or room setup.
+        item {
+            androidx.compose.material3.Surface(
+                onClick = { navController.navigate("listen_together/party") },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                color = AppTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                androidx.compose.foundation.layout.Row(
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    modifier = Modifier.padding(16.dp),
+                ) {
+                    androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.jam_title), style = AppTheme.typography.titleSmall)
+                        Text(
+                            stringResource(R.string.jam_desc),
+                            style = AppTheme.typography.bodySmall,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                        )
+                    }
+                    com.convx.music.ui.component.SymbolIcon(
+                        symbol = com.convx.music.ui.component.sf("chevron.right"),
+                        contentDescription = null, size = 16.dp,
+                    )
+                }
+            }
+        }
+
         item {
             ConnectionStatusCard(
                 connectionState = connectionState,
@@ -300,7 +329,6 @@ fun ListenTogetherScreen(
         }
 
         if (isInRoom) {
-            // Room status card
             roomState?.let { room ->
                 item {
                     RoomStatusCard(
@@ -311,8 +339,7 @@ fun ListenTogetherScreen(
                     )
                 }
 
-                // Session countdown. Rooms are a shared, temporary resource —
-                // people should see it coming rather than be cut off.
+                // Show the expiry before the server closes the room.
                 if (roomExpiresAt > 0L) {
                     item {
                         SessionCountdownCard(
@@ -325,7 +352,7 @@ fun ListenTogetherScreen(
                     }
                 }
 
-                // Who may drive playback. Host-only control; the server enforces it.
+                // The server remains authoritative for playback permissions.
                 if (isHost) {
                     item {
                         ControlModeCard(
@@ -335,7 +362,6 @@ fun ListenTogetherScreen(
                     }
                 }
 
-                // Connected users
                 val connectedUsers = room.users.filter { it.isConnected }
                 val currentUserIdValue = userId ?: ""
                 item {
@@ -352,7 +378,6 @@ fun ListenTogetherScreen(
                     )
                 }
 
-                // Pending join requests (host only)
                 if (isHost && pendingJoinRequests.isNotEmpty()) {
                     item {
                         PendingJoinRequestsSection(
@@ -363,7 +388,6 @@ fun ListenTogetherScreen(
                     }
                 }
 
-                // Pending suggestions (host only)
                 if (isHost && pendingSuggestions.isNotEmpty()) {
                     item {
                         PendingSuggestionsSection(
@@ -374,9 +398,7 @@ fun ListenTogetherScreen(
                     }
                 }
 
-                // Leave room. A solid error-red bar made the least likely action
-                // the loudest thing on the screen — red text on the surface is
-                // still unmistakably destructive without shouting.
+                // Keep the destructive action quiet while retaining its error color.
                 item {
                     Row(
                         modifier = Modifier
@@ -388,12 +410,7 @@ fun ListenTogetherScreen(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.logout),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = AppTheme.colorScheme.error
-                        )
+                        SymbolIcon(symbol = sf("rectangle.portrait.and.arrow.right"), contentDescription = null, size = 18.dp, tint = AppTheme.colorScheme.error)
                         Spacer(Modifier.width(9.dp))
                         Text(
                             text = stringResource(R.string.leave_room),
@@ -405,7 +422,6 @@ fun ListenTogetherScreen(
                 }
             }
         } else {
-            // Join/Create room section
             item {
                 JoinCreateRoomSection(
                     usernameInput = usernameInput,
@@ -426,9 +442,7 @@ fun ListenTogetherScreen(
                             isCreatingRoom = true
                             isJoiningRoom = false
                             joinErrorMessage = null
-                            // createRoom now allocates the code and opens the
-                            // socket against that room itself — a bare connect()
-                            // has no room to dial and would be refused.
+                            // createRoom allocates the code before opening its socket.
                             listenTogetherManager.createRoom(finalUsername)
                         } else {
                             Toast.makeText(context, R.string.error_username_empty, Toast.LENGTH_SHORT).show()
@@ -461,7 +475,6 @@ fun ListenTogetherScreen(
             }
         }
 
-        // Settings link
         item {
             SettingsLinkCard(
                 onClick = { navController.navigate("settings/integrations/listen_together") }
@@ -482,12 +495,7 @@ private fun NotConfiguredContent() {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(24.dp)
         ) {
-            Icon(
-                painter = painterResource(R.drawable.group),
-                contentDescription = null,
-                tint = AppTheme.colorScheme.primary,
-                modifier = Modifier.size(64.dp)
-            )
+            SymbolIcon(symbol = sf("person.2.fill"), contentDescription = null, size = 64.dp, tint = AppTheme.colorScheme.primary)
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = stringResource(R.string.listen_together),
@@ -510,9 +518,6 @@ private fun NotConfiguredContent() {
 private fun HeaderSection(isInRoom: Boolean = false) {
     if (isInRoom) return
 
-    // The 80dp icon medallion is gone. A screen titled "Listen together" does
-    // not need a picture of two people next to the words "Listen together" —
-    // that space belongs to the type.
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.listen_together),
@@ -536,10 +541,7 @@ private fun ConnectionStatusCard(
     onDisconnect: () -> Unit,
     onReconnect: () -> Unit
 ) {
-    // Connection is plumbing, not content. It used to be a full-width coloured
-    // panel with two buttons, which made the least interesting thing on the
-    // screen the loudest. Now it is a status line, and it only offers an action
-    // when something is actually wrong.
+    // Keep connection status quiet unless the user needs to act.
     val broken = connectionState == ConnectionState.ERROR ||
         connectionState == ConnectionState.DISCONNECTED
     val busy = connectionState == ConnectionState.CONNECTING ||
@@ -648,8 +650,7 @@ private fun RoomStatusCard(
 
         Spacer(Modifier.height(16.dp))
 
-        // One tile per character. A room code gets read aloud and typed by hand,
-        // so it is spaced like a code rather than run together as a word.
+        // Tracking keeps room codes easy to scan when typing.
         Row(
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             modifier = Modifier.combinedBounceClick(
@@ -700,9 +701,7 @@ private fun RoomStatusCard(
                     icon = R.drawable.link,
                     label = stringResource(R.string.copy_link),
                     onClick = {
-                        // Deep link into the app, not a hardcoded web host. The
-                        // previous link pointed at the old Render server, which
-                        // is not even where the room lives any more.
+                        // Share an app deep link for this room code.
                         copy("Listen Together Link", "vivimusic://listen?code=$roomCode")
                     }
                 )
@@ -711,7 +710,7 @@ private fun RoomStatusCard(
     }
 }
 
-/** Square glass-ish action tile used by the room header. */
+/** Action tile used in the room header. */
 @Composable
 private fun ListenTogetherRoomAction(icon: Int, label: String, onClick: () -> Unit) {
     Column(
@@ -744,15 +743,9 @@ private fun ConnectedUsersSection(
     currentUserId: String,
     onUserClick: (String, String) -> Unit
 ) {
-    // Deliberately not a Card. The old screen was a stack of six outlined
-    // containers, which is what made it read as a settings page rather than a
-    // room. Sections are separated by space and type weight instead.
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionLabel(stringResource(R.string.listen_together_in_the_room))
         Spacer(Modifier.height(14.dp))
-
-        // Faces first. The people ARE the content of this screen, so they get
-        // the size, and their names drop to a metadata line underneath.
         Row(
             horizontalArrangement = Arrangement.spacedBy((-10).dp),
             verticalAlignment = Alignment.CenterVertically
@@ -803,8 +796,7 @@ private fun ConnectedUsersSection(
     }
 }
 
-/** Small, quiet, and consistent — the only thing separating one section from
- *  the next now that the containers are gone. */
+/** Vertical spacing between room sections. */
 @Composable
 private fun SectionLabel(text: String) {
     Text(
@@ -816,8 +808,7 @@ private fun SectionLabel(text: String) {
     )
 }
 
-/** Colours are derived from the name, so a person keeps the same colour every
- *  session and across everyone's device — recognisable rather than decorative. */
+/** Stable colors derived from each member's name. */
 private val MemberColors = listOf(
     Color(0xFFFF2D55), Color(0xFF5856D6), Color(0xFF32ADE6),
     Color(0xFF34C759), Color(0xFFFF9F0A), Color(0xFFAF52DE),
@@ -839,9 +830,7 @@ private fun MemberAvatar(
         Box(
             modifier = Modifier
                 .size(46.dp)
-                // The ring is a background colour, not a border: it reads as the
-                // avatar sitting on the surface rather than being outlined, which
-                // is what lets them overlap cleanly.
+                // A filled ring lets overlapping avatars blend into the surface.
                 .clip(CircleShape)
                 .background(AppTheme.colorScheme.background)
                 .padding(2.dp)
@@ -865,12 +854,7 @@ private fun MemberAvatar(
                     .background(AppTheme.colorScheme.background),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.star),
-                    contentDescription = null,
-                    modifier = Modifier.size(11.dp),
-                    tint = AppTheme.colorScheme.primary
-                )
+                SymbolIcon(symbol = sf("star.fill"), contentDescription = null, size = 11.dp, tint = AppTheme.colorScheme.primary)
             }
         }
     }
@@ -882,9 +866,7 @@ private fun PendingJoinRequestsSection(
     onApprove: (String) -> Unit,
     onReject: (String) -> Unit
 ) {
-    // Same flat treatment as the member row — these are the same people, one
-    // step earlier. Giving them a container made a queue of two names look more
-    // important than the room itself.
+    // Keep pending requests visually quieter than connected users.
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionLabel(stringResource(R.string.listen_together_join_requests))
         Spacer(Modifier.height(12.dp))
@@ -929,7 +911,7 @@ private fun PendingJoinRequestsSection(
     }
 }
 
-/** Circular icon button sized to sit level with a 46dp avatar row. */
+/** Circular action button aligned with the member avatars. */
 @Composable
 private fun ListenTogetherRowAction(
     icon: Int,
@@ -971,9 +953,7 @@ private fun PendingSuggestionsSection(
                     .fillMaxWidth()
                     .padding(vertical = 6.dp)
             ) {
-                // Square artwork slot, not a circle: this row is about a track,
-                // and the member rows above use circles for people. The shape
-                // carries the distinction so the eye does not have to read.
+                // Square artwork distinguishes track suggestions from member avatars.
                 Box(
                     modifier = Modifier
                         .size(42.dp)
@@ -981,12 +961,7 @@ private fun PendingSuggestionsSection(
                         .background(AppTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.queue_music),
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    SymbolIcon(symbol = sf("music.note.list"), contentDescription = null, size = 20.dp, tint = AppTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -1044,8 +1019,6 @@ private fun JoinCreateRoomSection(
     val canAct = usernameInput.trim().isNotBlank() || savedUsername.isNotBlank()
     val hasCode = roomCodeInput.trim().length >= MIN_ROOM_CODE_LENGTH
 
-    // No container. Starting a room is the whole job of this screen, so it gets
-    // the page rather than a panel sitting on the page.
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionLabel(stringResource(R.string.listen_together_your_name))
         Spacer(Modifier.height(10.dp))
@@ -1069,7 +1042,6 @@ private fun JoinCreateRoomSection(
 
         Spacer(Modifier.height(24.dp))
 
-        // Primary action, full width, unmissable. One clear thing to do.
         PrimaryAction(
             label = stringResource(R.string.create_room),
             enabled = canAct,
@@ -1085,8 +1057,7 @@ private fun JoinCreateRoomSection(
             onValueChange = { onRoomCodeChange(it.uppercase().filter { c -> c.isLetterOrDigit() }.take(MAX_ROOM_CODE_LENGTH)) },
             placeholder = stringResource(R.string.enter_room_code),
             onFieldFocused = onFieldFocused,
-            // The code is data, so it is set like data: wide tracking that makes a
-            // mistyped character obvious before you submit it.
+            // Space characters so the room code is easy to distinguish.
             letterSpacing = 4.sp,
             bold = true,
             modifier = Modifier.bringIntoViewRequester(bringIntoViewRequester)
@@ -1112,7 +1083,7 @@ private fun JoinCreateRoomSection(
     }
 }
 
-/** Flat filled field, no outline, matching the rest of the screen. */
+/** Filled text field for room entry. */
 @Composable
 private fun EntryField(
     value: String,
@@ -1239,8 +1210,6 @@ private fun DividerWithLabel(label: String) {
 
 @Composable
 private fun SettingsLinkCard(onClick: () -> Unit) {
-    // A row, not a card. It is navigation to somewhere else, so it should sit
-    // quieter than anything describing the room itself.
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1249,24 +1218,14 @@ private fun SettingsLinkCard(onClick: () -> Unit) {
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            painter = painterResource(R.drawable.settings),
-            contentDescription = null,
-            tint = AppTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
-        )
+        SymbolIcon(symbol = sf("gearshape.fill"), contentDescription = null, size = 20.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(14.dp))
         Text(
             text = stringResource(R.string.settings),
             style = AppTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
         )
-        Icon(
-            painter = painterResource(R.drawable.arrow_forward),
-            contentDescription = null,
-            tint = AppTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(16.dp)
-        )
+        SymbolIcon(symbol = sf("arrow.right"), contentDescription = null, size = 16.dp, tint = AppTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -1281,11 +1240,7 @@ private fun UserActionDialog(
     DefaultDialog(
         onDismiss = onDismiss,
         icon = {
-            Icon(
-                painter = painterResource(R.drawable.group),
-                contentDescription = null,
-                modifier = Modifier.size(28.dp)
-            )
+            SymbolIcon(symbol = sf("person.2.fill"), contentDescription = null, size = 28.dp)
         },
         title = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1309,7 +1264,6 @@ private fun UserActionDialog(
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Kick button
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1321,12 +1275,7 @@ private fun UserActionDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.close),
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    SymbolIcon(symbol = sf("xmark"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.error)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -1344,7 +1293,6 @@ private fun UserActionDialog(
                 }
             }
 
-            // Permanently kick button
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1356,12 +1304,7 @@ private fun UserActionDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.close),
-                        contentDescription = null,
-                        tint = AppTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    SymbolIcon(symbol = sf("xmark"), contentDescription = null, size = 24.dp, tint = AppTheme.colorScheme.error)
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -1377,8 +1320,6 @@ private fun UserActionDialog(
                     }
                 }
             }
-
-            // Transfer ownership button
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1416,13 +1357,7 @@ private fun UserActionDialog(
     }
 }
 
-/**
- * Countdown to the room closing.
- *
- * Rooms expire because they are a shared free resource and an abandoned one
- * would otherwise hold its server state forever. Showing the clock is the
- * difference between "the session ended" and "the app broke".
- */
+/** Shows how long the temporary room remains active. */
 @Composable
 private fun SessionCountdownCard(
     expiresAt: Long,
@@ -1446,14 +1381,12 @@ private fun SessionCountdownCard(
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
     val pretty = if (hours > 0) {
-        String.format(java.util.Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+        String.format(LocalLocale.current.platformLocale, "%d:%02d:%02d", hours, minutes, seconds)
     } else {
-        String.format(java.util.Locale.getDefault(), "%d:%02d", minutes, seconds)
+        String.format(LocalLocale.current.platformLocale, "%d:%02d", minutes, seconds)
     }
 
-    // A metadata line, not a container. Only the last ten minutes earn colour —
-    // an always-red panel trains people to ignore it, and then it cannot warn
-    // them about anything.
+    // Highlight the countdown only when the room is close to expiry.
     val tone = if (expiring) {
         AppTheme.colorScheme.error
     } else {
@@ -1463,12 +1396,7 @@ private fun SessionCountdownCard(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            painter = painterResource(R.drawable.timer),
-            contentDescription = null,
-            modifier = Modifier.size(15.dp),
-            tint = tone
-        )
+        SymbolIcon(symbol = sf("timer"), contentDescription = null, size = 15.dp, tint = tone)
         Spacer(Modifier.width(8.dp))
         Text(
             text = stringResource(
@@ -1496,13 +1424,7 @@ private fun SessionCountdownCard(
     }
 }
 
-/**
- * Owner-only switch between owner-driven and free-for-all playback.
- *
- * This only reflects the room's setting — the server decides whether a given
- * action is accepted, so a client that lies about its mode gets refused rather
- * than obeyed.
- */
+/** Shows the room's playback control mode; the server validates each action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ControlModeCard(
@@ -1510,8 +1432,6 @@ private fun ControlModeCard(
     onChange: (String) -> Unit
 ) {
     val everyone = controlMode == com.convx.music.listentogether.ControlModes.EVERYONE
-    // Container dropped to match the rest of the room view; the segmented
-    // control is already a strong enough shape to hold this section on its own.
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionLabel(stringResource(R.string.listen_together_control_mode))
         Spacer(Modifier.height(6.dp))

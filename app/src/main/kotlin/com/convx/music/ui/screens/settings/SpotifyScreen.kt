@@ -1,108 +1,63 @@
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.ios.compat.AppTheme
 
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.webkit.CookieManager
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.webkit.WebResourceRequest
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.webkit.WebView
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.webkit.WebViewClient
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.LinearEasing
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.RepeatMode
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.animateFloat
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.infiniteRepeatable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.rememberInfiniteTransition
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.animation.core.tween
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.background
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.graphics.graphicsLayer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.*
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.shape.CircleShape
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import androidx.compose.material3.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarScrollBehavior
+import com.convx.music.ui.ios.compat.Button
+import com.convx.music.ui.ios.compat.OutlinedButton
+import com.convx.music.ui.ios.compat.TextButton
+import com.convx.music.ui.ios.compat.Text
+import com.convx.music.ui.ios.compat.Icon
+import com.convx.music.ui.ios.compat.LinearProgressIndicator
 import com.convx.music.ui.ios.compat.ModalBottomSheet
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.ui.ios.compat.Surface
+import com.convx.music.ui.ios.compat.rememberIosModalSheetState
 import androidx.compose.runtime.*
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.draw.clip
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.graphics.Color
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.layout.ContentScale
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalContext
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.text.font.FontWeight
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.viewinterop.AndroidView
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import coil3.compose.AsyncImage
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.music.spotify.SpotifyAuth
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.music.spotify.SpotifyHomeItem
+import com.music.spotify.SpotifyHomeShelf
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.DefaultDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.viewmodels.SpotifyImportViewModel
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.viewmodels.SpotifyImportUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +96,6 @@ fun SpotifyScreen(
         pageColor = AppTheme.colorScheme.background,
         horizontalPadding = 24.dp,
     ) {
-        // Connection Card/Group
         IosSettingsGroup(
             title = stringResource(R.string.spotify_account),
             items = listOf(
@@ -192,6 +146,18 @@ fun SpotifyScreen(
             )
         )
 
+        if (state.isAuthenticated) {
+            Spacer(modifier = Modifier.height(24.dp))
+            SpotifyHomeFeedSection(
+                state = state,
+                onRefresh = {
+                    viewModel.loadSources()
+                    viewModel.loadHomeFeed()
+                },
+                onImportPlaylist = viewModel::importHomePlaylist,
+            )
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         val totalPlaylists = state.playlists.size + if (state.likedSongsCount > 0) 1 else 0
@@ -226,39 +192,31 @@ fun SpotifyScreen(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.sync),
-                                contentDescription = null,
-                                tint = if (!refreshEnabled) {
+                            SymbolIcon(symbol = sf("arrow.triangle.2.circlepath"), contentDescription = null, size = 24.dp, modifier = Modifier
+                                    
+                                    .graphicsLayer {
+                                        rotationZ = rotationAngle
+                                    }, tint = if (!refreshEnabled) {
                                     AppTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                 } else {
                                     AppTheme.colorScheme.primary.copy(alpha = 0.9f)
-                                },
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .graphicsLayer {
-                                        rotationZ = rotationAngle
-                                    }
-                            )
+                                })
                         }
                     },
                     enabled = refreshEnabled,
-                    onClick = { viewModel.loadSources() }
+                    onClick = {
+                        viewModel.loadSources()
+                        viewModel.loadHomeFeed()
+                    }
                 )
             )
         )
 
-        // Info block
         Row(
             modifier = Modifier.padding(top = 24.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Icon(
-                painter = painterResource(R.drawable.info),
-                contentDescription = null,
-                tint = AppTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = 8.dp)
-            )
+            SymbolIcon(symbol = sf("info.circle"), contentDescription = null, modifier = Modifier.padding(end = 8.dp), tint = AppTheme.colorScheme.onSurfaceVariant)
             Text(
                 text = stringResource(R.string.spotify_import_desc),
                 style = AppTheme.typography.bodyMedium,
@@ -371,13 +329,127 @@ fun SpotifyScreen(
     }
 }
 
+@Composable
+private fun SpotifyHomeFeedSection(
+    state: SpotifyImportUiState,
+    onRefresh: () -> Unit,
+    onImportPlaylist: (SpotifyHomeItem) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.spotify_home_title),
+                style = AppTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = AppTheme.colorScheme.onSurface,
+            )
+            TextButton(onClick = onRefresh, enabled = !state.isHomeFeedLoading) {
+                Text(stringResource(R.string.spotify_refresh))
+            }
+        }
+
+        when {
+            state.isHomeFeedLoading && state.homeShelves.isEmpty() -> {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            state.homeFeedErrorMessage != null && state.homeShelves.isEmpty() -> {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.spotify_home_error),
+                        style = AppTheme.typography.bodyMedium,
+                        color = AppTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = onRefresh) {
+                        Text(stringResource(R.string.spotify_home_retry))
+                    }
+                }
+            }
+            state.homeShelves.isEmpty() -> {
+                Text(
+                    text = stringResource(R.string.spotify_home_empty),
+                    style = AppTheme.typography.bodyMedium,
+                    color = AppTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            else -> {
+                state.homeShelves.forEach { shelf ->
+                    SpotifyHomeShelfRow(shelf = shelf, onImportPlaylist = onImportPlaylist)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpotifyHomeShelfRow(
+    shelf: SpotifyHomeShelf,
+    onImportPlaylist: (SpotifyHomeItem) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = shelf.title,
+            style = AppTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = AppTheme.colorScheme.onSurface,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(shelf.items, key = SpotifyHomeItem::uri) { item ->
+                Surface(
+                    modifier = Modifier.width(148.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = AppTheme.colorScheme.surfaceContainerLow,
+                    onClick = { onImportPlaylist(item) },
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AsyncImage(
+                            model = item.artworkUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(AppTheme.colorScheme.primary.copy(alpha = 0.08f)),
+                            contentScale = ContentScale.Crop,
+                            error = painterResource(R.drawable.spotify),
+                            placeholder = painterResource(R.drawable.spotify),
+                        )
+                        Text(
+                            text = item.title,
+                            style = AppTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = AppTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            minLines = 2,
+                        )
+                        Text(
+                            text = stringResource(R.string.spotify_home_import_hint),
+                            style = AppTheme.typography.labelSmall,
+                            color = AppTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SpotifyLoginSheet(
     onDismiss: () -> Unit,
     onCookiesCaptured: (spDc: String, spKey: String) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberIosModalSheetState(skipPartiallyExpanded = true)
     var webView by remember { mutableStateOf<WebView?>(null) }
     var captured by remember { mutableStateOf(false) }
 

@@ -114,14 +114,7 @@ internal object LibraryMapper {
             }
         }.toMutableList()
 
-        /*
-         * We need to fetch the artist page when accessing the library because it allows to have
-         * a proper playEndpoint, which is needed to correctly report the playing indicator in
-         * the home page.
-         *
-         * Despite this, we need to use the old thumbnail because it's the proper format for a
-         * square picture, which is what we need.
-         */
+        // Fetch the full artist for its play endpoint, but keep the library's square thumbnail.
         items.forEachIndexed { index, item ->
             if (item is ArtistItem) {
                 ArtistMapper.artist(innerTube, item.id).getOrNull()?.artist?.let { fetchedArtist ->

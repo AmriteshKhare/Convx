@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.library
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -120,7 +122,6 @@ import com.convx.music.ui.utils.combinedBounceClick
 import com.convx.music.ui.utils.localPlaylistRoute
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.convx.music.utils.rememberEnumPreference
-import com.convx.music.constants.LocalOnlyModeKey
 import com.convx.music.utils.rememberPreference
 import com.convx.music.viewmodels.LibraryMixViewModel
 import java.text.Collator
@@ -128,6 +129,7 @@ import java.time.LocalDateTime
 import java.util.Locale
 import java.util.UUID
 import androidx.compose.ui.platform.LocalLocale
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -139,8 +141,8 @@ fun LibraryMixScreen(
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
     var viewType by rememberEnumPreference(AlbumViewTypeKey, LibraryViewType.GRID)
     val (sortType, onSortTypeChange) = rememberEnumPreference(
@@ -161,9 +163,9 @@ fun LibraryMixScreen(
     val uploadedThumbnail by rememberPreference(stringPreferencesKey("thumbnail_${PlaylistEntity.UPLOADED_PLAYLIST_ID}"), "")
     val localThumbnail by rememberPreference(stringPreferencesKey("thumbnail_${PlaylistEntity.LOCAL_PLAYLIST_ID}"), "")
 
-    val albums by viewModel.albums.collectAsState()
-    val artists by viewModel.artists.collectAsState()
-    val playlists by viewModel.playlists.collectAsState()
+    val albums by viewModel.albums.collectAsStateWithLifecycle()
+    val artists by viewModel.artists.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
 
     // Pinned playlists get their own row up top -- same pattern as
     // LibraryPlaylistsScreen's. Without this, pinning a playlist from the mixed
@@ -245,7 +247,7 @@ fun LibraryMixScreen(
 
     // Every auto playlist except Local is built from YouTube state (likes, YT
     // downloads, listening history, uploads), so local-only mode leaves just the one.
-    val (localOnly) = rememberPreference(LocalOnlyModeKey, false)
+    val localOnly = com.convx.music.LocalLocalOnlyMode.current
     val (showLikedPref) = rememberPreference(ShowLikedPlaylistKey, true)
     val (showDownloadedPref) = rememberPreference(ShowDownloadedPlaylistKey, true)
     val (showTopPref) = rememberPreference(ShowTopPlaylistKey, true)
@@ -318,7 +320,7 @@ fun LibraryMixScreen(
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val scrollToTop =
-        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsState()
+        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTop?.value) {
         if (scrollToTop?.value == true) {
@@ -359,13 +361,10 @@ fun LibraryMixScreen(
                         selected = viewType == type,
                         onClick = { viewType = type },
                         icon = {
-                            Icon(
-                                imageVector = when (type) {
-                                    LibraryViewType.LIST -> SfSymbols.Monochrome.SFListBullet
-                                    LibraryViewType.GRID -> SfSymbols.Monochrome.SFSquareGrid2x2
-                                },
-                                contentDescription = null,
-                            )
+                            SymbolIcon(bounceOnEnter = true, symbol = when (type) {
+                                    LibraryViewType.LIST -> sf("SFListBullet")
+                                    LibraryViewType.GRID -> sf("SFSquareGrid2x2")
+                                }, contentDescription = null)
                         },
                     )
                 }
@@ -373,7 +372,7 @@ fun LibraryMixScreen(
         }
     }
 
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val pullRefreshState = rememberPullToRefreshState()
 
     HeroBackground(
@@ -487,6 +486,7 @@ fun LibraryMixScreen(
                                 PlaylistListItem(
                                     playlist = likedPlaylist,
                                     autoPlaylist = true,
+                                    sharedArtworkId = "liked",
                                     flat = true,
                                     showIconOnly = libraryIconsOnly,
                                     thumbnailOverrideUrl = likedThumbnail.takeIf { it.isNotBlank() },
@@ -522,6 +522,7 @@ fun LibraryMixScreen(
                                 PlaylistListItem(
                                     playlist = downloadPlaylist,
                                     autoPlaylist = true,
+                                    sharedArtworkId = "downloaded",
                                     flat = true,
                                     showIconOnly = libraryIconsOnly,
                                     thumbnailOverrideUrl = downloadThumbnail.takeIf { it.isNotBlank() },
@@ -557,6 +558,7 @@ fun LibraryMixScreen(
                                 PlaylistListItem(
                                     playlist = topPlaylist,
                                     autoPlaylist = true,
+                                    sharedArtworkId = topSize.toString(),
                                     flat = true,
                                     showIconOnly = libraryIconsOnly,
                                     thumbnailOverrideUrl = topThumbnail.takeIf { it.isNotBlank() },
@@ -592,6 +594,7 @@ fun LibraryMixScreen(
                                 PlaylistListItem(
                                     playlist = cachePlaylist,
                                     autoPlaylist = true,
+                                    sharedArtworkId = "cached",
                                     flat = true,
                                     showIconOnly = libraryIconsOnly,
                                     thumbnailOverrideUrl = cacheThumbnail.takeIf { it.isNotBlank() },
@@ -627,6 +630,7 @@ fun LibraryMixScreen(
                             PlaylistListItem(
                                 playlist = uploadedPlaylist,
                                 autoPlaylist = true,
+                                sharedArtworkId = "uploaded",
                                 flat = true,
                                 showIconOnly = true,
                                 thumbnailOverrideUrl = uploadedThumbnail.takeIf { it.isNotBlank() },
@@ -662,6 +666,7 @@ fun LibraryMixScreen(
                             PlaylistListItem(
                                 playlist = localPlaylist,
                                 autoPlaylist = true,
+                                sharedArtworkId = "local",
                                 flat = true,
                                 showIconOnly = true,
                                 thumbnailOverrideUrl = localThumbnail.takeIf { it.isNotBlank() },
@@ -712,10 +717,7 @@ fun LibraryMixScreen(
                                                 }
                                             },
                                         ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.more_horiz),
-                                                contentDescription = null,
-                                            )
+                                            SymbolIcon(bounceOnEnter = true, symbol = sf("ellipsis"), contentDescription = null)
                                         }
                                     },
                                     modifier =
@@ -757,10 +759,7 @@ fun LibraryMixScreen(
                                                 }
                                             },
                                         ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.more_horiz),
-                                                contentDescription = null,
-                                            )
+                                            SymbolIcon(bounceOnEnter = true, symbol = sf("ellipsis"), contentDescription = null)
                                         }
                                     },
                                     modifier =
@@ -804,10 +803,7 @@ fun LibraryMixScreen(
                                                 }
                                             },
                                         ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.more_horiz),
-                                                contentDescription = null,
-                                            )
+                                            SymbolIcon(bounceOnEnter = true, symbol = sf("ellipsis"), contentDescription = null)
                                         }
                                     },
                                     modifier =
@@ -918,6 +914,7 @@ fun LibraryMixScreen(
                                 playlist = likedPlaylist,
                                 fillMaxWidth = true,
                                 autoPlaylist = true,
+                                sharedArtworkId = "liked",
                                 showIconOnly = true,
                                 thumbnailOverrideUrl = likedThumbnail.takeIf { it.isNotBlank() },
                                 modifier =
@@ -953,6 +950,7 @@ fun LibraryMixScreen(
                                 playlist = downloadPlaylist,
                                 fillMaxWidth = true,
                                 autoPlaylist = true,
+                                sharedArtworkId = "downloaded",
                                 showIconOnly = true,
                                 thumbnailOverrideUrl = downloadThumbnail.takeIf { it.isNotBlank() },
                                 modifier =
@@ -988,6 +986,7 @@ fun LibraryMixScreen(
                                 playlist = topPlaylist,
                                 fillMaxWidth = true,
                                 autoPlaylist = true,
+                                sharedArtworkId = topSize.toString(),
                                 showIconOnly = true,
                                 thumbnailOverrideUrl = topThumbnail.takeIf { it.isNotBlank() },
                                 modifier =
@@ -1023,6 +1022,7 @@ fun LibraryMixScreen(
                                 playlist = cachePlaylist,
                                 fillMaxWidth = true,
                                 autoPlaylist = true,
+                                sharedArtworkId = "cached",
                                 showIconOnly = true,
                                 thumbnailOverrideUrl = cacheThumbnail.takeIf { it.isNotBlank() },
                                 modifier =
@@ -1058,6 +1058,7 @@ fun LibraryMixScreen(
                                 playlist = uploadedPlaylist,
                                 fillMaxWidth = true,
                                 autoPlaylist = true,
+                                sharedArtworkId = "uploaded",
                                 showIconOnly = true,
                                 thumbnailOverrideUrl = uploadedThumbnail.takeIf { it.isNotBlank() },
                                 modifier =
@@ -1093,6 +1094,7 @@ fun LibraryMixScreen(
                                 playlist = localPlaylist,
                                 fillMaxWidth = true,
                                 autoPlaylist = true,
+                                sharedArtworkId = "local",
                                 showIconOnly = true,
                                 thumbnailOverrideUrl = localThumbnail.takeIf { it.isNotBlank() },
                                 modifier =

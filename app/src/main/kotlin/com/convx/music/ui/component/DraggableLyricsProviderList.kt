@@ -97,11 +97,7 @@ fun DraggableLyricsProviderList(
                             onClick = { },
                             modifier = Modifier.draggableHandle(),
                         ) {
-                            Icon(
-                                painter = painterResource(R.drawable.drag_handle),
-                                contentDescription = null,
-                                tint = AppTheme.colorScheme.onSurfaceVariant,
-                            )
+                            SymbolIcon(symbol = sf("line.3.horizontal"), contentDescription = null, tint = AppTheme.colorScheme.onSurfaceVariant)
                         }
 
                         Text(

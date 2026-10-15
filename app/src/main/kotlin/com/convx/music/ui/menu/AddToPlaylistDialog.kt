@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.menu
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -61,6 +63,7 @@ import com.convx.music.viewmodels.PlaylistsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun AddToPlaylistDialog(
@@ -71,7 +74,7 @@ fun AddToPlaylistDialog(
     onDismiss: () -> Unit,
     viewModel: PlaylistsViewModel = hiltViewModel()
 ) {
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val coroutineScope = rememberCoroutineScope()
     val (sortType, onSortTypeChange) = rememberEnumPreference(
         AddToPlaylistSortTypeKey,
@@ -81,7 +84,7 @@ fun AddToPlaylistDialog(
         AddToPlaylistSortDescendingKey,
         false
     )
-    val playlists by viewModel.allPlaylists.collectAsState()
+    val playlists by viewModel.allPlaylists.collectAsStateWithLifecycle()
     val (innerTubeCookie) = rememberPreference(InnerTubeCookieKey, "")
     val isLoggedIn = remember(innerTubeCookie) {
         "SAPISID" in parseCookieString(innerTubeCookie)
@@ -149,20 +152,12 @@ fun AddToPlaylistDialog(
                             ) 
                         },
                         leadingIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.search),
-                                contentDescription = null,
-                                tint = AppTheme.colorScheme.primary
-                            )
+                            SymbolIcon(symbol = sf("magnifyingglass"), contentDescription = null, tint = AppTheme.colorScheme.primary)
                         },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.close),
-                                        contentDescription = null,
-                                        tint = AppTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    SymbolIcon(symbol = sf("xmark"), contentDescription = null, tint = AppTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         },
@@ -228,18 +223,16 @@ fun AddToPlaylistDialog(
                     modifier = Modifier.clickable {
                         selectedPlaylist = playlist
                         coroutineScope.launch(Dispatchers.IO) {
-                            if (songIds == null) {
-                                songIds = onGetSong(playlist)
-                            }
-                            duplicates = database.playlistDuplicates(playlist.id, songIds!!)
+                            val playlistSongIds = songIds ?: onGetSong(playlist).also { songIds = it }
+                            duplicates = database.playlistDuplicates(playlist.id, playlistSongIds)
                             if (duplicates.isNotEmpty()) {
                                 showDuplicateDialog = true
                             } else {
                                 onDismiss()
-                                database.addSongToPlaylist(playlist, songIds!!)
+                                database.addSongToPlaylist(playlist, playlistSongIds)
 
                                 playlist.playlist.browseId?.let { plist ->
-                                    songIds?.forEach {
+                                    playlistSongIds.forEach {
                                         YouTube.addToPlaylist(plist, it)
                                     }
                                 }
@@ -256,15 +249,14 @@ fun AddToPlaylistDialog(
             onDismiss = { showCreatePlaylistDialog = false },
             initialTextFieldValue = initialTextFieldValue,
             allowSyncing = allowSyncing,
-            // Creating a playlist from this song picker never added the songs the
-            // user was picking a destination for — CreatePlaylistDialog only ever
-            // creates the empty playlist, nothing in this dialog wired the pending
-            // selection to it afterward.
             onPlaylistCreated = { playlistId ->
                 coroutineScope.launch(Dispatchers.IO) {
                     val newPlaylist = database.playlist(playlistId).first() ?: return@launch
                     val ids = songIds ?: onGetSong(newPlaylist)
                     database.addSongToPlaylist(newPlaylist, ids)
+                    // A synced playlist is empty on YouTube; without this the next sync drops the songs.
+                    newPlaylist.playlist.browseId?.let { remote -> ids.forEach { YouTube.addToPlaylist(remote, it) } }
+                    onDismiss()
                 }
             }
         )
@@ -279,13 +271,15 @@ fun AddToPlaylistDialog(
                         onClick = {
                             showDuplicateDialog = false
                             onDismiss()
-                            database.transaction {
-                                addSongToPlaylist(
-                                    selectedPlaylist!!,
-                                    songIds!!.filter {
-                                        !duplicates.contains(it)
+                            selectedPlaylist?.let { playlist ->
+                                songIds?.let { playlistSongIds ->
+                                    database.transaction {
+                                        addSongToPlaylist(
+                                            playlist,
+                                            playlistSongIds.filterNot { it in duplicates },
+                                        )
                                     }
-                                )
+                                }
                             }
                         }
                     ) {
@@ -296,8 +290,12 @@ fun AddToPlaylistDialog(
                         onClick = {
                             showDuplicateDialog = false
                             onDismiss()
-                            database.transaction {
-                                addSongToPlaylist(selectedPlaylist!!, songIds!!)
+                            selectedPlaylist?.let { playlist ->
+                                songIds?.let { playlistSongIds ->
+                                    database.transaction {
+                                        addSongToPlaylist(playlist, playlistSongIds)
+                                    }
+                                }
                             }
                         }
                     ) {

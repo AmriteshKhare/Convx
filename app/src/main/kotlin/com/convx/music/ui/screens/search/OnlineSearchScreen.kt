@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.search
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -59,6 +61,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.convx.music.ui.ios.foundation.iosRowPress
+import com.convx.music.ui.screens.library.apple.SfStyle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.composables.sfsymbols.monochrome.SFArrowUp
@@ -104,9 +110,10 @@ fun OnlineSearchScreen(
     // screen renders transparent over the caller's existing blurred hero backdrop
     // instead of painting its own, so text/icons need to match that same contrast.
     contentColor: Color = AppTheme.colorScheme.onSurface,
+    referenceHistory: Boolean = false,
     viewModel: OnlineSearchSuggestionViewModel = hiltViewModel(),
 ) {
-    val database = LocalDatabase.current
+    val database = LocalDatabase.current.get()
     val keyboardController = LocalSoftwareKeyboardController.current
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -114,11 +121,11 @@ fun OnlineSearchScreen(
     val scope = rememberCoroutineScope()
 
     val haptic = LocalHapticFeedback.current
-    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
     val coroutineScope = rememberCoroutineScope()
-    val viewState by viewModel.viewState.collectAsState()
+    val viewState by viewModel.viewState.collectAsStateWithLifecycle()
 
     val lazyListState = rememberLazyListState()
     val searchedSongsTitle = stringResource(R.string.queue_searched_songs)
@@ -144,16 +151,33 @@ fun OnlineSearchScreen(
 
     LazyColumn(
         state = lazyListState,
-        contentPadding = LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom).asPaddingValues(),
+        contentPadding = LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+            .asPaddingValues(),
         modifier = Modifier
             .fillMaxSize()
-            // Transparent so the caller's own blurred hero backdrop (and home
-            // background image, if the user has one set) shows through instead
-            // of this screen painting over it. The rest of the search flow
-            // (title, tabs) doesn't special-case pureBlack either — this used
-            // to override with flat black regardless, hiding the image.
+            // Keep the list transparent so the caller's hero background shows through.
     ) {
-        if (viewState.history.isNotEmpty()) {
+        if (referenceHistory && query.isEmpty()) {
+            item(key = "history_header", contentType = "header") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp,
+                        top = 20.dp, bottom = 24.dp).height(26.dp),
+                ) {
+                    Text(text = stringResource(R.string.recently_searched),
+                        style = SfStyle(22.sp, 26.sp, FontWeight.Bold, (-0.22).sp),
+                        color = contentColor, modifier = Modifier.weight(1f))
+                    if (viewState.history.isNotEmpty()) {
+                        Text(text = stringResource(R.string.clear_recent_searches),
+                            style = SfStyle(17.sp, 22.sp, tracking = (-0.51).sp),
+                            color = Color(0xFFFA233A),
+                            modifier = Modifier.iosRowPress(onClick = {
+                                database.query { clearSearchHistory() }
+                            }))
+                    }
+                }
+            }
+        } else if (viewState.history.isNotEmpty()) {
             item(key = "history_header") {
                 Text(
                     text = stringResource(R.string.search_history),
@@ -169,6 +193,7 @@ fun OnlineSearchScreen(
             SuggestionItem(
                 query = history.query,
                 online = false,
+                referenceHistory = referenceHistory,
                 contentColor = contentColor,
                 onClick = {
                     onSearch(history.query)
@@ -292,10 +317,7 @@ fun OnlineSearchScreen(
                             }
                         }
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.more_horiz),
-                            contentDescription = null
-                        )
+                        SymbolIcon(symbol = sf("ellipsis"), contentDescription = null)
                     }
                 },
                 modifier = Modifier
@@ -379,6 +401,7 @@ fun SuggestionItem(
     modifier: Modifier = Modifier,
     query: String,
     online: Boolean,
+    referenceHistory: Boolean = false,
     contentColor: Color,
     onClick: () -> Unit,
     onDelete: () -> Unit = {},
@@ -389,24 +412,20 @@ fun SuggestionItem(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(SuggestionItemHeight)
+                .height(if (referenceHistory && !online) 56.dp else SuggestionItemHeight)
                 // Flat — same borderless-row-over-hero-blur look as the actual
                 // result rows below (YouTubeListItem, flat = true), not a card.
                 .bounceClick(onClick = onClick)
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)),
         ) {
-            Icon(
-                if (online) SfSymbols.Monochrome.SFMagnifyingglass else SfSymbols.Monochrome.SFClock,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.padding(horizontal = 16.dp).alpha(0.5f)
-            )
+            SymbolIcon(symbol = if (online) sf("SFMagnifyingglass") else sf("SFClock"), contentDescription = null, size = 17.dp, modifier = Modifier.padding(horizontal = 16.dp).alpha(0.5f), tint = contentColor)
 
             Text(
                 text = query,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = contentColor,
+                style = SfStyle(17.sp, 22.sp, tracking = (-0.43).sp),
                 modifier = Modifier.weight(1f),
             )
 
@@ -415,11 +434,7 @@ fun SuggestionItem(
                     onClick = onDelete,
                     modifier = Modifier.alpha(0.5f),
                 ) {
-                    Icon(
-                        imageVector = SfSymbols.Monochrome.SFXmark,
-                        contentDescription = null,
-                        tint = contentColor,
-                    )
+                    SymbolIcon(symbol = sf("SFXmark"), contentDescription = null, size = 14.dp, tint = contentColor)
                 }
             }
 
@@ -427,11 +442,7 @@ fun SuggestionItem(
                 onClick = onFillTextField,
                 modifier = Modifier.alpha(0.5f),
             ) {
-                Icon(
-                    imageVector = SfSymbols.Monochrome.SFArrowUp,
-                    contentDescription = null,
-                    tint = contentColor,
-                )
+                SymbolIcon(symbol = sf("SFArrowUp"), contentDescription = null, size = 16.dp, tint = contentColor)
             }
         }
         HorizontalDivider(

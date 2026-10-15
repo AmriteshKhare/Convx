@@ -24,6 +24,7 @@ import com.convx.music.playback.dj.MusicalKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -33,87 +34,49 @@ import org.json.JSONObject
 import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicInteger
 
-/** How many of the user's library songs get offered to the LLM as candidates
- *  — bounded so a large library doesn't blow up the prompt. */
+/** Maximum number of local songs included as AI candidates. */
 private const val MAX_LIBRARY_CANDIDATES = 150
 
-/** One AI-picked song plus where it sits in a concert-mode set. Ignored
- *  entirely outside [AiDjSetBuilder.buildSet]'s concertMode path. */
+/** An AI-selected song and its position in a concert set. */
 private data class ChosenSong(val title: String, val artist: String, val role: String)
 
-/** Narrative order a concert-mode set is assembled in — see
- *  [AiDjSetBuilder.buildSet]'s ordering step. */
+/** Playback order for roles in a concert set. */
 private val CONCERT_ROLES = listOf("opener", "rising", "peak", "closer")
 
 data class AiDjSetResult(
     val playlistName: String,
     val orderedTitles: List<String>,
     val unmatchedTitles: List<String>,
-    /** Plain-language summary of how the set was actually built — so it's
-     *  visible whether the AI curated it or it's the seed's related songs
-     *  passed straight through, rather than the two looking identical. */
+    /** Description of how this set was generated. */
     val method: String,
-    /** Song ids in final playback order — the seed (if any) first. Not
-     *  persisted anywhere until [AiDjSetBuilder.savePlaylist] is called. */
+    /** Song ids in playback order. */
     val orderedIds: List<String>,
-    /** Resolved AI/related picks, keyed by id. Excludes the seed, which is
-     *  already a local library song — see [seedSong]. */
+    /** Resolved YouTube songs, keyed by id; excludes the local seed song. */
     val songsById: Map<String, SongItem>,
-    /** The local library song this set was seeded from, if any. */
+    /** Local library song used as the seed, if any. */
     val seedSong: Song?,
 )
 
 /**
- * Designs a DJ-ready set from a vibe prompt, a seed song, or an artist/genre
- * concert theme — and hands back the result to preview or play immediately.
- * Nothing is written to the database until [savePlaylist] is called
- * separately: generating a set the user doesn't like should cost nothing to
- * undo.
- *
- * Song *selection* is the LLM's job (or, with a seed and no prompt outside
- * concert mode, no LLM at all — see below). Song *ordering* is either the
- * LLM's own sequence (concert mode — see [buildSet]'s concertMode doc) or
- * [DjSetOrderer], which sequences by the same BPM/key scoring the mixer
- * itself uses at playback time.
+ * Builds a set from a prompt or seed song. Prompted and concert sets use AI;
+ * a seed-only set uses related songs. Concert mode preserves the AI's role
+ * order, while other sets use [DjSetOrderer]. Saving is a separate operation.
  */
 object AiDjSetBuilder {
 
-    /**
-     * At least one of [prompt]/[seedSongId] must be given.
-     *
-     * A [seedSongId] with a blank/null [prompt] skips the AI call entirely:
-     * the candidate pool is just that song's YouTube "related" results,
-     * ordered directly. That path needs no API key and costs nothing — the
-     * local/free option. A non-blank [prompt] asks the configured AI provider
-     * to pick [songCount] songs fitting the vibe from the library (plus the
-     * seed's related songs, when there is a seed); if that call fails for any
-     * reason, a seed's related songs are used as a fallback instead of
-     * failing outright.
-     */
-    /** Assumed average track length, used only to convert a duration target
-     *  into an approximate song count for the AI prompt / fallback loop. */
+    /** Assumed track length, used to estimate how many songs meet a duration target. */
     private const val ASSUMED_AVERAGE_SONG_SECONDS = 210
 
+    /** Builds a set from a prompt, seed song, or both. Without a prompt, non-concert mode uses related songs directly. */
     suspend fun buildSet(
         context: Context,
         database: MusicDatabase,
         prompt: String?,
         seedSongId: String?,
         songCount: Int,
-        /** When set, overrides [songCount]: keep adding songs until their
-         *  combined duration reaches this many seconds instead of a fixed
-         *  count. */
+        /** Target set duration in seconds. When set, this determines the song count. */
         targetDurationSeconds: Long? = null,
-        /** Designs the set like a real live show instead of a flat list: the
-         *  AI researches the artist/genre/vibe from its own knowledge, tags
-         *  each pick opener/rising/peak/closer, and — unlike the plain vibe
-         *  path — the AI's own output order is trusted as the running order
-         *  directly, on the idea that a real setlist's flow (which song
-         *  follows which) is itself part of what's being designed, not
-         *  something a BPM-nearest-neighbour pass should re-decide afterward.
-         *  Always goes through the AI, even with a blank [prompt] (a seed's
-         *  artist becomes the theme) — there's no non-AI way to design a set
-         *  arc. */
+        /** Keep the AI's role order for a concert set. */
         concertMode: Boolean = false,
         onLog: suspend (String) -> Unit,
     ): AiDjSetResult? = withContext(Dispatchers.IO) {
@@ -130,50 +93,18 @@ object AiDjSetBuilder {
             "Gathering candidates... (prompt=${if (trimmedPrompt.isEmpty()) "none" else "\"$trimmedPrompt\""}, " +
                 "seed=${seedSongId ?: "none"})"
         )
-        val related = LinkedHashMap<String, SongItem>()
-        // The seed itself is already a local song (this is always launched from
-        // a song the user already has), not one of its own "related" results —
-        // fetch it directly rather than hoping it shows up in that list.
+        // The seed is already local; fetch it directly instead of relying on related results.
         val seedSong = if (!seedSongId.isNullOrBlank()) database.song(seedSongId).first() else null
-        if (!seedSongId.isNullOrBlank()) {
-            val nextResult = YouTube.next(WatchEndpoint(videoId = seedSongId))
-            val endpoint = nextResult.getOrNull()?.relatedEndpoint
-            if (endpoint != null) {
-                val page = YouTube.related(endpoint)
-                page.onFailure { onLog("Related songs request failed: ${it.message}") }
-                page.getOrNull()?.songs?.forEach { if (it.id != seedSongId) related[it.id] = it }
-            }
-            if (related.isEmpty()) {
-                // No related endpoint (local file, or YouTube just has nothing to
-                // relate it to) — fall back to more songs by the same artist
-                // instead of a dead end.
-                val artist = seedSong?.artists?.firstOrNull()?.name
-                if (!artist.isNullOrBlank()) {
-                    onLog("No related songs for the seed — searching more by $artist instead.")
-                    YouTube.search(artist, SearchFilter.FILTER_SONG).getOrNull()
-                        ?.items?.filterIsInstance<SongItem>()
-                        ?.forEach { if (it.id != seedSongId) related[it.id] = it }
-                }
-            }
-            onLog("Found ${related.size} candidates from the seed.")
-        }
+        val related = findSeedRelatedSongs(seedSongId, seedSong, onLog)
 
-        // What the AI is actually designing a set for — the typed prompt, or
-        // (concert mode only) the seed's own artist as a synthesised theme,
-        // since a concert needs *something* to build an arc around.
+        // Concert mode uses the seed artist as its theme when the prompt is blank.
         val conceptLabel = trimmedPrompt.ifBlank {
             seedSong?.artists?.firstOrNull()?.name ?: seedSong?.song?.title.orEmpty()
         }
         val useAi = trimmedPrompt.isNotEmpty() || (concertMode && conceptLabel.isNotBlank())
 
         if (concertMode && conceptLabel.isNotBlank()) {
-            // The seed's "related" results skew toward whatever YouTube
-            // associates loosely with it — similar artists, generic radio —
-            // which is exactly the "artist-related, not what the artist would
-            // actually perform" drift this is trying to avoid. A direct
-            // search for the concert's own theme gives the AI real
-            // same-artist/same-vibe material as a hint, though the AI is told
-            // below to lean on its own knowledge of the artist over this list.
+            // Search the concert theme directly to give the AI relevant candidates.
             YouTube.search(conceptLabel, SearchFilter.FILTER_SONG).getOrNull()
                 ?.items?.filterIsInstance<SongItem>()
                 ?.forEach { if (it.id != seedSongId) related.putIfAbsent(it.id, it) }
@@ -188,22 +119,227 @@ object AiDjSetBuilder {
                 else "Asking AI to pick songs for the vibe..."
             )
             val librarySongs = database.allSearchableSongs().first().take(MAX_LIBRARY_CANDIDATES)
-            val poolJson = JSONArray().apply {
-                related.values.forEach {
-                    put(JSONObject().apply {
-                        put("title", it.title)
-                        put("artist", it.artists.joinToString { a -> a.name })
-                    })
-                }
-                librarySongs.forEach {
-                    put(JSONObject().apply {
-                        put("title", it.song.title)
-                        put("artist", it.artists.firstOrNull()?.name.orEmpty())
-                    })
-                }
-            }.toString()
+            val poolJson = buildCandidatePool(related.values, librarySongs)
 
-            val systemPrompt = if (concertMode) {
+            val systemPrompt = buildAiPrompt(conceptLabel, poolJson, effectiveSongCount, concertMode)
+
+            val response = AiChatClient.complete(context, systemPrompt, conceptLabel, onLog)
+            chosenSongs += parseAiResponse(response, onLog)
+            usedAi = chosenSongs.isNotEmpty()
+            if (usedAi) {
+                onLog("AI picked: " + chosenSongs.joinToString { "${it.title} — ${it.artist} [${it.role}]" })
+            }
+        }
+
+        val resolved = LinkedHashMap<String, SongItem>()
+        val roleById = mutableMapOf<String, String>()
+        val unmatched = mutableListOf<String>()
+
+        if (usedAi && chosenSongs.isNotEmpty()) {
+            onLog("Resolving ${chosenSongs.size} songs...")
+            val results = resolveChosenSongs(chosenSongs, related.values, onLog)
+            results.forEach { (chosen, item) ->
+                if (item != null) {
+                    resolved[item.id] = item
+                    roleById[item.id] = chosen.role
+                } else {
+                    unmatched += chosen.title
+                }
+            }
+        } else {
+            addRelatedSongs(resolved, related.values, targetDurationSeconds, effectiveSongCount)
+            onLog("Using ${resolved.size} related songs directly (no vibe given).")
+        }
+
+        if (resolved.isEmpty()) {
+            onLog("No songs found.")
+            return@withContext null
+        }
+
+        val method = when {
+            concertMode && usedAi -> "AI-designed concert set for \"$conceptLabel\" (opener, rising, peak, closer)"
+            usedAi && trimmedPrompt.isNotEmpty() -> "AI-curated from your vibe"
+            seedSong != null -> "Related songs for \"${seedSong.song.title}\", no AI involved"
+            else -> "Related songs, no AI involved"
+        }
+
+        onLog("Ordering for the mix...")
+        val orderedIds = orderSongs(
+            database = database,
+            songIds = resolved.keys,
+            roleById = roleById,
+            concertMode = concertMode,
+            seedSongId = seedSongId,
+        )
+        val seedTitle = seedSong?.song?.title
+
+        val name = playlistName(
+            concertMode = concertMode,
+            conceptLabel = conceptLabel,
+            prompt = trimmedPrompt,
+            seedTitle = seedTitle,
+        )
+
+        onLog("Done! Built \"$name\" with ${orderedIds.size} songs.")
+        AiDjSetResult(
+            playlistName = name,
+            orderedTitles = orderedIds.map { id -> resolved[id]?.title ?: seedTitle.takeIf { id == seedSongId } ?: id },
+            unmatchedTitles = unmatched,
+            method = method,
+            orderedIds = orderedIds,
+            songsById = resolved,
+            seedSong = seedSong,
+        )
+    }
+
+    private fun addRelatedSongs(
+        target: MutableMap<String, SongItem>,
+        relatedSongs: Collection<SongItem>,
+        targetDurationSeconds: Long?,
+        songCount: Int,
+    ) {
+        if (targetDurationSeconds == null) {
+            relatedSongs.take(songCount).forEach { target[it.id] = it }
+            return
+        }
+
+        var totalSeconds = 0L
+        for (song in relatedSongs) {
+            if (totalSeconds >= targetDurationSeconds) break
+            target[song.id] = song
+            totalSeconds += song.duration ?: ASSUMED_AVERAGE_SONG_SECONDS
+        }
+    }
+
+    private fun playlistName(
+        concertMode: Boolean,
+        conceptLabel: String,
+        prompt: String,
+        seedTitle: String?,
+    ): String = when {
+        concertMode -> "Concert: $conceptLabel"
+        prompt.isNotEmpty() && seedTitle != null -> "AI DJ Mix: $seedTitle + $prompt"
+        prompt.isNotEmpty() -> "AI DJ Mix: $prompt"
+        seedTitle != null -> "AI DJ Mix: $seedTitle"
+        else -> "AI DJ Mix"
+    }.take(100)
+
+    private suspend fun orderSongs(
+        database: MusicDatabase,
+        songIds: Collection<String>,
+        roleById: Map<String, String>,
+        concertMode: Boolean,
+        seedSongId: String?,
+    ): List<String> {
+        val ids = songIds.toMutableList()
+        if (seedSongId != null) {
+            ids.remove(seedSongId)
+            ids.add(0, seedSongId)
+        }
+
+        if (concertMode && roleById.isNotEmpty()) {
+            return orderConcertSongs(ids, roleById, seedSongId)
+        }
+
+        val analysisRows = database.songAnalyses(ids, SongAnalysisEntity.CURRENT_ANALYSIS_VERSION)
+        val analysisById = analysisRows.associate { row ->
+            row.id to (
+                BeatGrid(row.bpm, row.anchorBeatMs, row.bpmConfidence) to
+                    MusicalKey(row.keyIndex, row.keyIsMinor, row.keyConfidence)
+                )
+        }
+        return DjSetOrderer.order(ids, analysisById)
+    }
+
+    /** Keeps the AI's concert arc and appends songs with unrecognized or missing roles. */
+    internal fun orderConcertSongs(
+        ids: List<String>,
+        roleById: Map<String, String>,
+        seedSongId: String?,
+    ): List<String> {
+        // BPM and key ordering would break the concert arc chosen by the AI.
+        val ordered = listOfNotNull(seedSongId) + CONCERT_ROLES.flatMap { role ->
+            ids.filter { it != seedSongId && roleById[it] == role }
+        }
+        val orderedSet = ordered.toHashSet()
+        return ordered + ids.filterNot(orderedSet::contains)
+    }
+
+    private suspend fun resolveChosenSongs(
+        chosenSongs: List<ChosenSong>,
+        relatedSongs: Collection<SongItem>,
+        onLog: suspend (String) -> Unit,
+    ): List<Pair<ChosenSong, SongItem?>> = coroutineScope {
+        val semaphore = Semaphore(4)
+        val completedCount = AtomicInteger(0)
+
+        // awaitAll preserves the AI's order even when searches finish out of order.
+        chosenSongs.map { chosen ->
+            async {
+                semaphore.withPermit {
+                    val relatedMatch = relatedSongs.firstOrNull {
+                        it.title.equals(chosen.title, ignoreCase = true)
+                    }
+                    val song = relatedMatch ?: run {
+                        val query = if (chosen.artist.isBlank()) {
+                            chosen.title
+                        } else {
+                            "${chosen.title} ${chosen.artist}"
+                        }
+                        YouTube.search(query, SearchFilter.FILTER_SONG).getOrNull()
+                            ?.items?.filterIsInstance<SongItem>()?.firstOrNull()
+                    }
+
+                    val completed = completedCount.incrementAndGet()
+                    onLog("Resolving [$completed/${chosenSongs.size}]: ${chosen.title}")
+                    chosen to song
+                }
+            }
+        }.awaitAll()
+    }
+
+    private suspend fun findSeedRelatedSongs(
+        seedSongId: String?,
+        seedSong: Song?,
+        onLog: suspend (String) -> Unit,
+    ): LinkedHashMap<String, SongItem> {
+        val related = LinkedHashMap<String, SongItem>()
+        if (seedSongId.isNullOrBlank()) return related
+
+        val endpoint = YouTube.next(WatchEndpoint(videoId = seedSongId))
+            .getOrNull()
+            ?.relatedEndpoint
+        if (endpoint != null) {
+            val page = YouTube.related(endpoint)
+            page.onFailure { onLog("Related songs request failed: ${it.message}") }
+            page.getOrNull()?.songs?.forEach { song ->
+                if (song.id != seedSongId) related[song.id] = song
+            }
+        }
+
+        if (related.isEmpty()) {
+            // If there are no related results, search for more songs by the seed artist.
+            val artist = seedSong?.artists?.firstOrNull()?.name
+            if (!artist.isNullOrBlank()) {
+                onLog("No related songs for the seed — searching more by $artist instead.")
+                YouTube.search(artist, SearchFilter.FILTER_SONG).getOrNull()
+                    ?.items?.filterIsInstance<SongItem>()
+                    ?.forEach { song ->
+                        if (song.id != seedSongId) related[song.id] = song
+                    }
+            }
+        }
+
+        onLog("Found ${related.size} candidates from the seed.")
+        return related
+    }
+
+    private fun buildAiPrompt(
+        conceptLabel: String,
+        poolJson: String,
+        songCount: Int,
+        concertMode: Boolean,
+    ): String = if (concertMode) {
                 """
                     You are a knowledgeable concert-setlist designer with real,
                     accurate knowledge of "$conceptLabel"'s discography and how
@@ -238,7 +374,7 @@ object AiDjSetBuilder {
                     reordering afterward, so put real thought into what follows
                     what for a natural energy/tempo flow, not just genre match.
 
-                    Pick exactly $effectiveSongCount songs total across all four parts.
+                    Pick exactly $songCount songs total across all four parts.
                     Output ONLY a JSON array of objects, in that exact sequence:
                     [{"title": "...", "artist": "...", "role": "opener|rising|peak|closer"}].
                     Do NOT include markdown formatting, explanations, or any other text.
@@ -249,162 +385,55 @@ object AiDjSetBuilder {
                     Candidate songs, prefer these when they fit (title/artist pairs):
                     $poolJson
 
-                    Pick exactly $effectiveSongCount songs that best match the requested vibe. You may
+                    Pick exactly $songCount songs that best match the requested vibe. You may
                     suggest a well-known song not in the candidate list if nothing there fits.
                     Output ONLY a JSON array of objects: [{"title": "...", "artist": "..."}].
                     Do NOT include markdown formatting, explanations, or any other text.
                 """.trimIndent()
             }
 
-            val response = AiChatClient.complete(context, systemPrompt, conceptLabel, onLog)
-            if (response != null) {
-                val clean = response.replace("```json", "").replace("```", "").trim()
-                try {
-                    val array = JSONArray(clean)
-                    for (i in 0 until array.length()) {
-                        val obj = array.optJSONObject(i) ?: continue
-                        val title = obj.optString("title")
-                        if (title.isNotBlank()) {
-                            val role = obj.optString("role").lowercase().takeIf { it in CONCERT_ROLES } ?: "peak"
-                            chosenSongs += ChosenSong(title, obj.optString("artist"), role)
-                            usedAi = true
-                        }
-                    }
-                } catch (e: Exception) {
-                    onLog("Couldn't parse the AI response, falling back to related songs.")
-                }
+    private fun buildCandidatePool(relatedSongs: Collection<SongItem>, librarySongs: List<Song>): String =
+        JSONArray().apply {
+            relatedSongs.forEach { song ->
+                put(JSONObject().apply {
+                    put("title", song.title)
+                    put("artist", song.artists.joinToString { it.name })
+                })
             }
-            if (usedAi) {
-                onLog("AI picked: " + chosenSongs.joinToString { "${it.title} — ${it.artist} [${it.role}]" })
+            librarySongs.forEach { song ->
+                put(JSONObject().apply {
+                    put("title", song.song.title)
+                    put("artist", song.artists.firstOrNull()?.name.orEmpty())
+                })
             }
-        }
+        }.toString()
 
-        val resolved = LinkedHashMap<String, SongItem>()
-        val roleById = mutableMapOf<String, String>()
-        val unmatched = mutableListOf<String>()
+    private suspend fun parseAiResponse(
+        response: String?,
+        onLog: suspend (String) -> Unit,
+    ): List<ChosenSong> {
+        val chosenSongs = mutableListOf<ChosenSong>()
+        if (response == null) return chosenSongs
 
-        if (usedAi && chosenSongs.isNotEmpty()) {
-            onLog("Resolving ${chosenSongs.size} songs...")
-            val semaphore = Semaphore(4)
-            val done = AtomicInteger(0)
-            // async{}.awaitAll() preserves list order regardless of completion
-            // order — load-bearing for concert mode, which trusts this order
-            // as the final running order.
-            val results = chosenSongs.map { chosen ->
-                async {
-                    semaphore.withPermit {
-                        val fromRelated = related.values.firstOrNull { it.title.equals(chosen.title, ignoreCase = true) }
-                        val item = fromRelated ?: run {
-                            val query = if (chosen.artist.isBlank()) chosen.title else "${chosen.title} ${chosen.artist}"
-                            YouTube.search(query, SearchFilter.FILTER_SONG).getOrNull()
-                                ?.items?.filterIsInstance<SongItem>()?.firstOrNull()
-                        }
-                        val count = done.incrementAndGet()
-                        onLog("Resolving [$count/${chosenSongs.size}]: ${chosen.title}")
-                        chosen to item
-                    }
-                }
-            }.awaitAll()
-            results.forEach { (chosen, item) ->
-                if (item != null) {
-                    resolved[item.id] = item
-                    roleById[item.id] = chosen.role
-                } else {
-                    unmatched += chosen.title
-                }
+        try {
+            val json = response.replace("```json", "").replace("```", "").trim()
+            val songs = JSONArray(json)
+            for (index in 0 until songs.length()) {
+                val song = songs.optJSONObject(index) ?: continue
+                val title = song.optString("title")
+                if (title.isBlank()) continue
+
+                val role = song.optString("role").lowercase().takeIf { it in CONCERT_ROLES } ?: "peak"
+                chosenSongs += ChosenSong(title, song.optString("artist"), role)
             }
-        } else {
-            // No prompt, or the AI call didn't produce anything usable: fall
-            // back to the seed's related songs directly, no network beyond
-            // what was already fetched above.
-            if (targetDurationSeconds != null) {
-                var totalSeconds = 0L
-                for (item in related.values) {
-                    if (totalSeconds >= targetDurationSeconds) break
-                    resolved[item.id] = item
-                    totalSeconds += item.duration ?: ASSUMED_AVERAGE_SONG_SECONDS
-                }
-            } else {
-                related.values.take(effectiveSongCount).forEach { resolved[it.id] = it }
-            }
-            onLog("Using ${resolved.size} related songs directly (no vibe given).")
+        } catch (e: Exception) {
+            onLog("Couldn't parse the AI response, falling back to related songs.")
         }
-
-        if (resolved.isEmpty()) {
-            onLog("No songs found.")
-            return@withContext null
-        }
-
-        val method = when {
-            concertMode && usedAi -> "AI-designed concert set for \"$conceptLabel\" (opener, rising, peak, closer)"
-            usedAi && trimmedPrompt.isNotEmpty() -> "AI-curated from your vibe"
-            seedSong != null -> "Related songs for \"${seedSong.song.title}\", no AI involved"
-            else -> "Related songs, no AI involved"
-        }
-
-        onLog("Ordering for the mix...")
-        val ids = resolved.keys.toMutableList()
-        if (seedSongId != null) {
-            // Always present and always first, regardless of whether it also
-            // turned up as a "related" candidate — this is the song the set
-            // was asked to be built from.
-            ids.remove(seedSongId)
-            ids.add(0, seedSongId)
-        }
-
-        val orderedIds = if (concertMode && roleById.isNotEmpty()) {
-            // Trust the AI's own sequence: bucket by role, preserving the
-            // order it was returned in within (and across) buckets, rather
-            // than re-sorting by BPM/key. A real setlist's flow is part of
-            // what was just designed, backed by the model's own knowledge of
-            // the artist — a nearest-neighbour pass afterward would throw
-            // that reasoning away in favour of a heuristic that knows nothing
-            // about the songs beyond a cached tempo, if one even exists yet.
-            val opener = listOfNotNull(seedSongId) + ids.filter { it != seedSongId && roleById[it] == "opener" }
-            val rest = CONCERT_ROLES.drop(1).flatMap { role -> ids.filter { it != seedSongId && roleById[it] == role } }
-            // Every resolved id was tagged with a role during parsing (unknown
-            // roles default to "peak"), so nothing should be left over here —
-            // kept as a safety net rather than a reason to drop a song.
-            val placed = opener + rest
-            placed + ids.filterNot { it in placed }
-        } else {
-            val analysisRows = database.songAnalyses(ids, SongAnalysisEntity.CURRENT_ANALYSIS_VERSION)
-            val analysisMap = analysisRows.associate {
-                it.id to (
-                    BeatGrid(it.bpm, it.anchorBeatMs, it.bpmConfidence) to
-                        MusicalKey(it.keyIndex, it.keyIsMinor, it.keyConfidence)
-                    )
-            }
-            DjSetOrderer.order(ids, analysisMap)
-        }
-        val seedTitle = seedSong?.song?.title
-
-        val name = when {
-            concertMode -> "Concert: $conceptLabel"
-            trimmedPrompt.isNotEmpty() && seedTitle != null -> "AI DJ Mix: $seedTitle + $trimmedPrompt"
-            trimmedPrompt.isNotEmpty() -> "AI DJ Mix: $trimmedPrompt"
-            seedTitle != null -> "AI DJ Mix: $seedTitle"
-            else -> "AI DJ Mix"
-        }.take(100)
-
-        onLog("Done! Built \"$name\" with ${orderedIds.size} songs.")
-        AiDjSetResult(
-            playlistName = name,
-            orderedTitles = orderedIds.map { id -> resolved[id]?.title ?: seedTitle.takeIf { id == seedSongId } ?: id },
-            unmatchedTitles = unmatched,
-            method = method,
-            orderedIds = orderedIds,
-            songsById = resolved,
-            seedSong = seedSong,
-        )
+        return chosenSongs
     }
 
-    /**
-     * Persists a previously built [result] as a real playlist. Kept separate
-     * from [buildSet] on purpose: generating a set is free to preview and
-     * replay, and should cost nothing to discard — this is the only step
-     * that actually writes to the library.
-     */
+    /** Saves a generated set as a playlist in the library. */
+
     suspend fun savePlaylist(database: MusicDatabase, result: AiDjSetResult): String = withContext(Dispatchers.IO) {
         val playlistId = PlaylistEntity.generatePlaylistId()
         database.insert(
@@ -418,8 +447,7 @@ object AiDjSetBuilder {
             )
         )
         result.orderedIds.forEachIndexed { index, id ->
-            // The seed is already a local song — nothing to upsert, it just
-            // joins the new playlist at its ordered position.
+            // The seed is already in the database; only insert its playlist mapping.
             result.songsById[id]?.let { item ->
                 database.upsert(
                     SongEntity(
@@ -436,8 +464,8 @@ object AiDjSetBuilder {
     }
 }
 
-/** Builds a queue for immediate playback without saving anything — the
- *  "try it before you commit to it" path [AiDjSetBuilder.buildSet] exists for. */
+/** Converts the ordered set, including its local seed, into playable queue items. */
+
 fun AiDjSetResult.toMediaItems(): List<MediaItem> = orderedIds.mapNotNull { id ->
     songsById[id]?.toMediaItem() ?: seedSong?.takeIf { it.song.id == id }?.toMediaItem()
 }

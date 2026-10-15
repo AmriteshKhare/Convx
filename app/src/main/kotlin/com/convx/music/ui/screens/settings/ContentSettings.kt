@@ -21,176 +21,73 @@ import com.convx.music.ui.ios.foundation.IosTheme
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Arrangement
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Row
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.widthIn
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Button
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.OutlinedTextField
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Slider
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Switch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SwitchDefaults
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TextButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.TopAppBar
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.LaunchedEffect
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableFloatStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.rememberCoroutineScope
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ContentCountryKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ContentLanguageKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SuggestionRegionKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SuggestionRegionSlugToName
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.screens.search.suggestions.SuggestionRegionSheet
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.CountryCodeToName
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.HideExplicitKey
 import com.convx.music.constants.DataSaverEnabledKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.HideVideoSongsKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.HideYoutubeShortsKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.LanguageCodeToName
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.RandomizeHomeOrderKey
 import com.convx.music.constants.ShowHomeMoodFiltersKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.SYSTEM_DEFAULT
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.constants.ShowWrappedCardKey
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.EnumDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberEnumPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.utils.rememberPreference
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateListOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.music.innertube.YouTube
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.collectAsState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -274,7 +171,7 @@ fun ContentSettings(
         horizontalPadding = 16.dp,
     ) {
         IosSettingsGroup(
-            title = stringResource(R.string.general),
+            title = "Region & language",
             items = listOf(
                 IosSettingsItem(
                     icon = rememberVectorPainter(SfSymbols.Monochrome.SFGlobe),
@@ -305,7 +202,15 @@ fun ContentSettings(
                         )
                     },
                     onClick = { showSuggestionSheet = true }
-                ),
+                )
+            )
+        )
+
+        Spacer(modifier = Modifier.height(27.dp))
+
+        IosSettingsGroup(
+            title = "Filters & data",
+            items = listOf(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.explicit),
                     title = { Text(stringResource(R.string.hide_explicit)) },
@@ -356,38 +261,9 @@ fun ContentSettings(
         )
 
         Spacer(modifier = Modifier.height(27.dp))
-//        Spacer(modifier = Modifier.height(27.dp))
-//
-//        IosSettingsGroup(
-//            title = "Wrapped",
-//            items = listOf(
-//                IosSettingsItem(
-//                    icon = painterResource(R.drawable.trending_up),
-//                    title = { Text(stringResource(R.string.show_wrapped_card)) },
-//                    trailingContent = {
-//                        Switch(
-//                            checked = showWrappedCard,
-//                            onCheckedChange = onShowWrappedCardChange,
-//                            thumbContent = {
-//                                Icon(
-//                                    painter = painterResource(
-//                                        id = if (showWrappedCard) R.drawable.check else R.drawable.close
-//                                    ),
-//                                    contentDescription = null,
-//                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-//                                )
-//                            }
-//                        )
-//                    },
-//                    onClick = { onShowWrappedCardChange(!showWrappedCard) }
-//                )
-//            )
-//        )
-
-        Spacer(modifier = Modifier.height(27.dp))
 
         IosSettingsGroup(
-            title = stringResource(R.string.misc),
+            title = "Home feed",
             items = listOf(
                 IosSettingsItem(
                     icon = rememberVectorPainter(SfSymbols.Monochrome.SFShuffle),

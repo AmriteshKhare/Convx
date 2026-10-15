@@ -5,6 +5,9 @@
 
 package com.convx.music.ui.component
 
+import com.convx.music.ui.utils.MenuItemChrome
+import com.convx.music.ui.utils.MenuIconChrome
+import com.convx.music.ui.utils.additiveChrome
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -40,12 +43,15 @@ import androidx.compose.ui.unit.sp
 import com.convx.music.ui.component.shapes.ContinuousRoundedRectangle
 import com.convx.music.ui.ios.compat.ProvideTextStyle
 import com.convx.music.ui.ios.foundation.IosMetrics
+import com.convx.music.ui.ios.foundation.IosMenuMaterial
 import com.convx.music.ui.ios.foundation.IosTheme
+import com.convx.music.ui.ios.foundation.iosMenuSurface
+import com.convx.music.ui.ios.foundation.menuVibrancy
 import com.convx.music.ui.ios.foundation.iosRowPress
 import com.convx.music.ui.ios.foundation.LocalIosContentColor
 import com.convx.music.ui.ios.foundation.LocalIosTextStyle
 
-/** Figma Menu glass corner radius (629:22894). Menu-only. */
+/** Corner radius shared by grouped menu cards. */
 val MenuGroupCornerRadius = 32.dp
 
 /**
@@ -62,6 +68,10 @@ fun IosMenuGroup(
     modifier: Modifier = Modifier,
 ) {
     if (items.isEmpty()) return
+    if (LocalInMenuPanel.current) {
+        FlatMenuGroup(items, modifier)
+        return
+    }
     val colors = IosTheme.colors
 
     // One-shot elastic entrance: the group rises 28dp on a bouncy spring,
@@ -73,33 +83,53 @@ fun IosMenuGroup(
         launch { enterAlpha.animateTo(1f, tween(180)) }
     }
 
+    val stretchScope = rememberCoroutineScope()
+    val bloom = remember(stretchScope) {
+        InteractiveHighlight(animationScope = stretchScope, radiusScale = 0.6f, sheenAlpha = 0.06f, spotAlpha = 0.32f, releasePulse = true)
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
-            // Figma Menu glass: radius 32 + soft drop shadow (629:22894).
-            .shadow(20.dp, ContinuousRoundedRectangle(MenuGroupCornerRadius))
-            .clip(ContinuousRoundedRectangle(MenuGroupCornerRadius))
-            // Frosted, not glassed: flat translucent fill, no refraction.
-            .background(colors.secondarySystemGroupedBackground.copy(alpha = 0.72f))
             .graphicsLayer {
                 translationY = enterOffset.value
                 alpha = enterAlpha.value
             }
+            .iosMenuSurface(ContinuousRoundedRectangle(MenuGroupCornerRadius), bloom, frosted = false)
+            .menuVibrancy()
             .animateContentSize()
     ) {
         items.forEachIndexed { index, item ->
             if (index > 0) {
-                // Figma menu separators: uniform 8pt insets, icon or not (393:7946).
                 Box(
                     Modifier
                         .padding(horizontal = 8.dp)
                         .fillMaxWidth()
                         .height(IosMetrics.SeparatorThickness)
-                        .background(colors.separator)
+                        .background(IosMenuMaterial.colors.separator)
                 )
             }
             IosMenuItemRow(item)
         }
+    }
+}
+
+/**
+ * A group inside the menu panel: no card of its own — iOS menu items sit straight on the
+ * menu — just a separator band above it and hairlines between rows.
+ */
+@Composable
+private fun FlatMenuGroup(items: List<IosMenuItemData>, modifier: Modifier) {
+    val separator = IosMenuMaterial.colors.separator
+    Column(modifier.fillMaxWidth()) {
+        // Existing group spacing plus the hairline creates a 21dp separator band.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .height(1.dp)
+                .background(separator),
+        )
+        items.forEach { item -> IosMenuItemRow(item) }
     }
 }
 
@@ -108,26 +138,31 @@ private fun IosMenuItemRow(item: IosMenuItemData) {
     val colors = IosTheme.colors
     // A destructive row colours its label as well as its icon — that, not a red fill,
     // is how iOS marks "Delete" apart from the rows above it.
-    val contentColor = if (item.tint.isSpecified) item.tint else colors.label
+    val contentColor = if (item.tint.isSpecified) item.tint else IosMenuMaterial.colors.label
     // Finger-tracking press glow over the flat iOS fill.
     val glowScope = rememberCoroutineScope()
     val glow = remember(glowScope) { InteractiveHighlight(animationScope = glowScope) }
 
-    // Figma Context Menu item (393:7946): row pads L8/R6/T10/B10, 28 icon +
-    // 8 gap + label column (17/-0.43, 2px to the 13px subtitle), 6 to trailing.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .iosRowPress(onClick = item.onClick)
             .then(glow.modifier)
             .then(glow.gestureModifier)
-            .defaultMinSize(minHeight = 40.dp)
-            .padding(start = 8.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+            .defaultMinSize(minHeight = 44.dp)
+            .padding(start = 8.dp, end = 6.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         item.icon?.let { icon ->
             Box(Modifier.width(28.dp), contentAlignment = Alignment.CenterStart) {
-                ProvideIosContent(contentColor, IosTheme.typography.body) { icon() }
+                // Quieter than the label: the additive chrome lifts it back up.
+                val iconColor = if (item.tint.isSpecified) contentColor else contentColor
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalSymbolChrome provides MenuItemChrome,
+                    LocalSymbolIconSize provides 22.dp,
+                ) {
+                    ProvideIosContent(iconColor, IosTheme.typography.body) { icon() }
+                }
             }
             Spacer(Modifier.width(8.dp))
         }

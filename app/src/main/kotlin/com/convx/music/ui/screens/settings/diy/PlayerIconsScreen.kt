@@ -5,6 +5,8 @@
 
 package com.convx.music.ui.screens.settings.diy
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -92,7 +94,7 @@ fun PlayerIconsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val (useAppleMusicPlayer, _) = rememberPreference(UseAppleMusicPlayerKey, defaultValue = false)
+    val (useAppleMusicPlayer, _) = rememberPreference(UseAppleMusicPlayerKey, defaultValue = true)
     val (json) = rememberPreference(PlayerIconsKey, defaultValue = "{}")
     val v1Set = remember(json) { PlayerIconSet.fromJson(json) }
     val (v2Json) = rememberPreference(V2PlayerIconsKey, defaultValue = "{}")
@@ -314,11 +316,7 @@ private fun SlotRow(
                 Switch(checked = override.tint, onCheckedChange = onTintChange)
             }
             IconButton(onClick = onClear, onLongClick = {}) {
-                Icon(
-                    painterResource(R.drawable.delete),
-                    contentDescription = null,
-                    tint = AppTheme.colorScheme.error,
-                )
+                SymbolIcon(symbol = sf("trash"), contentDescription = null, tint = AppTheme.colorScheme.error)
             }
         }
     }

@@ -1,110 +1,61 @@
 package com.convx.music.ui.screens.settings
 
+import com.convx.music.ui.component.sf
+import com.convx.music.ui.component.SymbolIcon
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.height
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.padding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.size
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.rememberScrollState
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.foundation.verticalScroll
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Icon
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Switch
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.SwitchDefaults
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.ios.compat.Text
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.material3.TopAppBarScrollBehavior
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.LaunchedEffect
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.getValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.mutableStateOf
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.remember
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.runtime.setValue
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.platform.LocalContext
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.painterResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.stringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.unit.dp
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.content.Intent
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import android.net.Uri
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.navigation.NavController
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.LocalPlayerAwareWindowInsets
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.R
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IconButton
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsGroup
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.component.IosSettingsItem
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.component.UpdateInfoDialog
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.core.component.UpdateInfoDialog
 import com.convx.music.ui.utils.backToMain
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.getAutoUpdateCheckSetting
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.saveAutoUpdateCheckSetting
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.getUpdateAvailableState
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.saveUpdateAvailableState
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.getUpdateNotificationsSetting
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.saveUpdateNotificationsSetting
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.core.updater.getAutoUpdateCheckSetting
+import com.convx.music.core.updater.saveAutoUpdateCheckSetting
+import com.convx.music.core.updater.getUpdateAvailableState
+import com.convx.music.core.updater.saveUpdateAvailableState
+import com.convx.music.core.updater.getUpdateNotificationsSetting
+import com.convx.music.core.updater.saveUpdateNotificationsSetting
 import android.widget.Toast
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import androidx.compose.ui.res.pluralStringResource
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.getDownloadedApkCount
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.clearDownloadedApks
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.getBetaUpdatesSetting
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.saveBetaUpdatesSetting
-import com.convx.music.ui.utils.appTopBarWindowInsets
-import com.convx.music.vivimusic.updater.autoClearOldApks
-import com.convx.music.ui.utils.appTopBarWindowInsets
+import com.convx.music.core.updater.getDownloadedApkCount
+import com.convx.music.core.updater.clearDownloadedApks
+import com.convx.music.core.updater.getBetaUpdatesSetting
+import com.convx.music.core.updater.saveBetaUpdatesSetting
+import com.convx.music.core.updater.autoClearOldApks
 import com.convx.music.ui.ios.compat.AppTheme
-import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.BuildConfig
-
-//here b5.0.1 must be used for the beta tag
 
 /**
  * Convx Project (C) 2026
@@ -123,6 +74,7 @@ fun UpdateSettings(
     val context = LocalContext.current
     var autoUpdateEnabled by remember { mutableStateOf(getAutoUpdateCheckSetting(context)) }
     var updateNotificationsEnabled by remember { mutableStateOf(getUpdateNotificationsSetting(context)) }
+    val alertsPaused = com.convx.music.core.updater.AUTOMATIC_UPDATE_ALERTS_PAUSED
     var betaUpdatesEnabled by remember { mutableStateOf(getBetaUpdatesSetting(context)) }
     val isUpdateAvailable = getUpdateAvailableState(context) && autoUpdateEnabled
     var apkCount by remember { mutableStateOf(getDownloadedApkCount(context)) }
@@ -184,10 +136,11 @@ fun UpdateSettings(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.update),
                     title = { Text(stringResource(R.string.auto_update_check)) },
-                    description = { Text(stringResource(R.string.auto_update_check_subtitle)) },
+                    description = { Text(if (alertsPaused) stringResource(R.string.app_updates_paused) else stringResource(R.string.auto_update_check_subtitle)) },
                     trailingContent = {
                         Switch(
                             checked = autoUpdateEnabled,
+                            enabled = !alertsPaused,
                             onCheckedChange = { enabled ->
                                 autoUpdateEnabled = enabled
                                 saveAutoUpdateCheckSetting(context, enabled)
@@ -198,10 +151,10 @@ fun UpdateSettings(
                         )
                     },
                     onClick = {
-                        autoUpdateEnabled = !autoUpdateEnabled
-                        saveAutoUpdateCheckSetting(context, autoUpdateEnabled)
-                        if (!autoUpdateEnabled) {
-                            saveUpdateAvailableState(context, false)
+                        if (!alertsPaused) {
+                            autoUpdateEnabled = !autoUpdateEnabled
+                            saveAutoUpdateCheckSetting(context, autoUpdateEnabled)
+                            if (!autoUpdateEnabled) saveUpdateAvailableState(context, false)
                         }
                     }
                 ),
@@ -209,10 +162,11 @@ fun UpdateSettings(
                 IosSettingsItem(
                     icon = painterResource(R.drawable.notification),
                     title = { Text(stringResource(R.string.update_notifications)) },
-                    description = { Text(stringResource(R.string.update_notifications_subtitle)) },
+                    description = { Text(if (alertsPaused) stringResource(R.string.app_updates_paused) else stringResource(R.string.update_notifications_subtitle)) },
                     trailingContent = {
                         Switch(
                             checked = updateNotificationsEnabled,
+                            enabled = !alertsPaused,
                             onCheckedChange = { enabled ->
                                 updateNotificationsEnabled = enabled
                                 saveUpdateNotificationsSetting(context, enabled)
@@ -220,8 +174,10 @@ fun UpdateSettings(
                         )
                     },
                     onClick = {
-                        updateNotificationsEnabled = !updateNotificationsEnabled
-                        saveUpdateNotificationsSetting(context, updateNotificationsEnabled)
+                        if (!alertsPaused) {
+                            updateNotificationsEnabled = !updateNotificationsEnabled
+                            saveUpdateNotificationsSetting(context, updateNotificationsEnabled)
+                        }
                     }
                 ),
 
@@ -265,11 +221,7 @@ fun UpdateSettings(
                             onClick = { showInfoDialog = true },
                             onLongClick = {}
                         ) {
-                            Icon(
-                                painterResource(R.drawable.info),
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            SymbolIcon(symbol = sf("info.circle"), contentDescription = null, size = 20.dp)
                         }
                     },
                     onClick = {
@@ -284,12 +236,6 @@ fun UpdateSettings(
                         }
                     }
                 )
-
-//                IosSettingsItem(
-//                    icon = painterResource(R.drawable.info),
-//                    title = { Text(stringResource(R.string.namespace)) },
-//                    description = { Text(BuildConfig.APPLICATION_ID) }
-//                )
 
             )
         )
