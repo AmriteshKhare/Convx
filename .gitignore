@@ -153,3 +153,15 @@ Convx_GitHub_Analytics.xlsx
 # Workspace-local native toolchains and Cargo outputs.
 .tools/
 spotify/native/target/
+
+# Local-only folders: reference assets, resumes, dev scripts, generated/tooling output
+design-reference/
+resume/
+scripts/
+artifacts/
+agent/
+.agents/
+.figma-assets/
+.gradle-user/
+.kiro-prof/
+.shots/
