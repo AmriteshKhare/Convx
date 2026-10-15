@@ -125,6 +125,9 @@ app/keystore/
 !.github/CONTRIBUTING.md
 !automation/**/*.md
 !.github/pull_request_template.md
+!CODE_OF_CONDUCT.md
+!.github/SUPPORT.md
+!.github/release-notes/*.md
 app/src/main/kotlin/com/designRefrence/
 
 # Upstream marketing/store assets — not used by the build
@@ -170,3 +173,9 @@ sh.exe.stackdump
 # Release notes read by CI
 !.github/release-notes/
 !.github/release-notes/*.md
+
+# Local data and tooling files
+/Convx*.csv
+/Convx*Analytics.xlsx
+skills-lock.json
+renovate.json
