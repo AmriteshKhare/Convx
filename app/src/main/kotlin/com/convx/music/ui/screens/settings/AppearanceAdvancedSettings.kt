@@ -51,7 +51,6 @@ import com.convx.music.LocalPlayerAwareWindowInsets
 import com.convx.music.R
 import com.convx.music.constants.AppBackgroundColorKey
 import com.convx.music.constants.AppTextColorKey
-import com.convx.music.constants.AppleMusicLyricsBlurKey
 import com.convx.music.constants.ChipSortTypeKey
 import com.convx.music.constants.DensityScale
 import com.convx.music.constants.DensityScaleKey
@@ -71,8 +70,6 @@ import com.convx.music.constants.IosOverscrollKey
 import com.convx.music.constants.LibraryFilter
 import com.convx.music.constants.LibraryIconsOnlyKey
 import com.convx.music.constants.LocalAlbumsByYearKey
-import com.convx.music.constants.LyricsGlowEffectKey
-import com.convx.music.constants.LyricsStandardBlurKey
 import com.convx.music.constants.EnableLyricsThumbnailPlayPauseKey
 import com.convx.music.constants.MiniBarTabStyleKey
 import com.convx.music.constants.NavBarMeltTransitionKey
@@ -167,15 +164,6 @@ fun AppearanceAdvancedSettings(
         defaultValue = true
     )
 
-    val (lyricsGlowEffect, onLyricsGlowEffectChange) = rememberPreference(LyricsGlowEffectKey, defaultValue = true)
-    val (appleMusicLyricsBlur, onAppleMusicLyricsBlurChange) = rememberPreference(
-        AppleMusicLyricsBlurKey,
-        defaultValue = true
-    )
-    val (lyricsStandardBlur, onLyricsStandardBlurChange) = rememberPreference(
-        LyricsStandardBlurKey,
-        defaultValue = false
-    )
     val (enableLyricsThumbnailPlayPause, onEnableLyricsThumbnailPlayPauseChange) = rememberPreference(
         EnableLyricsThumbnailPlayPauseKey,
         defaultValue = false
@@ -566,39 +554,6 @@ fun AppearanceAdvancedSettings(
                 IosSettingsGroup(
                     title = "Lyrics effects",
                     items = listOf(
-                        IosSettingsItem(
-                            icon = painterResource(R.drawable.lyrics),
-                            title = { Text(stringResource(R.string.lyrics_glow_effect)) },
-                            description = { Text(stringResource(R.string.lyrics_glow_effect_desc)) },
-                            trailingContent = {
-                                Switch(checked = lyricsGlowEffect, onCheckedChange = onLyricsGlowEffectChange)
-                            },
-                            onClick = { onLyricsGlowEffectChange(!lyricsGlowEffect) }
-                        ),
-                        IosSettingsItem(
-                            icon = painterResource(R.drawable.lyrics),
-                            title = { Text(stringResource(R.string.apple_music_lyrics_blur)) },
-                            description = { Text(stringResource(R.string.apple_music_lyrics_blur_desc)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = appleMusicLyricsBlur,
-                                    onCheckedChange = onAppleMusicLyricsBlurChange
-                                )
-                            },
-                            onClick = { onAppleMusicLyricsBlurChange(!appleMusicLyricsBlur) }
-                        ),
-                        IosSettingsItem(
-                            icon = painterResource(R.drawable.lyrics),
-                            title = { Text(stringResource(R.string.standard_lyrics_blur)) },
-                            description = { Text(stringResource(R.string.apple_music_lyrics_blur_desc)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = lyricsStandardBlur,
-                                    onCheckedChange = onLyricsStandardBlurChange
-                                )
-                            },
-                            onClick = { onLyricsStandardBlurChange(!lyricsStandardBlur) }
-                        ),
                         IosSettingsItem(
                             icon = painterResource(R.drawable.play),
                             title = { Text(stringResource(R.string.lyrics_thumbnail_play_pause)) },

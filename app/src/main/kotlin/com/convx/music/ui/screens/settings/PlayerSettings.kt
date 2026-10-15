@@ -32,7 +32,6 @@ import com.convx.music.constants.AutoSkipNextOnErrorKey
 import com.convx.music.constants.CrossfadeEnabledKey
 import com.convx.music.constants.EnableGoogleCastKey
 import com.convx.music.constants.KeepScreenOn
-import com.convx.music.constants.LocalOnlyModeKey
 import com.convx.music.constants.PauseOnMute
 import com.convx.music.constants.PersistentQueueKey
 import com.convx.music.constants.RememberShuffleAndRepeatKey
@@ -63,10 +62,6 @@ fun PlayerSettings(
     )
     val (autoDjMixingEnabled) = rememberPreference(
         AutoDjMixingEnabledKey,
-        defaultValue = false
-    )
-    val (localOnlyMode, onLocalOnlyModeChange) = rememberPreference(
-        LocalOnlyModeKey,
         defaultValue = false
     )
     val (persistentQueue, onPersistentQueueChange) = rememberPreference(
@@ -347,18 +342,6 @@ fun PlayerSettings(
                 IosSettingsGroup(
                     title = "Local music",
                     items = buildList {
-                        add(IosSettingsItem(
-                            icon = painterResource(R.drawable.music_note),
-                            title = { Text(stringResource(R.string.local_only_mode)) },
-                            description = { Text(stringResource(R.string.local_only_mode_desc)) },
-                            trailingContent = {
-                                Switch(
-                                    checked = localOnlyMode,
-                                    onCheckedChange = onLocalOnlyModeChange
-                                )
-                            },
-                            onClick = { onLocalOnlyModeChange(!localOnlyMode) }
-                        ))
                         add(IosSettingsItem(
                             icon = painterResource(R.drawable.music_note),
                             title = { Text(stringResource(R.string.scan_local_files)) },

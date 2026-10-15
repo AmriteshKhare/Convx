@@ -78,7 +78,9 @@ fun SettingsPage(
     scrollState: ScrollState = rememberScrollState(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    ScreenPage(
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalContentColor provides IosTheme.colors.label,
+    ) { ScreenPage(
         title = title,
         modifier = modifier,
         onBack = onBack ?: { navController.navigateUp(); Unit },
@@ -93,7 +95,7 @@ fun SettingsPage(
             content()
             Spacer(Modifier.height(32.dp))
         },
-    )
+    ) }
 }
 
 /** The LazyColumn flavour, for settings pages whose body is a real list. */
@@ -110,7 +112,9 @@ fun SettingsLazyPage(
     listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
-    ScreenLazyPage(
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalContentColor provides IosTheme.colors.label,
+    ) { ScreenLazyPage(
         title = title,
         modifier = modifier,
         onBack = onBack ?: { navController.navigateUp(); Unit },
@@ -121,7 +125,7 @@ fun SettingsLazyPage(
         listState = listState,
         largeTitle = settingsLargeTitle(title),
         content = content,
-    )
+    ) }
 }
 
 /**

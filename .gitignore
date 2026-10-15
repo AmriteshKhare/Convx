@@ -165,3 +165,4 @@ agent/
 .gradle-user/
 .kiro-prof/
 .shots/
+sh.exe.stackdump

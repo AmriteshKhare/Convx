@@ -524,6 +524,10 @@ fun NavGraphBuilder.navigationBuilder(
         ContentAdvancedSettings(navController, scrollBehavior)
     }
 
+    sharedComposable("settings/lyrics") {
+        com.convx.music.ui.screens.settings.LyricsSettingsScreen(navController)
+    }
+
     com.convx.music.ui.screens.settings.SettingsHubs.all.forEach { hub ->
         sharedComposable(hub.route) {
             com.convx.music.ui.screens.settings.SettingsHubScreen(navController, hub)
