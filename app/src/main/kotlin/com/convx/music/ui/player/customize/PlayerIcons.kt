@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.Painter
@@ -215,17 +218,37 @@ fun PlayerGlyph(
 ) {
     val resolved = if (slot != null) rememberPlayerIcon(slot).takeIf { it.isCustom } else null
     val painter = resolved?.painter ?: painterResource(fallback)
+    val isLike = slot == PlayerIconSlot.LIKE || slot == PlayerIconSlot.LIKED
+    // The heart eases between its outline and filled looks, and pops when it becomes liked.
+    val shownTint = if (isLike) {
+        androidx.compose.animation.animateColorAsState(tint, tween(220), label = "heartTint").value
+    } else tint
     val filter = when {
-        resolved == null -> ColorFilter.tint(tint)
-        else -> resolved.colorFilterFor(tint)
+        resolved == null -> ColorFilter.tint(shownTint)
+        else -> resolved.colorFilterFor(shownTint)
     }
-    Image(
-        painter = painter,
-        contentDescription = contentDescription,
-        contentScale = ContentScale.Fit,
-        colorFilter = filter,
-        modifier = modifier,
-    )
+    val pop = remember { androidx.compose.animation.core.Animatable(1f) }
+    var settled by remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(slot) {
+        if (settled && slot == PlayerIconSlot.LIKED) {
+            pop.animateTo(1.4f, tween(90))
+            pop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = 380f))
+        }
+        settled = true
+    }
+    androidx.compose.animation.Crossfade(
+        targetState = painter,
+        animationSpec = tween(if (isLike) 180 else 0),
+        label = "glyph",
+    ) { shown ->
+        Image(
+            painter = shown,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            colorFilter = filter,
+            modifier = if (isLike) modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value } else modifier,
+        )
+    }
 }
 
 /**

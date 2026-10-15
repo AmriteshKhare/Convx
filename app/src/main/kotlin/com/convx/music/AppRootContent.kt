@@ -179,6 +179,7 @@ import com.convx.music.ui.screens.settings.DarkMode
 import com.convx.music.ui.screens.settings.NavigationTab
 import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.theme.ConvxTheme
+import com.convx.music.ui.theme.ForcedDarkScope
 import com.convx.music.ui.theme.DefaultThemeColor
 import com.convx.music.ui.utils.LocalSharedTransitionScope
 import com.convx.music.ui.utils.ShowMediaInfo
@@ -298,6 +299,7 @@ internal fun AppRootContent(
             )
             val glassConfigState = rememberGlassConfigState(artworkChromeDark)
             val glassEffectConfig = glassConfigState.config
+            val darkGlassEffectConfig = rememberGlassConfigState(artworkChromeDark = true).config
             // Gate backdrop capture once for devices that cannot render glass.
             val glassAllowed = isGlassAllowed()
 
@@ -746,6 +748,7 @@ internal fun AppRootContent(
                 // Disable Listen Together until ready; current entry points handle a missing manager.
                 LocalListenTogetherManager provides null,
                 LocalGlassEffectConfig provides glassEffectConfig,
+                com.convx.music.ui.theme.LocalDarkGlassEffectConfig provides darkGlassEffectConfig,
                 LocalAppleMusicUi provides appleMusicUi,
                 LocalTabView provides showRail,
                 LocalAppBackdrop provides appBackdrop,
@@ -808,6 +811,8 @@ internal fun AppRootContent(
                 val showFallbackTopHaze = !shouldShowTopBar &&
                     AppRoutePolicy.showsFallbackTopHaze(currentRoute)
                 val menuBackdrop = rememberLayerBackdrop()
+                val playerBackdropHolder = remember { com.convx.music.ui.player.PlayerBackdropHolder() }
+                val menuSourceBackdrop = (if (playerBottomSheetState.isExpanded) playerBackdropHolder.backdrop else null) ?: menuBackdrop
 
                 // Capture the page and chrome behind the menu. Keep the menu as a sibling
                 // to avoid a RenderNode cycle.
@@ -1144,14 +1149,21 @@ internal fun AppRootContent(
                             Box(
                                 modifier = Modifier.zIndex(if (playerAboveBars) 1f else 0f),
                             ) {
-                                BottomSheetPlayer(
-                                    state = playerBottomSheetState,
-                                    navController = navController,
-                                    pureBlack = pureBlack
-                                )
+                                ForcedDarkScope {
+                                    CompositionLocalProvider(com.convx.music.ui.player.LocalPlayerBackdropHolder provides playerBackdropHolder) {
+                                    BottomSheetPlayer(
+                                        state = playerBottomSheetState,
+                                        navController = navController,
+                                        pureBlack = pureBlack
+                                    )
+                                    }
+                                }
                             }
 
-                            // Keep glass chrome outside its captured content to avoid a recursive RenderNode draw.
+                            // Album, artist and playlist routes keep the floating nav bar and its mini player in the dark palette.
+                val darkRouteActive = com.convx.music.ui.theme.isForcedDarkRoute(currentRoute)
+                // Keep glass chrome outside its captured content to avoid a recursive RenderNode draw.
+                            ForcedDarkScope(enabled = darkRouteActive) {
                             CompositionLocalProvider(LocalPooledGlass provides pooledGlass) {
                                 val menuState = LocalMenuState.current
                                 val bottomSheetPageState = LocalBottomSheetPageState.current
@@ -1208,14 +1220,19 @@ internal fun AppRootContent(
                                         }
                                 )
                             }
+                            }
                         }
                     } else {
                         if (AppRoutePolicy.showsBottomSheetPlayer(currentRoute) && !isSettingsRoute) {
-                            BottomSheetPlayer(
-                                state = playerBottomSheetState,
-                                navController = navController,
-                                pureBlack = pureBlack
-                            )
+                            ForcedDarkScope {
+                                CompositionLocalProvider(com.convx.music.ui.player.LocalPlayerBackdropHolder provides playerBackdropHolder) {
+                                    BottomSheetPlayer(
+                                        state = playerBottomSheetState,
+                                        navController = navController,
+                                        pureBlack = pureBlack
+                                    )
+                                }
+                            }
                         }
 
                         Box(
@@ -1235,19 +1252,26 @@ internal fun AppRootContent(
 
             // menuBackdrop records the entire preceding Box, including the player.
             // Keep the same glass material over the expanded player as over Home.
+                // Menus on album, artist, playlist and player surfaces use the dark palette too.
+                val menuDark = com.convx.music.ui.theme.isForcedDarkRoute(currentRoute) || currentRoute?.startsWith("search") == true ||
+                    playerBottomSheetState.progress > 0f
+                ForcedDarkScope(enabled = menuDark) {
                 OverlayMenu(
                     state = LocalMenuState.current,
                     glass = true,
-                    backdrop = menuBackdrop,
+                    backdrop = menuSourceBackdrop,
                     liquid = true,
                 )
+                }
 
+                ForcedDarkScope(enabled = menuDark) {
                 BottomSheetPage(
                     state = LocalBottomSheetPageState.current,
                     modifier = Modifier.align(Alignment.BottomCenter),
-                    liveBackdrop = menuBackdrop,
+                    liveBackdrop = menuSourceBackdrop,
                     liquidGlassPlayerMode = playerBackgroundStyle == PlayerBackgroundStyle.GLASS,
                 )
+                }
 
                 // Show join requests at the app root; the host may be on another screen.
                 ListenTogetherOverlay(

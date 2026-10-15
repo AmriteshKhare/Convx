@@ -103,6 +103,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import com.convx.music.ui.theme.ForcedDarkScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -394,9 +395,10 @@ fun BottomSheetPlayer(
 
     val isSystemInDarkTheme = isSystemInDarkTheme()
     val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
-    val useDarkTheme = remember(darkTheme, isSystemInDarkTheme) {
+    val preferredDark = remember(darkTheme, isSystemInDarkTheme) {
         if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
     }
+    val useDarkTheme = com.convx.music.ui.theme.LocalForcedDark.current || preferredDark
 
     val dataSaverEnabled by rememberPreference(DataSaverEnabledKey, false)
     val enableCanvasPref by rememberPreference(CanvasThumbnailAnimationKey, true)
@@ -857,6 +859,9 @@ fun BottomSheetPlayer(
 
     // Capture this player's background so foreground glass buttons do not sample the screen behind it.
     val playerBackdrop = rememberLayerBackdrop()
+    // Menus opened from the expanded player sample this layer, not the whole app.
+    val backdropHolder = LocalPlayerBackdropHolder.current
+    androidx.compose.runtime.SideEffect { backdropHolder?.backdrop = playerBackdrop }
 
     val diyLayout = rememberDiyLayout()
     // Shared by the sticker canvas below AND the thumbnail/controls layout branch
@@ -1651,56 +1656,62 @@ fun BottomSheetPlayer(
                 textColor = TextBackgroundColor,
                 onClick = { classicPages.value = PlayerInternalState.COVER },
                 actions = {
-                    GlassCircleButton(
-                        onClick = {
-                            menuState.show {
-                                val onShowDetails: () -> Unit = {
-                                    mediaMetadata?.id?.let { id ->
-                                        bottomSheetPageState.showFloating { ShowMediaInfo(id) }
+                    ForcedDarkScope {
+                        GlassCircleButton(
+                            onClick = {
+                                menuState.show {
+                                    val onShowDetails: () -> Unit = {
+                                        mediaMetadata?.id?.let { id ->
+                                            bottomSheetPageState.showFloating { ShowMediaInfo(id) }
+                                        }
+                                        Unit
                                     }
-                                    Unit
+                                    if (useNewPlayerDesign) {
+                                        PlayerMenu(
+                                            mediaMetadata = mediaMetadata,
+                                            navController = navController,
+                                            playerBottomSheetState = state,
+                                            onShowDetailsDialog = onShowDetails,
+                                            onDismiss = menuState::dismiss,
+                                        )
+                                    } else {
+                                        OldPlayerMenu(
+                                            mediaMetadata = mediaMetadata,
+                                            navController = navController,
+                                            playerBottomSheetState = state,
+                                            onShowDetailsDialog = onShowDetails,
+                                            onDismiss = menuState::dismiss,
+                                        )
+                                    }
                                 }
-                                if (useNewPlayerDesign) {
-                                    PlayerMenu(
-                                        mediaMetadata = mediaMetadata,
-                                        navController = navController,
-                                        playerBottomSheetState = state,
-                                        onShowDetailsDialog = onShowDetails,
-                                        onDismiss = menuState::dismiss,
-                                    )
-                                } else {
-                                    OldPlayerMenu(
-                                        mediaMetadata = mediaMetadata,
-                                        navController = navController,
-                                        playerBottomSheetState = state,
-                                        onShowDetailsDialog = onShowDetails,
-                                        onDismiss = menuState::dismiss,
-                                    )
-                                }
-                            }
-                        },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        PlayerGlyph(
-                            slot = PlayerIconSlot.MORE,
-                            fallback = R.drawable.more_horiz,
-                            tint = TextBackgroundColor,
-                            modifier = Modifier.size(23.dp),
-                            contentDescription = "More options",
-                        )
+                            },
+                            modifier = Modifier.size(40.dp),
+    forceFlat = auxiliaryArtworkTransitionRunning(),
+) {
+                            PlayerGlyph(
+                                slot = PlayerIconSlot.MORE,
+                                fallback = R.drawable.more_horiz,
+                                tint = TextBackgroundColor,
+                                modifier = Modifier.size(23.dp),
+                                contentDescription = "More options",
+                            )
+                        }
                     }
-                    GlassCircleButton(
-                        onClick = playerConnection::toggleLike,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        val liked = currentSong?.song?.liked == true
-                        PlayerGlyph(
-                            slot = if (liked) PlayerIconSlot.LIKED else PlayerIconSlot.LIKE,
-                            fallback = if (liked) R.drawable.favorite else R.drawable.favorite_border,
-                            tint = if (liked) AppTheme.colorScheme.error else TextBackgroundColor,
-                            modifier = Modifier.size(23.dp),
-                            contentDescription = "Like",
-                        )
+                    ForcedDarkScope {
+                        GlassCircleButton(
+                                onClick = playerConnection::toggleLike,
+                                modifier = Modifier.size(40.dp),
+    forceFlat = auxiliaryArtworkTransitionRunning(),
+) {
+                            val liked = currentSong?.song?.liked == true
+                            PlayerGlyph(
+                                slot = if (liked) PlayerIconSlot.LIKED else PlayerIconSlot.LIKE,
+                                fallback = if (liked) R.drawable.favorite else R.drawable.favorite_border,
+                                tint = if (liked) AppTheme.colorScheme.error else TextBackgroundColor,
+                                modifier = Modifier.size(23.dp),
+                                contentDescription = "Like",
+                            )
+                        }
                     }
                 },
             )
@@ -2112,6 +2123,7 @@ fun BottomSheetPlayer(
                                         contentColor = iconButtonColor,
                                     ),
                                     modifier = Modifier.size(42.dp)
+                                        
                                         .additiveChrome(additiveChrome)
                                         .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
                                 ) {
@@ -2123,19 +2135,22 @@ fun BottomSheetPlayer(
                                     )
                                 }
                             } else {
-                                GlassCircleButton(
-                                    onClick = playerConnection::toggleLike,
-                                    modifier = Modifier.size(42.dp),
-                                    size = 42.dp,
-                                ) {
-                                    PlayerGlyph(
-                                        slot = if (currentSong?.song?.liked == true)
-                                            PlayerIconSlot.LIKED else PlayerIconSlot.LIKE,
-                                        fallback = if (currentSong?.song?.liked == true)
-                                            R.drawable.favorite else R.drawable.favorite_border,
-                                        tint = LocalContentColor.current,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                ForcedDarkScope {
+                                    GlassCircleButton(
+                                            onClick = playerConnection::toggleLike,
+                                            modifier = Modifier.size(42.dp),
+                                            size = 42.dp,
+    forceFlat = auxiliaryArtworkTransitionRunning(),
+) {
+                                        PlayerGlyph(
+                                            slot = if (currentSong?.song?.liked == true)
+                                                PlayerIconSlot.LIKED else PlayerIconSlot.LIKE,
+                                            fallback = if (currentSong?.song?.liked == true)
+                                                R.drawable.favorite else R.drawable.favorite_border,
+                                            tint = LocalContentColor.current,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2166,33 +2181,36 @@ fun BottomSheetPlayer(
                                 SymbolIcon(symbol = sf("arrow.up.left.and.arrow.down.right"), contentDescription = null, size = 24.dp)
                             }
                         } else {
-                            GlassCircleButton(
-                                onClick = {
-                                    menuState.show {
-                                        OldPlayerMenu(
-                                            mediaMetadata = mediaMetadata,
-                                            navController = navController,
-                                            playerBottomSheetState = state,
-                                            onShowDetailsDialog = {
-                                                mediaMetadata.id.let {
-                                                    bottomSheetPageState.showFloating {
-                                                       ShowMediaInfo(it)
+                            ForcedDarkScope {
+                                GlassCircleButton(
+                                    onClick = {
+                                        menuState.show {
+                                            OldPlayerMenu(
+                                                mediaMetadata = mediaMetadata,
+                                                navController = navController,
+                                                playerBottomSheetState = state,
+                                                onShowDetailsDialog = {
+                                                    mediaMetadata.id.let {
+                                                        bottomSheetPageState.showFloating {
+                                                           ShowMediaInfo(it)
+                                                        }
                                                     }
-                                                }
-                                            },
-                                            onDismiss = menuState::dismiss
-                                        )
-                                    }
-                                },
-                            ) {
-                                PlayerGlyph(
-                                    slot = PlayerIconSlot.MORE,
-                                    fallback = R.drawable.more_horiz,
-                                    tint = LocalContentColor.current,
-                                    modifier = Modifier.size(24.dp)
-                                        .additiveChrome(additiveChrome)
-                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
-                                )
+                                                },
+                                                onDismiss = menuState::dismiss
+                                            )
+                                        }
+                                    },
+    forceFlat = auxiliaryArtworkTransitionRunning(),
+) {
+                                    PlayerGlyph(
+                                        slot = PlayerIconSlot.MORE,
+                                        fallback = R.drawable.more_horiz,
+                                        tint = LocalContentColor.current,
+                                        modifier = Modifier.size(24.dp)
+                                            .additiveChrome(additiveChrome)
+                                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha }
+                                    )
+                                }
                             }
                         }
                     }
@@ -2200,46 +2218,53 @@ fun BottomSheetPlayer(
                     AnimatedContent(targetState = showInlineLyrics, label = "LikeButton") { showLyrics ->
                         if (showLyrics) {
                             val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue =null)
-                            GlassCircleButton(
-                                onClick = {
-                                    menuState.show {
-                                        com.convx.music.ui.menu.LyricsMenu(
-                                            lyricsProvider = { currentLyrics },
-                                            songProvider = { currentSong?.song },
-                                            mediaMetadataProvider = { mediaMetadata },
-                                            onDismiss = menuState::dismiss,
-                                            onShowOffsetDialog = {
-                                                bottomSheetPageState.show {
-                                                    ShowOffsetDialog(
-                                                        songProvider = { currentSong?.song }
-                                                    )
+                            ForcedDarkScope {
+                                GlassCircleButton(
+                                    onClick = {
+                                        menuState.show {
+                                            com.convx.music.ui.menu.LyricsMenu(
+                                                lyricsProvider = { currentLyrics },
+                                                songProvider = { currentSong?.song },
+                                                mediaMetadataProvider = { mediaMetadata },
+                                                onDismiss = menuState::dismiss,
+                                                onShowOffsetDialog = {
+                                                    bottomSheetPageState.show {
+                                                        ShowOffsetDialog(
+                                                            songProvider = { currentSong?.song }
+                                                        )
+                                                    }
                                                 }
-                                            }
-                                        )
-                                    }
-                                },
-                            ) {
-                                PlayerGlyph(
-                                    slot = PlayerIconSlot.MORE,
-                                    fallback = R.drawable.more_horiz,
-                                    tint = LocalContentColor.current,
-                                    modifier = Modifier.size(24.dp),
-                                )
+                                            )
+                                        }
+                                    },
+    forceFlat = auxiliaryArtworkTransitionRunning(),
+) {
+                                    PlayerGlyph(
+                                        slot = PlayerIconSlot.MORE,
+                                        fallback = R.drawable.more_horiz,
+                                        tint = LocalContentColor.current,
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                }
                             }
                         } else {
-                            GlassCircleButton(
-                                onClick = playerConnection::toggleLike,
-                            ) {
-                                PlayerGlyph(
-                                    slot = if (currentSong?.song?.liked == true)
-                                        PlayerIconSlot.LIKED else PlayerIconSlot.LIKE,
-                                    fallback = if (currentSong?.song?.liked == true)
-                                        R.drawable.favorite else R.drawable.favorite_border,
-                                    tint = if (currentSong?.song?.liked == true) AppTheme.colorScheme.error else LocalContentColor.current,
-                                    modifier = Modifier.size(24.dp)
-                                        .additiveChrome(additiveChrome)
-                                        .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
-                                )
+                            ForcedDarkScope {
+                                GlassCircleButton(
+                                        onClick = playerConnection::toggleLike,
+                                        modifier = Modifier,
+    forceFlat = auxiliaryArtworkTransitionRunning(),
+) {
+                                    PlayerGlyph(
+                                        slot = if (currentSong?.song?.liked == true)
+                                            PlayerIconSlot.LIKED else PlayerIconSlot.LIKE,
+                                        fallback = if (currentSong?.song?.liked == true)
+                                            R.drawable.favorite else R.drawable.favorite_border,
+                                        tint = if (currentSong?.song?.liked == true) AppTheme.colorScheme.error else LocalContentColor.current,
+                                        modifier = Modifier.size(24.dp)
+                                            .additiveChrome(additiveChrome)
+                                            .graphicsLayer { if (additiveChrome) alpha = AdditiveChromeContentAlpha },
+                                    )
+                                }
                             }
                         }
                     }
@@ -3156,8 +3181,13 @@ fun BottomSheetPlayer(
                                 }
                             }
                         }
-                        if (showAudioDeviceBottomSheet) {
-                            AudioDeviceMenu(onDismiss = { showAudioDeviceBottomSheet = false })
+                        // Shown through the shared menu host, so it slides up and glides like the other player menus.
+                        val audioMenuState = LocalMenuState.current
+                        LaunchedEffect(showAudioDeviceBottomSheet) {
+                            if (showAudioDeviceBottomSheet) {
+                                showAudioDeviceBottomSheet = false
+                                audioMenuState.show { AudioDeviceMenu(onDismiss = audioMenuState::dismiss) }
+                            }
                         }
                     }
                 }

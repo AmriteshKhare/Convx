@@ -349,7 +349,7 @@ private fun SideNavTabs(
     val sideThemeDark = AppTheme.colorScheme.surface.luminance() <= 0.5f
     val sideAmbient = Color.Unspecified // plain: no artwork-driven tinting
 
-    val selectedContentColor = if (appleMusicUi) Color(0xFFFF375F) else com.convx.music.ui.ios.foundation.IosTheme.tint
+    val selectedContentColor = com.convx.music.ui.ios.foundation.IosTheme.tint
     val inactiveContentColor = if (sideThemeDark) Color(0xFF8E8E93) else Color(0xFF6C6C70)
 
     val puckWash = if (appleMusicUi && sideThemeDark && puckColorIsDefault) {
@@ -583,13 +583,13 @@ private fun SideTabRow(
                     contentDescription = stringResource(tab.screen.titleId),
                     size = SideRowIconSize,
                     chrome = MenuIconChrome,
-                    tint = if (appleMusicUi) Color(0xFFFF375F) else LocalAccentColor.current,
+                    tint = LocalAccentColor.current,
                     mode = com.composables.sfsymbols.SfRenderingMode.Monochrome,
                     bounceOnEnter = tab.selected,
                     selected = tab.selected,
                 )
             } else {
-                Icon(painter = painterResource(tab.screen.icon(appleMusicUi)), contentDescription = stringResource(tab.screen.titleId), modifier = Modifier.size(SideRowIconSize), tint = if (appleMusicUi) Color(0xFFFF375F) else LocalAccentColor.current)
+                Icon(painter = painterResource(tab.screen.icon(appleMusicUi)), contentDescription = stringResource(tab.screen.titleId), modifier = Modifier.size(SideRowIconSize), tint = LocalAccentColor.current)
             }
         }
         if (!collapsed) {
@@ -638,7 +638,7 @@ private fun SideBarLinkRow(link: SideBarLink, contentColor: Color) {
                 link.iconRes != null -> Icon(
                     painter = painterResource(link.iconRes),
                     contentDescription = null,
-                    tint = if (LocalAppleMusicUi.current) Color(0xFFFF375F) else LocalAccentColor.current,
+                    tint = LocalAccentColor.current,
                     modifier = Modifier.size(SideRowIconSize),
                 )
             }
@@ -673,7 +673,7 @@ fun AppTabViewTopPill(
     val useGlass = glassConfig.isEnabledFor(GlassComponent.SIDE_PANEL) && isGlassAllowed()
     val shape = ContinuousRoundedRectangle(percent = 50)
     val chrome = com.convx.music.ui.ios.foundation.IosTheme.colors.label
-    val accent = if (LocalAppleMusicUi.current) Color(0xFFFF375F) else com.convx.music.ui.ios.foundation.IosTheme.tint
+    val accent = com.convx.music.ui.ios.foundation.IosTheme.tint
     val selectedRoute = rememberStickySelectedRoute(currentRoute, navigationItems)
     val tabs = navigationItems.filter { it != Screens.Search }
     val search = navigationItems.firstOrNull { it == Screens.Search }

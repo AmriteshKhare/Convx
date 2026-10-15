@@ -343,6 +343,13 @@ fun Modifier.liquidGlass(
     // make them opaque. Multiply so 1f means "use tint's own alpha".
     val effectiveTintAlpha = (tintColor.alpha * tintOpacity).coerceIn(0f, 1f)
 
+    // Glass crossfades between its light and dark look instead of snapping, so entering a
+    // dark-forced screen from a light one does not pop. Read in the draw phase, so animating
+    // never recomposes or rebuilds the backdrop effects.
+    val glassFade = androidx.compose.animation.core.tween<Color>(GlassThemeFadeMillis)
+    val animBaseColor = androidx.compose.animation.animateColorAsState(baseSurfaceColor.copy(alpha = baseSurfaceOpacity), glassFade, label = "glassBase")
+    val animTintColor = androidx.compose.animation.animateColorAsState(tintColor.copy(alpha = effectiveTintAlpha), glassFade, label = "glassTint")
+
     if (shouldUseTranslucentGlassFallback(config.style, isRenderEffectSupported())) {
         return this
             .clip(shape)
@@ -418,13 +425,14 @@ fun Modifier.liquidGlass(
     // Apply both component-specific and preference opacity.
     val rimAlpha = (baseHighlightAlpha * (config.highlightOpacity / EdgeHighlightAlpha)).coerceIn(0f, 1f)
 
-    val highlightBlock: (() -> Highlight?)? = remember(applyEdgeEffects, plainBlur, rimColor, rimAlpha, rimTintColor, animatedHighlightAngle) {
+    val animRim = androidx.compose.animation.animateColorAsState(rimColor.copy(alpha = rimAlpha), glassFade, label = "glassRim")
+    val highlightBlock: (() -> Highlight?)? = remember(applyEdgeEffects, plainBlur, rimTintColor, animatedHighlightAngle) {
         if (applyEdgeEffects && !plainBlur) {
             {
                 Highlight(
                     width = EdgeHighlightWidth,
                     style = HighlightStyle.Default(
-                        color = rimColor.copy(alpha = rimAlpha),
+                        color = animRim.value,
                         angle = animatedHighlightAngle,
                     ),
                 )
@@ -445,18 +453,18 @@ fun Modifier.liquidGlass(
 
     // RenderEffect is guaranteed supported past this point — the unsupported
     // case already returned the translucent-tint fallback above.
-    val surfaceBlock: DrawScope.() -> Unit = remember(baseSurfaceColor, baseSurfaceOpacity, tintColor, effectiveTintAlpha, usePool, shape) {
+    val surfaceBlock: DrawScope.() -> Unit = remember(usePool, shape) {
         {
             // A pooled surface clips to its bounds only (the pool masks its glass), so its
             // tint is filled to the exact outline instead of relying on a shape clip.
             val outline = if (usePool) shape.createOutline(size, layoutDirection, this) else null
-            if (baseSurfaceOpacity > 0f) {
-                val c = baseSurfaceColor.copy(alpha = baseSurfaceOpacity)
-                if (outline != null) drawOutline(outline, c) else drawRect(color = c, size = size)
+            val base = animBaseColor.value
+            if (base.alpha > 0f) {
+                if (outline != null) drawOutline(outline, base) else drawRect(color = base, size = size)
             }
-            if (effectiveTintAlpha > 0f) {
-                val c = tintColor.copy(alpha = effectiveTintAlpha)
-                if (outline != null) drawOutline(outline, c) else drawRect(color = c, size = size)
+            val tint = animTintColor.value
+            if (tint.alpha > 0f) {
+                if (outline != null) drawOutline(outline, tint) else drawRect(color = tint, size = size)
             }
         }
     }
@@ -490,5 +498,8 @@ fun Modifier.liquidGlass(
 /** Dark outer outline paired with [EdgeHighlightWidth]'s light rim: wider so
  *  it extends past it as the outermost layer, dimmer so it outlines without
  *  dirtying the glass. */
+/** Length of the light-to-dark glass crossfade. */
+private const val GlassThemeFadeMillis = 280
+
 private val DarkRimWidth = 1.6.dp
 private const val DarkRimAlpha = 0.32f

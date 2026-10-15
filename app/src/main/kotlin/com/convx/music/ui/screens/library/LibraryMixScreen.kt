@@ -202,7 +202,7 @@ fun LibraryMixScreen(
     // resolving the same preference by hand — its own fallback was colorScheme.primary,
     // a saturated accent, where every other screen falls back to a neutral surface.
     val tint = if (libraryBackgroundMode == LibraryBackgroundMode.THEME) {
-        rememberAppBackgroundColor(AppTheme.colorScheme.primary)
+        rememberAppBackgroundColor(AppTheme.colorScheme.surface)
     } else {
         rememberHeroTint(heroUrl)
     }

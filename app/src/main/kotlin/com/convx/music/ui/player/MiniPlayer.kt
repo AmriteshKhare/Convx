@@ -234,9 +234,10 @@ private fun NewMiniPlayer(
     val pureBlack by rememberPreference(PureBlackMiniPlayerKey, defaultValue = false)
     val isSystemInDarkTheme = isSystemInDarkTheme()
     val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
-    val useDarkTheme = remember(darkTheme, isSystemInDarkTheme) {
+    val preferredDark = remember(darkTheme, isSystemInDarkTheme) {
         if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
     }
+    val useDarkTheme = com.convx.music.ui.theme.LocalForcedDark.current || preferredDark
     
     val miniPlayerBackground by rememberEnumPreference(MiniPlayerBackgroundStyleKey, defaultValue = PlayerBackgroundStyle.DEFAULT)
     val miniPlayerWaveform by rememberPreference(MiniPlayerWaveformKey, defaultValue = false)

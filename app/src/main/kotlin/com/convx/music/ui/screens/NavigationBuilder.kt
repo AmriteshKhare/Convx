@@ -262,7 +262,7 @@ fun NavGraphBuilder.navigationBuilder(
             fadeOut(Motion.appearExit())
         },
     ) {
-        OnlineSearchResult(navController)
+        com.convx.music.ui.theme.ForcedDarkScope { OnlineSearchResult(navController) }
     }
 
     sharedComposable(
@@ -736,6 +736,7 @@ private fun NavGraphBuilder.sharedComposable(
 ): Unit {
     val detail = isMorphRoute(route)
     val collection = route.startsWith("album/") || route.contains("playlist/")
+    val darkRoute = com.convx.music.ui.theme.isForcedDarkRoute(route)
     composable(
         route = route,
         arguments = arguments,
@@ -786,8 +787,8 @@ private fun NavGraphBuilder.sharedComposable(
                         clip = pageTransition.currentState != pageTransition.targetState
                         this.shape = shape
                     },
-                ) { content(entry) }
-            } else content(entry)
+                ) { com.convx.music.ui.theme.ForcedDarkScope(darkRoute) { content(entry) } }
+            } else com.convx.music.ui.theme.ForcedDarkScope(darkRoute) { content(entry) }
         }
     }
 }

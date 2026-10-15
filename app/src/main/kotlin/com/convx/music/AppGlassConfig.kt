@@ -185,7 +185,11 @@ fun rememberGlassConfigState(artworkChromeDark: Boolean): GlassConfigState {
             style = liquidGlassStyle,
             puckColor = resolvedPuckTint,
             puckOpacity = resolvedPuckOpacity,
-            textColor = if (liquidGlassTextColorInt == 0) adaptiveGlassTextColor else Color(liquidGlassTextColorInt),
+            // Adaptive text is left unset so each surface resolves it from what is behind it
+            // (or from the dark palette inside a forced-dark scope) instead of a light-theme value.
+            textColor = if (liquidGlassTextColorInt == 0) {
+                if (liquidGlassAdaptiveContrast) Color.Unspecified else adaptiveGlassTextColor
+            } else Color(liquidGlassTextColorInt),
             miniPlayerEnabled = liquidGlassMiniPlayerEnabled,
             navBarEnabled = liquidGlassNavBarEnabled,
             sidePanelEnabled = liquidGlassSidePanelEnabled,

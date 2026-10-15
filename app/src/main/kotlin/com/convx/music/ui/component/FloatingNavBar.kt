@@ -137,7 +137,7 @@ fun AppFloatingNavBar(
 ) {
     val navSearch = LocalNavSearchState.current
     // Plain chrome: the old backdrop-pixel sampler flipped the bar between light and dark while scrolling.
-    androidx.compose.runtime.CompositionLocalProvider(LocalSampledChromeDark provides null) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalSampledChromeDark provides (if (com.convx.music.ui.theme.LocalForcedDark.current) true else null)) {
 
     AnimatedContent(
         targetState = navSearch.keyboardActive,
@@ -446,6 +446,8 @@ private fun SearchBarPlaceholder(
     modifier: Modifier,
     useGlass: Boolean = true,
 ) {
+    // Plus-blend chrome only reads on dark: added to a light surface it disappears.
+    val additiveOk = glassUsesDarkAppearance()
     // Same finger-tracking glow as the keyboard-active pill (NavBarSearchInputBar)
     // and the normal search circle (ExpandedStandaloneTab/InlineStandaloneTab).
     val glowScope = rememberCoroutineScope()
@@ -467,7 +469,7 @@ private fun SearchBarPlaceholder(
                 .bounceClick { state.onExit() }
                 .padding(8.dp)
         ) {
-            SymbolIcon(bounceOnEnter = true, symbol = sf("arrow.left"), contentDescription = stringResource(R.string.dismiss), modifier = Modifier.fillMaxSize().additiveChrome(useGlass), tint = contentColor)
+            SymbolIcon(bounceOnEnter = true, symbol = sf("arrow.left"), contentDescription = stringResource(R.string.dismiss), modifier = Modifier.fillMaxSize().additiveChrome(useGlass && additiveOk), tint = contentColor)
         }
         Box(Modifier.weight(1f)) {
             // After submit the keyboard closes and this bar takes over: keep showing
@@ -498,7 +500,7 @@ private fun SearchBarPlaceholder(
                             SearchSource.LOCAL -> sf("music.note.list")
                             SearchSource.ONLINE -> sf("globe")
                         }
-                    , contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass), tint = contentColor)
+                    , contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass && additiveOk), tint = contentColor)
             }
         }
     }
@@ -643,7 +645,7 @@ fun NavBarSearchInputBar(
                     .bounceClick { state.onQueryChange(TextFieldValue("")) }
                     .padding(12.dp)
             ) {
-                SymbolIcon(bounceOnEnter = true, symbol = sf("xmark"), contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass), tint = searchIconTint)
+                SymbolIcon(bounceOnEnter = true, symbol = sf("xmark"), contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass && isDark), tint = searchIconTint)
             }
         }
         if (state.canToggleSource) {
@@ -658,7 +660,7 @@ fun NavBarSearchInputBar(
                             SearchSource.LOCAL -> sf("music.note.list")
                             SearchSource.ONLINE -> sf("globe")
                         }
-                    , contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass), tint = searchIconTint)
+                    , contentDescription = null, modifier = Modifier.fillMaxSize().additiveChrome(useGlass && isDark), tint = searchIconTint)
             }
         }
     }

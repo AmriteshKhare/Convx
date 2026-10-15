@@ -118,19 +118,27 @@ internal fun PlayerArtworkStyle.coverStyle(): PlayerCoverStyle = when (this) {
 internal fun Modifier.coverMorph(style: PlayerCoverStyle): Modifier =
     if (style.morph == CoverMorph.SHARED) auxiliaryArtworkMorph() else this
 
-/** Shared by the big cover and the header cover so a record keeps turning as it shrinks. */
+/**
+ * Shared by the big cover and the header cover so a record keeps turning as it shrinks.
+ *
+ * The angle comes from the frame clock, which every caller reads, not from a transition each
+ * caller starts for itself: two transitions begin at different moments, so swapping the big
+ * cover for the header one (or back) jumped the record to a different angle.
+ */
 @Composable
 internal fun rememberCoverRotation(style: PlayerCoverStyle, isPlaying: Boolean): State<Float> =
     if (isPlaying && style.spins) {
-        rememberInfiniteTransition(label = "CoverRotation").animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(20000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart,
-            ),
-            label = "CoverRotation",
-        )
+        val angle = remember { mutableFloatStateOf(0f) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            while (true) {
+                androidx.compose.runtime.withFrameMillis { frame ->
+                    angle.floatValue = (frame % CoverRotationMillis) / CoverRotationMillis.toFloat() * 360f
+                }
+            }
+        }
+        angle
     } else {
         remember { mutableFloatStateOf(0f) }
     }
+
+private const val CoverRotationMillis = 20_000L

@@ -297,15 +297,9 @@ internal fun DrawScope.heroWashBlob(color: Color, at: Offset, radiusFraction: Fl
 }
 
 /**
- * The screen background tint actually used — [contentTint] (per-screen, derived
- * from artwork/thumbnails) when the user is on system/dynamic color, or their
- * own picked color (Theme settings) as a flat override when they're not. Ties
- * "custom theme color" directly to what screens paint behind their content,
- * not just Material's accent colors.
+ * The screen background tint: always the screen's own [contentTint]. The accent colour chosen in
+ * Theme settings recolours accents (buttons, selection, links), not what screens paint behind
+ * their content, so it never reaches the page background.
  */
 @Composable
-fun rememberAppBackgroundTint(contentTint: Color): Color {
-    val (isDynamic) = rememberPreference(DynamicThemeKey, defaultValue = true)
-    val (selectedColorInt) = rememberPreference(SelectedThemeColorKey, defaultValue = DefaultThemeColor.toArgb())
-    return if (isDynamic) contentTint else Color(selectedColorInt)
-}
+fun rememberAppBackgroundTint(contentTint: Color): Color = contentTint

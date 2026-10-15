@@ -568,24 +568,6 @@ fun AudioDeviceMenu(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
                         }
                     }
 
-                    VolumeControlRow(
-                        label = stringResource(R.string.volume),
-                        icon = Icons.Filled.MusicNote,
-                        volume = currentVolume,
-                        maxVolume = maxVolume,
-                        onVolumeChange = { newVolume ->
-                            currentVolume = newVolume
-                            audioManager.setStreamVolume(
-                                AudioManager.STREAM_MUSIC,
-                                newVolume.toInt(),
-                                0
-                            )
-                        },
-                        onDragStart = { isUserDragging = true },
-                        onDragEnd = { isUserDragging = false }
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
 
                     AudioQualitySelector(context)
 
