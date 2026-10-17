@@ -8,6 +8,8 @@ import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -505,6 +507,11 @@ private fun SpotifyLoginSheet(
                         settings.setSupportZoom(true)
                         settings.builtInZoomControls = true
                         settings.displayZoomControls = false
+                        // Spotify rejects embedded WebViews; drop the WebView markers from the UA.
+                        settings.userAgentString = settings.userAgentString.replace("; wv", "")
+                        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+                            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
+                        }
                         webViewClient = object : WebViewClient() {
                             private fun captureCookies(url: String?): Boolean {
                                 if (captured) return true
