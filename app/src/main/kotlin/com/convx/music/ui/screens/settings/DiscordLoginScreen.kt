@@ -37,12 +37,20 @@ import com.convx.music.ui.utils.backToMain
 import com.convx.music.utils.rememberPreference
 import org.json.JSONTokener
 
+// Discord's web app removes window.localStorage from the page; an about:blank iframe
+// shares the origin and still exposes the real storage.
 private const val DISCORD_TOKEN_SCRIPT = """(() => {
-    try {
-        const value = window.localStorage.getItem('token');
-        if (!value) return '';
-        try { return JSON.parse(value); } catch (_) { return value; }
-    } catch (_) { return ''; }
+    const read = () => {
+        try { const v = window.localStorage.getItem('token'); if (v) return v; } catch (_) {}
+        let frame;
+        try {
+            frame = document.body.appendChild(document.createElement('iframe'));
+            return frame.contentWindow.localStorage.getItem('token') || '';
+        } catch (_) { return ''; } finally { if (frame) frame.remove(); }
+    };
+    const value = read();
+    if (!value) return '';
+    try { return JSON.parse(value); } catch (_) { return value; }
 })()"""
 
 private const val MOTOROLA = "motorola"
