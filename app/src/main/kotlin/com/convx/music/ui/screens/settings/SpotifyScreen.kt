@@ -537,7 +537,7 @@ private fun SpotifyLoginSheet(
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
                                 request: WebResourceRequest,
-                            ): Boolean = captureCookies(request.url?.toString())
+                            ): Boolean = request.isForMainFrame && captureCookies(request.url?.toString())
 
                             override fun onPageStarted(
                                 view: WebView,
@@ -553,8 +553,10 @@ private fun SpotifyLoginSheet(
                         }
                         webChromeClient = android.webkit.WebChromeClient()
                         webView = this
-                        cookieManager.removeAllCookies(null)
-                        cookieManager.flush()
+                        // CookieManager is shared by every WebView in the app. Clearing it here
+                        // races its asynchronous callback against loadUrl(), and also removes the
+                        // user's Discord session. Keep the existing browser session and let the
+                        // normal page callbacks detect Spotify's authenticated cookie.
                         loadUrl(SpotifyAuth.LOGIN_URL)
                     }
                 },

@@ -2565,6 +2565,12 @@ class MusicService :
         mediaItem: MediaItem?,
         reason: Int,
     ) {
+        // A failed transition may need standard audio once. Let a later visit to
+        // that track try the preferred lossless source again without restarting.
+        forceStandardAudioMediaIds.filter { it != mediaItem?.mediaId }.forEach { departedId ->
+            forceStandardAudioMediaIds.remove(departedId)
+            bypassCacheForQualityChange.add(departedId)
+        }
         // Video mode belongs to one queue item. If playback leaves that item,
         // discard its standard-audio variant so returning to it as a song can
         // resolve the preferred lossless source again.
