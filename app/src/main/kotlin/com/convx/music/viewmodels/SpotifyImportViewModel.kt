@@ -25,6 +25,7 @@ import com.convx.music.models.toMediaMetadata
 import com.music.innertube.SearchFilter
 import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
+import com.convx.music.utils.SyncUtils
 import com.convx.music.utils.dataStore
 import com.convx.music.utils.reportException
 import com.convx.music.R
@@ -98,6 +99,7 @@ private data class PlaylistImportData(
 class SpotifyImportViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: MusicDatabase,
+    private val syncUtils: SyncUtils,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SpotifyImportUiState(isLoading = true))
@@ -134,10 +136,11 @@ class SpotifyImportViewModel @Inject constructor(
         }
     }
 
-    private suspend fun ensureAuthenticated(): SpotifySession = authMutex.withLock {
+    private suspend fun ensureAuthenticated(forceRefresh: Boolean = false): SpotifySession = authMutex.withLock {
         val session = getSession() ?: throw IllegalStateException("Not connected to Spotify")
-        if (session.accessToken != null && session.expiresAt > System.currentTimeMillis() + 60_000L) {
+        if (!forceRefresh && session.accessToken != null && session.expiresAt > System.currentTimeMillis() + 60_000L) {
             Spotify.accessToken = session.accessToken
+            Spotify.clientId = session.clientId.orEmpty()
             session
         } else {
             refreshSession(session.spDc, session.spKey.orEmpty())
@@ -150,7 +153,10 @@ class SpotifyImportViewModel @Inject constructor(
     private suspend fun refreshSession(spDc: String, spKey: String): SpotifySession = withContext(Dispatchers.IO) {
         val token = SpotifyAuth.fetchAccessToken(spDc, spKey).getOrThrow()
         Spotify.accessToken = token.accessToken
-        val profile = Spotify.me().getOrThrow()
+        Spotify.clientId = token.clientId
+        val profileResult = Spotify.me()
+        if ((profileResult.exceptionOrNull() as? Spotify.SpotifyException)?.statusCode == 401) profileResult.getOrThrow()
+        val profile = profileResult.getOrNull()
 
         val newSession = SpotifySession(
             spDc = spDc,
@@ -158,8 +164,8 @@ class SpotifyImportViewModel @Inject constructor(
             accessToken = token.accessToken,
             expiresAt = token.accessTokenExpirationTimestampMs,
             clientId = token.clientId,
-            accountName = profile.displayName,
-            accountAvatarUrl = profile.images.firstOrNull()?.url
+            accountName = profile?.displayName,
+            accountAvatarUrl = profile?.images?.firstOrNull()?.url
         )
         saveSession(newSession)
         _uiState.update {
@@ -183,6 +189,7 @@ class SpotifyImportViewModel @Inject constructor(
                 }
                 if (session.accessToken != null && session.expiresAt > System.currentTimeMillis() + 60_000L) {
                     Spotify.accessToken = session.accessToken
+                    Spotify.clientId = session.clientId.orEmpty()
                     _uiState.update {
                         it.copy(
                             isAuthenticated = true,
@@ -200,12 +207,19 @@ class SpotifyImportViewModel @Inject constructor(
                             loadHomeFeed()
                         }
                         .onFailure { error ->
-                            logout()
+                            if (error is kotlinx.coroutines.CancellationException) throw error
+                            val expired = (error as? Spotify.SpotifyException)?.statusCode == 401
+                            if (expired) {
+                                context.dataStore.edit { it.remove(SpotifySessionKey) }
+                                Spotify.accessToken = null
+                                Spotify.clientId = ""
+                            }
                             _uiState.update {
                                 it.copy(
                                     isAuthenticated = false,
                                     isLoading = false,
-                                    errorMessage = "Session expired. Please log in again."
+                                    errorMessage = if (expired) "Session expired. Please log in again."
+                                        else "Spotify is temporarily unavailable. Your saved session has been kept; try connecting again."
                                 )
                             }
                         }
@@ -267,7 +281,7 @@ class SpotifyImportViewModel @Inject constructor(
 
                 _uiState.update {
                     it.copy(
-                        playlists = playlistsList,
+                        playlists = playlistsList.distinctBy { it.id },
                         likedSongsCount = likedSongsResult.total,
                         isLoading = false,
                         accountName = meResult.displayName.orEmpty(),
@@ -314,7 +328,7 @@ class SpotifyImportViewModel @Inject constructor(
                 }
 
                 val playlistShelves = shelves.mapNotNull { shelf ->
-                    val playlists = shelf.items.filter { it.type == SpotifyHomeItemType.PLAYLIST }
+                    val playlists = shelf.items.filter { it.type == SpotifyHomeItemType.PLAYLIST }.distinctBy { it.uri }
                     shelf.copy(items = playlists).takeIf { playlists.isNotEmpty() }
                 }
                 _uiState.update {
@@ -347,10 +361,12 @@ class SpotifyImportViewModel @Inject constructor(
         homeFeedJob?.cancel()
         homeFeedJob = null
         viewModelScope.launch(Dispatchers.IO) {
+            SpotifyAuth.clearWebSession()
             context.dataStore.edit { prefs ->
                 prefs.remove(SpotifySessionKey)
             }
             Spotify.accessToken = null
+            Spotify.clientId = ""
             _uiState.update {
                 SpotifyImportUiState(
                     isAuthenticated = false,
@@ -366,7 +382,7 @@ class SpotifyImportViewModel @Inject constructor(
                 if ((error as? Spotify.SpotifyException)?.statusCode != 401) {
                     throw error
                 }
-                ensureAuthenticated()
+                ensureAuthenticated(forceRefresh = true)
                 block()
             }
 
@@ -539,6 +555,7 @@ class SpotifyImportViewModel @Inject constructor(
 
                     val matchedMedia = matchSongs(importData, totalSongs)
 
+                    var hasRemoteCopy = false
                     database.withTransaction {
                         val now = LocalDateTime.now()
                         val entity = saveImportedPlaylistHeader(importData, now)
@@ -559,6 +576,11 @@ class SpotifyImportViewModel @Inject constructor(
                             )
                         }
                         update(entity.copy(lastUpdateTime = now))
+                        hasRemoteCopy = entity.browseId != null
+                    }
+                    // A playlist that already has a remote copy is left alone so re-importing does not duplicate its songs there.
+                    if (!hasRemoteCopy) {
+                        syncUtils.uploadPlaylistInBackground(importData.localPlaylistId, matchedMedia.map { it.id })
                     }
                 }
                 _importProgress.update { old ->

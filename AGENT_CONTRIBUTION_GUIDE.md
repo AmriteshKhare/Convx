@@ -5,6 +5,7 @@
 This guide is the contribution contract for AI agents working in Convx. Read it before exploring or changing code. Use the bundled skills under [`contributor/skills/`](contributor/skills/) when their topic applies. The Android Compose and Convx motion skills are required for UI work.
 
 ## Project overview
+ 
 
 Convx is an open-source Android music player built with Kotlin, Jetpack Compose, Media3, and a custom Liquid Glass visual language. It streams and manages music, provides lyrics and integrations, and supports local and network storage. The UI should feel calm, responsive, accessible, and native to Convx.
 

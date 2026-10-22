@@ -392,6 +392,8 @@ fun ApplePlaylistsPage(navController: NavController, onBack: () -> Unit, viewMod
     val allPlaylists by viewModel.allPlaylists.collectAsStateWithLifecycle()
     val localOnly = com.convx.music.LocalLocalOnlyMode.current
     val playlists = allPlaylists.filter { !localOnly || it.playlist.browseId == null }
+    val ytmSync by rememberPreference(com.convx.music.constants.YtmSyncKey, true)
+    androidx.compose.runtime.LaunchedEffect(ytmSync, localOnly) { if (ytmSync && !localOnly) viewModel.sync() }
     var viewType by rememberEnumPreference(PlaylistViewTypeKey, LibraryViewType.LIST)
     var sortType by rememberEnumPreference(PlaylistSortTypeKey, PlaylistSortType.CREATE_DATE)
     var descending by rememberPreference(PlaylistSortDescendingKey, true)
@@ -607,6 +609,9 @@ fun AppleLocalSongsPage(navController: NavController, onBack: () -> Unit, viewMo
         onSort = { type, desc -> sortType = type; viewModel.sort(type, desc) },
         navController = navController,
         onBack = onBack,
+        header = if (granted) ({
+            com.convx.music.ui.screens.library.LocalMusicFoldersEntry(count = null, navController = navController)
+        }) else null,
         placeholder = when {
             !granted -> ({ LocalAccessCard(blocked = permission.blocked, onAllow = permission.request) })
             songs.isEmpty() && !scanning -> ({ com.convx.music.ui.component.LocalMusicEmptyState(onScan = { viewModel.scan(context) }) })
@@ -701,6 +706,7 @@ private fun AppleSongList(
     navController: NavController,
     onBack: () -> Unit,
     placeholder: (@Composable () -> Unit)? = null,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current
     val state = rememberLazyListState()
@@ -758,6 +764,7 @@ private fun AppleSongList(
             item(key = "placeholder", contentType = "placeholder") { placeholder() }
             return@AppleSubpage
         }
+        if (header != null) item(key = "folders", contentType = "folders") { header() }
         // Keep play and shuffle actions together above the song list.
         item(key = "buttons", contentType = "buttons") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {

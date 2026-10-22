@@ -100,6 +100,7 @@ import com.convx.music.ui.screens.settings.integrations.IntegrationScreen
 import com.convx.music.ui.screens.settings.integrations.LastFMSettings
 import com.convx.music.ui.screens.settings.integrations.ListenTogetherSettings
 import com.convx.music.ui.screens.ambient.AmbientModeScreen
+import com.convx.music.ui.screens.settings.AmbientModeSettings
 import com.convx.music.ui.screens.recognition.RecognitionScreen
 import com.convx.music.ui.screens.recognition.RecognitionHistoryScreen
 import com.convx.music.ui.screens.settings.ModuleSourceScreen
@@ -397,6 +398,10 @@ fun NavGraphBuilder.navigationBuilder(
         LocalFolderScreen(navController, it.arguments?.getString("path").orEmpty())
     }
 
+    sharedComposable("local_folders") {
+        com.convx.music.ui.screens.library.LocalFoldersScreen(navController)
+    }
+
     sharedComposable(
         route = "auto_playlist/{playlist}?thumb={thumb}",
         arguments = listOf(
@@ -504,6 +509,10 @@ fun NavGraphBuilder.navigationBuilder(
         CanvasSelection(navController, scrollBehavior)
     }
 
+    sharedComposable("settings/ambient") {
+        AmbientModeSettings(navController, scrollBehavior)
+    }
+
     sharedComposable("settings/appearance/playertheme") {
         PlayerThemeScreen(navController, scrollBehavior)
     }
@@ -591,6 +600,12 @@ fun NavGraphBuilder.navigationBuilder(
 
     sharedComposable("settings/equalizer") {
         AxionEqScreen(onBackClick = { navController.navigateUp() })
+    }
+    sharedComposable(
+        route = "song_insight/{songId}",
+        arguments = listOf(navArgument("songId") { type = NavType.StringType }),
+    ) {
+        com.convx.music.ui.screens.library.SongInsightScreen(navController)
     }
 
     sharedComposable("settings/privacy") {
