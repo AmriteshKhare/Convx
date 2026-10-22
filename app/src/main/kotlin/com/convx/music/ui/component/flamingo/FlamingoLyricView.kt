@@ -3,9 +3,10 @@ package com.convx.music.ui.component.flamingo
 
 import android.os.Build
 import androidx.compose.ui.text.font.FontFamily
-import com.convx.music.ui.component.LyricWaveSpacer
 import com.convx.music.ui.component.LyricsEndNote
 import com.convx.music.ui.component.followLyricLine
+import com.convx.music.ui.component.lyricRubber
+import com.convx.music.ui.component.rememberLyricRubber
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.AnimationSpec
@@ -67,10 +68,9 @@ import androidx.compose.ui.draw.DrawResult
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -166,6 +166,7 @@ fun YosLyricView(
         }
     } else {
         val scrollState = rememberLazyListState()
+        val rubber = rememberLyricRubber(scrollState)
 
         val ttmlLiveTime = remember("YosLyricView_ttmlLiveTime") {
             mutableIntStateOf(liveTimeLambda())
@@ -302,7 +303,6 @@ fun YosLyricView(
                         interactionSource = remember { MutableInteractionSource() }) {
                         onBackClick()
                     }
-                    .lyricGlow(glow, exposure)
                     .nestedScroll(nestedScrollConnection)
                     .onSizeChanged {
                         if (height.intValue != it.height && it.height > 0) {
@@ -387,7 +387,7 @@ fun YosLyricView(
                         )
                         YosWrapper {
                             Box(
-                                if (isBackgroundLine) {
+                                (if (isBackgroundLine) {
                                     Modifier
                                         .clipToBounds()
                                         .layout { measurable, constraints ->
@@ -403,7 +403,10 @@ fun YosLyricView(
                                         }
                                 } else {
                                     Modifier
-                                },
+                                })
+                                    .lyricRubber(rubber, index + 1)
+                                    // The sung line and the one fading out above it bloom; the rest of the list stays a plain layer.
+                                    .lyricGlow(glow && (isCurrent.value || isTop.value), exposure),
                             ) {
                             LyricItem(
                                 mainTextStyle = textStyle,
@@ -423,6 +426,7 @@ fun YosLyricView(
                                 subTextBasicColor,
                                 otherSide = otherSide,
                                 liveTimeLambda = liveTimeLambda,
+                                glow = glow,
                                 measurer = measurer,
                                 isLyricEmpty = { isLyricEmpty.value },
                                 nextTime = {
@@ -440,12 +444,6 @@ fun YosLyricView(
                         }
                     }
 
-                    LyricWaveSpacer(
-                        state = scrollState,
-                        itemIndex = index + 1,
-                        anchorItemIndex = focusedLyricAnchorIndex.value + 1,
-                        enabled = autoScrollEnabled && isSynced && enableLyricScroll.value && !isLyricEmpty.value,
-                    )
                 }
                 blankSpacer()
                 item("extra_blank") {
@@ -460,7 +458,7 @@ fun YosLyricView(
             LaunchedEffect(focusedLyricAnchorIndex.value, translationLambda(), enableLyricScroll.value,
                 autoScrollEnabled, isSynced, height.intValue, targetItem.value?.size) {
                 if (autoScrollEnabled && isSynced && enableLyricScroll.value && focusedLyricAnchorIndex.value >= 0) {
-                    scrollState.followLyricLine(focusedLyricAnchorIndex.value + 1)
+                    scrollState.followLyricLine(focusedLyricAnchorIndex.value + 1, rubber = rubber)
                 }
             }
         }
@@ -567,14 +565,13 @@ fun LazyItemScope.LyricItem(
     nextTime: () -> Float,
     otherSide: Boolean,
     liveTimeLambda: () -> Int,
+    glow: Boolean,
     onClick: () -> Unit
 ) {
     val viewAlign = if (otherSide) Alignment.End else Alignment.Start
 
     val focusedColor = Color(0xFFFFFFFF)
     val unfocusedColor = Color(0x2EFFFFFF)
-
-    val unfocusedSolidBrush = SolidColor(unfocusedColor)
 
     val isNotOneByOne = rememberSaveable(mainLyric) {
         mutableStateOf(
@@ -859,91 +856,46 @@ fun LazyItemScope.LyricItem(
                                             }
                                         }
 
-                                        var sum = 0
-                                        var lastTime = 0f
-
+                                        // One layout per word, not per letter: a line turning current measures a handful of runs.
+                                        val tokenStyle = mainTextStyle.copy(textAlign = TextAlign.Start)
+                                        val lastChar = (mainLyric.sumOf { it.second.length } - 1).coerceAtLeast(0)
                                         val wordsToDraw = arrayListOf<DrawWord>()
-
-                                        var averageTime = 0f
-
-                                        lastTime = mainLyric.first().first
+                                        var charIndex = 0
+                                        var segmentStart = mainLyric.first().first
 
                                         mainLyric.fastForEachIndexed { wordIndex, word ->
+                                            val text = word.second
+                                            if (text.isEmpty()) return@fastForEachIndexed
 
-                                            val thisWord = word.second
+                                            val perChar = ((word.first - segmentStart) / text.length).coerceAtLeast(1f)
+                                            val groupStart = if (wordIndex == 0) mainLyric.first().first else mainLyric[wordIndex - 1].first
+                                            val wordSpan = (word.first - groupStart).coerceAtLeast(1f)
+                                            val lift = { 4f * easing.transform(((liveTime.intValue - groupStart) / wordSpan).coerceIn(0f, 1f)) }
 
-                                            if (thisWord.isEmpty()) {
-                                                return@fastForEachIndexed
-                                            }
-
-                                            averageTime = ((word.first - lastTime) / thisWord.length).coerceAtLeast(1f)
-
-                                            val thisWordGroupLastTime = if (wordIndex - 1 < 0) {
-                                                mainLyric.first().first
-                                            } else {
-                                                mainLyric[(wordIndex - 1)].first
-                                            }
-                                            val wordSpan = (word.first - thisWordGroupLastTime).coerceAtLeast(1f)
-                                            val lift = {
-                                                val progress = ((liveTime.intValue - thisWordGroupLastTime) / wordSpan).coerceIn(0f, 1f)
-                                                4f * easing.transform(progress)
-                                            }
-
-                                            thisWord.forEach { char ->
-
-                                                val charWord = char.toString()
-
-                                                val layout = measurer.measure(
-                                                    text = charWord,
-                                                    style = if (otherSide) mainTextStyle.copy(
-                                                        textAlign = TextAlign.End
-                                                    ) else mainTextStyle,
-                                                    constraints = measureResult.layoutInput.constraints
-                                                )
-
-                                                val thisWordLastTime = lastTime
-                                                val thisWordAverageTime = averageTime
-
+                                            WordRun.findAll(text).forEach { run ->
+                                                val start = segmentStart + perChar * run.range.first
+                                                val span = perChar * run.value.length
+                                                val origin = measureResult.getBoundingBox((charIndex + run.range.first).coerceAtMost(lastChar)).topLeft
                                                 wordsToDraw += DrawWord(
-                                                    time = lastTime + averageTime,
-                                                    word = charWord,
-                                                    layout = layout,
-                                                    topLeft = run {
-                                                        val origin = measureResult.getBoundingBox(sum.coerceIn(0, (mainLyric.sumOf { it.second.length } - 1).coerceAtLeast(0))).topLeft
-                                                        val position: () -> Offset = { origin.minus(Offset(0f, lift())) }
-                                                        position
-                                                    },
-                                                    brush = { px, percent ->
-                                                        if (thisWord == " ") {
-                                                            return@DrawWord unfocusedSolidBrush
-                                                        }
-
-                                                        heatBrush(percent, px, focusedColor, unfocusedColor)
-                                                    },
-                                                    percent = {
-                                                        if (thisWord == " ") {
-                                                            return@DrawWord 0f
-                                                        }
-
-                                                        ((liveTime.intValue - thisWordLastTime) / thisWordAverageTime)
-
-                                                    }
-                                                ).also {
-                                                    sum += charWord.length
-                                                    lastTime += averageTime
-                                                }
+                                                    layout = measurer.measure(run.value, tokenStyle, layoutDirection = LayoutDirection.Ltr),
+                                                    topLeft = { origin - Offset(0f, lift()) },
+                                                    spread = SWEEP_SPREAD / run.value.length,
+                                                    percent = { (liveTime.intValue - start) / span },
+                                                )
                                             }
+                                            charIndex += text.length
+                                            segmentStart += perChar * text.length
                                         }
 
                                         onDrawBehind {
-                                            wordsToDraw.fastForEach { l ->
+                                            val glowRadius = WORD_GLOW_RADIUS.toPx()
+                                            wordsToDraw.fastForEach { w ->
+                                                val percent = w.percent()
                                                 drawText(
-                                                    textLayoutResult = l.layout,
-                                                    topLeft = l.topLeft(),
-                                                    brush = l.brush(
-                                                        0.3f,
-                                                        l.percent()
-                                                    )
+                                                    textLayoutResult = w.layout,
+                                                    topLeft = w.topLeft(),
+                                                    brush = sweepBrush(percent, w.spread, focusedColor, unfocusedColor),
+                                                    shadow = if (glow) wordGlow(percent, focusedColor, glowRadius) else null,
                                                 )
                                             }
                                         }
@@ -1088,12 +1040,28 @@ val MainTextStyle = TextStyle(
     )
 )
 
+/** Width of the sweep's soft edge, in letters. */
+private const val SWEEP_SPREAD = 0.3f
+
+private val WordRun = Regex("\\S+")
+
+private val WORD_GLOW_RADIUS = 12.dp
+/** Share of a word's sweep over which its halo rises, then fades once the word is sung. */
+private const val WORD_GLOW_RISE = 0.15f
+private const val WORD_GLOW_FADE = 0.6f
+
+/** Halo around the word being sung, null once the sweep is clear of it. */
+private fun wordGlow(percent: Float, color: Color, radius: Float): Shadow? {
+    if (percent <= 0f || percent >= 1f + WORD_GLOW_FADE) return null
+    val strength = (percent / WORD_GLOW_RISE).coerceAtMost(1f) *
+        (1f - (percent - 1f) / WORD_GLOW_FADE).coerceIn(0f, 1f)
+    return Shadow(color = color.copy(alpha = color.alpha * strength), blurRadius = radius)
+}
+
 @Stable
-private data class DrawWord(
-    val time: Float,
-    val word: String,
+private class DrawWord(
     val layout: TextLayoutResult,
     val topLeft: () -> Offset,
-    val brush: (px: Float, percent: Float) -> Brush,
-    val percent: () -> Float
+    val spread: Float,
+    val percent: () -> Float,
 )

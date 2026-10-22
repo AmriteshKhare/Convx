@@ -462,9 +462,9 @@ fun Lyrics(
     
     val openRouterApiKey by rememberPreference(OpenRouterApiKey, "")
     val deeplApiKey by rememberPreference(DeeplApiKey, "")
-    val aiProvider by rememberPreference(AiProviderKey, "OpenRouter")
-    val openRouterBaseUrl by rememberPreference(OpenRouterBaseUrlKey, "https://openrouter.ai/api/v1/chat/completions")
-    val openRouterModel by rememberPreference(OpenRouterModelKey, "google/gemini-2.5-flash-lite")
+    val aiProvider by rememberPreference(AiProviderKey, com.convx.music.ai.AiDefaults.PROVIDER)
+    val openRouterBaseUrl by rememberPreference(OpenRouterBaseUrlKey, com.convx.music.ai.AiDefaults.BASE_URL)
+    val openRouterModel by rememberPreference(OpenRouterModelKey, com.convx.music.ai.AiDefaults.MODEL)
     val translateLanguage by rememberPreference(TranslateLanguageKey, "en")
     val translateMode by rememberPreference(TranslateModeKey, "Literal")
     val deeplFormality by rememberPreference(DeeplFormalityKey, "default")
@@ -688,6 +688,7 @@ fun Lyrics(
     val hasProviderRow = isLyricsProviderShown && !usesArchiveTuneRenderer && !usesFlamingoRenderer && !usesCrawlRenderer
 
     val lazyListState = rememberLazyListState()
+    val rubber = rememberLyricRubber(lazyListState)
     
     var isAutoScrollEnabled by rememberSaveable { mutableStateOf(true) }
 
@@ -778,7 +779,7 @@ fun Lyrics(
 
     suspend fun performSmoothPageScroll(targetIndex: Int, animate: Boolean = true) {
         if (targetIndex < 0) return
-        lazyListState.followLyricLine(targetIndex + if (hasProviderRow) 1 else 0, animate)
+        lazyListState.followLyricLine(targetIndex + if (hasProviderRow) 1 else 0, animate, rubber)
     }
     LaunchedEffect(introKey) {
         if (introKey == 0) return@LaunchedEffect
@@ -830,18 +831,6 @@ fun Lyrics(
                 .zIndex(1f)
                 .padding(top = 56.dp),
         )
-
-        if (isSynced) {
-            InstrumentalNote(
-                lines = lines,
-                positionMs = { (sliderPositionProvider() ?: playerConnection.player.currentPosition) + (currentSong?.song?.lyricsOffset ?: 0) },
-                color = textColor,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .zIndex(1f)
-                    .padding(bottom = 24.dp),
-            )
-        }
 
         if (lyrics == LYRICS_NOT_FOUND || (lyrics != null && lines.all { it.text.isBlank() })) {
             LyricsEmptyNote(fontFamily = lyricsFontFamily, color = AppTheme.colorScheme.secondary)
@@ -979,6 +968,7 @@ fun Lyrics(
                         items = lines,
                         key = { index, item -> "$index-${item.time}" } // Add stable key
                     ) { index, item ->
+                    Box(Modifier.lyricRubber(rubber, index + if (hasProviderRow) 1 else 0)) {
                     run {
                     val isSelected = selectedIndices.contains(index)
                     if ((lyricsAnimationStyle == LyricsAnimationStyle.BITCHORD ||
@@ -1834,12 +1824,7 @@ fun Lyrics(
                         }
                     }
                     }
-                    LyricWaveSpacer(
-                        state = lazyListState,
-                        itemIndex = index + if (hasProviderRow) 1 else 0,
-                        anchorItemIndex = displayedCurrentLineIndex + if (hasProviderRow) 1 else 0,
-                        enabled = scrollLyrics && isSynced && isAutoScrollEnabled && !isSeeking && !isSelectionModeActive && displayedCurrentLineIndex >= 0,
-                    )
+                    }
                 }
                 item(key = "lyrics_end") {
                     LyricsEndNote(fontFamily = lyricsFontFamily, color = textColor)

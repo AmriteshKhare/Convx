@@ -37,9 +37,10 @@ private const val EXPOSURE_STEPS = 16
 
 /**
  * Bloom for the sung words: only pixels near full brightness are blurred at two
- * radii and added back, so the glow keeps the colour of the heat edge and spills
- * onto the lines above and below. [exposure] (0..1) works like a camera: a
- * stronger light raises the glow while the rest of the list is exposed darker.
+ * radii and added back, so the glow keeps the colour of the sung words and spills
+ * past the line. Apply it to the sung line alone: on a whole list every frame of
+ * the sweep re-blurs the full screen. [exposure] (0..1) works like a camera: a
+ * stronger light raises the glow while the line itself is exposed darker.
  * Needs RenderEffect (API 31).
  */
 @Composable
