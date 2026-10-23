@@ -2,18 +2,23 @@
   <img src="assets/convx-banner.png" width="1000" alt="Convx poster with the words Just Listen and a phone displaying the music player">
   <h1>Convx</h1>
   <p><strong>An open-source Android music player with a calm, glass-inspired interface.</strong></p>
+  <p><strong>Downloads:</strong> the current Stable release is outdated and not working. Use Nightly 2.0.4 from GitHub while the remaining issues are fixed; an updated Stable release will be published soon after they are fixed. The project website is being reworked, so download from GitHub Releases for now.</p>
   <p>
-    <a href="https://github.com/cosmictaserdev-creator/Convx/releases/latest">
-      <img src="https://img.shields.io/badge/Download-Stable-37A866?style=for-the-badge&logo=android&logoColor=white" alt="Download the stable Convx release">
+    <a href="https://github.com/cosmictaserdev-creator/Convx/releases/tag/2.0.4-nightly">
+      <img src="https://img.shields.io/badge/Download-Nightly%202.0.4-5268D8?style=for-the-badge&logo=android&logoColor=white" alt="Download Convx Nightly 2.0.4">
     </a>
-    <a href="https://github.com/cosmictaserdev-creator/Convx/releases/tag/2.0.3-nightly">
-      <img src="https://img.shields.io/badge/Download-Nightly-5268D8?style=for-the-badge&logo=android&logoColor=white" alt="Download the Convx nightly build">
+    <a href="https://github.com/cosmictaserdev-creator/Convx/releases/latest">
+      <img src="https://img.shields.io/badge/Stable-Outdated-888888?style=for-the-badge&logo=android&logoColor=white" alt="The current stable Convx release is outdated">
     </a>
   </p>
   <p>
     <a href="https://github.com/cosmictaserdev-creator/Convx/releases">
       <img src="https://img.shields.io/github/downloads/cosmictaserdev-creator/Convx/total?style=for-the-badge&label=total%20downloads&logo=github" alt="Total Convx release downloads">
     </a>
+  </p>
+  <p>
+    <a href="https://ko-fi.com/cosmictaser">Donate on Ko-fi</a> ·
+    <a href="upi://pay?pa=cosmictaser%40okicici&pn=CosmicTaser&cu=INR">Donate via UPI</a>
   </p>
   <p>
     <a href=".github/CONTRIBUTING.md">Contributing</a> ·
@@ -57,8 +62,10 @@ Convx brings music discovery, playback, lyrics, and your library together in one
 
 ## Download
 
-- **Stable:** [Download the latest release](https://github.com/cosmictaserdev-creator/Convx/releases/latest).
-- **Nightly:** [Download the latest nightly build](https://github.com/cosmictaserdev-creator/Convx/releases/tag/2.0.3-nightly). Nightlies are pre-release builds and may be unstable. On a 32-bit-only phone (for example Galaxy A13) that says "app not compatible", download the `arm32` APK from the same release.
+- **Stable:** The current release is outdated and not working. A refreshed Stable release will be published soon after the remaining issues are fixed.
+- **Nightly 2.0.4:** [Download from GitHub Releases](https://github.com/cosmictaserdev-creator/Convx/releases/tag/2.0.4-nightly). Nightlies are pre-release builds and may be unstable. On a 32-bit-only phone (for example Galaxy A13) that says "app not compatible", download the `arm32` APK from the same release.
+
+The project website is being reworked. Use GitHub Releases for downloads for now.
 
 Convx supports Android 8.0 (API 26) and later. Install APKs only from sources you trust. Android may ask you to allow installation from the app you used to download the APK.
 
@@ -109,7 +116,7 @@ AI agents should also follow the [Agent Contribution Guide](AGENT_CONTRIBUTION_G
 
 - [Discord community](https://discord.gg/Ejeb4cmzfd)
 - [Support Convx on Ko-fi](https://ko-fi.com/cosmictaser)
-- [Project website](https://cosmictaser.de5.net)
+- [Project website (being reworked)](https://cosmictaser.de5.net)
 
 ## Legal
 
